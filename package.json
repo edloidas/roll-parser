@@ -1,0 +1,48 @@
+{
+  "name": "roll-parser",
+  "version": "0.0.1",
+  "description": "Parser for classic (2d6+1) and simplified (2 6 1) dice rolls.",
+  "main": "index.js",
+  "keywords": [
+    "parser",
+    "dice",
+    "roll",
+    "rpg",
+    "dnd",
+    "wod"
+  ],
+  "homepage": "https://github.com/edloidas/roll-parser#readme",
+  "bugs": {
+    "url": "https://github.com/edloidas/roll-parser/issues"
+  },
+  "license": "MIT",
+  "author": "Mikita Taukachou <edloidas@gmail.com> (https://edloidas.com)",
+  "files": [
+    "index.js"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/edloidas/roll-parser.git"
+  },
+  "scripts": {
+    "test": "jest",
+    "cover": "jest --coverage",
+    "report": "node_modules/.bin/jest --coverage && cat coverage/lcov.info | node_modules/coveralls/bin/coveralls.js",
+    "prepush": "npm test",
+    "fix": "eslint --fix . || true"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "coveralls": "^2.11.14",
+    "eslint": "^3.7.0",
+    "eslint-config-airbnb-base": "^11.1.1",
+    "eslint-plugin-import": "^2.0.0",
+    "husky": "^0.13.2",
+    "istanbul": "^0.4.5",
+    "jest": "^19.0.2"
+  },
+  "engines": {
+    "node": ">= 7.7.2",
+    "npm": ">= 4.1.2"
+  }
+}

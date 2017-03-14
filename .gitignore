@@ -1,0 +1,16 @@
+# Directories #
+
+node_modules/
+coverage/
+
+# Files #
+
+npm-debug.log
+yarn.lock
+
+.DS_Store
+Desktop.ini
+
+*.sh
+*.bat
+*.cmd
