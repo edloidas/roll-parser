@@ -1,21 +1,13 @@
 const grammar = require( '../../src/grammar' );
 const util = require( '../util' );
 
+const testRolls = util.testRolls;
+
 const [
   single, double, triple,
   tripleBottomLimit,
   tripleBottomAndUpperLimit,
 ] = [ ...grammar.simple ];
-
-const testRolls = ( regexp, desc, validRolls, invalidRolls ) => {
-  describe( desc, () => {
-    const parseValid = util.validRoll( regexp );
-    validRolls.forEach( parseValid );
-
-    const parseInvalid = util.invalidRoll( regexp );
-    invalidRolls.forEach( parseInvalid );
-  });
-};
 
 testRolls(
   single,
