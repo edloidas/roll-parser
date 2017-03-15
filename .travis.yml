@@ -4,7 +4,7 @@ language: node_js
 env: TRAVIS_CI=true
 
 node_js:
-  - "6"
+  - "7"
 
 script:
   - npm run report
