@@ -1,7 +1,5 @@
 const grammar = require( '../../src/grammar' );
-const util = require( '../util' );
-
-const testRolls = util.testRolls;
+const testRolls = require( '../util' ).testRolls;
 
 const [
   single, double, triple,
