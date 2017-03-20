@@ -1,4 +1,4 @@
-const grammar = require( './grammar' ).simple;
+const grammar = require( './grammar' ).classic;
 
 module.exports = function parse( roll ) {
   let result = null;
