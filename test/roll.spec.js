@@ -15,7 +15,18 @@ describe( 'Roll validation:', () => {
     const result = { dice: 6, count: 4, modifier: 1, bottom: 0, top: 1 };
     expect( new Roll( 6, 4, 1, 0, 0 )).toEqual( result );
   });
+
+  test( 'Should fix border, if bottom limmit is bigger than upper limit`.', () => {
+    const result = { dice: 12, count: 3, modifier: -4, bottom: 5, top: 5 };
+    expect( new Roll( 12, 3, -4, 9, 5 )).toEqual( result );
+  });
 });
 
-describe( 'Notation:', () => {
+describe( 'Roll `simple` notation:', () => {
+});
+
+describe( 'Roll `classic` notation:', () => {
+  test( 'Should parse single roll `d20`.', () => {
+    expect( new Roll( 20 ).toClassicNotation()).toBe( 'd20' );
+  });
 });
