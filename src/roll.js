@@ -10,7 +10,15 @@ function Roll( dice = 20, count = 1, modifier = 0, bottom = 0, top = Number.MAX_
 }
 
 Roll.prototype.toSimpleNotation = function toSimpleNotation() {
-  return '';
+  const count = this.count > 1 ? `${ this.count } ` : '';
+  const modifier = this.modifier || '';
+
+  const max = ( this.count * this.dice ) + this.modifier;
+
+  const top = this.top < max ? ` ${ this.top }` : '';
+  const bottom = this.bottom > 1 ? ` ${ this.bottom }` : '';
+
+  return `${ count }${ this.dice }${ modifier }${ bottom }${ top }`;
 };
 
 Roll.prototype.toClassicNotation = function toClassicNotation() {
@@ -18,9 +26,16 @@ Roll.prototype.toClassicNotation = function toClassicNotation() {
   const modifier = this.modifier > 0 ? `+${ this.modifier }` : ( this.modifier || '' );
 
   const max = ( this.count * this.dice ) + this.modifier;
+  const hasBottomRange = this.bottom > 1;
+  const hasTopRange = this.top < max;
+  const hasRange = hasBottomRange || hasTopRange;
 
-  const top = this.top < max ? `,${ this.top }` : '';
-  const range = this.bottom > 1 ? ` (${ this.bottom }${ top })` : '';
+  let range = '';
+  if ( hasRange ) {
+    const bottom = hasBottomRange ? this.bottom : '';
+    const top = hasTopRange ? `,${ this.top }` : '';
+    range = `(${ bottom }${ top })`;
+  }
 
   return `${ count }d${ this.dice }${ modifier }${ range }`;
 };
