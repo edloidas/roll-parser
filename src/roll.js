@@ -9,7 +9,7 @@ function Roll( dice = 20, count = 1, modifier = 0, bottom, top ) {
 
 Roll.prototype.toSimpleNotation = function toSimpleNotation() {
   const count = this.count > 1 ? `${ this.count } ` : '';
-  const modifier = this.modifier || '';
+  const modifier = this.modifier ? ` ${ this.modifier }` : '';
 
   const max = ( this.count * this.dice ) + this.modifier;
 
