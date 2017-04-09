@@ -1,4 +1,6 @@
 const Roll = require( '../src/roll' );
+const testClassicNotation = require( './util' ).classicNotation;
+// const testSimpleNotation = require( './util' ).simpleNotation;
 
 describe( 'Roll validation:', () => {
   test( 'Should generate `d20` roll without parameters.', () => {
@@ -12,7 +14,7 @@ describe( 'Roll validation:', () => {
   });
 
   test( 'Should replace zero borders with 1 for roll `4d6+1 (0,0)`.', () => {
-    const result = { dice: 6, count: 4, modifier: 1, bottom: 0, top: 1 };
+    const result = { dice: 6, count: 4, modifier: 1, bottom: 0, top: Number.MAX_SAFE_INTEGER };
     expect( new Roll( 6, 4, 1, 0, 0 )).toEqual( result );
   });
 
@@ -26,7 +28,28 @@ describe( 'Roll `simple` notation:', () => {
 });
 
 describe( 'Roll `classic` notation:', () => {
-  test( 'Should parse single roll `d20`.', () => {
-    expect( new Roll( 20 ).toClassicNotation()).toBe( 'd20' );
-  });
+  testClassicNotation( 'd20', 20 );
+
+  testClassicNotation( '2d10', 10, 2 );
+
+  testClassicNotation( '4d6+1', 6, 4, 1 );
+  testClassicNotation( '10d99-77', 99, 10, -77 );
+
+  testClassicNotation( '4d10-3 (3)', 10, 4, -3, 3 );
+  testClassicNotation( '4d10-3 (7,21)', 10, 4, -3, 7, 21 );
+
+  testClassicNotation( '4d10-3 (15,15)', 10, 4, -3, 21, 15 );
+
+  testClassicNotation( '4d10-3 (3)', 10, 4, -3, 3, 0 );
+  testClassicNotation( '4d10-3 (3)', 10, 4, -3, 3, -4 );
+
+  testClassicNotation( '4d10-3 (3)', 10, 4, -3, 3, Number.MAX_SAFE_INTEGER );
+  testClassicNotation( '4d10-3 (3)', 10, 4, -3, 3, null );
+  testClassicNotation( '4d10-3 (3)', 10, 4, -3, 3, undefined );
+  testClassicNotation( '4d10-3 (3)', 10, 4, -3, 3, NaN );
+
+  testClassicNotation( '4d10-3 (,35)', 10, 4, -3, 0, 35 );
+  testClassicNotation( '4d10-3 (,35)', 10, 4, -3, null, 35 );
+  testClassicNotation( '4d10-3 (,35)', 10, 4, -3, undefined, 35 );
+  testClassicNotation( '4d10-3 (,35)', 10, 4, -3, NaN, 35 );
 });

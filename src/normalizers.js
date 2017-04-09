@@ -1,14 +1,16 @@
+const isNonNegativeInteger = value => Number.isInteger( value ) && value >= 0;
+
 // fixInvalid :: Number -> Number -> Number
 const fixInvalid = backup => ( value ) => {
   const isValid = value !== undefined &&
                   value !== null &&
                   !Number.isNaN( value ) &&
-                  Number.isInteger( value );
+                  isNonNegativeInteger( value );
   return isValid ? value : backup;
 };
 
 // normalizeTop :: Number -> Number
-const normalizeTop = top => Math.max( fixInvalid( Number.MAX_SAFE_INTEGER )( top ), 1 );
+const normalizeTop = top => fixInvalid( Number.MAX_SAFE_INTEGER )( top ) || Number.MAX_SAFE_INTEGER;
 // normalizeTop :: Number -> Number -> Array
 const normalizeBottom = top => bottom => [ Math.min( fixInvalid( 0 )( bottom ), top ), top ];
 

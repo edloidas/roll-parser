@@ -1,12 +1,10 @@
-/*
-{count}d{dice}{modifier} ({bottom},{top})
-*/
-function Roll( dice = 20, count = 1, modifier = 0, bottom = 0, top = Number.MAX_SAFE_INTEGER ) {
+const { normalizeBorders } = require( './normalizers' );
+
+function Roll( dice = 20, count = 1, modifier = 0, bottom, top ) {
   this.dice = dice;
   this.count = count;
   this.modifier = modifier;
-  this.top = Math.max( top, 1 );
-  this.bottom = Math.min( bottom, this.top );
+  [ this.bottom, this.top ] = normalizeBorders( bottom, top );
 }
 
 Roll.prototype.toSimpleNotation = function toSimpleNotation() {
@@ -34,7 +32,7 @@ Roll.prototype.toClassicNotation = function toClassicNotation() {
   if ( hasRange ) {
     const bottom = hasBottomRange ? this.bottom : '';
     const top = hasTopRange ? `,${ this.top }` : '';
-    range = `(${ bottom }${ top })`;
+    range = ` (${ bottom }${ top })`;
   }
 
   return `${ count }d${ this.dice }${ modifier }${ range }`;
