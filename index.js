@@ -1,12 +1,7 @@
-const parseSimple = require( './src/simple' );
-const parseClassic = require( './src/classic' );
-
-function parse( roll ) {
-  return parseSimple( roll ) || parseClassic( roll ) || null;
-}
+const { parseAny, parseSimple, parseClassic } = require( './src/parser' );
 
 module.exports = {
-  parse,
+  parse: parseAny,
   parseSimple,
   parseClassic,
 };
