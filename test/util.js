@@ -36,10 +36,35 @@ function simpleNotation( notation, ...args ) {
   });
 }
 
+const validRollParse = parser => ( roll ) => {
+  test( `Should parse '${ roll }' roll.`, () => {
+    expect( parser( roll )).toBeTruthy();
+  });
+};
+
+const invalidRollParse = parser => ( roll ) => {
+  test( `Should not parse '${ roll }' roll.`, () => {
+    expect( parser( roll )).toBeFalsy();
+  });
+};
+
+function testParse( parser, desc, validRolls, invalidRolls ) {
+  describe( desc, () => {
+    const parseValid = validRollParse( parser );
+    validRolls.forEach( parseValid );
+
+    const parseInvalid = invalidRollParse( parser );
+    invalidRolls.forEach( parseInvalid );
+  });
+}
+
 module.exports = {
   validRoll,
   invalidRoll,
   testRolls,
   classicNotation,
   simpleNotation,
+  validRollParse,
+  invalidRollParse,
+  testParse,
 };
