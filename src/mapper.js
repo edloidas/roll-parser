@@ -1,5 +1,6 @@
 const Roll = require( './roll' );
 
+// toInteger :: String -> Number
 const toInteger = srt => parseInt( srt || 0, 10 );
 
 /**
