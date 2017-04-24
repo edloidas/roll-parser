@@ -4,8 +4,8 @@ roll-parser
 [![Travis Build Status][travis-image]][travis-url]
 [![AppVeyor Build Status][appveyor-image]][appveyor-url]
 [![Coverage Status][coveralls-image]][coveralls-url]
-[![Dependency Status][dep-image]][dep-url]
 [![devDependency Status][devdep-image]][devdep-url]
+<!-- [![Dependency Status][dep-image]][dep-url] -->
 
 > Parser for classic (2d6+1) and simplified (2 6 1) dice rolls.
 
@@ -26,6 +26,9 @@ const simpleResult = parse( '2 10 -2 2 9' );
 // { dice: 6, count: 4, modifier: 1, bottom: 0, top: 5 }
 const classicResult = parse( '4d6+1 (,5)' );
 
+// { dice: 6, count: 1, modifier: 0, bottom: 2, top: 5 }
+const shortClassicResult = parse( 'd6 (2,5)' ); // '1d6+0 (2,5)'
+
 // `d20`
 const basicRoll = new Roll( 20 );
 // `2d10-4` within interval of [3, 17] for each dice
@@ -40,17 +43,17 @@ const complexRollNotation = complexRoll.toClassicNotation();
 
 ## Documentation
 
-### parse( roll )
+### parse( roll ) ⇒ Object
 
 Parses both simplified and classic roll.
 Will try to parse the roll as simplified at first and then fallback to classic one in the case of failure. Returns a `Roll` object or `null` if parsing failed.
 
-### parseSimpleRoll( roll )
+### parseSimpleRoll( roll ) ⇒ Object
 
 Parses simplified roll, like `'2 10 -1'`. Returns a `Roll` object or `null` if parsing failed.
 
 
-### parseClassicRoll( roll )
+### parseClassicRoll( roll ) ⇒ Object
 
 Parses classic roll, like `'2d10-1'`. Returns a `Roll` object or `null` if parsing failed.
 
@@ -98,11 +101,11 @@ Type: `number`
 
 Top roll limit.
 
-### Roll.prototype.toSimpleNotation()
+### Roll.prototype.toSimpleNotation() ⇒ String
 
 Returns a `string` representation of roll in simple notation.
 
-### Roll.prototype.toClassicNotation()
+### Roll.prototype.toClassicNotation() ⇒ String
 
 Returns a `string` representation of roll in classic notation.
 

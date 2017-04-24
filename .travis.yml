@@ -5,6 +5,7 @@ env: TRAVIS_CI=true
 
 node_js:
   - "7"
+  - "6.0.0"
 
 script:
   - npm run report
