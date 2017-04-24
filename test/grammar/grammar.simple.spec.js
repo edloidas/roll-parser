@@ -2,41 +2,40 @@ const grammar = require( '../../src/grammar' );
 const testRolls = require( '../util' ).testRolls;
 
 const [
-  single, double, triple,
-  tripleBottomLimit,
-  tripleBottomAndUpperLimit,
+  singleOrDouble,
+  tripleWithLimits,
 ] = [ ...grammar.simple ];
 
 testRolls(
-  single,
+  singleOrDouble,
   'One value roll',
   [ '0', '123456789' ],
   [ '-2' ],
 );
 
 testRolls(
-  double,
+  singleOrDouble,
   'Two values roll',
   [ '1  2', '12 123' ],
-  [ '0', '-2', '2 -20', '-10 1', '-10 -20' ],
+  [ '-2', '2 -20', '-10 1', '-10 -20' ],
 );
 
 testRolls(
-  triple,
+  tripleWithLimits,
   'Three values roll',
   [ '1 2 3', '2  10  +11', '2  10  -11' ],
-  [ '0', '-2', '2 -20', '-10 1', '-10 -20', '2 -20 1', '-10 1 2', '-10 -20 3' ],
+  [ '0', '-2', '2 20', '2 -20', '-10 1', '-10 -20', '2 -20 1', '-10 1 2', '-10 -20 3', '2 20+3', '2 20-3' ],
 );
 
 testRolls(
-  tripleBottomLimit,
+  tripleWithLimits,
   'Three values with upper limit roll',
   [ '1 2 3 1', '2  10  +11  5', '2  10  -11  10' ],
   [ '1 2 3 -1', '1 2 3 +1' ],
 );
 
 testRolls(
-  tripleBottomAndUpperLimit,
+  tripleWithLimits,
   'Three values with bottom and upper limit roll',
   [ '1 2 3 1 3', '2  10  +11  5  30', '2  10  -11  5  10' ],
   [ '1 2 3 1 -1', '1 2 3 1 +1' ],

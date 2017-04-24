@@ -13,7 +13,10 @@ function map( result ) {
 
   const values = result.slice( 1, 6 ).map( toInteger );
 
-  if ( values.length === 1 ) {
+  // Minimum grammar accepts 2 values. If second is not set, it is mapped to `undefined`
+  const isSinlge = values.length === 1 || ( values.length === 2 && result[ 2 ] === undefined );
+
+  if ( isSinlge ) {
     return new Roll( values[ 0 ]);
   }
 
