@@ -13,10 +13,11 @@ Roll.prototype.toSimpleNotation = function toSimpleNotation() {
   const count = this.count > 1 ? `${ this.count } ` : '';
   const modifier = this.modifier ? ` ${ this.modifier }` : '';
 
-  const max = ( this.count * this.dice ) + this.modifier;
+  const hasTopRange = this.top < this.dice;
+  const hasBottomRange = this.bottom > 1 || hasTopRange;
 
-  const top = this.top < max ? ` ${ this.top }` : '';
-  const bottom = this.bottom > 1 ? ` ${ this.bottom }` : '';
+  const top = hasTopRange ? ` ${ this.top }` : '';
+  const bottom = hasBottomRange ? ` ${ this.bottom }` : '';
 
   return `${ count }${ this.dice }${ modifier }${ bottom }${ top }`;
 };
@@ -25,9 +26,8 @@ Roll.prototype.toClassicNotation = function toClassicNotation() {
   const count = this.count > 1 ? this.count : '';
   const modifier = this.modifier > 0 ? `+${ this.modifier }` : ( this.modifier || '' );
 
-  const max = ( this.count * this.dice ) + this.modifier;
   const hasBottomRange = this.bottom > 1;
-  const hasTopRange = this.top < max;
+  const hasTopRange = this.top < this.dice;
   const hasRange = hasBottomRange || hasTopRange;
 
   let range = '';

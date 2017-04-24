@@ -34,12 +34,12 @@ const shortClassicResult = parse( 'd6 (2,5)' ); // '1d6+0 (2,5)'
 
 // `d20`
 const basicRoll = new Roll( 20 );
-// `2d10-4` within interval of [3, 17] for each dice
-const complexRoll = new Roll( 10, 2, -4, 3, 17 );
+// `2d20-4` within interval of [3, 17] for each dice
+const complexRoll = new Roll( 20, 2, -4, 3, 17 );
 
 // '20'
 const basicRollNotation = basicRoll.toSimpleNotation();
-// '2d10-4 (3,17)'
+// '2d20-4 (3,17)'
 const complexRollNotation = complexRoll.toClassicNotation();
 
 ```
