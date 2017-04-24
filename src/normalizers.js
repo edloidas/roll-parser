@@ -1,13 +1,10 @@
-const isNonNegativeInteger = value => Number.isInteger( value ) && value >= 0;
+const isPositiveInteger = value => Number.isInteger( value ) && value > 0;
 
-// fixInvalid :: Number -> Number -> Number
-const fixInvalid = backup => ( value ) => {
-  const isValid = value !== undefined &&
-                  value !== null &&
-                  !Number.isNaN( value ) &&
-                  isNonNegativeInteger( value );
-  return isValid ? value : backup;
-};
+// fixInvalid :: Number -> any -> Number
+const fixInvalid = backup => value => ( isPositiveInteger( value ) ? value : backup );
+
+// any -> Number
+const normalizeInteger = value => ( Number.isInteger( value ) ? value : 0 );
 
 // normalizeTop :: Number -> Number
 const normalizeTop = top => fixInvalid( Number.MAX_SAFE_INTEGER )( top ) || Number.MAX_SAFE_INTEGER;
@@ -21,4 +18,5 @@ module.exports = {
   normalizeTop,
   normalizeBottom,
   normalizeBorders,
+  normalizeInteger,
 };

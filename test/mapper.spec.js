@@ -18,6 +18,9 @@ describe( 'Map parser result:', () => {
     expect( map( parseSimple( '2 10 -2' ))).toMatchObject({ dice: 10, count: 2, modifier: -2 });
     expect( map( parseSimple( '2 10 +2 2' ))).toMatchObject({ dice: 10, count: 2, modifier: 2, bottom: 2 });
     expect( map( parseSimple( '2 10 2 2 17' ))).toEqual({ dice: 10, count: 2, modifier: 2, bottom: 2, top: 17 });
+    expect( map( parseClassic( 'd10' ))).toMatchObject({ dice: 10, count: 1, modifier: 0 });
+    expect( map( parseClassic( 'd10+3' ))).toMatchObject({ dice: 10, count: 1, modifier: 3 });
+    expect( map( parseClassic( 'd10-1 (,17)' ))).toEqual({ dice: 10, count: 1, modifier: -1, bottom: 0, top: 17 });
     expect( map( parseClassic( '2d10-2 (,17)' ))).toEqual({ dice: 10, count: 2, modifier: -2, bottom: 0, top: 17 });
   });
 

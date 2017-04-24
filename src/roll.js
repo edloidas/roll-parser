@@ -1,9 +1,11 @@
-const { normalizeBorders } = require( './normalizers' );
+const { fixInvalid, normalizeBorders, normalizeInteger } = require( './normalizers' );
+
+const positiveInteger = fixInvalid( 1 );
 
 function Roll( dice = 20, count = 1, modifier = 0, bottom, top ) {
-  this.dice = dice;
-  this.count = count;
-  this.modifier = modifier;
+  this.dice = positiveInteger( dice );
+  this.count = positiveInteger( count );
+  this.modifier = normalizeInteger( modifier );
   [ this.bottom, this.top ] = normalizeBorders( bottom, top );
 }
 
