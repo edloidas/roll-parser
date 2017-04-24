@@ -7,6 +7,9 @@ roll-parser
 [![devDependency Status][devdep-image]][devdep-url]
 <!-- [![Dependency Status][dep-image]][dep-url] -->
 
+[![Node.js version][node-image]][node-url]
+[![Project is on npm][npm-image]][npm-url]
+
 > Parser for classic (2d6+1) and simplified (2 6 1) dice rolls.
 
 ## Install
@@ -133,3 +136,9 @@ Please, check the [guide](CONTRIBUTING.md) first.
 
 [devdep-url]: https://david-dm.org/edloidas/roll-parser#info=devDependencies
 [devdep-image]: https://david-dm.org/edloidas/roll-parser/dev-status.svg
+
+[node-url]: https://nodejs.org
+[node-image]: https://img.shields.io/badge/node-≥%206.0.0-green.svg
+
+[npm-url]: https://www.npmjs.com/package/roll-parser
+[npm-image]: https://img.shields.io/badge/npm-roll--parser-blue.svg
