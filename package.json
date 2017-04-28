@@ -9,7 +9,9 @@
     "roll",
     "rpg",
     "dnd",
-    "wod"
+    "wod",
+    "random",
+    "d20"
   ],
   "homepage": "https://github.com/edloidas/roll-parser#readme",
   "bugs": {
