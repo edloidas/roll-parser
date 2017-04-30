@@ -9,14 +9,14 @@ const [
 
 testRolls(
   classicRolls,
-  'Default roll "dX"',
+  'Default roll: "dX"',
   [ 'd20', 'D6' ],
   [ '20', 'd-10', 'D 6' ],
 );
 
 testRolls(
   classicRolls,
-  'Multiple rolls: "ydX"',
+  'Multiple rolls: "YdX"',
   [ '20d20', '2D6' ],
   [ '2d-10', '1 D6' ],
 );
