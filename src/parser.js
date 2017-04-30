@@ -20,7 +20,7 @@ const parseSimple = makeParser( grammar.simple );
 // parseClassic :: String -> Array
 const parseClassic = makeParser( grammar.classic );
 // parseAny :: String -> Array
-const parseAny = roll => parseSimple( roll ) || parseClassic( roll );
+const parseAny = makeParser([].concat( grammar.simple, grammar.classic ));
 
 module.exports = {
   parseSimple,

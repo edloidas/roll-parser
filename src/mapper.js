@@ -1,10 +1,13 @@
 const Roll = require( './roll' );
 
 // toInteger :: String -> Number
-const toInteger = srt => parseInt( srt || 0, 10 );
+const toInteger = srt => parseInt( srt, 10 ) || null;
+
+// isAbsent :: Any -> Boolean
+const isAbsent = value => value === undefined || value === null;
 
 /**
- * @param {Array} result - result of the parse excecution.
+ * @param {Array} result - result of the regex (parse method) excecution.
  */
 function map( result ) {
   if ( !result || result.length < 2 ) {
@@ -14,7 +17,7 @@ function map( result ) {
   const values = result.slice( 1, 6 ).map( toInteger );
 
   // Minimum grammar accepts 2 values. If second is not set, it is mapped to `undefined`
-  const isSinlge = values.length === 1 || ( values.length === 2 && result[ 2 ] === undefined );
+  const isSinlge = values.length === 1 || ( values.length === 2 && isAbsent( values[ 1 ]));
 
   if ( isSinlge ) {
     return new Roll( values[ 0 ]);
