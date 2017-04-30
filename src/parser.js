@@ -1,12 +1,18 @@
 const grammar = require( './grammar' );
 
+// isUnary :: Array -> Boolean
+const isUnary = array => array.length === 1;
+
 // makeParser :: Array -> String -> Array
-const makeParser = grammarSet => ( roll ) => {
-  let result = null;
-
-  grammarSet.some( regex => ( result = regex.exec( roll )));
-
-  return result;
+const makeParser = ( grammarSet ) => {
+  if ( isUnary( grammarSet )) {
+    return roll => grammarSet[ 0 ].exec( roll );
+  } // else
+  return ( roll ) => {
+    let result = null;
+    grammarSet.some( regex => ( result = regex.exec( roll )));
+    return result;
+  };
 };
 
 // parseSimple :: String -> Array
