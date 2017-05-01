@@ -1,4 +1,5 @@
-// Multiple instances of classic and simple notations exists fro purposes of readability
+// Multiple instances of each notation exists for purposes of readability
+// Each grammar is an array of RegExps
 module.exports = {
   simple: [
     /^(\d+)(?:\s*)(\d+)?$/,                                                     // 20 || 1 20

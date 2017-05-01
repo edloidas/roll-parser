@@ -1,21 +1,15 @@
+const { normalizeRegexResult, isAbsent } = require( './normalizers' );
 const Roll = require( './roll' );
 
-// toInteger :: String -> Number
-const toInteger = srt => parseInt( srt, 10 ) || null;
-
-// isAbsent :: Any -> Boolean
-const isAbsent = value => value === undefined || value === null;
-
-
 // map :: Object -> [Array | null]
-// Takes a result of RegExp.prototype.exec() and returns an Array of integers or null
+//   Takes a result of RegExp.prototype.exec() and returns an Array of integers, strings, and null
 function map( result ) {
   const invalid = !result || result.length < 2;
-  return invalid ? null : ( result.slice( 1, 6 ).map( toInteger ));
+  return invalid ? null : ( result.slice( 1, 6 ).map( normalizeRegexResult ));
 }
 
 // map :: Object -> [Object | null]
-// Takes a result of map() function and returns a Roll object or null
+//   Takes a result of map() function and returns a Roll object or null
 function mapToRoll( result ) {
   const numbers = map( result );
 
