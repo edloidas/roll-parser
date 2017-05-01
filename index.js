@@ -1,13 +1,13 @@
 const Roll = require( './src/roll' );
 const { parseAny, parseSimple, parseClassic } = require( './src/parser' );
-const map = require( './src/mapper' );
+const { mapToRoll } = require( './src/mapper' );
 
 // parse :: String -> Roll
-const parse = roll => map( parseAny( roll ));
+const parse = roll => mapToRoll( parseAny( roll ));
 // parse :: String -> Roll
-const parseSimpleRoll = roll => map( parseSimple( roll ));
+const parseSimpleRoll = roll => mapToRoll( parseSimple( roll ));
 // parse :: String -> Roll
-const parseClassicRoll = roll => map( parseClassic( roll ));
+const parseClassicRoll = roll => mapToRoll( parseClassic( roll ));
 
 module.exports = {
   Roll,

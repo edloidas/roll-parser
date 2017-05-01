@@ -6,24 +6,33 @@ const toInteger = srt => parseInt( srt, 10 ) || null;
 // isAbsent :: Any -> Boolean
 const isAbsent = value => value === undefined || value === null;
 
-/**
- * @param {Array} result - result of the regex (parse method) excecution.
- */
+
+// map :: Object -> [Array | null]
+// Takes a result of RegExp.prototype.exec() and returns an Array of integers or null
 function map( result ) {
-  if ( !result || result.length < 2 ) {
+  const invalid = !result || result.length < 2;
+  return invalid ? null : ( result.slice( 1, 6 ).map( toInteger ));
+}
+
+// map :: Object -> [Object | null]
+// Takes a result of map() function and returns a Roll object or null
+function mapToRoll( result ) {
+  const numbers = map( result );
+
+  if ( !numbers ) {
     return null;
   }
 
-  const values = result.slice( 1, 6 ).map( toInteger );
-
-  // Minimum grammar accepts 2 values. If second is not set, it is mapped to `undefined`
-  const isSinlge = values.length === 1 || ( values.length === 2 && isAbsent( values[ 1 ]));
-
-  if ( isSinlge ) {
-    return new Roll( values[ 0 ]);
+  // Minimum grammar accepts 2 values. If second is not set, it is mapped to `null`
+  const sinlge = numbers.length === 1 || ( numbers.length === 2 && isAbsent( numbers[ 1 ]));
+  if ( sinlge ) {
+    return new Roll( numbers[ 0 ]);
   }
 
-  return new Roll( values[ 1 ], values[ 0 ], ...values.slice( 2, 5 ));
+  return new Roll( numbers[ 1 ], numbers[ 0 ], ...numbers.slice( 2, 5 ));
 }
 
-module.exports = map;
+module.exports = {
+  map,
+  mapToRoll,
+};
