@@ -7,7 +7,7 @@ const fixInvalid = backup => value => ( isPositiveInteger( value ) ? value : bac
 const normalizeInteger = value => ( Number.isInteger( value ) ? value : 0 );
 
 // normalizeTop :: Number -> Number
-const normalizeTop = top => fixInvalid( Number.MAX_SAFE_INTEGER )( top ) || Number.MAX_SAFE_INTEGER;
+const normalizeTop = top => fixInvalid( Number.MAX_SAFE_INTEGER )( top );
 // normalizeTop :: Number -> Number -> Array
 const normalizeBottom = top => bottom => [ Math.min( fixInvalid( 0 )( bottom ), top ), top ];
 

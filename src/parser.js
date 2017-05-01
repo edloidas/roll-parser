@@ -3,7 +3,7 @@ const grammar = require( './grammar' );
 // isUnary :: Array -> Boolean
 const isUnary = array => array.length === 1;
 
-// makeParser :: Array -> String -> Array
+// makeParser :: Array -> ( String -> Array )
 const makeParser = ( grammarSet ) => {
   if ( isUnary( grammarSet )) {
     return roll => grammarSet[ 0 ].exec( roll );
@@ -23,6 +23,7 @@ const parseClassic = makeParser( grammar.classic );
 const parseAny = makeParser([].concat( grammar.simple, grammar.classic ));
 
 module.exports = {
+  makeParser,
   parseSimple,
   parseClassic,
   parseAny,
