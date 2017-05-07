@@ -1,4 +1,4 @@
-const Roll = require( './src/roll' );
+const Roll = require( './src/object/Roll' );
 const { parseAny, parseSimple, parseClassic } = require( './src/parser' );
 const { mapToRoll } = require( './src/mapper' );
 

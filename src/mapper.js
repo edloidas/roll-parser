@@ -1,5 +1,5 @@
 const { normalizeRegexResult, isAbsent } = require( './normalizer' );
-const Roll = require( './roll' );
+const Roll = require( './object/Roll' );
 
 // map :: Object -> [Array | null]
 //   Takes a result of RegExp.prototype.exec() and returns an Array of integers, strings, and null

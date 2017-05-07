@@ -1,4 +1,4 @@
-const testSimpleNotation = require( '../util' ).simpleNotation;
+const { testSimpleNotation } = require( '../util' );
 
 describe( 'Roll `simple` notation:', () => {
   testSimpleNotation( '20', 20 );

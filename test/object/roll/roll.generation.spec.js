@@ -1,4 +1,4 @@
-const Roll = require( '../../src/roll' );
+const Roll = require( '../../../src/object/Roll' );
 
 describe( 'Roll generation:', () => {
   test( 'Should generate `d20` roll without parameters.', () => {

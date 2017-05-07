@@ -1,4 +1,5 @@
-const Roll = require( '../src/roll' );
+const Roll = require( '../src/object/Roll' );
+const { simpleNotation, classicNotation } = require( '../src/stringifier' );
 
 const validRoll = regexp => ( roll ) => {
   test( `Should parse '${ roll }' roll.`, () => {
@@ -24,15 +25,15 @@ function testRolls( regexp, desc, validRolls, invalidRolls ) {
 
 const stringifyArgs = args => args.map( v => String( v )).join( ', ' );
 
-function classicNotation( notation, ...args ) {
+function testClassicNotation( notation, ...args ) {
   test( `Should generate '${ notation }' from parameters '${ stringifyArgs( args ) }'.`, () => {
-    expect( new Roll( ...args ).toClassicNotation()).toBe( notation );
+    expect( classicNotation( new Roll( ...args ))).toBe( notation );
   });
 }
 
-function simpleNotation( notation, ...args ) {
+function testSimpleNotation( notation, ...args ) {
   test( `Should generate '${ notation }' from parameters '${ stringifyArgs( args ) }'.`, () => {
-    expect( new Roll( ...args ).toSimpleNotation()).toBe( notation );
+    expect( simpleNotation( new Roll( ...args ))).toBe( notation );
   });
 }
 
@@ -62,8 +63,8 @@ module.exports = {
   validRoll,
   invalidRoll,
   testRolls,
-  classicNotation,
-  simpleNotation,
+  testClassicNotation,
+  testSimpleNotation,
   validRollParse,
   invalidRollParse,
   testParse,
