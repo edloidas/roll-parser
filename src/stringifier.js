@@ -29,7 +29,15 @@ function classicNotation( roll ) {
   return `${ count }d${ roll.dice }${ modifier }${ range }`;
 }
 
+function wodNotation( roll ) {
+  const count = roll.count > 1 ? roll.count : '';
+  const again = roll.again ? '!' : '';
+
+  return `${ count }d${ roll.dice }${ again }>${ roll.success }f${ roll.fail }`;
+}
+
 module.exports = {
   simpleNotation,
   classicNotation,
+  wodNotation,
 };
