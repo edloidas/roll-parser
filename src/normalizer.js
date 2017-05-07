@@ -8,13 +8,22 @@ const fixInvalid = backup => value => ( isPositiveInteger( value ) ? value : bac
 const normalizeInteger = value => ( Number.isInteger( value ) ? value : 0 );
 
 
-// normalizeTop :: Any -> Number
-const normalizeTop = top => fixInvalid( Number.MAX_SAFE_INTEGER )( top );
-// normalizeTop :: a -> Number -> [ Number, a ]
-const normalizeBottom = top => bottom => [ Math.min( fixInvalid( 0 )( bottom ), top ), top ];
-// ( a, b ) -> [ Number, Number ]
-const normalizeBorders = ( bottom, top ) => normalizeBottom( normalizeTop( top ))( bottom );
-
+// normalizeTop :: Number -> Number -> Number
+const normalizeTop = max => top => Math.min( fixInvalid( Number.MAX_SAFE_INTEGER )( top ), max );
+// normalizeTop :: Number -> Number -> Number
+const normalizeBottom = max => bottom => Math.min( fixInvalid( 0 )( bottom ), max );
+// normalizeBorders :: ( Number, Number, Number ) -> [ Number, Number ]
+const normalizeBorders = ( bottom, top, max ) => {
+  const b = normalizeTop( max )( top );
+  const a = normalizeBottom( b )( bottom );
+  return [ a, b ];
+};
+// normalizeWodBorders :: ( Number, Number, Number ) -> [ Number, Number ]
+const normalizeWodBorders = ( bottom, top, max ) => {
+  const b = normalizeTop( max )( top );
+  const a = normalizeBottom( b - 1 )( bottom );
+  return [ a, b ];
+};
 
 // isAbsent :: Any -> Boolean
 //   Checks for absence of the values from RegExp execution result.
@@ -31,9 +40,10 @@ const normalizeRegexResult = value => ( isAbsent( value ) ? null : toInteger( va
 module.exports = {
   isAbsent,
   fixInvalid,
+  normalizeInteger,
   normalizeTop,
   normalizeBottom,
   normalizeBorders,
-  normalizeInteger,
+  normalizeWodBorders,
   normalizeRegexResult,
 };

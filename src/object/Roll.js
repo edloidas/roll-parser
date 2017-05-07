@@ -7,7 +7,7 @@ function Roll( dice = 20, count = 1, modifier = 0, bottom, top ) {
   this.dice = positiveInteger( dice );
   this.count = positiveInteger( count );
   this.modifier = normalizeInteger( modifier );
-  [ this.bottom, this.top ] = normalizeBorders( bottom, top );
+  [ this.bottom, this.top ] = normalizeBorders( bottom, top, this.dice );
 }
 
 Roll.prototype.toString = function toString() {
