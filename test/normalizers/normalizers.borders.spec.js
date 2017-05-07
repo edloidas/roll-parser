@@ -1,4 +1,4 @@
-const { normalizeBorders } = require( '../../src/normalizers' );
+const { normalizeBorders } = require( '../../src/normalizer' );
 
 describe( 'Normalize borders:', () => {
   test( 'Should return array for valid borders', () => {

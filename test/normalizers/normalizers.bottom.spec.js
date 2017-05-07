@@ -1,4 +1,4 @@
-const { normalizeBottom } = require( '../../src/normalizers' );
+const { normalizeBottom } = require( '../../src/normalizer' );
 
 describe( 'Normalize bottom border:', () => {
   const TOP = 20;

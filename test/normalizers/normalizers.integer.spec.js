@@ -1,4 +1,4 @@
-const { normalizeInteger } = require( '../../src/normalizers' );
+const { normalizeInteger } = require( '../../src/normalizer' );
 
 describe( 'Fix invalid non-integer value (default = 0):', () => {
   test( '`undefined` should be replaced with 0', () => {

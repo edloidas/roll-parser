@@ -1,4 +1,4 @@
-const { fixInvalid, normalizeBorders, normalizeInteger } = require( './normalizers' );
+const { fixInvalid, normalizeBorders, normalizeInteger } = require( './normalizer' );
 
 const positiveInteger = fixInvalid( 1 );
 

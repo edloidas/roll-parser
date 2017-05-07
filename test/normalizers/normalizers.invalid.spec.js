@@ -1,4 +1,4 @@
-const { fixInvalid } = require( '../../src/normalizers' );
+const { fixInvalid } = require( '../../src/normalizer' );
 
 describe( 'Fix invalid border (backup = 0):', () => {
   const fixInvalid0 = fixInvalid( 0 );

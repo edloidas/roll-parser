@@ -1,4 +1,4 @@
-const { normalizeTop } = require( '../../src/normalizers' );
+const { normalizeTop } = require( '../../src/normalizer' );
 
 describe( 'Normalize top border:', () => {
   test( 'Out of border value (negative) should be changed to MAX_SAFE_INTEGER', () => {

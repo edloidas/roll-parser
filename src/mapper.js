@@ -1,4 +1,4 @@
-const { normalizeRegexResult, isAbsent } = require( './normalizers' );
+const { normalizeRegexResult, isAbsent } = require( './normalizer' );
 const Roll = require( './roll' );
 
 // map :: Object -> [Array | null]
