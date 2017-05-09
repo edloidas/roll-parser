@@ -36,7 +36,7 @@ const mapToRoll = ( result ) => {
 //   and returns a WodRoll object or null
 const mapToWodRoll = ( result ) => {
   const values = orderArguments( map( result ));
-  return values ? new WodRoll( values ) : null;
+  return values ? new WodRoll( ...values ) : null;
 };
 
 module.exports = {
