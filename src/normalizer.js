@@ -7,6 +7,8 @@ const fixInvalid = backup => value => ( isPositiveInteger( value ) ? value : bac
 // normalizeInteger :: Any -> Number
 const normalizeInteger = value => ( Number.isInteger( value ) ? value : 0 );
 
+// normalizeRollResult :: Any -> Number
+const normalizeRollResult = fixInvalid( 1 );
 
 // normalizeTop :: Number -> Number -> Number
 const normalizeTop = max => top => Math.min( fixInvalid( Number.MAX_SAFE_INTEGER )( top ), max );
@@ -36,6 +38,7 @@ module.exports = {
   isAbsent,
   fixInvalid,
   normalizeInteger,
+  normalizeRollResult,
   normalizeTop,
   normalizeBottom,
   normalizeWodBorders,

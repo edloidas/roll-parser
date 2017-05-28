@@ -36,8 +36,14 @@ function wodNotation( roll ) {
   return `${ count }d${ roll.dice }${ again }>${ roll.success }f${ roll.fail }`;
 }
 
+function resultNotation( result ) {
+  const { notation, value, rolls } = result;
+  return `(${ notation }) ${ value } [${ rolls }]`;
+}
+
 module.exports = {
   simpleNotation,
   classicNotation,
   wodNotation,
+  resultNotation,
 };

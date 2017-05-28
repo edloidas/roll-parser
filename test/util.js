@@ -1,6 +1,7 @@
 const Roll = require( '../src/object/Roll' );
 const WodRoll = require( '../src/object/WodRoll' );
-const { simpleNotation, classicNotation, wodNotation } = require( '../src/stringifier' );
+const Result = require( '../src/object/Result' );
+const { simpleNotation, classicNotation, wodNotation, resultNotation } = require( '../src/stringifier' );
 
 const validRoll = regexp => ( roll ) => {
   test( `Should parse '${ roll }' roll.`, () => {
@@ -44,6 +45,12 @@ function testWodNotation( notation, ...args ) {
   });
 }
 
+function testResultNotation( notation, ...args ) {
+  test( `Should generate '${ notation }' from parameters '${ stringifyArgs( args ) }'.`, () => {
+    expect( resultNotation( new Result( ...args ))).toBe( notation );
+  });
+}
+
 const validRollParse = parser => ( roll ) => {
   test( `Should parse '${ roll }' roll.`, () => {
     expect( parser( roll )).toBeTruthy();
@@ -73,6 +80,7 @@ module.exports = {
   testSimpleNotation,
   testClassicNotation,
   testWodNotation,
+  testResultNotation,
   validRollParse,
   invalidRollParse,
   testParse,
