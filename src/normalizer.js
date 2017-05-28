@@ -12,12 +12,7 @@ const normalizeInteger = value => ( Number.isInteger( value ) ? value : 0 );
 const normalizeTop = max => top => Math.min( fixInvalid( Number.MAX_SAFE_INTEGER )( top ), max );
 // normalizeTop :: Number -> Number -> Number
 const normalizeBottom = max => bottom => Math.min( fixInvalid( 0 )( bottom ), max );
-// normalizeBorders :: ( Number, Number, Number ) -> [ Number, Number ]
-const normalizeBorders = ( bottom, top, max ) => {
-  const b = normalizeTop( max )( top );
-  const a = normalizeBottom( b )( bottom );
-  return [ a, b ];
-};
+
 // normalizeWodBorders :: ( Number, Number, Number ) -> [ Number, Number ]
 const normalizeWodBorders = ( bottom, top, max ) => {
   const b = normalizeTop( max )( top );
@@ -43,7 +38,6 @@ module.exports = {
   normalizeInteger,
   normalizeTop,
   normalizeBottom,
-  normalizeBorders,
   normalizeWodBorders,
   normalizeRegexResult,
 };
