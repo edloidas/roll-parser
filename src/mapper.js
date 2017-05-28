@@ -6,7 +6,7 @@ const WodRoll = require( './object/WodRoll' );
 //   Takes a result of RegExp.prototype.exec() and returns an Array of integers, strings, and null
 function map( result ) {
   const invalid = !result || result.length < 2;
-  return invalid ? null : ( result.slice( 1, 6 ).map( normalizeRegexResult ));
+  return invalid ? null : ( result.slice( 1 ).map( normalizeRegexResult ));
 }
 
 const orderArguments = limit => ( values ) => {

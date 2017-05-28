@@ -17,8 +17,4 @@ describe( 'Map parser result:', () => {
     expect( map([ '2d10+1', '2', '10', '+1' ])).toMatchObject([ 2, 10, 1 ]);
     expect( map([ '2d10!>8f1', '2', '10', '!', '8', '1' ])).toMatchObject([ 2, 10, '!', 8, 1 ]);
   });
-
-  test( 'Should trim excess values', () => {
-    expect( map([ 'skipped', '2', '10', '-2', '2', '17', '9' ])).toEqual([ 2, 10, -2, 2, 17 ]);
-  });
 });
