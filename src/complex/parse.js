@@ -20,11 +20,9 @@ const Type = require( '../object/Type' );
  */
 function parse( roll ) {
   const result = parseAny( roll );
-  if ( !result ) {
-    return null;
-  }
+  const type = result ? result.type : '';
 
-  switch ( result.type ) {
+  switch ( type ) {
     case Type.simple:
       return mapToRoll( result );
     case Type.classic:

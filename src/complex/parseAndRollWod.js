@@ -9,6 +9,7 @@ const parseWodRoll = require( './parseWodRoll' );
  * @param {String} roll
  * @return {Result}
  * @see parseAndRoll
+ * @see parseAndRollSimple
  * @see parseAndRollClassic
  * @example
  * parseAndRollWod('2d10>6');    //=> { notation: '2d10>6', value: 1, rolls: [ 5, 10 ] }

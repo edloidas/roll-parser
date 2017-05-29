@@ -8,6 +8,7 @@ const parse = require( './parse' );
  * @since v2.0.0
  * @param {String} roll
  * @return {Result}
+ * @see parseAndRollSimple
  * @see parseAndRollClassic
  * @see parseAndRollWod
  * @example

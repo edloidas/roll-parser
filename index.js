@@ -14,6 +14,7 @@ module.exports = {
   rollWod: require( './src/roller' ).rollWod,
 
   parseAndRoll: require( './src/complex/parseAndRoll' ),
+  parseAndRollSimple: require( './src/complex/parseAndRollSimple' ),
   parseAndRollClassic: require( './src/complex/parseAndRollClassic' ),
   parseAndRollWod: require( './src/complex/parseAndRollWod' ),
 };
