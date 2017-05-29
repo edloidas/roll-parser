@@ -21,7 +21,10 @@ function rollWod( roll ) {
   while ( i > 0 ) {
     const value = randomRoll( dice );
     rolls.push( value );
-    if ( value !== dice || !again ) {
+    // Check for "10 Again" flag
+    // `repeatLimit` will prevent infinite loop, for cases like `d1!>1`
+    const repeatLimit = 100;
+    if ( value !== dice || !again || rolls.length > repeatLimit ) {
       i -= 1;
     }
   }
