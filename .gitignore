@@ -1,0 +1,16 @@
+# Directories #
+
+node_modules/
+coverage/
+api/
+
+# Files #
+
+npm-debug.log
+
+.DS_Store
+Desktop.ini
+
+*.sh
+*.bat
+*.cmd
