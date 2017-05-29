@@ -1,8 +1,8 @@
 const WodRoll = require( '../../../src/object/WodRoll' );
 
 describe( 'WodRoll generation:', () => {
-  test( 'Should generate `d10>6f1` roll without parameters.', () => {
-    const result = { dice: 10, count: 1, again: false, success: 6, fail: 1 };
+  test( 'Should generate `d10>6` roll without parameters.', () => {
+    const result = { dice: 10, count: 1, again: false, success: 6, fail: 0 };
     expect( new WodRoll()).toEqual( result );
   });
 

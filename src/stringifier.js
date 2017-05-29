@@ -15,8 +15,9 @@ function classicNotation( roll ) {
 function wodNotation( roll ) {
   const count = roll.count > 1 ? roll.count : '';
   const again = roll.again ? '!' : '';
+  const fail = roll.fail > 0 ? `f${ roll.fail }` : '';
 
-  return `${ count }d${ roll.dice }${ again }>${ roll.success }f${ roll.fail }`;
+  return `${ count }d${ roll.dice }${ again }>${ roll.success }${ fail }`;
 }
 
 function resultNotation( result ) {

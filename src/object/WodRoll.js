@@ -15,7 +15,7 @@ const positiveInteger = fixInvalid( 1 );
  * @param {Number} fail - A maximum value, that counts as failure
  * @see Roll
  */
-function WodRoll( dice = 10, count = 1, again = false, success = 6, fail = 1 ) {
+function WodRoll( dice = 10, count = 1, again = false, success = 6, fail ) {
   this.dice = positiveInteger( dice );
   this.count = positiveInteger( count );
   this.again = !!again;
