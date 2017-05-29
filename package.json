@@ -31,17 +31,21 @@
     "cover": "jest --coverage",
     "report": "node_modules/.bin/jest --coverage && cat coverage/lcov.info | node_modules/coveralls/bin/coveralls.js",
     "prepush": "npm test",
-    "fix": "eslint --fix . || true"
+    "fix": "eslint --fix . || true",
+    "api": "rimraf api/ && jsdoc -c .jsdocrc"
   },
   "dependencies": {},
   "devDependencies": {
     "coveralls": "^2.13.1",
+    "docdash": "^0.4.0",
     "eslint": "^3.19.0",
     "eslint-config-airbnb-base": "^11.2.0",
     "eslint-plugin-import": "^2.3.0",
     "husky": "^0.13.4",
     "istanbul": "^0.4.5",
-    "jest": "^20.0.4"
+    "jest": "^20.0.4",
+    "jsdoc": "^3.4.3",
+    "rimraf": "^2.6.1"
   },
   "engines": {
     "node": ">= 6.0.0",

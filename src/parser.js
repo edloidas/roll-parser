@@ -1,32 +1,38 @@
 const grammar = require( './grammar' );
+const Type = require( './object/Type' );
 
 // isUnary :: Array -> Boolean
 const isUnary = array => array.length === 1;
-// concatProps :: { k: [ v ] } -> [ k ] -> [ v, ... ]
-const concatProps = obj => keys => keys.reduce(( prev, curr ) => prev.concat( obj[ curr ]), []);
 
-// makeParser :: [ RegExp ] -> ( String -> [ String | Undefined ] )
-const makeParser = ( grammarSet ) => {
+// makeParser :: ( [ RegExp ], String ) -> ( String -> [ String | Undefined ] )
+const makeParser = ( grammarSet, type ) => {
   if ( isUnary( grammarSet )) {
-    return roll => grammarSet[ 0 ].exec( roll );
+    return ( roll ) => {
+      const result = grammarSet[ 0 ].exec( roll );
+      if ( result ) {
+        result.type = type;
+      }
+      return result;
+    };
   }
   return ( roll ) => {
     let result = null;
     grammarSet.some( regex => ( result = regex.exec( roll )));
+    if ( result ) {
+      result.type = type;
+    }
     return result;
   };
 };
 
-const allGrammars = concatProps( grammar )( Object.keys( grammar ));
-
 // parseSimple :: String -> [ String | Undefined ]
-const parseSimple = makeParser( grammar.simple );
+const parseSimple = makeParser( grammar.simple, Type.simple );
 // parseClassic :: String -> [ String | Undefined ]
-const parseClassic = makeParser( grammar.classic );
+const parseClassic = makeParser( grammar.classic, Type.classic );
 // parseWod :: String -> [ String | Undefined ]
-const parseWod = makeParser( grammar.wod );
+const parseWod = makeParser( grammar.wod, Type.wod );
 // parseAny :: String -> [ String | Undefined ]
-const parseAny = makeParser( allGrammars );
+const parseAny = roll => parseClassic( roll ) || parseSimple( roll ) || parseWod( roll );
 
 module.exports = {
   makeParser,

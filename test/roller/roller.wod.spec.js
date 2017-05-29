@@ -13,4 +13,10 @@ describe( 'Rolling WoD roll:', () => {
     expect( result.value ).toEqual( 101 );
     expect( result.notation ).toEqual( 'd1!>1' );
   });
+
+  test( 'Should fail all rolls.', () => {
+    const roll = Object.assign({}, new WodRoll( 1, 1, false, 1 ), { success: 2, fail: 1 });
+    const result = rollWod( roll );
+    expect( result.value ).toEqual( 0 );
+  });
 });

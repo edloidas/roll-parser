@@ -51,9 +51,13 @@ function testResultNotation( notation, ...args ) {
   });
 }
 
-const validRollParse = parser => ( roll ) => {
+const validRollParse = ( parser, type ) => ( roll ) => {
   test( `Should parse '${ roll }' roll.`, () => {
-    expect( parser( roll )).toBeTruthy();
+    const result = parser( roll );
+    expect( result ).toBeTruthy();
+    if ( type ) {
+      expect( result.type ).toBe( type );
+    }
   });
 };
 
@@ -63,9 +67,9 @@ const invalidRollParse = parser => ( roll ) => {
   });
 };
 
-function testParse( parser, desc, validRolls, invalidRolls ) {
+function testParse( parser, desc, validRolls, invalidRolls, type ) {
   describe( desc, () => {
-    const parseValid = validRollParse( parser );
+    const parseValid = validRollParse( parser, type );
     validRolls.forEach( parseValid );
 
     const parseInvalid = invalidRollParse( parser );
@@ -81,7 +85,5 @@ module.exports = {
   testClassicNotation,
   testWodNotation,
   testResultNotation,
-  validRollParse,
-  invalidRollParse,
   testParse,
 };
