@@ -1,21 +1,21 @@
 <h1 align="center">Roll Parser</h1>
-===========
 
 <p align="center">
 :dragon: Parser for classic (2d6+1), simple (2 6 1), and WoD (4d10!>6f1) dice rolls.
 </p>
 
-<p align="center">
 [![Travis Build Status][travis-image]][travis-url]
 [![AppVeyor Build Status][appveyor-image]][appveyor-url]
 [![Coverage Status][coveralls-image]][coveralls-url]
 [![devDependency Status][devdep-image]][devdep-url]
 <!-- [![Dependency Status][dep-image]][dep-url] -->
-</p>
-<p align="center">
+
 [![Node.js version][node-image]][node-url]
 [![Project is on npm][npm-image]][npm-url]
-</p>
+
+## Documentation
+
+Please review the [API documentation](http://edloidas.com/roll-parser/).
 
 ## Install
 
@@ -130,10 +130,6 @@ random(10);
 //=> [2, 5, 2, 6] - 4d6-like roll
 new Array(4).fill(1).map(v => random(6))
 ```
-
-## Documentation
-
-Please review the [API documentation](http://edloidas.com/roll-parser/).
 
 ## Releases
 
