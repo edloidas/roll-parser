@@ -20,7 +20,7 @@ const WodRoll = require( './object/WodRoll' );
 function rollClassic( roll ) {
   const { dice, count, modifier } = roll;
 
-  const rolls = new Array( count ).fill( randomRoll( dice ));
+  const rolls = new Array( count ).fill( 1 ).map(() => randomRoll( dice ));
   const summ = rolls.reduce(( prev, curr ) => prev + curr, 0 );
   const result = normalizeRollResult( summ + modifier );
 
@@ -62,7 +62,7 @@ function rollWod( roll ) {
     } else if ( val <= fail ) {
       return suc - 1;
     }
-    return val;
+    return suc;
   }, 0 );
 
   return new Result( roll.toString(), Math.max( result, 0 ), rolls );
