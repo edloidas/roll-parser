@@ -22,7 +22,7 @@
 <label for="nav-trigger" class="overlay"></label>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="Result.html">Result</a></li><li><a href="Roll.html">Roll</a></li><li><a href="WodRoll.html">WodRoll</a></li></ul><h3>Global</h3><ul><li><a href="global.html#parse">parse</a></li><li><a href="global.html#parseAndRoll">parseAndRoll</a></li><li><a href="global.html#parseAndRollClassic">parseAndRollClassic</a></li><li><a href="global.html#parseAndRollSimple">parseAndRollSimple</a></li><li><a href="global.html#parseAndRollWod">parseAndRollWod</a></li><li><a href="global.html#parseClassicRoll">parseClassicRoll</a></li><li><a href="global.html#parseSimpleRoll">parseSimpleRoll</a></li><li><a href="global.html#parseWodRoll">parseWodRoll</a></li><li><a href="global.html#rollClassic">rollClassic</a></li><li><a href="global.html#rollWod">rollWod</a></li><li><a href="global.html#roll">roll</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="Result.html">Result</a></li><li><a href="Roll.html">Roll</a></li><li><a href="WodRoll.html">WodRoll</a></li></ul><h3>Global</h3><ul><li><a href="global.html#parse">parse</a></li><li><a href="global.html#parseAndRoll">parseAndRoll</a></li><li><a href="global.html#parseAndRollClassic">parseAndRollClassic</a></li><li><a href="global.html#parseAndRollSimple">parseAndRollSimple</a></li><li><a href="global.html#parseAndRollWod">parseAndRollWod</a></li><li><a href="global.html#parseClassicRoll">parseClassicRoll</a></li><li><a href="global.html#parseSimpleRoll">parseSimpleRoll</a></li><li><a href="global.html#parseWodRoll">parseWodRoll</a></li><li><a href="global.html#random">random</a></li><li><a href="global.html#rollClassic">rollClassic</a></li><li><a href="global.html#rollWod">rollWod</a></li><li><a href="global.html#roll">roll</a></li></ul>
 </nav>
 
 <div id="main">
@@ -44,6 +44,113 @@
 
     
 
+
+    <section class="readme">
+        <article><h1><h1 align="center">Roll Parser</h1></h1><p align="center">
+Parser for classic (2d6+1), simple (2 6 1), and WoD (4d10!&gt;6f1) dice rolls.
+</p>
+
+<p align="center">
+<a href="https://travis-ci.org/edloidas/roll-parser"><img src="https://img.shields.io/travis/edloidas/roll-parser.svg?label=linux%20build" alt="Travis Build Status"></a>
+<a href="https://ci.appveyor.com/project/edloidas/roll-parser"><img src="https://img.shields.io/appveyor/ci/edloidas/roll-parser.svg?label=windows%20build" alt="AppVeyor Build Status"></a>
+<a href="https://coveralls.io/github/edloidas/roll-parser?branch=master"><img src="https://coveralls.io/repos/github/edloidas/roll-parser/badge.svg?branch=master" alt="Coverage Status"></a>
+<a href="https://david-dm.org/edloidas/roll-parser#info=devDependencies"><img src="https://david-dm.org/edloidas/roll-parser/dev-status.svg" alt="devDependency Status"></a>
+<!-- [![Dependency Status][dep-image]][dep-url] -->
+</p>
+<p align="center">
+<a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-≥%206.0.0-green.svg" alt="Node.js version"></a>
+<a href="https://www.npmjs.com/package/roll-parser"><img src="https://img.shields.io/badge/npm-roll--parser-blue.svg" alt="Project is on npm"></a>
+</p>
+
+<h2>Install</h2><pre class="prettyprint source"><code>npm install --save roll-parser</code></pre><h2>Usage</h2><pre class="prettyprint source lang-js"><code>const { parse, roll, parseAndRoll, Roll } = require('roll-parser');
+
+// `parse()` function parses any notation and returns `Roll` or `WodRoll` object
+//=> { dice: 6, count: 4, modifier: 1 }
+const parsedRoll = parse('4d6+1');
+
+// `Roll` or `WodRoll` can be stringified
+//=> '4d6+1'
+const notation = parsedRoll.toString();
+
+// `roll()` function accepts only the default `Roll` or `WodRoll` objects
+//=> { notation: '4d6+1', value: 16, rolls: [3, 1, 6, 5] }
+const result1 = roll(parsedRoll);
+//=> { notation: '2d20-3', value: 23, rolls: [11, 15] }
+const result2 = roll(new Roll(20, 2, -3));
+
+// `parseAndRoll()` function can parse any notation and then roll the dice
+//=> { notation: '3d10!>8f1', value: 2, rolls: [3, 10, 7, 9] }
+const result3 = parseAndRoll('3d10!>8f1');</code></pre><p>Specific parsers can be used.</p>
+<p><strong>Classic (D&amp;D):</strong></p>
+<pre class="prettyprint source lang-js"><code>const {
+  parseClassicRoll,
+  rollClassic,
+  parseAndRollClassic,
+  Roll
+} = require('roll-parser');
+
+//=> { dice: 10, count: 1, modifier: 0 }
+const parsedRoll = parseClassicRoll('d10');
+
+//=> { notation: 'd10', value: 7, rolls: [7] }
+const result1 = rollClassic(parsedRoll);
+
+//=> { notation: '2d20', value: 26, rolls: [11, 15] }
+const result2 = rollClassic(new Roll(20, 2));
+
+// `rollClassic()` can also accepts plain objects though it's not recommended
+//=> { notation: '4d10+1', value: 22, rolls: [4, 6, 2, 9] }
+const result3 = rollClassic({ dice: 10, count: 4, modifier: 1 });
+
+//=> { notation: '3d6', value: 15, rolls: [6, 6, 3] }
+const result4 = parseAndRollClassic('3d6');</code></pre><p><strong>WoD (World of Darkness):</strong></p>
+<pre class="prettyprint source lang-js"><code>const {
+  parseWodRoll,
+  rollWod,
+  parseAndRollWod,
+  WodRoll
+} = require('roll-parser');
+
+//=> { dice: 10, count: 1, again: false, success: 6, fail: 0 }
+const parsedRoll = parseWodRoll('d10>6');
+
+// Returns notation, number of success rolls and list of all dice rolls
+//=> { notation: 'd10', value: 1, rolls: [7] }
+const result1 = rollWod(parsedRoll);
+
+//=> { notation: '4d10>6f1', value: 1, rolls: [4, 10, 5, 2] }
+const result2 = rollWod(new WodRoll(10, 4, false, 6, 1));
+
+// `rollWod()` can also accepts plain objects though it's not recommended
+//=> { notation: '4d10!>8f1', value: 22, rolls: [1, 8, 5, 10, 10, 4] }
+const result3 = rollWod({ dice: 10, count: 2, again: true, success: 8, fail: 1 });
+
+//=> { notation: '4d10>7f4', value: 1, rolls: [6, 3, 8, 4] }
+const result4 = parseAndRollWod('4d10>7f4');</code></pre><p><strong>Simple (D&amp;D, space-separated):</strong></p>
+<pre class="prettyprint source lang-js"><code>const { parseSimpleRoll, parseAndRollSimple } = require('roll-parser');
+
+//=> { dice: 10, count: 1, modifier: 0 }
+const parsedRoll = parseSimpleRoll('10');
+
+//=> { notation: '4d10-1', value: 23, rolls: [3, 6, 8, 7] }
+const result = parseAndRollSimple('4 10 -1');</code></pre><p>Random number generator can be used to roll the dice.</p>
+<pre class="prettyprint source lang-js"><code>const { random } = require('roll-parser');
+
+//=> 84 - d100-like roll
+random(100);
+
+//=> 7 - d10-like roll
+random(10);
+
+//=> [2, 5, 2, 6] - 4d6-like roll
+new Array(4).fill(1).map(v => random(6))</code></pre><h2>Documentation</h2><p>Please review the <a href="http://edloidas.com/roll-parser/">API documentation</a>.</p>
+<h2>Releases</h2><p>Current version has a lot of breaking changes.
+<br>If you are looking for the the previous one, use <a href="https://github.com/edloidas/roll-parser/tree/v1.1.1">v1.1.1</a>.</p>
+<h2>Contributing</h2><p>♥ <a href="https://github.com/edloidas/roll-parser">roll-parser</a> and want to get involved?<br>
+Please, check the <a href="CONTRIBUTING.md">guide</a> first.</p>
+<h2>License</h2><p><a href="LICENSE">MIT</a> © <a href="https://edloidas.com">Mikita Taukachou</a></p>
+<!-- Links --></article>
+    </section>
 
 
 
