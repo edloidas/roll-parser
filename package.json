@@ -1,6 +1,6 @@
 {
   "name": "roll-parser",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Parser for classic (2d6+1), simple (2 6 1), and WoD (4d10!>6f1) dice rolls.",
   "main": "index.js",
   "keywords": [
