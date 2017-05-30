@@ -1,16 +1,21 @@
-roll-parser
+<h1 align="center">Roll Parser</h1>
 ===========
 
+<p align="center">
+:dragon: Parser for classic (2d6+1), simple (2 6 1), and WoD (4d10!>6f1) dice rolls.
+</p>
+
+<p align="center">
 [![Travis Build Status][travis-image]][travis-url]
 [![AppVeyor Build Status][appveyor-image]][appveyor-url]
 [![Coverage Status][coveralls-image]][coveralls-url]
 [![devDependency Status][devdep-image]][devdep-url]
 <!-- [![Dependency Status][dep-image]][dep-url] -->
-
+</p>
+<p align="center">
 [![Node.js version][node-image]][node-url]
 [![Project is on npm][npm-image]][npm-url]
-
-> Parser for classic (2d6+1) and simplified (2 6 1) dice rolls.
+</p>
 
 ## Install
 
@@ -21,96 +26,119 @@ npm install --save roll-parser
 ## Usage
 
 ```js
-const { Roll, parse } = require( 'roll-parser' );
+const { parse, roll, parseAndRoll, Roll } = require('roll-parser');
 
-// { dice: 10, count: 2, modifier: -2, bottom: 2, top: 9 }
-const simpleResult = parse( '2 10 -2 2 9' );
+// `parse()` function parses any notation and returns `Roll` or `WodRoll` object
+//=> { dice: 6, count: 4, modifier: 1 }
+const parsedRoll = parse('4d6+1');
 
-// { dice: 6, count: 4, modifier: 1, bottom: 0, top: 5 }
-const classicResult = parse( '4d6+1 (,5)' );
+// `Roll` or `WodRoll` can be stringified
+//=> '4d6+1'
+const notation = parsedRoll.toString();
 
-// { dice: 6, count: 1, modifier: 0, bottom: 2, top: 5 }
-const shortClassicResult = parse( 'd6 (2,5)' ); // '1d6+0 (2,5)'
+// `roll()` function accepts only the default `Roll` or `WodRoll` objects
+//=> { notation: '4d6+1', value: 16, rolls: [3, 1, 6, 5] }
+const result1 = roll(parsedRoll);
+//=> { notation: '2d20-3', value: 23, rolls: [11, 15] }
+const result2 = roll(new Roll(20, 2, -3));
 
-// `d20`
-const basicRoll = new Roll( 20 );
-// `2d20-4` within interval of [3, 17] for each dice
-const complexRoll = new Roll( 20, 2, -4, 3, 17 );
+// `parseAndRoll()` function can parse any notation and then roll the dice
+//=> { notation: '3d10!>8f1', value: 2, rolls: [3, 10, 7, 9] }
+const result3 = parseAndRoll('3d10!>8f1');
+```
 
-// '20'
-const basicRollNotation = basicRoll.toSimpleNotation();
-// '2d20-4 (3,17)'
-const complexRollNotation = complexRoll.toClassicNotation();
+Specific parsers can be used.
 
+__Classic (D&D):__
+
+```js
+const {
+  parseClassicRoll,
+  rollClassic,
+  parseAndRollClassic,
+  Roll
+} = require('roll-parser');
+
+//=> { dice: 10, count: 1, modifier: 0 }
+const parsedRoll = parseClassicRoll('d10');
+
+//=> { notation: 'd10', value: 7, rolls: [7] }
+const result1 = rollClassic(parsedRoll);
+
+//=> { notation: '2d20', value: 26, rolls: [11, 15] }
+const result2 = rollClassic(new Roll(20, 2));
+
+// `rollClassic()` can also accepts plain objects though it's not recommended
+//=> { notation: '4d10+1', value: 22, rolls: [4, 6, 2, 9] }
+const result3 = rollClassic({ dice: 10, count: 4, modifier: 1 });
+
+//=> { notation: '3d6', value: 15, rolls: [6, 6, 3] }
+const result4 = parseAndRollClassic('3d6');
+```
+
+__WoD (World of Darkness):__
+
+```js
+const {
+  parseWodRoll,
+  rollWod,
+  parseAndRollWod,
+  WodRoll
+} = require('roll-parser');
+
+//=> { dice: 10, count: 1, again: false, success: 6, fail: 0 }
+const parsedRoll = parseWodRoll('d10>6');
+
+// Returns notation, number of success rolls and list of all dice rolls
+//=> { notation: 'd10', value: 1, rolls: [7] }
+const result1 = rollWod(parsedRoll);
+
+//=> { notation: '4d10>6f1', value: 1, rolls: [4, 10, 5, 2] }
+const result2 = rollWod(new WodRoll(10, 4, false, 6, 1));
+
+// `rollWod()` can also accepts plain objects though it's not recommended
+//=> { notation: '4d10!>8f1', value: 22, rolls: [1, 8, 5, 10, 10, 4] }
+const result3 = rollWod({ dice: 10, count: 2, again: true, success: 8, fail: 1 });
+
+//=> { notation: '4d10>7f4', value: 1, rolls: [6, 3, 8, 4] }
+const result4 = parseAndRollWod('4d10>7f4');
+```
+
+__Simple (D&D, space-separated):__
+
+```js
+const { parseSimpleRoll, parseAndRollSimple } = require('roll-parser');
+
+//=> { dice: 10, count: 1, modifier: 0 }
+const parsedRoll = parseSimpleRoll('10');
+
+//=> { notation: '4d10-1', value: 23, rolls: [3, 6, 8, 7] }
+const result = parseAndRollSimple('4 10 -1');
+```
+
+Random number generator can be used to roll the dice.
+
+```js
+const { random } = require('roll-parser');
+
+//=> 84 - d100-like roll
+random(100);
+
+//=> 7 - d10-like roll
+random(10);
+
+//=> [2, 5, 2, 6] - 4d6-like roll
+new Array(4).fill(1).map(v => random(6))
 ```
 
 ## Documentation
 
-### parse( roll ) ⇒ Object
+Please review the [API documentation](http://edloidas.com/roll-parser/).
 
-Parses both simplified and classic roll.
-Will try to parse the roll as simplified at first and then fallback to classic one in the case of failure. Returns a `Roll` object or `null` if parsing failed.
+## Releases
 
-### parseSimpleRoll( roll ) ⇒ Object
-
-Parses simplified roll, like `'2 10 -1'`. Returns a `Roll` object or `null` if parsing failed.
-
-
-### parseClassicRoll( roll ) ⇒ Object
-
-Parses classic roll, like `'2d10-1'`. Returns a `Roll` object or `null` if parsing failed.
-
-
-#### roll
-
-Type: `string`
-
-Simplified or classic roll notation.
-
-### Roll( dice, count, modifier, bottom, top  )
-
-Constructor for dice roll.
-
-##### dice
-
-Type: `number`<br>
-Default: `20`
-
-Dice type (maximum rolled number possible).
-
-##### count
-
-Type: `number`<br>
-Default: `1`
-
-Number of dices to roll.
-
-##### modifier
-
-Type: `number`<br>
-Default: `0`
-
-Roll modifier, that will be added or subtracted from roll.
-
-##### bottom
-
-Type: `number`
-
-Bottom roll limit.
-
-##### top
-
-Type: `number`
-
-Top roll limit.
-
-### Roll.prototype.toSimpleNotation() ⇒ String
-
-Returns a `string` representation of roll in simple notation.
-
-### Roll.prototype.toClassicNotation() ⇒ String
-
-Returns a `string` representation of roll in classic notation.
+Current version has a lot of breaking changes.
+<br>If you are looking for the the previous one, use [v1.1.1](https://github.com/edloidas/roll-parser/tree/v1.1.1).
 
 ## Contributing
 

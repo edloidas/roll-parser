@@ -17,4 +17,6 @@ module.exports = {
   parseAndRollSimple: require( './src/complex/parseAndRollSimple' ),
   parseAndRollClassic: require( './src/complex/parseAndRollClassic' ),
   parseAndRollWod: require( './src/complex/parseAndRollWod' ),
+
+  ramdom: require( './src/random' ).randomRoll,
 };
