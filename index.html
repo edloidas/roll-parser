@@ -22,10 +22,17 @@
 <label for="nav-trigger" class="overlay"></label>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="Result.html">Result</a></li><li><a href="Roll.html">Roll</a></li><li><a href="WodRoll.html">WodRoll</a></li></ul><h3>Global</h3><ul><li><a href="global.html#parse">parse</a></li><li><a href="global.html#parseAndRoll">parseAndRoll</a></li><li><a href="global.html#parseAndRollClassic">parseAndRollClassic</a></li><li><a href="global.html#parseAndRollSimple">parseAndRollSimple</a></li><li><a href="global.html#parseAndRollWod">parseAndRollWod</a></li><li><a href="global.html#parseClassicRoll">parseClassicRoll</a></li><li><a href="global.html#parseSimpleRoll">parseSimpleRoll</a></li><li><a href="global.html#parseWodRoll">parseWodRoll</a></li><li><a href="global.html#random">random</a></li><li><a href="global.html#rollClassic">rollClassic</a></li><li><a href="global.html#rollWod">rollWod</a></li><li><a href="global.html#roll">roll</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="Result.html">Result</a></li><li><a href="Roll.html">Roll</a></li><li><a href="WodRoll.html">WodRoll</a></li></ul><h3>Global</h3><ul><li><a href="global.html#parse">parse</a></li><li><a href="global.html#parseAndRoll">parseAndRoll</a></li><li><a href="global.html#parseAndRollClassic">parseAndRollClassic</a></li><li><a href="global.html#parseAndRollSimple">parseAndRollSimple</a></li><li><a href="global.html#parseAndRollWod">parseAndRollWod</a></li><li><a href="global.html#parseClassicRoll">parseClassicRoll</a></li><li><a href="global.html#parseSimpleRoll">parseSimpleRoll</a></li><li><a href="global.html#parseWodRoll">parseWodRoll</a></li><li><a href="global.html#convert">convert</a></li><li><a href="global.html#random">random</a></li><li><a href="global.html#rollClassic">rollClassic</a></li><li><a href="global.html#rollWod">rollWod</a></li><li><a href="global.html#roll">roll</a></li></ul>
 </nav>
 
 <div id="main">
+    
+
+    
+
+
+
+    
 
 
 
@@ -35,14 +42,7 @@
 
 
 
-
-
-
-
-
-
-
-
+    
 
 
     <section class="readme">
@@ -68,17 +68,23 @@ const parsedRoll = parse('4d6+1');
 
 // `Roll` or `WodRoll` can be stringified
 //=> '4d6+1'
-const notation = parsedRoll.toString();
+const rollNotation = parsedRoll.toString();
 
-// `roll()` function accepts only the default `Roll` or `WodRoll` objects
 //=> { notation: '4d6+1', value: 16, rolls: [3, 1, 6, 5] }
 const result1 = roll(parsedRoll);
 //=> { notation: '2d20-3', value: 23, rolls: [11, 15] }
 const result2 = roll(new Roll(20, 2, -3));
+// Can also accept plain objects
+//=> { notation: '2d10>7', value: 1, rolls: [4, 8] }
+const result3 = roll({dice: 10, count: 2, success: 7});
 
 // `parseAndRoll()` function can parse any notation and then roll the dice
+// Any invalid arguments, except `null` or `undefined`, will be parsed as default `Roll`
 //=> { notation: '3d10!>8f1', value: 2, rolls: [3, 10, 7, 9] }
-const result3 = parseAndRoll('3d10!>8f1');</code></pre><p>Specific parsers can be used.</p>
+const result4 = parseAndRoll('3d10!>8f1');
+
+//=> '(3d10!>8f1) 2 [3,10,7,9]'
+const resultNotation = result4.toString();</code></pre><p>Specific parsers can be used.</p>
 <p><strong>Classic (D&amp;D):</strong></p>
 <pre class="prettyprint source lang-js"><code>const {
   parseClassicRoll,
@@ -96,7 +102,6 @@ const result1 = rollClassic(parsedRoll);
 //=> { notation: '2d20', value: 26, rolls: [11, 15] }
 const result2 = rollClassic(new Roll(20, 2));
 
-// `rollClassic()` can also accepts plain objects though it's not recommended
 //=> { notation: '4d10+1', value: 22, rolls: [4, 6, 2, 9] }
 const result3 = rollClassic({ dice: 10, count: 4, modifier: 1 });
 
@@ -119,7 +124,6 @@ const result1 = rollWod(parsedRoll);
 //=> { notation: '4d10>6f1', value: 1, rolls: [4, 10, 5, 2] }
 const result2 = rollWod(new WodRoll(10, 4, false, 6, 1));
 
-// `rollWod()` can also accepts plain objects though it's not recommended
 //=> { notation: '4d10!>8f1', value: 22, rolls: [1, 8, 5, 10, 10, 4] }
 const result3 = rollWod({ dice: 10, count: 2, again: true, success: 8, fail: 1 });
 
@@ -141,8 +145,14 @@ random(100);
 random(10);
 
 //=> [2, 5, 2, 6] - 4d6-like roll
-new Array(4).fill(1).map(v => random(6))</code></pre><h2>Releases</h2><p>Current version has a lot of breaking changes.
-<br>If you are looking for the the previous one, use <a href="https://github.com/edloidas/roll-parser/tree/v1.1.1">v1.1.1</a>.</p>
+[...Array(4)].map(() => random(6))</code></pre><p>Even so the parse&amp;roll functions uses checks to convert non-standard objects to <code>Roll</code> or <code>WodRoll</code>, explicit conversion can be used in some cases:</p>
+<pre class="prettyprint source lang-js"><code>const { convert } = require('roll-parser');
+
+//=> new Roll(undefined, 4, -3)
+convert({ count: 4, modifier: -3 });
+
+//=> new WodRoll(10, 6, true, undefined, 2)
+convert({ dice: 10, count: 6, again: true, fail: 2 });</code></pre><h2>Releases</h2><p>Please review the <a href="https://github.com/edloidas/roll-parser/releases">changelog</a>.</p>
 <h2>Contributing</h2><p>♥ <a href="https://github.com/edloidas/roll-parser">roll-parser</a> and want to get involved?<br>
 Please, check the <a href="CONTRIBUTING.md">guide</a> first.</p>
 <h2>License</h2><p><a href="LICENSE">MIT</a> © <a href="https://edloidas.com">Mikita Taukachou</a></p>

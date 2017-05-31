@@ -22,7 +22,7 @@
 <label for="nav-trigger" class="overlay"></label>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="Result.html">Result</a></li><li><a href="Roll.html">Roll</a></li><li><a href="WodRoll.html">WodRoll</a></li></ul><h3>Global</h3><ul><li><a href="global.html#parse">parse</a></li><li><a href="global.html#parseAndRoll">parseAndRoll</a></li><li><a href="global.html#parseAndRollClassic">parseAndRollClassic</a></li><li><a href="global.html#parseAndRollSimple">parseAndRollSimple</a></li><li><a href="global.html#parseAndRollWod">parseAndRollWod</a></li><li><a href="global.html#parseClassicRoll">parseClassicRoll</a></li><li><a href="global.html#parseSimpleRoll">parseSimpleRoll</a></li><li><a href="global.html#parseWodRoll">parseWodRoll</a></li><li><a href="global.html#random">random</a></li><li><a href="global.html#rollClassic">rollClassic</a></li><li><a href="global.html#rollWod">rollWod</a></li><li><a href="global.html#roll">roll</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="Result.html">Result</a></li><li><a href="Roll.html">Roll</a></li><li><a href="WodRoll.html">WodRoll</a></li></ul><h3>Global</h3><ul><li><a href="global.html#parse">parse</a></li><li><a href="global.html#parseAndRoll">parseAndRoll</a></li><li><a href="global.html#parseAndRollClassic">parseAndRollClassic</a></li><li><a href="global.html#parseAndRollSimple">parseAndRollSimple</a></li><li><a href="global.html#parseAndRollWod">parseAndRollWod</a></li><li><a href="global.html#parseClassicRoll">parseClassicRoll</a></li><li><a href="global.html#parseSimpleRoll">parseSimpleRoll</a></li><li><a href="global.html#parseWodRoll">parseWodRoll</a></li><li><a href="global.html#convert">convert</a></li><li><a href="global.html#random">random</a></li><li><a href="global.html#rollClassic">rollClassic</a></li><li><a href="global.html#rollWod">rollWod</a></li><li><a href="global.html#roll">roll</a></li></ul>
 </nav>
 
 <div id="main">
@@ -294,7 +294,7 @@ parse('xyz');       //=> null</code></pre>
 
     
 
-    <h4 class="name" id="parseAndRoll"><span class="type-signature"></span>parseAndRoll<span class="signature">(roll)</span><span class="type-signature"> &rarr; {<a href="Result.html">Result</a>}</span></h4>
+    <h4 class="name" id="parseAndRoll"><span class="type-signature"></span>parseAndRoll<span class="signature">(roll)</span><span class="type-signature"> &rarr; {<a href="Result.html">Result</a>|null}</span></h4>
 
     
 
@@ -444,6 +444,10 @@ parseAndRoll('4d10!>8f1'); //=> { notation: '4d10!>8f1', value: 2, rolls: [ 3, 1
 <h5>Returns:</h5>
 
         
+<div class="param-desc">
+    <p>Returns <code>Result</code> for defined parameters, otherwise returns <code>null</code>.</p>
+</div>
+
 
 
 <dl class="param-type">
@@ -453,6 +457,9 @@ parseAndRoll('4d10!>8f1'); //=> { notation: '4d10!>8f1', value: 2, rolls: [ 3, 1
     <dd>
         
 <span class="param-type"><a href="Result.html">Result</a></span>
+|
+
+<span class="param-type">null</span>
 
 
     </dd>
@@ -1495,6 +1502,176 @@ parseWodRoll('4d10!>8f1'); //=> { dice: 10, count: 4, again: true, success: 8, f
 
     
 
+    <h4 class="name" id="convert"><span class="type-signature"></span>convert<span class="signature">(object)</span><span class="type-signature"> &rarr; {<a href="Roll.html">Roll</a>|<a href="WodRoll.html">WodRoll</a>}</span></h4>
+
+    
+
+
+
+
+<dl class="details">
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="converter.js.html">converter.js</a>, <a href="converter.js.html#line32">line 32</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+    <dt class="tag-since">Since:</dt>
+    <dd class="tag-since"><ul class="dummy"><li>v2.1.0</li></ul></dd>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+<div class="description">
+    <p>Converts any arguments to <code>Roll</code> or <code>WodRoll</code> object.
+If passed argument has <code>again</code>, <code>success</code> or <code>fail</code> property, the function will return <code>WodRoll</code>.
+Otherwise, <code>Roll</code> will be returned.</p>
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>convert({ dice: 6 }); //=> new Roll( 6 )
+convert({ modifier: 6 }); //=> new Roll( undefined, undefined, 6 )
+convert({ dice: 10, count: 5, success: 5 }); //=> new WodRoll( 10, 5, undefined, 5 )</code></pre>
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>object</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p><code>Roll</code>, <code>WodRoll</code> or similar object.</p></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    <p>Result of converion.</p>
+</div>
+
+
+
+<dl class="param-type">
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type"><a href="Roll.html">Roll</a></span>
+|
+
+<span class="param-type"><a href="WodRoll.html">WodRoll</a></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+        
+            
+
+    
+
     <h4 class="name" id="random"><span class="type-signature"></span>random<span class="signature">(max)</span><span class="type-signature"> &rarr; {Number}</span></h4>
 
     
@@ -1671,7 +1848,7 @@ random(1);   //=>  1 - always rolls 1</code></pre>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="roller.js.html">roller.js</a>, <a href="roller.js.html#line20">line 20</a>
+        <a href="roller.js.html">roller.js</a>, <a href="roller.js.html#line22">line 22</a>
     </li></ul></dd>
     
 
@@ -1736,7 +1913,8 @@ random(1);   //=>  1 - always rolls 1</code></pre>
 
     <h5>Example</h5>
     
-    <pre class="prettyprint"><code>roll(new Roll(10, 2, -1)); //=> { notation: '2d10-1', value: 14, rolls: [ 7, 8 ] }</code></pre>
+    <pre class="prettyprint"><code>rollClassic(new Roll(10, 2, -1)); //=> { notation: '2d10-1', value: 14, rolls: [ 7, 8 ] }
+rollClassic({ dice: 6 }); //=> { notation: 'd6', value: 4, rolls: [ 4 ] }</code></pre>
 
 
 
@@ -1782,7 +1960,7 @@ random(1);   //=>  1 - always rolls 1</code></pre>
 
             
 
-            <td class="description last"></td>
+            <td class="description last"><p><code>Roll</code> object or similar</p></td>
         </tr>
 
     
@@ -1839,7 +2017,7 @@ random(1);   //=>  1 - always rolls 1</code></pre>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="roller.js.html">roller.js</a>, <a href="roller.js.html#line42">line 42</a>
+        <a href="roller.js.html">roller.js</a>, <a href="roller.js.html#line46">line 46</a>
     </li></ul></dd>
     
 
@@ -1904,7 +2082,8 @@ random(1);   //=>  1 - always rolls 1</code></pre>
 
     <h5>Example</h5>
     
-    <pre class="prettyprint"><code>rollWod(new WodRoll(10, 4, true, 8)); //=> { notation: '4d10!>8', value: 2, rolls: [3,10,7,9,5] }</code></pre>
+    <pre class="prettyprint"><code>rollWod(new WodRoll(10, 4, true, 8)); //=> { notation: '4d10!>8', value: 2, rolls: [3,10,7,9,5] }
+rollWod({ dice: 8, count: 3 }); //=> { notation: '3d8>6', value: 2, rolls: [ 7, 3, 9 ] }</code></pre>
 
 
 
@@ -1950,7 +2129,7 @@ random(1);   //=>  1 - always rolls 1</code></pre>
 
             
 
-            <td class="description last"></td>
+            <td class="description last"><p><code>WodRoll</code> object or similar</p></td>
         </tr>
 
     
@@ -1995,7 +2174,7 @@ random(1);   //=>  1 - always rolls 1</code></pre>
 
     
 
-    <h4 class="name" id="roll"><span class="type-signature"></span>roll<span class="signature">(roll)</span><span class="type-signature"> &rarr; {<a href="Result.html">Result</a>|null}</span></h4>
+    <h4 class="name" id="roll"><span class="type-signature"></span>roll<span class="signature">(roll)</span><span class="type-signature"> &rarr; {<a href="Result.html">Result</a>}</span></h4>
 
     
 
@@ -2007,7 +2186,7 @@ random(1);   //=>  1 - always rolls 1</code></pre>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="roller.js.html">roller.js</a>, <a href="roller.js.html#line85">line 85</a>
+        <a href="roller.js.html">roller.js</a>, <a href="roller.js.html#line93">line 93</a>
     </li></ul></dd>
     
 
@@ -2073,7 +2252,10 @@ random(1);   //=>  1 - always rolls 1</code></pre>
     <h5>Example</h5>
     
     <pre class="prettyprint"><code>roll(new Roll(10, 2, -1)); //=> { notation: '2d10-1', value: 14, rolls: [ 7, 8 ] }
-roll(new WodRoll(10, 4, true, 8)); //=> { notation: '4d10!>8', value: 2, rolls: [3,10,7,9,5] }</code></pre>
+roll({ dice: 6 }); //=> { notation: 'd6', value: 4, rolls: [ 4 ] }
+roll(new WodRoll(10, 4, true, 8)); //=> { notation: '4d10!>8', value: 2, rolls: [3,10,7,9,5] }
+roll({ dice: 8, count: 3, again: true }); //=> { notation: '3d8!>6', value: 2, rolls: [7,3,9 ] }
+roll( null ); //=> null</code></pre>
 
 
 
@@ -2113,6 +2295,9 @@ roll(new WodRoll(10, 4, true, 8)); //=> { notation: '4d10!>8', value: 2, rolls: 
 |
 
 <span class="param-type"><a href="WodRoll.html">WodRoll</a></span>
+|
+
+<span class="param-type">Object</span>
 
 
             
@@ -2122,7 +2307,7 @@ roll(new WodRoll(10, 4, true, 8)); //=> { notation: '4d10!>8', value: 2, rolls: 
 
             
 
-            <td class="description last"><p>structly roll of those two types. Can't parse custom objects.</p></td>
+            <td class="description last"><p><code>Roll</code>, <code>WodRoll</code> or similar object.</p></td>
         </tr>
 
     
@@ -2146,7 +2331,7 @@ roll(new WodRoll(10, 4, true, 8)); //=> { notation: '4d10!>8', value: 2, rolls: 
 
         
 <div class="param-desc">
-    <p><code>Result</code> object or <code>null</code> if passed arguments is of unknown type</p>
+    <p>Returns <code>Result</code> for defined parameters, otherwise returns <code>null</code>.</p>
 </div>
 
 
@@ -2158,9 +2343,6 @@ roll(new WodRoll(10, 4, true, 8)); //=> { notation: '4d10!>8', value: 2, rolls: 
     <dd>
         
 <span class="param-type"><a href="Result.html">Result</a></span>
-|
-
-<span class="param-type">null</span>
 
 
     </dd>

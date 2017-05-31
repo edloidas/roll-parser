@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>complex/parseAndRoll.js - Documentation</title>
+    <title>converter.js - Documentation</title>
 
     <script src="scripts/prettify/prettify.js"></script>
     <script src="scripts/prettify/lang-css.js"></script>
@@ -27,7 +27,7 @@
 
 <div id="main">
     
-    <h1 class="page-title">complex/parseAndRoll.js</h1>
+    <h1 class="page-title">converter.js</h1>
     
 
     
@@ -37,27 +37,51 @@
     
     <section>
         <article>
-            <pre class="prettyprint source linenums"><code>const { rollAny } = require( '../roller' );
-const parse = require( './parse' );
+            <pre class="prettyprint source linenums"><code>const { isAbsent } = require( './normalizer' );
+const Roll = require( './object/Roll' );
+const WodRoll = require( './object/WodRoll' );
+
+function convertToRoll( object = {}) {
+  const { dice, count, modifier } = object || {};
+
+  return new Roll( dice, count, modifier );
+}
+
+function convertToWodRoll( object = {}) {
+  const { dice, count, again, success, fail } = object || {};
+
+  return new WodRoll( dice, count, again, success, fail );
+}
 
 /**
- * Parses simplified, classic or WoD roll notation and then rolls the dice.
+ * Converts any arguments to `Roll` or `WodRoll` object.
+ * If passed argument has `again`, `success` or `fail` property, the function will return `WodRoll`.
+ * Otherwise, `Roll` will be returned.
  *
  * @func
- * @since v2.0.0
- * @param {String} roll
- * @return {Result|null} Returns `Result` for defined parameters, otherwise returns `null`.
- * @see parseAndRollSimple
- * @see parseAndRollClassic
- * @see parseAndRollWod
+ * @alias convert
+ * @since v2.1.0
+ * @param {Object} object - `Roll`, `WodRoll` or similar object.
+ * @return {Roll|WodRoll} Result of converion.
  * @example
- * parseAndRoll('2 10 -1');   //=> { notation: '2d10-1', value: 14, rolls: [ 7, 8 ] }
- * parseAndRoll('2d10+1');    //=> { notation: '2d10+1', value: 9, rolls: [ 2, 6 ] }
- * parseAndRoll('4d10!>8f1'); //=> { notation: '4d10!>8f1', value: 2, rolls: [ 3, 10, 7, 9, 5 ] }
+ * convert({ dice: 6 }); //=> new Roll( 6 )
+ * convert({ modifier: 6 }); //=> new Roll( undefined, undefined, 6 )
+ * convert({ dice: 10, count: 5, success: 5 }); //=> new WodRoll( 10, 5, undefined, 5 )
  */
-const parseAndRoll = roll => rollAny( parse( roll ));
+function convertToAnyRoll( object = {}) {
+  const { again, success, fail } = object || {};
 
-module.exports = parseAndRoll;
+  if ( isAbsent( again ) &amp;&amp; isAbsent( success ) &amp;&amp; isAbsent( fail )) {
+    return convertToRoll( object );
+  } // else
+  return convertToWodRoll( object );
+}
+
+module.exports = {
+  convertToRoll,
+  convertToWodRoll,
+  convertToAnyRoll,
+};
 </code></pre>
         </article>
     </section>
