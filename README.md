@@ -34,7 +34,7 @@ const parsedRoll = parse('4d6+1');
 
 // `Roll` or `WodRoll` can be stringified
 //=> '4d6+1'
-const notation = parsedRoll.toString();
+const rollNotation = parsedRoll.toString();
 
 //=> { notation: '4d6+1', value: 16, rolls: [3, 1, 6, 5] }
 const result1 = roll(parsedRoll);
@@ -48,6 +48,9 @@ const result3 = roll({dice: 10, count: 2, success: 7});
 // Any invalid arguments, except `null` or `undefined`, will be parsed as default `Roll`
 //=> { notation: '3d10!>8f1', value: 2, rolls: [3, 10, 7, 9] }
 const result4 = parseAndRoll('3d10!>8f1');
+
+//=> '(3d10!>8f1) 2 [3,10,7,9]'
+const resultNotation = result4.toString();
 ```
 
 Specific parsers can be used.
@@ -132,7 +135,7 @@ random(10);
 [...Array(4)].map(() => random(6))
 ```
 
-Even so the parse&roll functions uses checks to convert non-standard objects to `Roll` or `WodRoll`, explicit conversion can be used:
+Even so the parse&roll functions uses checks to convert non-standard objects to `Roll` or `WodRoll`, explicit conversion can be used in some cases:
 
 ```js
 const { convert } = require('roll-parser');
