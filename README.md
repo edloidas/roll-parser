@@ -1,7 +1,7 @@
 <h1 align="center">Roll Parser</h1>
 
 <p align="center">
-:dragon: Parser for classic (2d6+1), simple (2 6 1), and WoD (4d10!>6f1) dice rolls.
+Parser for classic (2d6+1), simple (2 6 1), and WoD (4d10!>6f1) dice rolls.
 </p>
 
 [![Travis Build Status][travis-image]][travis-url]
@@ -128,13 +128,12 @@ random(100);
 random(10);
 
 //=> [2, 5, 2, 6] - 4d6-like roll
-new Array(4).fill(1).map(v => random(6))
+[...Array(4)].map(() => random(6))
 ```
 
 ## Releases
 
-Current version has a lot of breaking changes.
-<br>If you are looking for the the previous one, use [v1.1.1](https://github.com/edloidas/roll-parser/tree/v1.1.1).
+Please review the [changelog](https://github.com/edloidas/roll-parser/releases).
 
 ## Contributing
 
