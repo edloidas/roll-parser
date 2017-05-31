@@ -13,4 +13,10 @@ describe( 'Rolling classic roll:', () => {
     expect( result.value ).toEqual( 15 );
     expect( result.notation ).toEqual( '5d1+10' );
   });
+
+  test( 'Should not generate identical values.', () => {
+    const result = rollClassic( new Roll( 1000, 10, 0 ));
+    const allIdentical = result.rolls.every(( value, i, arr ) => value === arr[ 0 ]);
+    expect( allIdentical ).toBeFalsy();
+  });
 });
