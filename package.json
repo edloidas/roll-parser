@@ -31,9 +31,10 @@
     "test": "jest",
     "cover": "jest --coverage",
     "report": "node_modules/.bin/jest --coverage && cat coverage/lcov.info | node_modules/coveralls/bin/coveralls.js",
+    "fix": "eslint --fix .",
+    "api": "rimraf api/ && jsdoc -c .jsdocrc",
     "prepush": "npm test",
-    "fix": "eslint --fix . || true",
-    "api": "rimraf api/ && jsdoc -c .jsdocrc"
+    "prepublish": "npm run fix && npm test"
   },
   "dependencies": {},
   "devDependencies": {
