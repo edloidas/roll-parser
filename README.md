@@ -132,7 +132,7 @@ random(100);
 random(10);
 
 //=> [2, 5, 2, 6] - 4d6-like roll
-[...Array(4)].map(() => random(6))
+[...Array(4)].map(() => random(6));
 ```
 
 Even so the parse&roll functions uses checks to convert non-standard objects to `Roll` or `WodRoll`, explicit conversion can be used in some cases:
