@@ -1,5 +1,4 @@
 const { parseAny } = require( '../../src/parser' );
-const Type = require( '../../src/object/Type' );
 const { testParse } = require( '../util' );
 
 testParse(

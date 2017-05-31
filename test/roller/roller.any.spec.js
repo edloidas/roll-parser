@@ -1,6 +1,7 @@
 const { rollAny } = require( '../../src/roller' );
 const Roll = require( '../../src/object/Roll' );
 const WodRoll = require( '../../src/object/WodRoll' );
+const Result = require( '../../src/object/Result' );
 
 describe( 'Rolling WoD or classic roll:', () => {
   test( 'Should generate 6 values for classic roll.', () => {
@@ -15,8 +16,17 @@ describe( 'Rolling WoD or classic roll:', () => {
     expect( result.notation ).toEqual( '2d10>6' );
   });
 
-  test( 'Should return `null` for non-standard or invalid rolls.', () => {
-    expect( rollAny( null )).toBeNull();
-    expect( rollAny({ dice: 10, count: 6, modifier: 0 })).toBeNull();
+  test( 'Should return result for non-standard rolls.', () => {
+    expect( rollAny({})).toBeInstanceOf( Result );
+    expect( rollAny([])).toBeInstanceOf( Result );
+    expect( rollAny( '' )).toBeInstanceOf( Result );
+    expect( rollAny( '2d10-1' )).toBeInstanceOf( Result );
+    expect( rollAny({ dice: 10, count: 6, modifier: 0 })).toBeInstanceOf( Result );
+    expect( rollAny({ dice: 10, count: 6, fail: 1 })).toBeInstanceOf( Result );
+  });
+
+  test( 'Should return `null` for invalid rolls.', () => {
+    expect( rollAny( null )).toBeFalsy();
+    expect( rollAny( undefined )).toBeFalsy();
   });
 });

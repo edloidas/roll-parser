@@ -36,15 +36,18 @@ const parsedRoll = parse('4d6+1');
 //=> '4d6+1'
 const notation = parsedRoll.toString();
 
-// `roll()` function accepts only the default `Roll` or `WodRoll` objects
 //=> { notation: '4d6+1', value: 16, rolls: [3, 1, 6, 5] }
 const result1 = roll(parsedRoll);
 //=> { notation: '2d20-3', value: 23, rolls: [11, 15] }
 const result2 = roll(new Roll(20, 2, -3));
+// Can also accept plain objects
+//=> { notation: '2d10>7', value: 1, rolls: [4, 8] }
+const result3 = roll({dice: 10, count: 2, success: 7});
 
 // `parseAndRoll()` function can parse any notation and then roll the dice
+// Any invalid arguments, except `null` or `undefined`, will be parsed as default `Roll`
 //=> { notation: '3d10!>8f1', value: 2, rolls: [3, 10, 7, 9] }
-const result3 = parseAndRoll('3d10!>8f1');
+const result4 = parseAndRoll('3d10!>8f1');
 ```
 
 Specific parsers can be used.
@@ -68,7 +71,6 @@ const result1 = rollClassic(parsedRoll);
 //=> { notation: '2d20', value: 26, rolls: [11, 15] }
 const result2 = rollClassic(new Roll(20, 2));
 
-// `rollClassic()` can also accepts plain objects though it's not recommended
 //=> { notation: '4d10+1', value: 22, rolls: [4, 6, 2, 9] }
 const result3 = rollClassic({ dice: 10, count: 4, modifier: 1 });
 
@@ -96,7 +98,6 @@ const result1 = rollWod(parsedRoll);
 //=> { notation: '4d10>6f1', value: 1, rolls: [4, 10, 5, 2] }
 const result2 = rollWod(new WodRoll(10, 4, false, 6, 1));
 
-// `rollWod()` can also accepts plain objects though it's not recommended
 //=> { notation: '4d10!>8f1', value: 22, rolls: [1, 8, 5, 10, 10, 4] }
 const result3 = rollWod({ dice: 10, count: 2, again: true, success: 8, fail: 1 });
 
@@ -129,6 +130,18 @@ random(10);
 
 //=> [2, 5, 2, 6] - 4d6-like roll
 [...Array(4)].map(() => random(6))
+```
+
+Even so the parse&roll functions uses checks to convert non-standard objects to `Roll` or `WodRoll`, explicit conversion can be used:
+
+```js
+const { convert } = require('roll-parser');
+
+//=> new Roll(undefined, 4, -3)
+convert({ count: 4, modifier: -3 });
+
+//=> new WodRoll(10, 6, true, undefined, 2)
+convert({ dice: 10, count: 6, again: true, fail: 2 });
 ```
 
 ## Releases

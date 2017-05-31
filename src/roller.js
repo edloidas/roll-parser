@@ -1,5 +1,6 @@
 const { randomRoll } = require( './random' );
-const { normalizeRollResult } = require( './normalizer' );
+const { normalizeRollResult, isDefined } = require( './normalizer' );
+const { convertToRoll, convertToWodRoll, convertToAnyRoll } = require( './converter' );
 const Result = require( './object/Result' );
 const Roll = require( './object/Roll' );
 const WodRoll = require( './object/WodRoll' );
@@ -10,21 +11,23 @@ const WodRoll = require( './object/WodRoll' );
  *
  * @func
  * @since v2.0.0
- * @param {Roll} roll
+ * @param {Roll} roll - `Roll` object or similar
  * @return {Result}
  * @see roll
  * @see rollWod
  * @example
- * roll(new Roll(10, 2, -1)); //=> { notation: '2d10-1', value: 14, rolls: [ 7, 8 ] }
+ * rollClassic(new Roll(10, 2, -1)); //=> { notation: '2d10-1', value: 14, rolls: [ 7, 8 ] }
+ * rollClassic({ dice: 6 }); //=> { notation: 'd6', value: 4, rolls: [ 4 ] }
  */
 function rollClassic( roll ) {
-  const { dice, count, modifier } = roll;
+  const data = roll instanceof Roll ? roll : convertToRoll( roll );
+  const { dice, count, modifier } = data;
 
   const rolls = [ ...new Array( count ) ].map(() => randomRoll( dice ));
   const summ = rolls.reduce(( prev, curr ) => prev + curr, 0 );
   const result = normalizeRollResult( summ + modifier );
 
-  return new Result( roll.toString(), result, rolls );
+  return new Result( data.toString(), result, rolls );
 }
 
 /**
@@ -32,15 +35,17 @@ function rollClassic( roll ) {
  *
  * @func
  * @since v2.0.0
- * @param {WodRoll} roll
+ * @param {WodRoll} roll - `WodRoll` object or similar
  * @return {Result}
  * @see roll
  * @see rollClassic
  * @example
  * rollWod(new WodRoll(10, 4, true, 8)); //=> { notation: '4d10!>8', value: 2, rolls: [3,10,7,9,5] }
+ * rollWod({ dice: 8, count: 3 }); //=> { notation: '3d8>6', value: 2, rolls: [ 7, 3, 9 ] }
  */
 function rollWod( roll ) {
-  const { dice, count, again, success, fail } = roll;
+  const data = roll instanceof WodRoll ? roll : convertToWodRoll( roll );
+  const { dice, count, again, success, fail } = data;
 
   const rolls = [];
 
@@ -65,7 +70,7 @@ function rollWod( roll ) {
     return suc;
   }, 0 );
 
-  return new Result( roll.toString(), Math.max( result, 0 ), rolls );
+  return new Result( data.toString(), Math.max( result, 0 ), rolls );
 }
 
 /**
@@ -74,13 +79,16 @@ function rollWod( roll ) {
  * @func
  * @alias roll
  * @since v2.0.0
- * @param {Roll|WodRoll} roll - structly roll of those two types. Can't parse custom objects.
- * @return {Result|null} `Result` object or `null` if passed arguments is of unknown type
+ * @param {Roll|WodRoll|Object} roll - `Roll`, `WodRoll` or similar object.
+ * @return {Result} Returns `Result` for defined parameters, otherwise returns `null`.
  * @see rollClassic
  * @see rollWod
  * @example
  * roll(new Roll(10, 2, -1)); //=> { notation: '2d10-1', value: 14, rolls: [ 7, 8 ] }
+ * roll({ dice: 6 }); //=> { notation: 'd6', value: 4, rolls: [ 4 ] }
  * roll(new WodRoll(10, 4, true, 8)); //=> { notation: '4d10!>8', value: 2, rolls: [3,10,7,9,5] }
+ * roll({ dice: 8, count: 3, again: true }); //=> { notation: '3d8!>6', value: 2, rolls: [7,3,9 ] }
+ * roll( null ); //=> null
  */
 function rollAny( roll ) {
   if ( roll instanceof Roll ) {
@@ -88,7 +96,7 @@ function rollAny( roll ) {
   } else if ( roll instanceof WodRoll ) {
     return rollWod( roll );
   }
-  return null;
+  return isDefined( roll ) ? rollAny( convertToAnyRoll( roll )) : null;
 }
 
 module.exports = {

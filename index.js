@@ -19,4 +19,6 @@ module.exports = {
   parseAndRollWod: require( './src/complex/parseAndRollWod' ),
 
   ramdom: require( './src/random' ).randomRoll,
+
+  convert: require( './src/converter' ).convertToAnyRoll,
 };

@@ -1,5 +1,6 @@
 const { rollWod } = require( '../../src/roller' );
 const WodRoll = require( '../../src/object/WodRoll' );
+const Result = require( '../../src/object/Result' );
 
 describe( 'Rolling WoD roll:', () => {
   test( 'Should generate 6 values for `6d10>6` roll.', () => {
@@ -15,8 +16,16 @@ describe( 'Rolling WoD roll:', () => {
   });
 
   test( 'Should fail all rolls.', () => {
-    const roll = Object.assign({}, new WodRoll( 1, 1, false, 1 ), { success: 2, fail: 1 });
+    const roll = new WodRoll( 1, 1, false, 1 );
+    roll.success = 2;
+    roll.fail = 1;
     const result = rollWod( roll );
     expect( result.value ).toEqual( 0 );
+  });
+
+  test( 'Should return result for non-standard or invalid rolls.', () => {
+    expect( rollWod( null )).toBeInstanceOf( Result );
+    expect( rollWod({ dice: 10, count: 6, modifier: 0 })).toBeInstanceOf( Result );
+    expect( rollWod({ dice: 10, count: 6, fail: 1 })).toBeInstanceOf( Result );
   });
 });

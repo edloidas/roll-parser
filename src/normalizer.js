@@ -22,6 +22,10 @@ const normalizeWodBorders = ( bottom, top, max ) => {
   return [ a, b ];
 };
 
+// isDefined :: Any -> Boolean
+//   Checks for the existence of the value
+const isDefined = value => value !== undefined && value !== null;
+
 // isAbsent :: Any -> Boolean
 //   Checks for absence of the values from RegExp execution result.
 const isAbsent = value => value === undefined || value === null || value === '';
@@ -36,6 +40,7 @@ const normalizeRegexResult = value => ( isAbsent( value ) ? null : toInteger( va
 
 module.exports = {
   isAbsent,
+  isDefined,
   fixInvalid,
   normalizeInteger,
   normalizeRollResult,

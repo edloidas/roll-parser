@@ -7,7 +7,7 @@ const parse = require( './parse' );
  * @func
  * @since v2.0.0
  * @param {String} roll
- * @return {Result}
+ * @return {Result|null} Returns `Result` for defined parameters, otherwise returns `null`.
  * @see parseAndRollSimple
  * @see parseAndRollClassic
  * @see parseAndRollWod
