@@ -3,6 +3,8 @@
 node_modules/
 coverage/
 api/
+bin/
+dist/
 
 # Files #
 

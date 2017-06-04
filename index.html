@@ -60,7 +60,11 @@ Parser for classic (2d6+1), simple (2 6 1), and WoD (4d10!&gt;6f1) dice rolls.
 <p><a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-≥%206.0.0-green.svg" alt="Node.js version"></a>
 <a href="https://www.npmjs.com/package/roll-parser"><img src="https://img.shields.io/badge/npm-roll--parser-blue.svg" alt="Project is on npm"></a></p>
 <h2>Documentation</h2><p>Please review the <a href="http://edloidas.com/roll-parser/">API documentation</a>.</p>
-<h2>Install</h2><pre class="prettyprint source"><code>npm install --save roll-parser</code></pre><h2>Usage</h2><pre class="prettyprint source lang-js"><code>const { parse, roll, parseAndRoll, Roll } = require('roll-parser');
+<h2>Install</h2><h4>Node:</h4><pre class="prettyprint source"><code>npm install roll-parser</code></pre><p>Then in the console or JS file:</p>
+<pre class="prettyprint source lang-js"><code>const rollParser = require('roll-parser');</code></pre><h4>Browser:</h4><pre class="prettyprint source lang-html"><code>&lt;script src=&quot;https://unpkg.com/roll-parser/dist/roll-parser.js&quot;>&lt;/script></code></pre><p>Minified version:</p>
+<pre class="prettyprint source lang-html"><code>&lt;script src=&quot;https://unpkg.com/roll-parser/dist/roll-parser.min.js&quot;>&lt;/script></code></pre><p>Then access all functions from <code>rollParser</code> object.</p>
+<h4>Console:</h4><pre class="prettyprint source lang-bash"><code>$ roll-parser [options] [&lt;rolls>]</code></pre><p>Run <code>roll-parser --help</code> for more details.</p>
+<h2>Usage</h2><pre class="prettyprint source lang-js"><code>const { parse, roll, parseAndRoll, Roll } = require('roll-parser');
 
 // `parse()` function parses any notation and returns `Roll` or `WodRoll` object
 //=> { dice: 6, count: 4, modifier: 1 }
@@ -145,7 +149,7 @@ random(100);
 random(10);
 
 //=> [2, 5, 2, 6] - 4d6-like roll
-[...Array(4)].map(() => random(6))</code></pre><p>Even so the parse&amp;roll functions uses checks to convert non-standard objects to <code>Roll</code> or <code>WodRoll</code>, explicit conversion can be used in some cases:</p>
+[...Array(4)].map(() => random(6));</code></pre><p>Even so the parse&amp;roll functions uses checks to convert non-standard objects to <code>Roll</code> or <code>WodRoll</code>, explicit conversion can be used in some cases:</p>
 <pre class="prettyprint source lang-js"><code>const { convert } = require('roll-parser');
 
 //=> new Roll(undefined, 4, -3)
