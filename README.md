@@ -44,6 +44,12 @@ Then access all functions from `rollParser` object.
 
 #### Console:
 
+Install package globally:
+```bash
+npm install -g roll-parser
+```
+
+Then in the console:
 ```bash
 $ roll-parser [options] [<rolls>]
 ```
