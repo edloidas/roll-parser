@@ -29,12 +29,17 @@ Then in the console:
 const rollParser = require('roll-parser');
 ```
 
+<br/>
 To use directly in the browser:
 ```html
 <script src="https://unpkg.com/roll-parser/dist/roll-parser.min.js"></script>
 ```
+Full version:
+```html
+<script src="https://unpkg.com/roll-parser/dist/roll-parser.js"></script>
+```
 
-Then access it with `rollParser` variable.
+Then access all functions from `rollParser` object.
 
 ## Usage
 

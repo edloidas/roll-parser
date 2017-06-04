@@ -21,8 +21,8 @@
   "author": "Mikita Taukachou <edloidas@gmail.com> (https://edloidas.com)",
   "files": [
     "index.js",
-    "dist/roll-parser.min.js",
-    "src"
+    "src",
+    "dist"
   ],
   "repository": {
     "type": "git",
@@ -34,15 +34,19 @@
     "report": "node_modules/.bin/jest --coverage && cat coverage/lcov.info | node_modules/coveralls/bin/coveralls.js",
     "fix": "eslint --fix .",
     "api": "rimraf api/ && jsdoc -c .jsdocrc",
-    "build": "webpack && babili dist/roll-parser.js --out-file dist/roll-parser.min.js && bash ./build/build.sh",
+    "clean": "rimraf dist/*",
+    "build:bundle": "browserify index.js --debug --standalone rollParser -o dist/roll-parser.js",
+    "build:minify": "babili dist/roll-parser.js --out-file dist/roll-parser.min.js",
+    "build": "npm run build:bundle && npm run build:minify",
     "prepush": "npm test",
-    "prepublishOnly": "npm run fix && npm test && npm run build"
+    "prepublishOnly": "npm run fix && npm test && npm run clean && npm run build"
   },
   "dependencies": {},
   "devDependencies": {
     "babel-core": "^6.24.1",
     "babel-preset-babili": "^0.1.2",
     "babili": "^0.1.2",
+    "browserify": "^14.4.0",
     "coveralls": "^2.13.1",
     "docdash": "^0.4.0",
     "eslint": "^3.19.0",
@@ -52,8 +56,7 @@
     "istanbul": "^0.4.5",
     "jest": "^20.0.4",
     "jsdoc": "^3.4.3",
-    "rimraf": "^2.6.1",
-    "webpack": "^2.6.1"
+    "rimraf": "^2.6.1"
   },
   "engines": {
     "node": ">= 6.0.0",
