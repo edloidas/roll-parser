@@ -63,7 +63,9 @@ Parser for classic (2d6+1), simple (2 6 1), and WoD (4d10!&gt;6f1) dice rolls.
 <h2>Install</h2><h4>Node:</h4><pre class="prettyprint source"><code>npm install roll-parser</code></pre><p>Then in the console or JS file:</p>
 <pre class="prettyprint source lang-js"><code>const rollParser = require('roll-parser');</code></pre><h4>Browser:</h4><pre class="prettyprint source lang-html"><code>&lt;script src=&quot;https://unpkg.com/roll-parser/dist/roll-parser.js&quot;>&lt;/script></code></pre><p>Minified version:</p>
 <pre class="prettyprint source lang-html"><code>&lt;script src=&quot;https://unpkg.com/roll-parser/dist/roll-parser.min.js&quot;>&lt;/script></code></pre><p>Then access all functions from <code>rollParser</code> object.</p>
-<h4>Console:</h4><pre class="prettyprint source lang-bash"><code>$ roll-parser [options] [&lt;rolls>]</code></pre><p>Run <code>roll-parser --help</code> for more details.</p>
+<h4>Console:</h4><p>Install package globally:</p>
+<pre class="prettyprint source lang-bash"><code>npm install -g roll-parser</code></pre><p>Then in the console:</p>
+<pre class="prettyprint source lang-bash"><code>$ roll-parser [options] [&lt;rolls>]</code></pre><p>Run <code>roll-parser --help</code> for more details.</p>
 <h2>Usage</h2><pre class="prettyprint source lang-js"><code>const { parse, roll, parseAndRoll, Roll } = require('roll-parser');
 
 // `parse()` function parses any notation and returns `Roll` or `WodRoll` object
