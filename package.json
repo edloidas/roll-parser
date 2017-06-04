@@ -21,8 +21,9 @@
   "author": "Mikita Taukachou <edloidas@gmail.com> (https://edloidas.com)",
   "files": [
     "index.js",
-    "src",
-    "dist"
+    "bin",
+    "dist",
+    "src"
   ],
   "repository": {
     "type": "git",
@@ -41,7 +42,9 @@
     "prepush": "npm test",
     "prepublishOnly": "npm run fix && npm test && npm run clean && npm run build"
   },
-  "dependencies": {},
+  "dependencies": {
+    "minimist": "^1.2.0"
+  },
   "devDependencies": {
     "babel-core": "^6.24.1",
     "babel-preset-babili": "^0.1.2",

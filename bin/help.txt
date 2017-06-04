@@ -1,0 +1,18 @@
+Usage:
+  roll-parser [options] [<rolls>]
+
+Options:
+  --help  # Print the module options and usage
+
+Arguments:
+  rolls   # Whitespace separated list of roll notations.
+          Only classic or WoD notations are parsed.
+          Can be omitted. In that case, classic d20 roll will be used.
+          Classic: 2d20+1
+          World of Darkness: 6d10!>6f1
+
+Examples:
+  roll-parser 2d20+1
+  roll-parser 4d10 5d6-1 d100
+  roll-parser 6d10!>6f1
+  roll-parser --help
