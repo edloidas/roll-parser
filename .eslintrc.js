@@ -11,7 +11,8 @@ module.exports = {
     'template-curly-spacing': [ 2, 'always' ],
     'no-restricted-syntax': [ 'off' ],
     'object-property-newline': [ 'off', { 'allowMultiplePropertiesPerLine': true } ],
-    'no-plusplus': [ 'error', { 'allowForLoopAfterthoughts': true } ]
+    'no-plusplus': [ 'error', { 'allowForLoopAfterthoughts': true } ],
+    'no-underscore-dangle': [ 'off' ],
   },
   'env': {
     'browser': true,

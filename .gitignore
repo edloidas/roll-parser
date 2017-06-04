@@ -2,6 +2,7 @@
 
 node_modules/
 coverage/
+dist/
 api/
 
 # Files #
@@ -10,7 +11,3 @@ npm-debug.log
 
 .DS_Store
 Desktop.ini
-
-*.sh
-*.bat
-*.cmd

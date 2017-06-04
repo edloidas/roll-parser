@@ -19,9 +19,22 @@ Please review the [API documentation](http://edloidas.com/roll-parser/).
 
 ## Install
 
+To use with node:
 ```
-npm install --save roll-parser
+npm install roll-parser
 ```
+
+Then in the console:
+```js
+const rollParser = require('roll-parser');
+```
+
+To use directly in the browser:
+```html
+<script src="https://unpkg.com/roll-parser/dist/roll-parser.min.js"></script>
+```
+
+Then access it with `rollParser` variable.
 
 ## Usage
 
