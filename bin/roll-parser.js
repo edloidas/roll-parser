@@ -10,12 +10,14 @@ const fs = require( 'fs' );
 
 const rollParser = require( '../index' );
 
+const format = roll => `${ rollParser.parseAndRoll( roll ) || 'Invalid roll notation.' }`;
+
 void function cmd() {
   // --help
   if ( argv.help ) {
     fs.createReadStream( path.resolve( __dirname, './help.txt' )).pipe( process.stdout );
   } else {
     const rolls = argv._.length > 0 ? argv._ : [ 'd20' ];
-    rolls.forEach( roll => console.log( rollParser.parseAndRoll( roll ).toString()));
+    rolls.forEach( roll => console.log( format( roll )));
   }
 }();
