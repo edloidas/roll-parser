@@ -28,8 +28,8 @@ Then in the console:
 ```js
 const rollParser = require('roll-parser');
 ```
+__- OR -__
 
-<br/>
 To use directly in the browser:
 ```html
 <script src="https://unpkg.com/roll-parser/dist/roll-parser.min.js"></script>
