@@ -1,4 +1,3 @@
-/* eslint global-require: "off" */
 module.exports = {
   Roll: require( './src/object/Roll' ),
   WodRoll: require( './src/object/WodRoll' ),

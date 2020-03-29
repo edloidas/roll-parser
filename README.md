@@ -1,7 +1,7 @@
-<h1 align="center">Roll Parser</h1>
+<h1 align="center">Roll 🎲 Parser</h1>
 
 <p align="center">
-Parser for classic (2d6+1), simple (2 6 1), and WoD (4d10!>6f1) dice rolls.
+Supecharged parser for D&D and WoD dice rolls.
 </p>
 
 [![Travis Build Status][travis-image]][travis-url]
@@ -210,7 +210,7 @@ Please, check the [guide](CONTRIBUTING.md) first.
 [devdep-image]: https://david-dm.org/edloidas/roll-parser/dev-status.svg
 
 [node-url]: https://nodejs.org
-[node-image]: https://img.shields.io/badge/node-≥%206.0.0-green.svg
+[node-image]: https://img.shields.io/badge/node-≥%2010.9.0-green.svg
 
 [npm-url]: https://www.npmjs.com/package/roll-parser
 [npm-image]: https://img.shields.io/badge/npm-roll--parser-blue.svg

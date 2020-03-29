@@ -35,35 +35,38 @@
     "cover": "jest --coverage",
     "report": "node_modules/.bin/jest --coverage && cat coverage/lcov.info | node_modules/coveralls/bin/coveralls.js",
     "fix": "eslint --fix .",
-    "api": "rimraf api/ && jsdoc -c .jsdocrc",
+    "api": "rimraf api/ && typedoc --out api/",
     "clean": "rimraf dist/*",
-    "build:bundle": "browserify index.js --debug --standalone rollParser -o dist/roll-parser.js",
-    "build:minify": "babili dist/roll-parser.js --out-file dist/roll-parser.min.js",
-    "build": "npm run build:bundle && npm run build:minify",
+    "build:node": "webpack --config webpack.node.config.js --colors",
+    "build:browser": "webpack --config webpack.browser.config.js --colors",
+    "build": "npm run build:node && npm run build:browser",
     "prepush": "npm test",
     "prepublishOnly": "npm run fix && npm test && npm run clean && npm run build"
   },
   "dependencies": {
-    "minimist": "^1.2.0"
+    "minimist": "^1.2.0",
+    "typedoc": "^0.17.3"
   },
   "devDependencies": {
-    "babel-core": "^6.24.1",
-    "babel-preset-babili": "^0.1.2",
-    "babili": "^0.1.2",
-    "browserify": "^14.4.0",
-    "coveralls": "^2.13.1",
-    "docdash": "^0.4.0",
-    "eslint": "^3.19.0",
-    "eslint-config-airbnb-base": "^11.2.0",
-    "eslint-plugin-import": "^2.3.0",
-    "husky": "^0.13.4",
+    "@types/node": "^13.9.5",
+    "@typescript-eslint/eslint-plugin": "^2.25.0",
+    "@typescript-eslint/parser": "^2.25.0",
+    "coveralls": "^3.0.11",
+    "eslint": "^6.8.0",
+    "husky": "^4.2.3",
     "istanbul": "^0.4.5",
-    "jest": "^20.0.4",
+    "jest": "^25.2.3",
     "jsdoc": "^3.4.3",
-    "rimraf": "^2.6.1"
+    "rimraf": "^3.0.2",
+    "terser-webpack-plugin": "^2.3.5",
+    "ts-jest": "^25.2.1",
+    "ts-loader": "^6.2.2",
+    "typescript": "^3.8.3",
+    "webpack": "^4.42.1",
+    "webpack-cli": "^3.3.11"
   },
   "engines": {
-    "node": ">= 6.0.0",
-    "npm": ">= 3.8.6"
+    "node": ">= 12.16.1",
+    "npm": ">= 6.13.4"
   }
 }
