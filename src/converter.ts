@@ -1,15 +1,15 @@
-const { isAbsent } = require( './normalizer' );
-const Roll = require( './object/Roll' );
-const WodRoll = require( './object/WodRoll' );
+import { isAbsent } from './normalizer';
+import Roll from './object/Roll';
+import WodRoll from './object/WodRoll';
 
-function convertToRoll( object = {}) {
-  const { dice, count, modifier } = object || {};
+export function convertToRoll( object = {}) {
+  const { dice, count, modifier } = ( object || {}) as any;
 
   return new Roll( dice, count, modifier );
 }
 
-function convertToWodRoll( object = {}) {
-  const { dice, count, again, success, fail } = object || {};
+export function convertToWodRoll( object = {}) {
+  const { dice, count, again, success, fail } = ( object || {}) as any;
 
   return new WodRoll( dice, count, again, success, fail );
 }
@@ -29,17 +29,11 @@ function convertToWodRoll( object = {}) {
  * convert({ modifier: 6 }); //=> new Roll( undefined, undefined, 6 )
  * convert({ dice: 10, count: 5, success: 5 }); //=> new WodRoll( 10, 5, undefined, 5 )
  */
-function convertToAnyRoll( object = {}) {
-  const { again, success, fail } = object || {};
+export function convertToAnyRoll( object = {}) {
+  const { again, success, fail } = ( object || {}) as any;
 
   if ( isAbsent( again ) && isAbsent( success ) && isAbsent( fail )) {
     return convertToRoll( object );
   } // else
   return convertToWodRoll( object );
 }
-
-module.exports = {
-  convertToRoll,
-  convertToWodRoll,
-  convertToAnyRoll,
-};

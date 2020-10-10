@@ -2,15 +2,15 @@
 
 process.title = 'roll-parser';
 
-/* eslint-disable max-len, no-console, no-var, vars-on-top, prefer-spread, global-require, import/no-dynamic-require, wrap-iife, no-void */
-
-const argv = require( 'minimist' )( process.argv.slice( 2 ));
 const path = require( 'path' );
 const fs = require( 'fs' );
+const minimist = require( 'minimist' );
 
-const rollParser = require( '../index' );
+const { parseAndRoll } = require( '../index' );
 
-const format = roll => `${ rollParser.parseAndRoll( roll ) || 'Invalid roll notation.' }`;
+const argv = minimist( process.argv.slice( 2 ));
+
+const format = roll => `${ parseAndRoll( roll ) || 'Invalid roll notation.' }`;
 
 void function cmd() {
   // --help

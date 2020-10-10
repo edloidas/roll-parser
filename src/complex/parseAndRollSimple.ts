@@ -1,5 +1,5 @@
-const { rollClassic } = require( '../roller' );
-const parseSimpleRoll = require( './parseSimpleRoll' );
+import { rollClassic } from '../roller';
+import parseSimpleRoll from './parseSimpleRoll';
 
 /**
  * Parses simple notation and then rolls the dice.
@@ -14,6 +14,4 @@ const parseSimpleRoll = require( './parseSimpleRoll' );
  * @example
  * parseAndRollSimple('2 10 -1'); //=> { notation: '2d10-1', value: 14, rolls: [ 7, 8 ] }
  */
-const parseAndRollSimple = roll => rollClassic( parseSimpleRoll( roll ));
-
-module.exports = parseAndRollSimple;
+export default roll => rollClassic( parseSimpleRoll( roll ));

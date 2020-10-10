@@ -1,4 +1,4 @@
-const { resultNotation } = require( '../stringifier' );
+import {resultNotation} from '../stringifier';
 /**
  * A class that represents a dice roll result
  * @class
@@ -10,7 +10,7 @@ const { resultNotation } = require( '../stringifier' );
  * @see Roll
  * @see WodRoll
  */
-function Result( notation, value, rolls ) {
+export default function Result( notation: string, value: number, rolls: number[]) {
   this.notation = notation;
   this.value = value;
   this.rolls = rolls;
@@ -19,5 +19,3 @@ function Result( notation, value, rolls ) {
 Result.prototype.toString = function toString() {
   return resultNotation( this );
 };
-
-module.exports = Result;

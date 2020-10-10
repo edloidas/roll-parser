@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Roll Parser</title>
+  <script src="../dist/roll-parser.min.js" defer></script>
+  <style>
+    html {
+      font-size: 16px;
+    }
+    #message {
+      padding: 1em;
+      font-size: 2rem;
+      font-weight: bold;
+      text-align: center;
+    }
+
+    #message.error {
+      color: red;
+    }
+  </style>
+</head>
+<body>
+  <div id="message"></div>
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      try {
+        const message = document.querySelector('#message');
+        message.innerHTML = rollParser.parseAndRoll('1d20+1');
+      } catch (e) {
+        message.className = 'error';
+        message.innerHTML = e.message;
+        console.error(e);
+      }
+    });
+  </script>
+</body>
+</html>

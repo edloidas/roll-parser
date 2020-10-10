@@ -1,23 +1,40 @@
-module.exports = {
-  Roll: require( './src/object/Roll' ),
-  WodRoll: require( './src/object/WodRoll' ),
-  Result: require( './src/object/Result' ),
+import Roll from './src/object/Roll';
+import WodRoll from './src/object/WodRoll';
+import Result from './src/object/Result';
 
-  parse: require( './src/complex/parse' ),
-  parseClassicRoll: require( './src/complex/parseClassicRoll' ),
-  parseSimpleRoll: require( './src/complex/parseSimpleRoll' ),
-  parseWodRoll: require( './src/complex/parseWodRoll' ),
+import parse from './src/complex/parse';
+import parseClassicRoll from './src/complex/parseClassicRoll';
+import parseSimpleRoll from './src/complex/parseSimpleRoll';
+import parseWodRoll from './src/complex/parseWodRoll';
 
-  roll: require( './src/roller' ).rollAny,
-  rollClassic: require( './src/roller' ).rollClassic,
-  rollWod: require( './src/roller' ).rollWod,
+import {rollAny} from './src/roller';
+import {rollClassic} from './src/roller';
+import {rollWod} from './src/roller';
 
-  parseAndRoll: require( './src/complex/parseAndRoll' ),
-  parseAndRollSimple: require( './src/complex/parseAndRollSimple' ),
-  parseAndRollClassic: require( './src/complex/parseAndRollClassic' ),
-  parseAndRollWod: require( './src/complex/parseAndRollWod' ),
+import parseAndRoll from './src/complex/parseAndRoll';
+import parseAndRollSimple from './src/complex/parseAndRollSimple';
+import parseAndRollClassic from './src/complex/parseAndRollClassic';
+import parseAndRollWod from './src/complex/parseAndRollWod';
 
-  random: require( './src/random' ).randomRoll,
+import {randomRoll} from './src/random';
 
-  convert: require( './src/converter' ).convertToAnyRoll,
+import {convertToAnyRoll} from './src/converter';
+
+export {
+  Roll,
+  WodRoll,
+  Result,
+  parse,
+  parseClassicRoll,
+  parseSimpleRoll,
+  parseWodRoll,
+  rollAny,
+  rollClassic,
+  rollWod,
+  parseAndRoll,
+  parseAndRollSimple,
+  parseAndRollClassic,
+  parseAndRollWod,
+  randomRoll,
+  convertToAnyRoll,
 };

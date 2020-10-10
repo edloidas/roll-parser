@@ -7,7 +7,7 @@ module.exports = {
   ],
   'parser': '@typescript-eslint/parser',
   'parserOptions': {
-    'ecmaVersion': 2019,
+    'ecmaVersion': 2020,
     'project': 'tsconfig.json',
     'tsconfigRootDir': '.',
   },
@@ -24,7 +24,17 @@ module.exports = {
     'object-property-newline': [ 'off', { 'allowMultiplePropertiesPerLine': true } ],
     'no-plusplus': [ 'error', { 'allowForLoopAfterthoughts': true } ],
     'no-underscore-dangle': [ 'off' ],
+    // Temporaly disabled
+    '@typescript-eslint/explicit-function-return-type': 'off',
   },
+  'overrides': [
+    {
+      'files': ['*.js'],
+      'rules': {
+        '@typescript-eslint/no-var-requires': [ 'off' ],
+      }
+    }
+  ],
   'env': {
     'browser': true,
     'es6': true,

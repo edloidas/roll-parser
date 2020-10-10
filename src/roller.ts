@@ -1,9 +1,9 @@
-const { randomRoll } = require( './random' );
-const { normalizeRollResult, isDefined } = require( './normalizer' );
-const { convertToRoll, convertToWodRoll, convertToAnyRoll } = require( './converter' );
-const Result = require( './object/Result' );
-const Roll = require( './object/Roll' );
-const WodRoll = require( './object/WodRoll' );
+import { randomRoll } from './random';
+import { normalizeRollResult, isDefined } from './normalizer';
+import { convertToRoll, convertToWodRoll, convertToAnyRoll } from './converter';
+import Result from './object/Result';
+import Roll from './object/Roll';
+import WodRoll from './object/WodRoll';
 
 
 /**
@@ -19,7 +19,7 @@ const WodRoll = require( './object/WodRoll' );
  * rollClassic(new Roll(10, 2, -1)); //=> { notation: '2d10-1', value: 14, rolls: [ 7, 8 ] }
  * rollClassic({ dice: 6 }); //=> { notation: 'd6', value: 4, rolls: [ 4 ] }
  */
-function rollClassic( roll ) {
+export function rollClassic( roll ) {
   const data = roll instanceof Roll ? roll : convertToRoll( roll );
   const { dice, count, modifier } = data;
 
@@ -43,7 +43,7 @@ function rollClassic( roll ) {
  * rollWod(new WodRoll(10, 4, true, 8)); //=> { notation: '4d10!>8', value: 2, rolls: [3,10,7,9,5] }
  * rollWod({ dice: 8, count: 3 }); //=> { notation: '3d8>6', value: 2, rolls: [ 7, 3, 9 ] }
  */
-function rollWod( roll ) {
+export function rollWod( roll ) {
   const data = roll instanceof WodRoll ? roll : convertToWodRoll( roll );
   const { dice, count, again, success, fail } = data;
 
@@ -90,7 +90,7 @@ function rollWod( roll ) {
  * roll({ dice: 8, count: 3, again: true }); //=> { notation: '3d8!>6', value: 2, rolls: [7,3,9 ] }
  * roll( null ); //=> null
  */
-function rollAny( roll ) {
+export function rollAny( roll ) {
   if ( roll instanceof Roll ) {
     return rollClassic( roll );
   } else if ( roll instanceof WodRoll ) {
@@ -98,9 +98,3 @@ function rollAny( roll ) {
   }
   return isDefined( roll ) ? rollAny( convertToAnyRoll( roll )) : null;
 }
-
-module.exports = {
-  rollClassic,
-  rollWod,
-  rollAny,
-};

@@ -1,6 +1,6 @@
-const { parseAny } = require( '../parser' );
-const { mapToRoll, mapToWodRoll } = require( '../mapper' );
-const Type = require( '../object/Type' );
+import { parseAny } from '../parser';
+import { mapToRoll, mapToWodRoll } from '../mapper';
+import Type from '../object/Type';
 
 /**
  * Parses simplified, classic or WoD roll notation.
@@ -18,7 +18,7 @@ const Type = require( '../object/Type' );
  * parse('4d10!>8f1'); //=> { dice: 10, count: 4, again: true, success: 8, fail: 1 }
  * parse('xyz');       //=> null
  */
-function parse( roll ) {
+export default function parse( roll ) {
   const result = parseAny( roll );
   const type = result ? result.type : '';
 
@@ -33,5 +33,3 @@ function parse( roll ) {
       return null;
   }
 }
-
-module.exports = parse;

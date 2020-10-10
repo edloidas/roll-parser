@@ -1,5 +1,5 @@
-const { fixInvalid, normalizeInteger } = require( '../normalizer' );
-const { classicNotation } = require( '../stringifier' );
+import { fixInvalid, normalizeInteger } from '../normalizer';
+import { classicNotation } from '../stringifier';
 
 const positiveInteger = fixInvalid( 1 );
 
@@ -13,7 +13,7 @@ const positiveInteger = fixInvalid( 1 );
  * @param {Number} modifier - A modifier, that should be added/sustracted from result
  * @see WodRoll
  */
-function Roll( dice = 20, count = 1, modifier = 0 ) {
+export default function Roll( dice = 20, count = 1, modifier = 0 ) {
   this.dice = positiveInteger( dice );
   this.count = positiveInteger( count );
   this.modifier = normalizeInteger( modifier );
@@ -22,5 +22,3 @@ function Roll( dice = 20, count = 1, modifier = 0 ) {
 Roll.prototype.toString = function toString() {
   return classicNotation( this );
 };
-
-module.exports = Roll;

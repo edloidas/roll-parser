@@ -1,5 +1,5 @@
-const { fixInvalid, normalizeWodBorders } = require( '../normalizer' );
-const { wodNotation } = require( '../stringifier' );
+import { fixInvalid, normalizeWodBorders } from '../normalizer';
+import { wodNotation } from '../stringifier';
 
 const positiveInteger = fixInvalid( 1 );
 
@@ -15,7 +15,7 @@ const positiveInteger = fixInvalid( 1 );
  * @param {Number} fail - A maximum value, that counts as failure
  * @see Roll
  */
-function WodRoll( dice = 10, count = 1, again = false, success = 6, fail ) {
+export default function WodRoll( dice = 10, count = 1, again = false, success = 6, fail?: number ) {
   this.dice = positiveInteger( dice );
   this.count = positiveInteger( count );
   this.again = !!again;
@@ -25,5 +25,3 @@ function WodRoll( dice = 10, count = 1, again = false, success = 6, fail ) {
 WodRoll.prototype.toString = function toString() {
   return wodNotation( this );
 };
-
-module.exports = WodRoll;

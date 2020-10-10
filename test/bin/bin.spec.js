@@ -6,7 +6,7 @@ function runAndRead( args ) {
 
   const result = execFileSync( 'node', [ binPath, ...nodeArgs ]);
 
-  return result.toString( 'utf8' ).trim();
+  return result.toString().trim();
 }
 
 describe( 'Single roll:', () => {

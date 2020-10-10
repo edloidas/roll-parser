@@ -1,5 +1,5 @@
-const { parseClassic } = require( '../parser' );
-const { mapToRoll } = require( '../mapper' );
+import { parseClassic } from '../parser';
+import { mapToRoll } from '../mapper';
 
 /**
  * Parses classic DnD roll notation.
@@ -17,6 +17,4 @@ const { mapToRoll } = require( '../mapper' );
  * parseClassicRoll('d10+1');  //=> { dice: 10, count: 1, modifier: 1 }
  * parseClassicRoll('2d10-1'); //=> { dice: 10, count: 2, modifier: -1 }
  */
-const parseClassicRoll = roll => mapToRoll( parseClassic( roll ));
-
-module.exports = parseClassicRoll;
+export default roll => mapToRoll( parseClassic( roll ));

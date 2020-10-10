@@ -1,5 +1,5 @@
-const { parseSimple } = require( '../parser' );
-const { mapToRoll } = require( '../mapper' );
+import { parseSimple } from '../parser';
+import { mapToRoll } from '../mapper';
 
 /**
  * Parses simple roll notation (space separated values).
@@ -16,6 +16,4 @@ const { mapToRoll } = require( '../mapper' );
  * parseSimpleRoll('2 10');    //=> { dice: 10, count: 2, modifier: 0 }
  * parseSimpleRoll('2 10 -1'); //=> { dice: 10, count: 2, modifier: -1 }
  */
-const parseSimpleRoll = roll => mapToRoll( parseSimple( roll ));
-
-module.exports = parseSimpleRoll;
+export default roll => mapToRoll( parseSimple( roll ));

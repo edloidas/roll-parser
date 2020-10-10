@@ -1,5 +1,5 @@
-const { rollAny } = require( '../roller' );
-const parse = require( './parse' );
+import { rollAny } from '../roller';
+import parse from './parse';
 
 /**
  * Parses simplified, classic or WoD roll notation and then rolls the dice.
@@ -16,6 +16,4 @@ const parse = require( './parse' );
  * parseAndRoll('2d10+1');    //=> { notation: '2d10+1', value: 9, rolls: [ 2, 6 ] }
  * parseAndRoll('4d10!>8f1'); //=> { notation: '4d10!>8f1', value: 2, rolls: [ 3, 10, 7, 9, 5 ] }
  */
-const parseAndRoll = roll => rollAny( parse( roll ));
-
-module.exports = parseAndRoll;
+export default roll => rollAny( parse( roll ));
