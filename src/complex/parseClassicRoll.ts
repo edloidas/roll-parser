@@ -12,9 +12,11 @@ import { mapToRoll } from '../mapper';
  * @see parseSimpleRoll
  * @see parseWodRoll
  * @example
+ * ```typescript
  * parseClassicRoll('d10');    //=> { dice: 10, count: 1, modifier: 0 }
  * parseClassicRoll('2d10');   //=> { dice: 10, count: 2, modifier: 0 }
  * parseClassicRoll('d10+1');  //=> { dice: 10, count: 1, modifier: 1 }
  * parseClassicRoll('2d10-1'); //=> { dice: 10, count: 2, modifier: -1 }
+ * ```
  */
 export default roll => mapToRoll( parseClassic( roll ));

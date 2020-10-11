@@ -11,7 +11,9 @@ export const random = min => max => Math.floor( Math.random() * (( max + 1 ) - m
  * @param {Number} max - maximum possible generated value
  * @return {Number} Positive integer, from `1` to `max`
  * @example
+ * ```typescript
  * random(100); //=> 77 - random number from 1 to 100
  * random(1);   //=>  1 - always rolls 1
+ * ```
  */
 export const randomRoll = random( 1 );

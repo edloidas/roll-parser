@@ -12,7 +12,9 @@ import parseClassicRoll from './parseClassicRoll';
  * @see parseAndRollSimple
  * @see parseAndRollWod
  * @example
+ * ```typescript
  * parseAndRollClassic('2d10+1');  //=> { notation: '2d10+1', value: 9, rolls: [ 2, 6 ] }
  * parseAndRollClassic('d6');      //=> { notation: 'd6', value: 3, rolls: [ 3 ] }
+ * ```
  */
 export default roll => rollClassic( parseClassicRoll( roll ));

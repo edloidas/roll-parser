@@ -13,10 +13,12 @@ import Type from '../object/Type';
  * @see parseClassicRoll
  * @see parseWodRoll
  * @example
+ * ```typescript
  * parse('2 10 -1');   //=> { dice: 10, count: 2, modifier: -1 }
  * parse('2d10+1');    //=> { dice: 10, count: 2, modifier: 1 }
  * parse('4d10!>8f1'); //=> { dice: 10, count: 4, again: true, success: 8, fail: 1 }
  * parse('xyz');       //=> null
+ * ```
  */
 export default function parse( roll ) {
   const result = parseAny( roll );

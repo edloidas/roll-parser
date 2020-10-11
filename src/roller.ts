@@ -16,8 +16,10 @@ import WodRoll from './object/WodRoll';
  * @see roll
  * @see rollWod
  * @example
+ * ```typescript
  * rollClassic(new Roll(10, 2, -1)); //=> { notation: '2d10-1', value: 14, rolls: [ 7, 8 ] }
  * rollClassic({ dice: 6 }); //=> { notation: 'd6', value: 4, rolls: [ 4 ] }
+ * ```
  */
 export function rollClassic( roll ) {
   const data = roll instanceof Roll ? roll : convertToRoll( roll );
@@ -40,8 +42,10 @@ export function rollClassic( roll ) {
  * @see roll
  * @see rollClassic
  * @example
+ * ```typescript
  * rollWod(new WodRoll(10, 4, true, 8)); //=> { notation: '4d10!>8', value: 2, rolls: [3,10,7,9,5] }
  * rollWod({ dice: 8, count: 3 }); //=> { notation: '3d8>6', value: 2, rolls: [ 7, 3, 9 ] }
+ * ```
  */
 export function rollWod( roll ) {
   const data = roll instanceof WodRoll ? roll : convertToWodRoll( roll );
@@ -84,11 +88,13 @@ export function rollWod( roll ) {
  * @see rollClassic
  * @see rollWod
  * @example
+ * ```typescript
  * roll(new Roll(10, 2, -1)); //=> { notation: '2d10-1', value: 14, rolls: [ 7, 8 ] }
  * roll({ dice: 6 }); //=> { notation: 'd6', value: 4, rolls: [ 4 ] }
  * roll(new WodRoll(10, 4, true, 8)); //=> { notation: '4d10!>8', value: 2, rolls: [3,10,7,9,5] }
  * roll({ dice: 8, count: 3, again: true }); //=> { notation: '3d8!>6', value: 2, rolls: [7,3,9 ] }
  * roll( null ); //=> null
+ * ```
  */
 export function rollAny( roll ) {
   if ( roll instanceof Roll ) {

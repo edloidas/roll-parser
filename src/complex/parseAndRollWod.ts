@@ -12,7 +12,9 @@ import parseWodRoll from './parseWodRoll';
  * @see parseAndRollSimple
  * @see parseAndRollClassic
  * @example
+ * ```typescript
  * parseAndRollWod('2d10>6');    //=> { notation: '2d10>6', value: 1, rolls: [ 5, 10 ] }
  * parseAndRollWod('4d10!>8f1'); //=> { notation: '4d10!>8f1', value: 2, rolls: [ 3, 10, 7, 9, 5 ] }
+ * ```
  */
 export default roll => rollWod( parseWodRoll( roll ));

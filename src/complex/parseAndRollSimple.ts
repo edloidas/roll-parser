@@ -12,6 +12,8 @@ import parseSimpleRoll from './parseSimpleRoll';
  * @see parseAndRollSimple
  * @see parseAndRollWod
  * @example
+ * ```typescript
  * parseAndRollSimple('2 10 -1'); //=> { notation: '2d10-1', value: 14, rolls: [ 7, 8 ] }
+ * ```
  */
 export default roll => rollClassic( parseSimpleRoll( roll ));

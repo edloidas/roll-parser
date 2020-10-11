@@ -12,8 +12,10 @@ import parse from './parse';
  * @see parseAndRollClassic
  * @see parseAndRollWod
  * @example
+ * ```typescript
  * parseAndRoll('2 10 -1');   //=> { notation: '2d10-1', value: 14, rolls: [ 7, 8 ] }
  * parseAndRoll('2d10+1');    //=> { notation: '2d10+1', value: 9, rolls: [ 2, 6 ] }
  * parseAndRoll('4d10!>8f1'); //=> { notation: '4d10!>8f1', value: 2, rolls: [ 3, 10, 7, 9, 5 ] }
+ * ```
  */
 export default roll => rollAny( parse( roll ));

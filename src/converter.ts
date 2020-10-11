@@ -25,9 +25,11 @@ export function convertToWodRoll( object = {}) {
  * @param {Object} object - `Roll`, `WodRoll` or similar object.
  * @return {Roll|WodRoll} Result of converion.
  * @example
+ * ```typescript
  * convert({ dice: 6 }); //=> new Roll( 6 )
  * convert({ modifier: 6 }); //=> new Roll( undefined, undefined, 6 )
  * convert({ dice: 10, count: 5, success: 5 }); //=> new WodRoll( 10, 5, undefined, 5 )
+ * ```
  */
 export function convertToAnyRoll( object = {}) {
   const { again, success, fail } = ( object || {}) as any;

@@ -35,7 +35,7 @@
     "cover": "jest --coverage",
     "report": "node_modules/.bin/jest --coverage && cat coverage/lcov.info | node_modules/coveralls/bin/coveralls.js",
     "fix": "eslint --fix .",
-    "api": "rimraf api/ && typedoc --out api/ src/",
+    "api": "rimraf api/ && typedoc --out api/ index.ts",
     "clean": "rimraf dist/* index.js",
     "build:node": "esbuild --bundle --platform=node --outfile=index.js index.ts",
     "build:browser": "esbuild --bundle --target=es2020 --global-name=rollParser --sourcemap=inline --outfile=dist/roll-parser.js index.ts",
