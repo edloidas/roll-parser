@@ -1,13 +1,45 @@
-# Directories #
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
 
-node_modules/
-coverage/
+# AI Assistant
+.claude/plans/
+.codex/
+.cursor/commands/
+.cursor/mcp.json
+.mcp.json
+settings.local.json
+
+# Build files
 dist/
+build/
+
+# Development files
 api/
+*.local
 
-# Files #
+# Dependencies
+node_modules/
 
-npm-debug.log
-
+# OS files
 .DS_Store
+Thumbs.db
 Desktop.ini
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+bun-debug.log*
+
+# Test coverage
+coverage/
+
+# Misc
+.cache/
+.temp/
+.tmp/
+.eslintcache

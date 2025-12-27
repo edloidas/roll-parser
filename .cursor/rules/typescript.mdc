@@ -1,0 +1,227 @@
+---
+description: TypeScript coding standards
+globs: *.ts
+alwaysApply: false
+---
+
+# TypeScript Coding Standards
+
+## Code Style
+
+```typescript
+// Spaces inside `{}` in imports, types, objects, or destructuring
+import { Data } from './utils';
+type IdType = { id: string };
+const bar = { foo: 1 };
+function getId({ id }: IdType): string {
+  const { foo } = bar;
+  return id;
+}
+
+// Prefer single quotes over double quotes
+import { parse } from 'roll-parser';
+const note = `Time: ${Date.now()}`;
+
+// Check for both null and undefined with `!= null`
+if (response != null) {
+  // safe to use response
+}
+
+// No nested ternaries - use if/else or object lookup
+const status = isLoading ? 'loading' : isError ? 'error' : 'idle'; // Bad
+
+// Good alternatives
+const status = getStatus(); // Extract to function
+const statusMap = { loading: isLoading, error: isError };
+
+// Leverage modern TypeScript syntax
+const len = items?.length ?? 0;
+settings.debug ||= false;
+cache?.clear();
+const size = 1_000;
+
+// Prefer `const` over `let` if variable won't change
+const max = 100;
+
+// Prefer destructuring assignment
+const [body, headers = {}] = request;
+const { signal } = new AbortController();
+
+// Prefer single-line guard clauses (early return)
+if (element == null) return;
+if (!isSupported) return false;
+
+// Insert exactly one blank line between logically distinct operations
+const result = doSomething();
+
+updateAnotherThing();
+
+// End every source file with a single trailing newline
+```
+
+## Naming Standards
+
+```typescript
+// Standalone booleans use `is`/`has`/`can`/`should`/`will` prefixes
+const isEnabled = true;
+const hasFocus = false;
+const canEdit = permissions.includes('edit');
+const shouldUpdate = version < latest;
+
+// Object props: drop prefixes for boolean props
+const enabled = true;
+const state = { enabled };
+
+// Arrays use plural forms
+const users: User[] = [];
+const selectedIds: string[] = [];
+
+// Functions use verb prefixes
+function getUserById(id: string) {} // get/fetch/load/parse
+function setUserName(name: string) {} // set/update/save/calc/compute
+function isValidEmail(email: string) {} // is/has for boolean returns
+
+// Add comma after the last element in multi-line arrays, objects
+function add(
+  firstValue: number,
+  secondValue: number,
+): number {
+  // ...
+}
+
+// Name constants using UPPERCASE and underscore
+const TIMEOUT_MS = 30_000;
+const MAX_RETRIES = 3;
+```
+
+## Type Definitions
+
+```typescript
+// Prefer types for object shapes
+type User = {
+  id: string;
+  name: string;
+};
+
+// Use type aliases for unions/primitives
+type UserStatus = 'active' | 'inactive' | 'pending';
+type UserId = string;
+
+// Use T[] syntax for arrays
+type Users = User[];
+const items: string[] = [];
+
+// Avoid Array<T> generic syntax
+type Users = Array<User>; // Bad
+
+// Avoid any type - use unknown and type guards
+const data: unknown = fetchData();
+if (isUser(data)) {
+  // TypeScript knows data is User here
+}
+
+// Avoid type assertions with 'as' - use type guards
+const user = {} as User; // Bad
+const user: Partial<User> = {}; // Good
+
+// Avoid non-null assertion '!' - use optional chaining or guards
+const value = getUserInput()!; // Bad
+const value = getUserInput() ?? defaultValue; // Good
+
+// Prefer defining types separately
+type Identifiable = { id: string };
+function getById<T extends Identifiable>(items: T[], id: string): T | undefined {
+  return items.find((item) => item.id === id);
+}
+
+// Explicit type annotation when assigning objects
+const user: User = { id, name };
+
+// Use `satisfies` for precise literal types without widening
+const options = {
+  retry: 3,
+  timeout: 5000,
+} satisfies RequestOptions;
+
+// Define and use `Maybe<T>` for nullish values
+type Maybe<T> = T | null | undefined;
+function findUser(id: string): Maybe<User> {
+  // ...
+}
+
+// Prefer `undefined` over `null` for unset values
+const activeId: string | undefined = undefined;
+```
+
+**Rationale for `undefined` over `null`:**
+
+- `undefined` is JavaScript's default for uninitialized values
+- Consistent with TypeScript optional properties (`prop?: string`)
+- More semantically correct for "not set"
+
+## Type Composition
+
+```typescript
+// Use regular imports for types
+import { ParserOptions } from './types';
+
+export type ParseResult = Omit<FullResult, 'internal'>;
+
+// Prefer composition: define base types, then extend
+type RollOwnProps = {
+  count?: number;
+  sides?: number;
+  modifier?: number;
+};
+
+// Internal type combines base + dependencies
+type RollInternalProps = RollOwnProps & ParserContext;
+
+// Consumer type uses base directly
+export type RollProps = RollOwnProps;
+```
+
+**Rationale:**
+
+- Composition (`Base & Extensions`) is clearer than subtraction (`Omit`)
+- IDE hover shows actual properties instead of computed types
+- TypeScript errors reference real property names
+
+## Function Signatures
+
+```typescript
+// Explicit return types for public functions
+export function calculateTotal(items: number[]): number {
+  return items.reduce((sum, item) => sum + item, 0);
+}
+
+// Arrow functions with return type for one-liners
+const isEven = (value: number): boolean => value % 2 === 0;
+
+// Use generic constraints
+function updateEntity<T extends { id: string }>(entity: T, updates: Partial<T>): T {
+  return { ...entity, ...updates };
+}
+```
+
+## Import/Export Standards
+
+```typescript
+// Named exports preferred
+export { RollParser, DiceRoller };
+
+// Group imports by source
+import { readFile, writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+
+import { parse } from '../parser';
+import { validate } from '../utils/validation';
+
+import type { RollResult, DiceConfig } from '../types';
+
+// Prefer path aliases over long relative paths
+import { Parser } from '@/parser';
+
+// Import with relative paths only from same directory
+import { utils } from './utils';
+```

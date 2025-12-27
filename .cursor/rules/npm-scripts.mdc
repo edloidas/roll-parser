@@ -1,0 +1,76 @@
+---
+description: Bun scripts reference
+globs:
+alwaysApply: true
+---
+
+# Bun Scripts
+
+Use `bun`, never `npm`, `yarn`, or `pnpm`. Use `bun x` instead of `npx`.
+
+## Verify Changes
+
+```bash
+bun check:fix   # typecheck + lint:fix + format (recommended)
+bun check       # typecheck + lint + format:check (read-only)
+```
+
+## Individual Checks
+
+```bash
+bun typecheck      # TypeScript type checking
+bun lint           # Linting (read-only)
+bun lint:fix       # Linting with auto-fix
+bun format         # Format code (writes)
+bun format:check   # Format check (read-only)
+```
+
+## Build
+
+```bash
+bun run build    # Build library (compile TS to JS)
+bun run clean    # Remove dist/, coverage/
+```
+
+## Testing
+
+```bash
+bun test         # Run tests (Bun's built-in test runner)
+bun test:ci      # Run tests in CI mode
+bun run coverage # Run tests with coverage
+```
+
+## Release
+
+```bash
+bun release:dry  # Validate publish (dry run)
+bun publish      # Publish to npm
+```
+
+Pre-publish runs: `check -> build -> test`
+
+## Bun-Specific Commands
+
+```bash
+bun install      # Install dependencies (uses bun.lockb)
+bun add <pkg>    # Add dependency
+bun remove <pkg> # Remove dependency
+bun update       # Update dependencies
+bun outdated     # Check for outdated dependencies
+```
+
+## Pre-commit Hook
+
+`lefthook` or `simple-git-hooks` runs on commit:
+
+- `*.ts` -> lint + format
+
+## CI Pipeline
+
+GitHub Actions on push/PR to master:
+
+1. typecheck
+2. lint
+3. format:check
+4. build
+5. test

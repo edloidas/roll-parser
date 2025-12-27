@@ -1,0 +1,213 @@
+---
+description: Testing standards and best practices
+globs: *.test.ts,*.spec.ts
+alwaysApply: false
+---
+
+# Testing Standards
+
+Uses Bun's built-in test runner (`bun test`).
+
+## Test Structure
+
+```typescript
+import { describe, it, expect } from 'bun:test';
+
+// Arrange-Act-Assert pattern
+describe('RollParser', () => {
+  describe('parse', () => {
+    it('should parse standard dice notation', () => {
+      // Arrange
+      const input = '2d6+3';
+
+      // Act
+      const result = parse(input);
+
+      // Assert
+      expect(result.count).toBe(2);
+      expect(result.sides).toBe(6);
+      expect(result.modifier).toBe(3);
+    });
+
+    it('should return error for invalid notation', () => {
+      // Arrange
+      const invalidInput = 'invalid';
+
+      // Act
+      const result = parse(invalidInput);
+
+      // Assert
+      expect(result.success).toBe(false);
+      expect(result.error.code).toBe('PARSE_ERROR');
+    });
+  });
+});
+```
+
+## Unit Testing Patterns
+
+```typescript
+import { describe, it, expect } from 'bun:test';
+
+// Test pure functions with clear inputs/outputs
+describe('calculateTotal', () => {
+  it('should sum all dice values with modifier', () => {
+    // Arrange
+    const rolls = [3, 5, 2];
+    const modifier = 4;
+
+    // Act
+    const total = calculateTotal(rolls, modifier);
+
+    // Assert
+    expect(total).toBe(14); // 3 + 5 + 2 + 4
+  });
+
+  it('should handle negative modifiers', () => {
+    const rolls = [6, 6];
+    const modifier = -3;
+
+    expect(calculateTotal(rolls, modifier)).toBe(9);
+  });
+
+  it('should return 0 for empty rolls with no modifier', () => {
+    expect(calculateTotal([], 0)).toBe(0);
+  });
+});
+```
+
+## Mock Patterns
+
+```typescript
+import { describe, it, expect, mock, spyOn, beforeEach, afterEach } from 'bun:test';
+
+// Mock modules
+import { RandomService } from '../services/RandomService';
+
+// Spy on methods
+const rollSpy = spyOn(RandomService, 'roll').mockReturnValue(4);
+
+// Use factories for test data
+function createMockRoll(overrides?: Partial<Roll>): Roll {
+  return {
+    count: 1,
+    sides: 6,
+    modifier: 0,
+    results: [4],
+    total: 4,
+    ...overrides,
+  };
+}
+
+// Restore mocks after tests
+afterEach(() => {
+  rollSpy.mockRestore();
+});
+
+// Mock functions
+const mockCallback = mock((value: number) => value * 2);
+```
+
+## CLI Testing
+
+```typescript
+import { describe, it, expect } from 'bun:test';
+
+// Test CLI argument parsing
+describe('CLI', () => {
+  it('should parse dice notation from arguments', () => {
+    const args = ['2d6+1'];
+    const result = parseArgs(args);
+
+    expect(result.notation).toBe('2d6+1');
+  });
+
+  it('should handle --help flag', () => {
+    const args = ['--help'];
+    const result = parseArgs(args);
+
+    expect(result.showHelp).toBe(true);
+  });
+
+  it('should handle --version flag', () => {
+    const args = ['--version'];
+    const result = parseArgs(args);
+
+    expect(result.showVersion).toBe(true);
+  });
+});
+
+// Test CLI execution with subprocess
+describe('CLI execution', () => {
+  it('should output roll result', async () => {
+    const proc = Bun.spawn(['bun', 'run', 'bin/roll.ts', '2d6']);
+    const output = await new Response(proc.stdout).text();
+
+    expect(output).toMatch(/\d+/);
+  });
+});
+```
+
+## Edge Cases and Error Handling
+
+```typescript
+import { describe, it, expect } from 'bun:test';
+
+describe('Edge cases', () => {
+  it('should handle maximum dice count', () => {
+    const result = parse('100d20');
+    expect(result.count).toBe(100);
+  });
+
+  it('should reject negative dice count', () => {
+    expect(() => parse('-2d6')).toThrow('Invalid dice count');
+  });
+
+  it('should handle d% notation', () => {
+    const result = parse('1d%');
+    expect(result.sides).toBe(100);
+  });
+});
+```
+
+## Test Naming Conventions
+
+```typescript
+import { describe, it } from 'bun:test';
+
+// Use descriptive test names
+describe('DiceRoller', () => {
+  // Describe the unit under test
+  describe('roll', () => {
+    // should + expected behavior
+    it('should return array of random values', () => {});
+    it('should respect dice count', () => {});
+    it('should apply exploding dice rules when enabled', () => {});
+  });
+
+  describe('when given invalid input', () => {
+    // Context-specific behavior
+    it('should throw ParseError for empty string', () => {});
+    it('should throw ParseError for non-numeric values', () => {});
+  });
+});
+```
+
+## Bun Test Configuration
+
+In `bunfig.toml`:
+
+```toml
+[test]
+coverage = false
+coverageSkipSourceFiles = true
+```
+
+Or run with flags:
+
+```bash
+bun test --coverage          # Enable coverage
+bun test --timeout 5000      # Set timeout (ms)
+bun test --watch             # Watch mode
+bun test --bail              # Stop on first failure
+```
