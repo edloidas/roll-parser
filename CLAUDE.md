@@ -33,8 +33,16 @@ Detailed rules in `.cursor/rules/`:
 
 - `npm-scripts.mdc` - Available scripts reference (Bun)
 - `typescript.mdc` - Type definitions and coding style
-- `testing.mdc` - Test patterns (Bun test runner)
+- `testing.mdc` - Test patterns (Bun test runner, fast-check)
+- `rng.mdc` - RNG interface and MockRNG usage
 - `comments.mdc` - Documentation style
+
+## Testing Standards
+
+- Use MockRNG for deterministic dice tests (see `rng.mdc`)
+- Use fast-check for property-based invariant testing (see `testing.mdc`)
+- Co-locate tests with source: `foo.ts` → `foo.test.ts`
+- Target >90% statement coverage, 100% function coverage
 
 ## Skills
 

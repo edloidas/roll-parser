@@ -211,3 +211,43 @@ bun test --timeout 5000      # Set timeout (ms)
 bun test --watch             # Watch mode
 bun test --bail              # Stop on first failure
 ```
+
+## Property-Based Testing (fast-check)
+
+Use fast-check for invariant testing. Combine with Bun's test runner.
+
+### When to Use
+
+- Mathematical invariants (range checks, associativity)
+- Roundtrip properties (parse → stringify → parse)
+- Edge case discovery (let fast-check find bugs)
+
+### Pattern
+
+```typescript
+import { describe, it, expect } from 'bun:test';
+import fc from 'fast-check';
+
+describe('roll invariants', () => {
+  it('NdX total is always in valid range', () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 1, max: 100 }),
+        fc.integer({ min: 1, max: 100 }),
+        (count, sides) => {
+          const result = roll(`${count}d${sides}`);
+          return result.total >= count && result.total <= count * sides;
+        }
+      ),
+      { numRuns: 1000 }
+    );
+  });
+});
+```
+
+### Guidelines
+
+- Keep numRuns reasonable (100-1000) for CI speed
+- Use seed option for reproducibility: `{ seed: 42 }`
+- For flaky tests, increase numRuns locally but not in CI
+- Combine with MockRNG when testing dice logic specifically

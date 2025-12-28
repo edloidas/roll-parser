@@ -1,216 +1,126 @@
 <h1 align="center">Roll Parser</h1>
 
 <p align="center">
-Parser for classic (2d6+1), simple (2 6 1), and WoD (4d10!>6f1) dice rolls.
+High-performance dice notation parser for tabletop RPGs.<br>
+TypeScript-first, Bun-optimized, Pratt parser architecture.
 </p>
 
-[![Travis Build Status][travis-image]][travis-url]
-[![AppVeyor Build Status][appveyor-image]][appveyor-url]
-[![Coverage Status][coveralls-image]][coveralls-url]
-[![devDependency Status][devdep-image]][devdep-url]
-<!-- [![Dependency Status][dep-image]][dep-url] -->
+<p align="center">
+  <a href="https://github.com/edloidas/roll-parser/actions"><img src="https://github.com/edloidas/roll-parser/actions/workflows/ci.yml/badge.svg" alt="CI Status"></a>
+  <a href="https://www.npmjs.com/package/roll-parser"><img src="https://img.shields.io/npm/v/roll-parser.svg" alt="npm version"></a>
+  <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-5.7-blue.svg" alt="TypeScript"></a>
+  <a href="https://bun.sh/"><img src="https://img.shields.io/badge/Bun-1.0+-black.svg" alt="Bun"></a>
+</p>
 
-[![Node.js version][node-image]][node-url]
-[![Project is on npm][npm-image]][npm-url]
+## Status
 
-## Documentation
+> **v3 in Development** - Complete architectural rewrite in progress.
+>
+> For production use, install [v2.3.2](https://www.npmjs.com/package/roll-parser/v/2.3.2).
 
-Please review the [API documentation](http://edloidas.com/roll-parser/).
+## Features
 
-## Install
+### Stage 1: Core Engine (In Progress)
 
-#### Node:
+- Basic dice notation: `2d6`, `d20`, `4d6+4`
+- Full arithmetic: `+`, `-`, `*`, `/`, `%`, `**`
+- Parentheses: `(1d4+1)*2`
+- Keep/Drop modifiers: `4d6kh3`, `2d20kl1`, `4d6dl1`
+- Computed dice: `(1+1)d(3*2)`
+- Seedable RNG for reproducible rolls
 
-```
+### Stage 2: System Compatibility (Planned)
+
+- Exploding dice: `1d6!`, `1d6!!`, `1d6!p`
+- Reroll mechanics: `2d6r<2`, `2d6ro<3`
+- Success counting: `10d10>=6`, `10d10>=6f1`
+- Math functions: `floor()`, `ceil()`, `max()`, `min()`
+
+### Stage 3: Advanced Features (Planned)
+
+- Variables: `1d20+@str`, `1d20+@{modifier}`
+- Grouped rolls: `{1d8, 1d10}kh1`
+- Rich JSON output with roll breakdown
+
+## Installation
+
+```bash
+# When v3 is released
+bun add roll-parser
 npm install roll-parser
 ```
 
-Then in the console or JS file:
-```js
-const rollParser = require('roll-parser');
+## Usage (v3 API Preview)
+
+```typescript
+import { roll, parse } from 'roll-parser';
+
+// Simple roll
+const result = roll('4d6kh3');
+console.log(result.total);      // e.g., 14
+console.log(result.rolls);      // Individual die results
+console.log(result.rendered);   // "4d6kh3[6,5,3,2] = 14"
+
+// With seeded RNG for reproducibility
+const seeded = roll('2d20', { seed: 'my-seed' });
+
+// Parse without rolling (for inspection)
+const ast = parse('2d6+5');
 ```
 
-#### Browser:
+### CLI
 
-```html
-<script src="https://unpkg.com/roll-parser/dist/roll-parser.js"></script>
-```
-Minified version:
-```html
-<script src="https://unpkg.com/roll-parser/dist/roll-parser.min.js"></script>
-```
-
-Then access all functions from `rollParser` object.
-
-#### Console:
-
-Install package globally:
 ```bash
-npm install -g roll-parser
+# Roll dice from command line
+roll-parser 2d6+3
+roll-parser 4d6kh3
+roll-parser --help
 ```
 
-Then in the console:
+## Development
+
 ```bash
-$ roll-parser [options] [<rolls>]
+bun install          # Install dependencies
+bun check:fix        # Type check + lint + format
+bun test             # Run tests
+bun run build        # Build library
+bun release:dry      # Validate release
 ```
 
-Run `roll-parser --help` for more details.
+## Architecture
 
-## Usage
+Built with a Pratt parser for:
 
-```js
-const { parse, roll, parseAndRoll, Roll } = require('roll-parser');
+- **Clean precedence handling** - Operator binding power, not grammar rules
+- **Easy extensibility** - Add new modifiers without restructuring
+- **Optimal performance** - Target <1ms for complex expressions
+- **Type safety** - Strict TypeScript, no `any`
 
-// `parse()` function parses any notation and returns `Roll` or `WodRoll` object
-//=> { dice: 6, count: 4, modifier: 1 }
-const parsedRoll = parse('4d6+1');
+### Project Structure
 
-// `Roll` or `WodRoll` can be stringified
-//=> '4d6+1'
-const rollNotation = parsedRoll.toString();
-
-//=> { notation: '4d6+1', value: 16, rolls: [3, 1, 6, 5] }
-const result1 = roll(parsedRoll);
-//=> { notation: '2d20-3', value: 23, rolls: [11, 15] }
-const result2 = roll(new Roll(20, 2, -3));
-// Can also accept plain objects
-//=> { notation: '2d10>7', value: 1, rolls: [4, 8] }
-const result3 = roll({dice: 10, count: 2, success: 7});
-
-// `parseAndRoll()` function can parse any notation and then roll the dice
-// Any invalid arguments, except `null` or `undefined`, will be parsed as default `Roll`
-//=> { notation: '3d10!>8f1', value: 2, rolls: [3, 10, 7, 9] }
-const result4 = parseAndRoll('3d10!>8f1');
-
-//=> '(3d10!>8f1) 2 [3,10,7,9]'
-const resultNotation = result4.toString();
+```
+src/
+├── lexer/       # Tokenization (d, kh, kl, dh, dl, numbers, operators)
+├── parser/      # Pratt parser with AST generation
+├── evaluator/   # AST evaluation with modifier handling
+├── rng/         # Seedable random number generation
+├── cli/         # Command-line interface
+└── index.ts     # Public API exports
 ```
 
-Specific parsers can be used.
+## Supported Systems
 
-__Classic (D&D):__
-
-```js
-const {
-  parseClassicRoll,
-  rollClassic,
-  parseAndRollClassic,
-  Roll
-} = require('roll-parser');
-
-//=> { dice: 10, count: 1, modifier: 0 }
-const parsedRoll = parseClassicRoll('d10');
-
-//=> { notation: 'd10', value: 7, rolls: [7] }
-const result1 = rollClassic(parsedRoll);
-
-//=> { notation: '2d20', value: 26, rolls: [11, 15] }
-const result2 = rollClassic(new Roll(20, 2));
-
-//=> { notation: '4d10+1', value: 22, rolls: [4, 6, 2, 9] }
-const result3 = rollClassic({ dice: 10, count: 4, modifier: 1 });
-
-//=> { notation: '3d6', value: 15, rolls: [6, 6, 3] }
-const result4 = parseAndRollClassic('3d6');
-```
-
-__WoD (World of Darkness):__
-
-```js
-const {
-  parseWodRoll,
-  rollWod,
-  parseAndRollWod,
-  WodRoll
-} = require('roll-parser');
-
-//=> { dice: 10, count: 1, again: false, success: 6, fail: 0 }
-const parsedRoll = parseWodRoll('d10>6');
-
-// Returns notation, number of success rolls and list of all dice rolls
-//=> { notation: 'd10', value: 1, rolls: [7] }
-const result1 = rollWod(parsedRoll);
-
-//=> { notation: '4d10>6f1', value: 1, rolls: [4, 10, 5, 2] }
-const result2 = rollWod(new WodRoll(10, 4, false, 6, 1));
-
-//=> { notation: '4d10!>8f1', value: 22, rolls: [1, 8, 5, 10, 10, 4] }
-const result3 = rollWod({ dice: 10, count: 2, again: true, success: 8, fail: 1 });
-
-//=> { notation: '4d10>7f4', value: 1, rolls: [6, 3, 8, 4] }
-const result4 = parseAndRollWod('4d10>7f4');
-```
-
-__Simple (D&D, space-separated):__
-
-```js
-const { parseSimpleRoll, parseAndRollSimple } = require('roll-parser');
-
-//=> { dice: 10, count: 1, modifier: 0 }
-const parsedRoll = parseSimpleRoll('10');
-
-//=> { notation: '4d10-1', value: 23, rolls: [3, 6, 8, 7] }
-const result = parseAndRollSimple('4 10 -1');
-```
-
-Random number generator can be used to roll the dice.
-
-```js
-const { random } = require('roll-parser');
-
-//=> 84 - d100-like roll
-random(100);
-
-//=> 7 - d10-like roll
-random(10);
-
-//=> [2, 5, 2, 6] - 4d6-like roll
-[...Array(4)].map(() => random(6));
-```
-
-Even so the parse&roll functions uses checks to convert non-standard objects to `Roll` or `WodRoll`, explicit conversion can be used in some cases:
-
-```js
-const { convert } = require('roll-parser');
-
-//=> new Roll(undefined, 4, -3)
-convert({ count: 4, modifier: -3 });
-
-//=> new WodRoll(10, 6, true, undefined, 2)
-convert({ dice: 10, count: 6, again: true, fail: 2 });
-```
-
-## Releases
-
-Please review the [changelog](https://github.com/edloidas/roll-parser/releases).
+| System | Notation Examples | Stage |
+|--------|-------------------|-------|
+| D&D 5e | `2d6`, `1d20+5`, `4d6kh3` | 1 |
+| Pathfinder 2e | `1d20+10 vs 25` | 2 |
+| World of Darkness | `10d10>=6f1` | 2 |
+| Savage Worlds | `1d6!` | 2 |
 
 ## Contributing
 
-♥ [roll-parser](https://github.com/edloidas/roll-parser) and want to get involved?<br>
-Please, check the [guide](CONTRIBUTING.md) first.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines.
 
 ## License
 
 [MIT](LICENSE) © [Mikita Taukachou](https://edloidas.com)
-
-<!-- Links -->
-[travis-url]: https://travis-ci.org/edloidas/roll-parser
-[travis-image]: https://img.shields.io/travis/edloidas/roll-parser.svg?label=linux%20build
-
-[appveyor-url]: https://ci.appveyor.com/project/edloidas/roll-parser
-[appveyor-image]: https://img.shields.io/appveyor/ci/edloidas/roll-parser.svg?label=windows%20build
-
-[coveralls-url]: https://coveralls.io/github/edloidas/roll-parser?branch=master
-[coveralls-image]: https://coveralls.io/repos/github/edloidas/roll-parser/badge.svg?branch=master
-
-[dep-url]: https://david-dm.org/edloidas/roll-parser
-[dep-image]: https://david-dm.org/edloidas/roll-parser.svg
-
-[devdep-url]: https://david-dm.org/edloidas/roll-parser#info=devDependencies
-[devdep-image]: https://david-dm.org/edloidas/roll-parser/dev-status.svg
-
-[node-url]: https://nodejs.org
-[node-image]: https://img.shields.io/badge/node-≥%206.0.0-green.svg
-
-[npm-url]: https://www.npmjs.com/package/roll-parser
-[npm-image]: https://img.shields.io/badge/npm-roll--parser-blue.svg

@@ -1,353 +1,547 @@
-# Product Requirements Document: High-Performance Dice Notation Parser for Bun
+# Roll Parser — PRD & Implementation Plan
 
-## 1. Executive Summary and Strategic Context
+> High-performance dice notation parser for Bun runtime, TypeScript-first.
 
-The modern landscape of Tabletop Role-Playing Games (TTRPGs) has undergone a radical digital transformation. The shift from physical tabletops to Virtual Tabletop (VTT) environments, Discord-based play-by-post communities, and sophisticated character management applications has created a critical demand for robust computational infrastructure. At the heart of every digital RPG interaction lies the dice engine—a component responsible for translating human-readable stochastic instructions into deterministic, mathematically rigorous outcomes.
+## 1. Project Overview
 
-While the JavaScript ecosystem offers several dice parsing libraries, the current market is fragmented and plagued by legacy technical debt. Existing solutions often suffer from bloated dependency chains, reliance on slow and fragile Regular Expression engines, or a lack of support for the nuanced mechanics found in complex systems like Pathfinder 2nd Edition (PF2e) and World of Darkness (WoD). Furthermore, many libraries fail to address critical edge cases, such as the correct handling of negative numbers or the complex operator precedence required by nested mathematical expressions.
+**Goal:** Build a market-leading dice parsing library that outperforms existing solutions (dice-roller, rpg-dice-roller) via Pratt Parser architecture.
 
-This Product Requirements Document (PRD) outlines the comprehensive specifications for a next-generation, high-performance dice parsing library. Designed specifically for the Bun runtime environment and written in strict TypeScript, this library aims to set a new industry standard for speed, type safety, and feature completeness. The architectural strategy rejects the limitations of Recursive Descent and PEG parsers in favor of a Pratt Parser (Top-Down Operator Precedence) approach. This choice is strategic, addressing the specific linguistic ambiguities of dice notation while ensuring the extensibility required for future game systems.
+**Target Runtime:** Bun (JavaScriptCore) — optimized for serverless/Discord bots  
+**Language:** Strict TypeScript (no `any`, use `unknown` + type guards)  
+**Output Formats:** ESM (.mjs) + CJS (.js)
 
-The proposed implementation is structured into three progressive stages:
-- **Stage 1** establishes the Core Engine and D&D 5e compatibility, focusing on the resolution of foundational architectural challenges.
-- **Stage 2** expands into System Compatibility, introducing the complex modifier logic required for Pathfinder and dice-pool systems.
-- **Stage 3** delivers Advanced Features, including macro expansion, variable injection, and semantic output formatting.
+### Why Pratt Parser?
 
-This phased approach ensures immediate utility while systematically eliminating the technical deficits present in current open-source offerings.
+| Approach | Problem |
+|----------|---------|
+| Recursive Descent | Left-recursion issues, verbose grammar for 20+ modifiers |
+| PEG (PEG.js) | Memoization overhead, cold-start penalty |
+| **Pratt Parser** | ✅ Token-centric, handles prefix/infix/postfix naturally, easy extensibility |
 
-## 2. Theoretical Foundations and Architectural Analysis
+**Core Pratt Concepts:**
+- **Binding Power (BP):** Operator precedence as numbers
+- **NUD (Null Denotation):** Token at expression start (literals, prefix ops)
+- **LED (Left Denotation):** Token between expressions (infix, postfix)
 
-To engineer a parser that surpasses existing solutions, one must first deconstruct the linguistic and mathematical properties of dice notation. It is insufficient to treat dice rolls as simple text replacement tasks; rather, standard dice notation (`NdX`) functions as a Domain-Specific Language (DSL) with high operator density and context-sensitive grammar.
+---
 
-### 2.1 The Linguistic Complexity of Dice Notation
+## 2. Three-Stage Roadmap
 
-Superficially, dice notation appears to be simple arithmetic. However, it combines algebraic operations, stochastic functions (the rolls themselves), and set operations (keep/drop/sort) into a single, compact syntax. This creates unique parsing challenges that baffle standard mathematical parsers.
+| Stage | Scope | Target Systems |
+|-------|-------|----------------|
+| **1** | Core Engine, Basic Arithmetic, Keep/Drop | D&D 5e MVP |
+| **2** | Exploding, Reroll, Success Counting, Seeded RNG | Pathfinder, WoD |
+| **3** | Groups, Variables, Math Functions, Rich JSON | Roll20 Parity |
 
-The primary source of ambiguity is the `d` operator. In the expression `4d6`, `d` acts as a binary (infix) operator, taking a count on the left and a size on the right. However, in the expression `d20`, `d` acts as a unary (prefix) operator, implying a count of one. Furthermore, in the context of modifiers, `d` can also signify "drop," as in `4d6d1` (roll 4 six-sided dice, drop the lowest 1). A robust parser must disambiguate these contexts without relying on fragile lookahead regexes that degrade performance and maintainability.
+---
 
-A defining failure of current libraries is the **"Negative Number Bug."** Standard arithmetic dictates that `3 - 5` equals `-2`. However, in a dice context, users often write expressions like `1d4-1`. If the die rolls a 1, the result is 0. If the system is used for a penalty calculation, users might write `3d4 - 7`. If the roll is 4, the result must be `-3`. Many existing parsers, specifically those relying on basic regex substitution or improperly configured operator precedence, incorrectly clamp these results to 0 or 1, or fail to parse the negative sign as a unary negation operator versus a binary subtraction operator.
+## 3. Stage 1: Core Engine (D&D 5e MVP)
 
-### 2.2 Architectural Selection: The Superiority of Pratt Parsing
-
-The analysis of parsing methodologies reveals three primary candidates: Recursive Descent, Parsing Expression Grammars (PEG), and Pratt Parsing (Top-Down Operator Precedence).
-
-**Recursive Descent** is the traditional choice for many hand-written parsers. It maps grammar rules directly to functions (e.g., `parseExpression`, `parseTerm`). While intuitive, Recursive Descent struggles with left-recursive grammars and operator precedence without verbose grammar definitions. As the dice DSL grows to include dozens of modifiers (`!`, `!!`, `!p`, `r`, `ro`, `kh`, `kl`), the function call depth and complexity of a Recursive Descent parser become unmanageable.
-
-**PEG (Parsing Expression Grammar)** parsers, often generated by tools like PEG.js, offer a declarative syntax. However, PEGs often suffer from performance penalties due to memoization overhead (Packrat parsing) and difficulties handling left recursion naturally. For a library targeting high-frequency usage in serverless environments (Bun), the cold-start time and memory footprint of generated PEG parsers are suboptimal.
-
-**Pratt Parsing** emerges as the optimal architecture for dice notation. Developed by Vaughan Pratt, this technique associates parsing logic directly with tokens rather than grammar rules. Each token is assigned a "binding power" (precedence) and up to two semantic functions:
-- **Null Denotation (NUD):** Handles tokens appearing at the start of an expression (literals, prefix operators).
-- **Left Denotation (LED):** Handles tokens appearing between expressions (infix operators, postfix modifiers).
-
-This architecture solves the core domain challenges elegantly:
-
-1. **Contextual Behavior:** The `d` token can have both a NUD (for `d20`) and an LED (for `4d6`), resolving the unary/binary conflict without special grammar rules.
-2. **Dynamic Precedence:** Pratt parsing handles the mix of left-associative operators (subtraction) and right-associative operators (exponentiation `**`) natively via binding power comparison.
-3. **Extensibility:** Adding a new modifier, such as "Penetrating Dice" (`!p`), involves registering a single new token handler. It does not require refactoring a complex grammar tree, making the library highly maintainable.
-
-### 2.3 The Bun Runtime Advantage
-
-The choice of Bun as the target runtime is strategic. Bun's JavaScriptCore engine is optimized for rapid startup and execution, characteristics critical for serverless functions (e.g., AWS Lambda or Cloudflare Workers) that often power Discord bots. A dice parser in this environment may be cold-started thousands of times to process individual commands. Bun's native support for TypeScript eliminates the need for build-step transpilation during development, and its built-in test runner (`bun test`) provides a high-performance harness for the thousands of property-based tests required to verify stochastic correctness.
-
-## 3. Stage 1: Core Engine and D&D 5e Foundations
-
-The initial stage focuses on building the parsing infrastructure and supporting the core mechanics of Dungeons & Dragons 5th Edition. This represents the Minimum Viable Product (MVP) necessary to satisfy the largest segment of the user base.
-
-### 3.1 Lexical Analysis (Tokenizer) Specifications
-
-The Lexer's responsibility is to transform raw input strings into a stream of typed tokens. It must be resilient to user error, variable whitespace, and case insensitivity—typical characteristics of manual input in chat applications.
-
-#### Requirement 1.1: Token Taxonomy
-
-The library must define a strict, comprehensive set of tokens. In TypeScript, these should be defined via `enum` or union types to enforce strict checking throughout the parsing pipeline.
-
-- **NUMBER:** Matches integers and floating-point numbers. Pattern: `/[0-9]+(\.[0-9]+)?/`. Used for dice counts, face counts, and modifier values.
-- **DICE:** Matches `d` or `D`. This token identifies a dice roll instruction.
-- **PLUS / MINUS:** Matches `+` and `-`. Used for arithmetic and unary negation.
-- **MULTI / DIV / MOD / POW:** Matches `*`, `/`, `%`, `**` (or `^`). Essential for calculating damage resistance (halving) or crits (multiplication).
-- **LPAREN / RPAREN:** Matches `(` and `)`. Critical for enforcing operation precedence.
-- **KEEP:** Matches `k`, `kh`, `kl`. Used for Advantage/Disadvantage and stat generation.
-- **DROP:** Matches `d`, `dh`, `dl`. Note the lexical collision with DICE.
-- **TEXT:** Matches annotations or labels (optional at this stage but planned for output).
-
-#### Requirement 1.2: Disambiguation Strategies
-
-The Lexer must implement a "Maximal Munch" strategy to resolve the collision between the dice operator `d` and the drop modifier `d`.
-
-- **Logic:** When the character `d` is encountered, the lexer must peek ahead. If the subsequent character is `h` or `l` (forming `dh` or `dl`), it serves as a distinct DROP token. If the `d` is followed by a number, its semantic meaning (Dice vs. Drop) is context-dependent and should be resolved by the Parser, not the Lexer. However, distinguishing `dh`/`dl` at the token level simplifies the parser's logic significantly.
-
-### 3.2 Abstract Syntax Tree (AST) Design
-
-The Parser does not calculate results directly; it builds an AST. This decoupling allows for validation, serialization, and multiple evaluations of the same formula (e.g., re-rolling a saved macro).
-
-#### Requirement 1.3: AST Node Interfaces
-
-The AST must use a Discriminated Union pattern in TypeScript to ensure type safety.
+### 3.1 Lexer — Token Types
 
 ```typescript
-export type ASTNode =
+enum TokenType {
+  NUMBER,      // /[0-9]+(\.[0-9]+)?/
+  DICE,        // 'd' or 'D'
+  PLUS,        // '+'
+  MINUS,       // '-'
+  MULTIPLY,    // '*'
+  DIVIDE,      // '/'
+  MODULO,      // '%'
+  POWER,       // '**' or '^'
+  LPAREN,      // '('
+  RPAREN,      // ')'
+  KEEP_HIGH,   // 'kh' or 'k'
+  KEEP_LOW,    // 'kl'
+  DROP_HIGH,   // 'dh'
+  DROP_LOW,    // 'dl'
+  EOF,
+}
+
+interface Token {
+  type: TokenType;
+  value: string;
+  position: number;
+}
+```
+
+**Disambiguation Rules:**
+- `dh`/`dl` → always DROP modifier (maximal munch)
+- Bare `d` after dice expression + number → context-dependent (parser resolves)
+- Case-insensitive (`D20` = `d20`)
+- Whitespace-tolerant
+
+### 3.2 AST Node Types
+
+```typescript
+type ASTNode =
   | LiteralNode
   | DiceNode
-  | OperatorNode
+  | BinaryOpNode
+  | UnaryOpNode
   | ModifierNode
   | GroupNode;
 
-export interface LiteralNode {
+interface LiteralNode {
   type: 'Literal';
   value: number;
 }
 
-export interface DiceNode {
+interface DiceNode {
   type: 'Dice';
-  count: ASTNode; // Allows expressions like (1+1)d6
-  sides: ASTNode; // Allows expressions like 1d(2*10)
+  count: ASTNode;  // Allows (1+1)d6
+  sides: ASTNode;  // Allows 1d(2*10)
 }
 
-export interface OperatorNode {
-  type: 'Operator';
+interface BinaryOpNode {
+  type: 'BinaryOp';
   operator: '+' | '-' | '*' | '/' | '%' | '**';
   left: ASTNode;
   right: ASTNode;
 }
 
-export interface ModifierNode {
+interface UnaryOpNode {
+  type: 'UnaryOp';
+  operator: '-';
+  operand: ASTNode;
+}
+
+interface ModifierNode {
   type: 'Modifier';
   modifier: 'keep' | 'drop';
-  variant: 'highest' | 'lowest';
+  selector: 'highest' | 'lowest';
   count: ASTNode;
-  operand: ASTNode; // The node being modified
+  target: ASTNode;  // The dice/group being modified
 }
 ```
 
-This recursive structure is non-negotiable. It allows for "Computed Dice" (e.g., `(2+2)d6`), a feature often requested by power users but missing from simpler regex parsers.
+### 3.3 Operator Precedence (Binding Power)
 
-### 3.3 RNG and Determinism
+```typescript
+const BINDING_POWER: Record<string, { left: number; right: number }> = {
+  '+':  { left: 10, right: 11 },
+  '-':  { left: 10, right: 11 },
+  '*':  { left: 20, right: 21 },
+  '/':  { left: 20, right: 21 },
+  '%':  { left: 20, right: 21 },
+  '**': { left: 31, right: 30 },  // Right-associative
+  'd':  { left: 40, right: 41 },  // Dice operator binds tighter than math
+  // Modifiers (kh, kl, dh, dl) bind tightest as postfix
+};
+```
 
-A dice library is only as good as its source of entropy. Standard `Math.random()` is insufficient for rigorous testing and "fairness" verification.
+### 3.4 Pratt Parser Algorithm
 
-#### Requirement 1.4: Seedable PRNG
+```typescript
+class Parser {
+  private tokens: Token[];
+  private pos = 0;
 
-The library must abstract the Random Number Generator (RNG) behind an interface.
+  parseExpression(minBp = 0): ASTNode {
+    let left = this.parseNud();  // Get prefix/atom
+    
+    while (this.hasTokens()) {
+      const token = this.peek();
+      const bp = this.getLeftBp(token);
+      if (bp < minBp) break;
+      
+      this.advance();
+      left = this.parseLed(left, token);  // Infix/postfix
+    }
+    return left;
+  }
 
-- **Implementation:** The default implementation should use a high-quality seeded PRNG. The research recommends xorshift128+ or the random-js library (which uses Mersenne Twister or similar algorithms).
-- **Justification:** Seedable RNG is mandatory for unit testing. A test case must be able to inject a seed (e.g., "TEST_SEED") and assert that `1d20` results in exactly 15. This makes the library deterministic for debugging purposes.
-- **Bun Integration:** Bun provides `Math.random()` which is generally V8/JSC compliant, but for cryptographic requirements, `Bun.crypto` or `crypto.getRandomValues()` should be accessible via configuration.
+  private parseNud(): ASTNode {
+    const token = this.advance();
+    switch (token.type) {
+      case TokenType.NUMBER:
+        return { type: 'Literal', value: parseFloat(token.value) };
+      case TokenType.MINUS:
+        return { type: 'UnaryOp', operator: '-', operand: this.parseExpression(100) };
+      case TokenType.DICE:
+        // Prefix 'd' implies count of 1: d20 → 1d20
+        return { type: 'Dice', count: { type: 'Literal', value: 1 }, sides: this.parseExpression(41) };
+      case TokenType.LPAREN:
+        const expr = this.parseExpression(0);
+        this.expect(TokenType.RPAREN);
+        return expr;
+      default:
+        throw new ParseError(`Unexpected token: ${token.value}`);
+    }
+  }
 
-### 3.4 Core D&D 5e Mechanics Implementation
+  private parseLed(left: ASTNode, token: Token): ASTNode {
+    switch (token.type) {
+      case TokenType.DICE:
+        // Infix 'd': 4d6
+        return { type: 'Dice', count: left, sides: this.parseExpression(41) };
+      case TokenType.PLUS:
+      case TokenType.MINUS:
+      case TokenType.MULTIPLY:
+      case TokenType.DIVIDE:
+        return { type: 'BinaryOp', operator: token.value, left, right: this.parseExpression(this.getRightBp(token)) };
+      case TokenType.KEEP_HIGH:
+      case TokenType.KEEP_LOW:
+      case TokenType.DROP_HIGH:
+      case TokenType.DROP_LOW:
+        return this.parseModifier(left, token);
+      default:
+        throw new ParseError(`Unexpected infix: ${token.value}`);
+    }
+  }
+}
+```
 
-The MVP must verify specific D&D 5e behaviors.
+### 3.5 RNG Interface (Seedable)
 
-#### Requirement 1.5: Advantage and Disadvantage
+```typescript
+interface RNG {
+  next(): number;  // Returns [0, 1)
+  nextInt(min: number, max: number): number;  // Returns [min, max] inclusive
+}
 
-- **Mechanic:** Roll two d20s, take the highest (Advantage) or lowest (Disadvantage).
-- **Syntax:** `2d20kh1` (Keep Highest 1) and `2d20kl1` (Keep Lowest 1).
-- **Alias Support:** Users expect shorthand. The parser should optionally map `adv` to `2d20kh1` and `dis` to `2d20kl1` during the tokenization or parsing phase.
+// Default: xorshift128+ or similar
+class SeededRNG implements RNG {
+  constructor(seed?: string | number) { /* ... */ }
+}
 
-#### Requirement 1.6: Stat Generation
+// For testing determinism
+const testRng = new SeededRNG('TEST_SEED');
+```
 
-- **Mechanic:** Roll 4d6, drop the lowest die.
-- **Syntax:** `4d6dl1` or `4d6kh3`.
-- **Verification:** The evaluator must sort the individual die results, identify the lowest value(s), and exclude them from the summation.
+### 3.6 Stage 1 Mechanics Checklist
 
-#### Requirement 1.7: Negative Number Handling
+| Feature | Syntax | Example | Notes |
+|---------|--------|---------|-------|
+| Basic roll | `NdX` | `2d6` | |
+| Implicit count | `dX` | `d20` → `1d20` | |
+| Arithmetic | `+`, `-`, `*`, `/`, `%`, `**` | `1d20+5` | Standard precedence |
+| Parentheses | `(...)` | `(1d4+1)*2` | |
+| Keep Highest | `khN` or `kN` | `2d20kh1` | Advantage |
+| Keep Lowest | `klN` | `2d20kl1` | Disadvantage |
+| Drop Lowest | `dlN` | `4d6dl1` | Stat generation |
+| Drop Highest | `dhN` | `4d6dh1` | |
+| Negative results | — | `1d4-5` → can be `-4` | **Critical: no clamping!** |
+| Computed dice | `(expr)d(expr)` | `(1+1)d(3*2)` | |
 
-- **Mechanic:** Allow penalties to reduce a total below zero.
-- **Verification:** An input of `1d4 - 5` given a roll of 1 must return `-4`. The library must explicitly *not* clamp results to 0 unless a `max(0,...)` function is explicitly invoked by the user.
+### 3.7 Critical Test: Negative Numbers
 
-### 3.5 Implementation Guidance: The Pratt Algorithm
+```typescript
+test('negative result not clamped', () => {
+  const rng = createMockRng([1]);  // Force d4 to roll 1
+  const result = roll('1d4 - 5', { rng });
+  expect(result.total).toBe(-4);  // NOT 0!
+});
 
-For the AI or developer implementing this stage:
+test('unary vs binary minus', () => {
+  const rng = createMockRng([3]);
+  expect(roll('-1d4', { rng }).total).toBe(-3);
+  expect(roll('0 - 1d4', { rng }).total).toBe(-3);
+});
+```
 
-1. **Initialize the Parser:** Create a class `Parser` holding the token stream and a `tokenIndex`.
-2. **Register NUDs:** Register NUMBER to return a `LiteralNode`. Register MINUS to return a unary negation operator (binding power high). Register LPAREN to handle grouped expressions.
-3. **Register LEDs:** Register PLUS, MINUS, MULTI, DIV as binary operators. Register DICE (`d`) with a binding power higher than math but lower than parentheses.
-4. **Register Modifiers:** Register KEEP (`k`/`kh`) and DROP (`d`/`dl`) as postfix operators (LEDs that do not consume a right-hand expression in the traditional infix sense, but consume parameters).
-5. **Main Loop:** `parseExpression(precedence)` calls the NUD of the current token, then loops while the next token's binding power > precedence, calling the LED of the next token.
+---
 
-## 4. Stage 2: System Compatibility (Pathfinder & WoD)
+## 4. Stage 2: System Compatibility
 
-Stage 2 expands the library to support the complex ecosystems of Pathfinder (1e/2e) and World of Darkness. These systems introduce non-standard arithmetic, complex recursion, and result counting.
+### 4.1 Exploding Dice
 
-### 4.1 Advanced Modifiers: Exploding and Rerolling
+| Variant | Syntax | Behavior |
+|---------|--------|----------|
+| Standard | `NdX!` | Roll again on max, add to pool |
+| Threshold | `NdX!>Y` | Explode when ≥Y |
+| Compounding | `NdX!!` | Explosions add to single die value |
+| Penetrating | `NdX!p` | Explosions subtract 1 |
 
-These modifiers alter the process of rolling itself, potentially generating infinite sets of numbers.
+**Safety:** Hard limit of 1000 iterations to prevent `1d1!` infinite loops.
 
-#### Requirement 2.1: Exploding Dice (!)
+```typescript
+interface ExplodeModifier {
+  type: 'Explode';
+  variant: 'standard' | 'compound' | 'penetrating';
+  threshold?: ComparePoint;  // { operator: '>' | '>=' | ..., value: number }
+  target: ASTNode;
+}
+```
 
-- **Mechanic:** If a die rolls the maximum value (or a target `>N`), roll another die and add it to the set.
-- **Syntax:** `NdX!` (explode on max) or `NdX!>Y` (explode on range).
-- **Compounding (`!!`):** Shadowrun style. The extra rolls are added to the *value* of the original die, not the *count* of dice. `1d6!!` rolling a 6 then a 5 results in a single die value of 11, not two dice (6, 5).
-- **Penetrating (`!p`):** HackMaster style. Exploded dice subtract 1 from their result. `1d6!p` rolling 6, then 6, then 2 results in `6 + (6-1) + (2-1) = 12`.
-- **Safety:** The engine must enforce a hard recursion limit (e.g., 1000 iterations) to prevent infinite loops (e.g., `1d1!`) from crashing the Bun process.
+### 4.2 Reroll Mechanics
 
-#### Requirement 2.2: Reroll Mechanics (r, ro)
+| Modifier | Syntax | Behavior |
+|----------|--------|----------|
+| Reroll | `rCOND` | Reroll matching dice recursively |
+| Reroll Once | `roCOND` | Reroll once, keep second result |
 
-- **Reroll (r):** Reroll any die meeting the condition, recursively. `1d6r<2` rerolls 1s until a number >= 2 appears.
-- **Reroll Once (ro):** Crucial for D&D 5e "Great Weapon Fighting". Reroll matching dice exactly once; accept the second result even if it matches the condition.
-- **Verification:** `2d6ro<3` must allow a sequence of `[2 -> 1]` to result in 1. Standard `r` would continue rerolling the 1.
-
-### 4.2 Pathfinder 2e Mechanics: Degrees of Success
-
-PF2e utilizes a four-tier success system that cannot be represented by a single boolean or number.
-
-#### Requirement 2.3: Degree of Success Logic
-
-- **The Math:** A check result is compared to a DC.
-  - **Critical Success:** Result >= DC+10.
-  - **Success:** DC <= Result < DC+10.
-  - **Failure:** DC-10 < Result < DC.
-  - **Critical Failure:** Result <= DC-10.
-- **The "Nat 20/1" Rule:** A Natural 20 upgrades the degree by one step. A Natural 1 downgrades it by one step. It is *incorrect* to treat a Nat 20 as an automatic critical success; it is merely a step-up.
-- **Output Requirement:** The parser must return the total and the raw `die_value` separately. It should ideally allow a comparison syntax like `1d20+10 vs 25` which returns a structured object indicating the degree of success (0-3).
+```
+2d6r<2   → reroll 1s until ≥2
+2d6ro<3  → reroll 1-2 once, accept any result
+```
 
 ### 4.3 Success Counting (Dice Pools)
 
-Systems like WoD or Shadowrun do not sum dice. They count how many dice exceed a threshold.
+```typescript
+// Syntax: NdX>Y  or  NdX>=Y
+// Returns count of successes, not sum
 
-#### Requirement 2.4: Target Numbers (>)
+interface SuccessCountNode {
+  type: 'SuccessCount';
+  dice: DiceNode;
+  threshold: ComparePoint;
+  failOn?: number;  // Optional: subtract for this value (f1)
+}
 
-- **Syntax:** `NdX>Y`. Example: `10d10>6` (World of Darkness).
-- **Logic:** The evaluator iterates through the rolled array. For each die `d`, if `d >= Y`, increment success count.
-- **Failure Counting (f):** Example: `10d10>6f1`. If `d >= 6`, success +1. If `d = 1`, success -1.
-- **Integration:** In the Pratt parser, `>` acts as an infix operator. However, unlike math operators, it transforms a DiceResult (array) into a CountResult (integer). This requires the AST evaluation phase to handle heterogeneous return types.
+// Example: 10d10>=6f1 (WoD)
+// - Each die ≥6: +1 success
+// - Each die =1: -1 success
+```
 
-### 4.4 Grouped Rolls and Set Operations
+### 4.4 Pathfinder 2e Degrees of Success
 
-Grouped rolls allow users to perform operations on multiple distinct expressions.
+```typescript
+enum DegreeOfSuccess {
+  CriticalFailure = 0,
+  Failure = 1,
+  Success = 2,
+  CriticalSuccess = 3,
+}
 
-#### Requirement 2.5: Group Syntax {}
+function calculateDegree(total: number, dc: number, natural: number): DegreeOfSuccess {
+  let degree: DegreeOfSuccess;
+  
+  if (total >= dc + 10) degree = DegreeOfSuccess.CriticalSuccess;
+  else if (total >= dc) degree = DegreeOfSuccess.Success;
+  else if (total > dc - 10) degree = DegreeOfSuccess.Failure;
+  else degree = DegreeOfSuccess.CriticalFailure;
+  
+  // Nat 20 upgrades, Nat 1 downgrades (by one step, not auto-crit)
+  if (natural === 20 && degree < 3) degree++;
+  if (natural === 1 && degree > 0) degree--;
+  
+  return degree;
+}
+```
 
-- **Syntax:** `{ 1d8+4, 1d10+2 }`.
-- **Functionality:**
-  - **Keep/Drop:** `{...}kh1` executes both sub-expressions and keeps the one with the higher total.
-  - **Sum:** `{...}` creates a set. `sum({...})` adds them.
-- **Implementation:** The lexer detects `{`. The parser treats the contents as a comma-separated list of expressions, returning a `GroupNode`. The evaluator resolves all children before applying modifiers.
+**Syntax option:** `1d20+10 vs 25` → returns structured degree result
 
 ### 4.5 Math Functions
 
-Pathfinder macros rely heavily on rounding functions.
+```typescript
+// Supported: floor, ceil, round, abs, max, min
+// Syntax: func(expr) or func(expr, expr)
 
-#### Requirement 2.6: Supported Functions
+floor(10/3)     → 3
+max(1d6, 1d8)   → higher of two rolls
+min(10, 1d20+5) → capped damage
+```
 
-- **List:** `floor()`, `ceil()`, `round()`, `abs()`, `max()`, `min()`.
-- **Pathfinder Nuance:** Integer division in Pathfinder usually rounds down. The library should support `floor(A/B)` syntax.
-- **Parsing:** These are treated as prefix operators or function calls within the Pratt parser, binding tightly to their parenthesized arguments.
+---
 
-## 5. Stage 3: Advanced Features and API Parity
+## 5. Stage 3: Advanced Features
 
-The final stage aims for feature parity with established VTTs like Roll20 and Foundry, creating a developer-centric API that supports macros and rich output.
+### 5.1 Variable/Macro Expansion
 
-### 5.1 Macro and Variable Expansion
+```typescript
+// Syntax: @varName or @{variable name}
+roll('1d20 + @strMod', { context: { strMod: 5 } });
+roll('1d20 + @{Strength Modifier}', { context: { 'Strength Modifier': 3 } });
 
-Rolls often depend on character statistics not known at parse time.
+interface VariableNode {
+  type: 'Variable';
+  name: string;
+}
+```
 
-#### Requirement 3.1: Context Injection
+**Error handling:** Configurable — throw or default to 0.
 
-- **Feature:** The `roll` function must accept a context object (dictionary of key-value pairs).
-- **Syntax:** `1d20 + @strMod` or `1d20 + @{strength}`.
-- **Process:** The lexer identifies `@`. The parser creates a `VariableNode`. During evaluation, the engine looks up the variable name in the context. If missing, it should throw a descriptive error or default to 0 (configurable).
+### 5.2 Grouped Rolls
 
-### 5.2 Structured JSON Output
+```typescript
+// Syntax: { expr1, expr2, ... }
+// Operations on groups: kh, kl, sum
 
-For a VTT, the final number is less important than the "story" of the roll. Users need to see which dice were dropped, which exploded, and which were criticals.
+{ 1d8+4, 1d10+2 }kh1  → roll both, keep higher total
+sum({ 1d6, 1d6 })     → sum of all sub-results
+```
 
-#### Requirement 3.2: Output Schema
-
-The library must return a rich object, not just a number.
+### 5.3 Structured Output Schema
 
 ```typescript
 interface RollResult {
   total: number;
-  notation: string;
-  rendered: string; // "1d20(15) + 5 = 20"
-  parts: Array<{
-    type: 'die' | 'operator' | 'literal';
-    value: number;
-    rolls?: Array<{
-      result: number;
-      sides: number;
-      modifiers: string; // ["dropped", "exploded"]
-      critical: boolean; // Natural 20 or max value
-      fumble: boolean; // Natural 1 or min value
-    }>;
-  }>;
+  notation: string;      // Original input
+  expression: string;    // Normalized: "1d20 + 5"
+  rendered: string;      // "1d20[15] + 5 = 20"
+  
+  rolls: DieResult[];
+  
+  // For PF2e
+  degree?: DegreeOfSuccess;
+  natural?: number;      // The raw d20 value
+}
+
+interface DieResult {
+  sides: number;
+  result: number;
+  modifiers: ('dropped' | 'exploded' | 'rerolled' | 'kept')[];
+  critical: boolean;   // Rolled max
+  fumble: boolean;     // Rolled 1
 }
 ```
 
-This structure enables frontend clients (React/Vue/Svelte) to render 3D dice or visual logs without re-parsing the string.
-
-### 5.3 Advanced Sorting and Visualization
-
-- **Sorting (s):** `4d6s` does not change the mathematical total but reorders the rolls array in the JSON output (ascending). `sd` sorts descending.
-- **Critical/Fumble Thresholds (cs, cf):** `1d20cs>19` marks 19 and 20 as criticals in the output metadata. This allows systems like Champion Fighter (crit on 19) to be represented visually without altering the sum logic.
-
-## 6. Implementation Guidelines for AI Agents
-
-When generating code for this library, AI agents should adhere to the following strictures to ensure quality and alignment with the PRD.
-
-### 6.1 Code Style and Structure
-
-- **Language:** Strict TypeScript. No `any`. Use `unknown` with type guards where necessary.
-- **Bundling:** Configure `bun build` to emit both ESM (`.mjs`) and CJS (`.js`) formats to ensure broad compatibility, although the primary target is Bun.
-- **Testing:** Use `bun test`. Tests must be co-located with source files (e.g., `parser.ts` and `parser.test.ts`).
-
-### 6.2 The "Negative Number" Verification
-
-Every AI-generated parser iteration must pass this specific regression test:
+### 5.4 Sorting & Critical Thresholds
 
 ```typescript
-test("Parses negative numbers correctly", () => {
-  // Mock RNG to return 2
-  const result = roll("1d4 - 5", { seed: "force_2" });
-  expect(result.total).toBe(-3);
-});
+// Sorting (visual only, doesn't change total)
+4d6s     → sort ascending
+4d6sd    → sort descending
+
+// Critical/Fumble thresholds (metadata only)
+1d20cs>19    → mark 19-20 as critical
+1d20cf<3     → mark 1-2 as fumble
 ```
-
-This ensures the parser correctly identifies binary subtraction versus unary negation.
-
-### 6.3 Performance Optimization
-
-- **Object Allocation:** Minimize object creation in the roll hot path. Re-use token objects if possible.
-- **Lookup Tables:** Use `Map` or pre-computed lookup tables for Operator Precedence (Binding Power) rather than switch statements, as Bun's JIT optimizes these efficiently.
-
-### 6.4 Verification via Property-Based Testing
-
-Unit tests are insufficient for random behavior. Use `fast-check` (compatible with Bun) to define properties.
-
-- **Invariant:** `min_possible <= result <= max_possible`.
-- **Invariant:** Result is always an integer (unless math functions introduce floats).
-- **Invariant:** The length of the rolls array in the output object matches the number of dice requested (accounting for explosions).
-
-## 7. Roadmap and Conclusion
-
-This architecture provides a clear path to a market-leading dice library. By leveraging Pratt Parsing, we solve the historical fragility of dice syntax. By targeting Bun, we achieve the performance necessary for high-scale bot infrastructure.
-
-- **Phase 1:** Core Lexer, Pratt Parser, Basic Arithmetic, Keep/Drop. (Target: D&D 5e MVP).
-- **Phase 2:** Exploding, Rerolling, Success Counting, Seeded RNG. (Target: Pathfinder/WoD).
-- **Phase 3:** Grouped Rolls, Variables, Math Functions, Rich JSON Output. (Target: Roll20 Parity).
-
-This document serves as the single source of truth for the development lifecycle, ensuring that every line of code contributes to a robust, extensible, and high-performance engine.
 
 ---
 
-## Works Cited
+## 6. Project Structure
 
-1. Deep Research - Roll Robot - Gemini.pdf
-2. [Pratt Parsers: Expression Parsing Made Easy](https://journal.stuffwithstuff.com/2011/03/19/pratt-parsers-expression-parsing-made-easy/)
-3. [Difference between a PEG and recursive descent parser? - Stack Overflow](https://stackoverflow.com/questions/59157302/difference-between-a-peg-and-recursive-descent-parser)
-4. [How do Pratt parsers compare to other parser types and why are they used so little?](https://stackoverflow.com/questions/13634393/how-do-pratt-parsers-compare-to-other-parser-types-and-why-are-they-used-so-litt)
-5. [Benchmarking - Bun](https://bun.com/docs/project/benchmarking)
-6. [Bun — A fast all-in-one JavaScript runtime](https://bun.com/)
-7. [Bun vs Node.js 2025: Performance, Speed & Developer Guide - Strapi](https://strapi.io/blog/bun-vs-nodejs-performance-comparison-guide)
-8. [Don't use Math.random() - DeepSource](https://deepsource.com/blog/dont-use-math-random)
-9. [LinusU/node-xorshift128plus - GitHub](https://github.com/LinusU/node-xorshift128plus)
-10. [Seeding the random number generator in JavaScript - Stack Overflow](https://stackoverflow.com/questions/521295/seeding-the-random-number-generator-in-javascript)
-11. [Reddit: Effects that decrease or increase degrees of success](https://www.reddit.com/r/Pathfinder2e/comments/1g0h8nt/effects_that_decrease_or_increase_degrees_of/)
-12. [How do criticals interact with degrees of success for attacks? - RPG Stack Exchange](https://rpg.stackexchange.com/questions/175240/how-do-criticals-interact-with-degrees-of-success-for-attacks)
-13. [Step 4: Determine the Degree of Success and Effect - Pathfinder 2](https://pf2easy.com/index.php?id=5753&name=Step_4:_Determine_the_Degree_of_Success_and_Effect)
-14. [Dice Reference - Roll20 Help Center](https://help.roll20.net/hc/en-us/articles/360037773133-Dice-Reference)
-15. [API: Chat - Roll20 Help Center](https://help.roll20.net/hc/en-us/articles/360037256754-API-Chat)
-16. [Roll20 dice rolling guide - Reddit](https://www.reddit.com/r/DnD/comments/5ejl1l/roll20_how_to_roll_dice_like_a_motherfucker/)
-17. [Bundler - Bun](https://bun.com/docs/bundler)
-18. [How to get started with property-based testing in JavaScript using fast-check](https://jrsinclair.com/articles/2021/how-to-get-started-with-property-based-testing-in-javascript-with-fast-check/)
-19. [Exploring RPG Dice Systems: A Comprehensive Guide - Rune Rollers](https://runerollers.com/blogs/dnd-dice/exploring-rpg-dice-systems-a-comprehensive-guide)
+```
+roll-parser/
+├── src/
+│   ├── lexer/
+│   │   ├── lexer.ts
+│   │   ├── lexer.test.ts
+│   │   └── tokens.ts
+│   ├── parser/
+│   │   ├── parser.ts
+│   │   ├── parser.test.ts
+│   │   └── ast.ts
+│   ├── evaluator/
+│   │   ├── evaluator.ts
+│   │   ├── evaluator.test.ts
+│   │   └── modifiers/
+│   │       ├── keep-drop.ts
+│   │       ├── explode.ts
+│   │       └── reroll.ts
+│   ├── rng/
+│   │   ├── interface.ts
+│   │   ├── xorshift.ts
+│   │   └── mock.ts
+│   ├── index.ts          // Public API
+│   └── types.ts          // Shared types
+├── package.json
+├── tsconfig.json
+├── bunfig.toml
+└── README.md
+```
+
+---
+
+## 7. Public API
+
+```typescript
+// Main entry point
+export function roll(notation: string, options?: RollOptions): RollResult;
+export function parse(notation: string): ASTNode;  // For inspection
+export function evaluate(ast: ASTNode, options?: EvalOptions): RollResult;
+
+export interface RollOptions {
+  rng?: RNG;
+  seed?: string | number;
+  context?: Record<string, number>;  // Variables
+  maxIterations?: number;            // Explosion safety (default: 1000)
+}
+```
+
+---
+
+## 8. Testing Strategy
+
+### Unit Tests (co-located)
+- Lexer: token stream verification
+- Parser: AST structure verification  
+- Evaluator: deterministic output with mock RNG
+
+### Property-Based Tests (fast-check)
+```typescript
+// Invariants:
+fc.assert(fc.property(
+  fc.integer({ min: 1, max: 100 }),
+  fc.integer({ min: 1, max: 100 }),
+  (count, sides) => {
+    const result = roll(`${count}d${sides}`);
+    return result.total >= count && result.total <= count * sides;
+  }
+));
+```
+
+### Regression Tests
+- **Negative number bug** (see 3.7)
+- **Modifier chaining:** `4d6dl1kh3` 
+- **Edge cases:** `0d6`, `1d1`, `1d1!` (infinite loop protection)
+
+---
+
+## 9. Performance Guidelines
+
+1. **Minimize allocations** in hot path — reuse token objects where possible
+2. **Use Map** for binding power lookups (not switch)
+3. **Avoid regex** in lexer main loop — character-by-character scanning
+4. **Benchmark with `bun:test`** — target <1ms for simple rolls
+
+---
+
+## 10. Implementation Order
+
+### Phase 1 (MVP)
+1. ✅ Token types & Lexer
+2. ✅ AST node interfaces
+3. ✅ Pratt Parser core (NUD/LED)
+4. ✅ Basic arithmetic evaluation
+5. ✅ Dice rolling with keep/drop
+6. ✅ Seedable RNG
+7. ✅ Negative number handling
+8. ✅ Core test suite
+
+### Phase 2 (Expanded)
+1. Exploding dice variants
+2. Reroll mechanics
+3. Success counting
+4. Compare points (`>`, `>=`, `<`, `<=`, `=`)
+5. Math functions
+
+### Phase 3 (Full)
+1. Variable expansion
+2. Grouped rolls
+3. Rich JSON output
+4. Sorting modifiers
+5. Critical thresholds
+6. Alias support (`adv` → `2d20kh1`)
+
+---
+
+## Quick Reference: Syntax Cheatsheet
+
+```
+BASIC
+  d20, 2d6, 4d6+4, (1+1)d(2*3)
+
+KEEP/DROP
+  4d6kh3, 4d6dl1, 2d20kl1
+
+EXPLODING (Stage 2)
+  1d6!, 1d6!>5, 1d6!!, 1d6!p
+
+REROLL (Stage 2)
+  2d6r<2, 2d6ro<3
+
+SUCCESS (Stage 2)
+  10d10>=6, 10d10>=6f1
+
+GROUPS (Stage 3)
+  {1d8, 1d10}kh1
+
+VARIABLES (Stage 3)
+  1d20+@str, 1d20+@{modifier}
+
+FUNCTIONS (Stage 2-3)
+  floor(1d10/2), max(1d6, 1d8)
+```

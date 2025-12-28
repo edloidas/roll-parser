@@ -1,18 +1,33 @@
 {
   "name": "roll-parser",
-  "version": "2.3.2",
-  "description": "Parser for classic (2d6+1), simple (2 6 1), and WoD (4d10!>6f1) dice rolls.",
-  "main": "index.js",
-  "bin": "bin/roll-parser.js",
+  "version": "3.0.0-alpha.0",
+  "description": "High-performance dice notation parser for tabletop RPGs. TypeScript-first, Bun-optimized.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "bin": "./dist/cli.js",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
   "keywords": [
     "parser",
     "dice",
     "roll",
     "rpg",
     "dnd",
-    "wod",
-    "random",
-    "d20"
+    "d20",
+    "pratt-parser",
+    "typescript",
+    "bun"
   ],
   "homepage": "https://github.com/edloidas/roll-parser#readme",
   "bugs": {
@@ -20,50 +35,36 @@
   },
   "license": "MIT",
   "author": "Mikita Taukachou <edloidas@gmail.com> (https://edloidas.com)",
-  "files": [
-    "index.js",
-    "bin",
-    "dist",
-    "src"
-  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/edloidas/roll-parser.git"
   },
   "scripts": {
-    "test": "jest",
-    "cover": "jest --coverage",
-    "report": "node_modules/.bin/jest --coverage && cat coverage/lcov.info | node_modules/coveralls/bin/coveralls.js",
-    "fix": "eslint --fix .",
-    "api": "rimraf api/ && jsdoc -c .jsdocrc",
-    "clean": "rimraf dist/*",
-    "build:bundle": "browserify index.js --debug --standalone rollParser -o dist/roll-parser.js",
-    "build:minify": "babili dist/roll-parser.js --out-file dist/roll-parser.min.js",
-    "build": "npm run build:bundle && npm run build:minify",
-    "prepush": "npm test",
-    "prepublishOnly": "npm run fix && npm test && npm run clean && npm run build"
-  },
-  "dependencies": {
-    "minimist": "^1.2.0"
+    "typecheck": "tsc --noEmit",
+    "lint": "biome lint .",
+    "lint:fix": "biome lint --write .",
+    "format": "biome format --write .",
+    "format:check": "biome format .",
+    "check": "bun typecheck && bun lint && bun format:check",
+    "check:fix": "bun typecheck && bun lint:fix && bun format",
+    "clean": "rm -rf dist coverage",
+    "build": "bun run build:esm && bun run build:cjs && bun run build:types",
+    "build:esm": "bun build src/index.ts --outfile dist/index.mjs --target bun",
+    "build:cjs": "bun build src/index.ts --outfile dist/index.js --target node",
+    "build:types": "tsc --emitDeclarationOnly --declaration --noEmit false --outDir dist",
+    "test": "bun test",
+    "test:ci": "bun test --bail",
+    "coverage": "bun test --coverage",
+    "release:dry": "bun run check && bun run build && bun test",
+    "prepublishOnly": "bun run release:dry"
   },
   "devDependencies": {
-    "babel-core": "^6.24.1",
-    "babel-preset-babili": "^0.1.2",
-    "babili": "^0.1.2",
-    "browserify": "^14.4.0",
-    "coveralls": "^2.13.1",
-    "docdash": "^0.4.0",
-    "eslint": "^3.19.0",
-    "eslint-config-airbnb-base": "^11.2.0",
-    "eslint-plugin-import": "^2.3.0",
-    "husky": "^0.13.4",
-    "istanbul": "^0.4.5",
-    "jest": "^20.0.4",
-    "jsdoc": "^3.4.3",
-    "rimraf": "^2.6.1"
+    "@biomejs/biome": "^1.9.4",
+    "bun-types": "latest",
+    "fast-check": "^3.23.2",
+    "typescript": "^5.7.2"
   },
   "engines": {
-    "node": ">= 6.0.0",
-    "npm": ">= 3.8.6"
+    "node": ">= 18.0.0"
   }
 }
