@@ -8,9 +8,26 @@
 export { lex, Lexer, LexerError } from './lexer/lexer';
 export { TokenType, type Token } from './lexer/tokens';
 
-// TODO: [Phase 2] Export parser components
+// * Parser exports
+export { parse, Parser, ParseError } from './parser/parser';
+export type {
+  ASTNode,
+  BinaryOpNode,
+  DiceNode,
+  LiteralNode,
+  ModifierNode,
+  UnaryOpNode,
+} from './parser/ast';
+export {
+  isBinaryOp,
+  isDice,
+  isLiteral,
+  isModifier,
+  isUnaryOp,
+} from './parser/ast';
+
 // TODO: [Phase 3] Export RNG interface
 // TODO: [Phase 4] Export evaluator and result types
-// TODO: [Phase 5] Export public API (roll, parse, evaluate)
+// TODO: [Phase 5] Export public API (roll, evaluate)
 
 export const VERSION = '3.0.0-alpha.0';
