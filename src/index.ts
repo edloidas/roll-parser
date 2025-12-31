@@ -4,7 +4,10 @@
  * @module roll-parser
  */
 
-// TODO: [Phase 1] Export lexer components
+// * Lexer exports
+export { lex, Lexer, LexerError } from './lexer/lexer';
+export { TokenType, type Token } from './lexer/tokens';
+
 // TODO: [Phase 2] Export parser components
 // TODO: [Phase 3] Export RNG interface
 // TODO: [Phase 4] Export evaluator and result types
