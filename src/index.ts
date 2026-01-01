@@ -26,7 +26,11 @@ export {
   isUnaryOp,
 } from './parser/ast';
 
-// TODO: [Phase 3] Export RNG interface
+// * RNG exports
+export type { RNG } from './rng/types';
+export { SeededRNG } from './rng/seeded';
+export { createMockRng, MockRNGExhaustedError } from './rng/mock';
+
 // TODO: [Phase 4] Export evaluator and result types
 // TODO: [Phase 5] Export public API (roll, evaluate)
 
