@@ -36,6 +36,7 @@ Detailed rules in `.cursor/rules/`:
 - `testing.mdc` - Test patterns (Bun test runner, fast-check)
 - `rng.mdc` - RNG interface and MockRNG usage
 - `comments.mdc` - Documentation style
+- `git-conventions.mdc` - Commit, issue, and PR naming
 
 ## Testing Standards
 
@@ -43,6 +44,27 @@ Detailed rules in `.cursor/rules/`:
 - Use fast-check for property-based invariant testing (see `testing.mdc`)
 - Co-locate tests with source: `foo.ts` → `foo.test.ts`
 - Target >90% statement coverage, 100% function coverage
+
+## Validation
+
+During iteration:
+
+```bash
+bun check:fix    # Typecheck + lint + format (with auto-fix)
+bun test         # Run tests
+```
+
+Before commit (mirrors CI):
+
+```bash
+bun validate     # typecheck + lint + format:check + build + test
+```
+
+Task is complete when `bun validate` passes with no errors.
+
+## Planning
+
+For complex tasks, start with plan mode. Ask clarifying questions before implementation.
 
 ## Skills
 
