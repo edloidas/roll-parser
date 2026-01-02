@@ -54,6 +54,7 @@
     "build:types": "tsc --emitDeclarationOnly --declaration --noEmit false --outDir dist",
     "test": "bun test",
     "test:ci": "bun test --bail",
+    "validate": "bun run check && bun run build && bun test:ci",
     "coverage": "bun test --coverage",
     "release:dry": "bun run check && bun run build && bun test",
     "prepublishOnly": "bun run release:dry"

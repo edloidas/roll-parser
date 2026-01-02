@@ -1,0 +1,62 @@
+---
+description:
+globs:
+alwaysApply: true
+---
+
+# Git Conventions
+
+_Follow these conventions for commits, issues, and PRs._
+
+---
+
+## Commit Messages
+
+Use [Conventional Commits](https://www.conventionalcommits.org/) format:
+
+```
+<type>: <description> #<issue>
+```
+
+### Types
+
+- `feat` - New feature
+- `fix` - Bug fix
+- `docs` - Documentation only
+- `style` - Formatting, no code change
+- `refactor` - Code change that neither fixes a bug nor adds a feature
+- `test` - Adding or fixing tests
+- `chore` - Maintenance tasks
+- `perf` - Performance improvement
+- `build` - Build system or dependencies
+- `ci` - CI configuration
+
+### Rules
+
+1. Use imperative mood: "add feature" not "added feature"
+2. Keep first line under 72 characters
+3. Add issue number after description if commit relates to an issue: `feat: add parser #5`
+4. Omit issue number if commit is unrelated to any issue
+5. No period at the end
+
+### Examples
+
+```
+feat: implement dice notation lexer #3
+fix: handle edge case in parser
+chore: update dependencies
+docs: add API documentation #12
+```
+
+## Issue Titles
+
+Follow same format without issue reference:
+
+```
+feat: <description>
+fix: <description>
+```
+
+## PR Titles
+
+Follow commit message format. Use the primary change type.
