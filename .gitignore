@@ -23,6 +23,8 @@ api/
 
 # Dependencies
 node_modules/
+package-lock.json
+pnpm-lock.yaml
 
 # OS files
 .DS_Store

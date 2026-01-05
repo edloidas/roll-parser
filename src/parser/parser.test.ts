@@ -369,6 +369,73 @@ describe('Parser', () => {
     });
   });
 
+  describe('modifier chaining', () => {
+    it('should parse 4d6dl1kh3 as (4d6dl1)kh3', () => {
+      // Chained modifiers: drop lowest 1, then keep highest 3
+      expect(parse('4d6dl1kh3')).toEqual(
+        modifier(
+          'keep',
+          'highest',
+          literal(3),
+          modifier('drop', 'lowest', literal(1), dice(literal(4), literal(6))),
+        ),
+      );
+    });
+
+    it('should parse 4d6kh3dl1 (reverse order)', () => {
+      // Reverse order: keep highest 3, then drop lowest 1
+      expect(parse('4d6kh3dl1')).toEqual(
+        modifier(
+          'drop',
+          'lowest',
+          literal(1),
+          modifier('keep', 'highest', literal(3), dice(literal(4), literal(6))),
+        ),
+      );
+    });
+
+    it('should parse multiple same modifiers: 4d6dl1dl1', () => {
+      // Chaining same modifier type (semantically odd but should parse)
+      expect(parse('4d6dl1dl1')).toEqual(
+        modifier(
+          'drop',
+          'lowest',
+          literal(1),
+          modifier('drop', 'lowest', literal(1), dice(literal(4), literal(6))),
+        ),
+      );
+    });
+
+    it('should allow computed count in chain: 4d6kh(1+2)', () => {
+      // Computed counts should still work with the fix
+      expect(parse('4d6kh(1+2)')).toEqual(
+        modifier(
+          'keep',
+          'highest',
+          binary('+', literal(1), literal(2)),
+          dice(literal(4), literal(6)),
+        ),
+      );
+    });
+
+    it('should parse triple chain: 4d6dl1kh3dh1', () => {
+      // Three modifiers in sequence
+      expect(parse('4d6dl1kh3dh1')).toEqual(
+        modifier(
+          'drop',
+          'highest',
+          literal(1),
+          modifier(
+            'keep',
+            'highest',
+            literal(3),
+            modifier('drop', 'lowest', literal(1), dice(literal(4), literal(6))),
+          ),
+        ),
+      );
+    });
+  });
+
   describe('Parser class', () => {
     it('should allow direct usage with tokens', () => {
       const tokens = lex('2d6');
