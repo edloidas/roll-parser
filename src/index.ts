@@ -35,6 +35,8 @@ export { createMockRng, MockRNGExhaustedError } from './rng/mock';
 export { evaluate, EvaluatorError } from './evaluator/evaluator';
 export type { DieModifier, DieResult, EvaluateOptions, RollResult } from './types';
 
-// TODO: [Phase 5] Export public API (roll function)
+// * Public API
+export { roll } from './roll';
+export type { RollOptions } from './roll';
 
 export const VERSION = '3.0.0-alpha.0';
