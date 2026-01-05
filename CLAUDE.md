@@ -38,6 +38,11 @@ Detailed rules in `.cursor/rules/`:
 - `comments.mdc` - Documentation style
 - `git-conventions.mdc` - Commit, issue, and PR naming
 
+## Git Commits
+
+- Use `Co-Authored-By:` trailer only, no promotional lines
+- Issue titles follow commit format: `<type>: <description>`
+
 ## Testing Standards
 
 - Use MockRNG for deterministic dice tests (see `rng.mdc`)
