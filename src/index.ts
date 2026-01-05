@@ -31,7 +31,10 @@ export type { RNG } from './rng/types';
 export { SeededRNG } from './rng/seeded';
 export { createMockRng, MockRNGExhaustedError } from './rng/mock';
 
-// TODO: [Phase 4] Export evaluator and result types
-// TODO: [Phase 5] Export public API (roll, evaluate)
+// * Evaluator exports
+export { evaluate, EvaluatorError } from './evaluator/evaluator';
+export type { DieModifier, DieResult, EvaluateOptions, RollResult } from './types';
+
+// TODO: [Phase 5] Export public API (roll function)
 
 export const VERSION = '3.0.0-alpha.0';

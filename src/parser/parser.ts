@@ -234,16 +234,19 @@ export class Parser {
         ? 'highest'
         : 'lowest';
 
-    // Count is required after modifier
-    if (this.peek().type !== TokenType.NUMBER) {
+    // Count is required after modifier (number or parenthesized expression)
+    const nextToken = this.peek().type;
+    if (nextToken !== TokenType.NUMBER && nextToken !== TokenType.LPAREN) {
       throw new ParseError(
-        `Expected number after '${token.value}' modifier`,
+        `Expected number or expression after '${token.value}' modifier`,
         this.peek().position,
         this.peek(),
       );
     }
 
-    const count = this.parseExpression(BP.MODIFIER);
+    // Use DICE_LEFT to prevent modifiers from appearing in count position (e.g., 4d6kh1kh3)
+    // This allows computed counts like 4d6kh(1+2) but prevents nested modifiers
+    const count = this.parseExpression(BP.DICE_LEFT);
 
     return {
       type: 'Modifier',
