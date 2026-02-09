@@ -292,13 +292,29 @@ describe('roll() integration', () => {
       expect(result.rendered).toContain('~~1~~');
     });
 
-    test('chained modifiers evaluate sequentially (current behavior - see issue #12)', () => {
-      // Documents current behavior: inner modifier fully evaluates first
-      // Note: This differs from Roll20/RPG Dice Roller
-      // See issue #12 for planned Stage 2/3 enhancement
+    test('chained modifiers apply independently to full pool', () => {
+      // Each modifier sees the full original pool; drop sets are merged via union
+      // dl1 drops {idx1}, kh3 drops {idx1} → union {1} → total 9
       const result = roll('4d6dl1kh3', { rng: createMockRng([3, 1, 4, 2]) });
-      // dl1 drops 1, kh3 on remaining [3, 4, 2] keeps all 3
       expect(result.total).toBe(9);
+    });
+
+    test('chained kh1dh1 drops all dice when keep and drop target different dice', () => {
+      // [1,2,7]: kh1 drops {0,1}, dh1 drops {2} → all dropped → total 0
+      const result = roll('3d10kh1dh1', { rng: createMockRng([1, 2, 7]) });
+      expect(result.total).toBe(0);
+    });
+
+    test('chained modifiers in different order produce same result', () => {
+      const r1 = roll('4d6dl1kh3', { rng: createMockRng([3, 1, 4, 2]) });
+      const r2 = roll('4d6kh3dl1', { rng: createMockRng([3, 1, 4, 2]) });
+      expect(r1.total).toBe(r2.total);
+    });
+
+    test('triple chained modifiers', () => {
+      // [3,1,4,2]: dl1→{1}, kh3→{1}, dh1→{2} → union {1,2} → total 5
+      const result = roll('4d6dl1kh3dh1', { rng: createMockRng([3, 1, 4, 2]) });
+      expect(result.total).toBe(5);
     });
   });
 });

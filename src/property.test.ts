@@ -248,6 +248,86 @@ describe('property-based invariants', () => {
     });
   });
 
+  describe('chained modifier invariants', () => {
+    test('chained kh+dl total <= single kh total (adding dl can only remove more)', () => {
+      fc.assert(
+        fc.property(
+          fc.integer({ min: 2, max: 8 }),
+          fc.integer({ min: 1, max: 20 }),
+          fc.integer({ min: 1, max: 4 }),
+          fc.integer({ min: 1, max: 3 }),
+          fc.integer({ min: 0, max: 0xffffffff }),
+          (count, sides, keep, drop, seed) => {
+            const keepN = Math.min(keep, count);
+            const dropN = Math.min(drop, count);
+            const seedStr = `chain-test-${seed}`;
+            const khOnly = roll(`${count}d${sides}kh${keepN}`, { seed: seedStr });
+            const khDl = roll(`${count}d${sides}kh${keepN}dl${dropN}`, { seed: seedStr });
+            return khDl.total <= khOnly.total;
+          },
+        ),
+        { numRuns: 300 },
+      );
+    });
+
+    test('chained modifier total is always >= 0', () => {
+      fc.assert(
+        fc.property(
+          fc.integer({ min: 2, max: 8 }),
+          fc.integer({ min: 1, max: 20 }),
+          fc.integer({ min: 1, max: 4 }),
+          fc.integer({ min: 1, max: 4 }),
+          (count, sides, keep, drop) => {
+            const keepN = Math.min(keep, count);
+            const dropN = Math.min(drop, count);
+            const result = roll(`${count}d${sides}kh${keepN}dl${dropN}`);
+            return result.total >= 0;
+          },
+        ),
+        { numRuns: 300 },
+      );
+    });
+
+    test('chained modifier order does not affect total (commutativity)', () => {
+      fc.assert(
+        fc.property(
+          fc.integer({ min: 2, max: 8 }),
+          fc.integer({ min: 1, max: 20 }),
+          fc.integer({ min: 1, max: 4 }),
+          fc.integer({ min: 1, max: 3 }),
+          fc.integer({ min: 0, max: 0xffffffff }),
+          (count, sides, keep, drop, seed) => {
+            const keepN = Math.min(keep, count);
+            const dropN = Math.min(drop, count);
+            const seedStr = `order-test-${seed}`;
+            const r1 = roll(`${count}d${sides}kh${keepN}dl${dropN}`, { seed: seedStr });
+            const r2 = roll(`${count}d${sides}dl${dropN}kh${keepN}`, { seed: seedStr });
+            return r1.total === r2.total;
+          },
+        ),
+        { numRuns: 300 },
+      );
+    });
+
+    test('rolls array length equals dice count for chained modifiers', () => {
+      fc.assert(
+        fc.property(
+          fc.integer({ min: 2, max: 8 }),
+          fc.integer({ min: 1, max: 20 }),
+          fc.integer({ min: 1, max: 4 }),
+          fc.integer({ min: 1, max: 3 }),
+          (count, sides, keep, drop) => {
+            const keepN = Math.min(keep, count);
+            const dropN = Math.min(drop, count);
+            const result = roll(`${count}d${sides}kh${keepN}dl${dropN}`);
+            return result.rolls.length === count;
+          },
+        ),
+        { numRuns: 200 },
+      );
+    });
+  });
+
   describe('seeded reproducibility', () => {
     test('same seed always produces same results', () => {
       fc.assert(
