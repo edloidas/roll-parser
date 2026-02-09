@@ -5,6 +5,7 @@
  */
 
 import type { ASTNode, BinaryOpNode, DiceNode, ModifierNode, UnaryOpNode } from '../parser/ast';
+import { isModifier } from '../parser/ast';
 import type { RNG } from '../rng/types';
 import type { DieResult, EvaluateOptions, RollResult } from '../types';
 import {
@@ -33,6 +34,16 @@ type EvalContext = {
   rolls: DieResult[];
   expressionParts: string[];
   renderedParts: string[];
+};
+
+/**
+ * Flattened representation of a keep/drop modifier for chain evaluation.
+ */
+type ModifierSpec = {
+  modifier: 'keep' | 'drop';
+  selector: 'highest' | 'lowest';
+  count: number;
+  code: string;
 };
 
 /**
@@ -181,55 +192,97 @@ function evalUnaryOp(node: UnaryOpNode, rng: RNG, ctx: EvalContext): number {
   return -value;
 }
 
-function evalModifier(node: ModifierNode, rng: RNG, ctx: EvalContext): number {
-  // LIMITATION: Chained modifiers (e.g., 4d6dl1kh3) evaluate sequentially, not per industry standard.
-  // Current: Inner modifier is fully evaluated, outer sees final result.
-  // Roll20/RPG Dice Roller: Each modifier sees ALL original dice and can override previous modifiers.
-  // See: https://dice-roller.github.io/documentation/guide/notation/modifiers.html
-  // TODO: Refactor to pass dice pools through modifier chain (Stage 2/3 enhancement)
+/**
+ * Walks a nested ModifierNode chain, collecting specs outermost-first,
+ * then reverses to notation order (innermost-first).
+ */
+function flattenModifierChain(
+  node: ModifierNode,
+  rng: RNG,
+): { specs: ModifierSpec[]; baseTarget: ASTNode } {
+  const specs: ModifierSpec[] = [];
+  let current: ASTNode = node;
 
-  const countCtx: EvalContext = { rolls: [], expressionParts: [], renderedParts: [] };
-  const modCount = evalNode(node.count, rng, countCtx);
+  while (isModifier(current)) {
+    const countCtx: EvalContext = { rolls: [], expressionParts: [], renderedParts: [] };
+    const modCount = evalNode(current.count, rng, countCtx);
 
-  if (!Number.isInteger(modCount) || modCount < 0) {
-    throw new EvaluatorError(`Invalid modifier count: ${modCount}`);
+    if (!Number.isInteger(modCount) || modCount < 0) {
+      throw new EvaluatorError(`Invalid modifier count: ${modCount}`);
+    }
+
+    const code =
+      current.modifier === 'keep'
+        ? current.selector === 'highest'
+          ? 'kh'
+          : 'kl'
+        : current.selector === 'highest'
+          ? 'dh'
+          : 'dl';
+
+    specs.push({ modifier: current.modifier, selector: current.selector, count: modCount, code });
+    current = current.target;
   }
+
+  specs.reverse();
+  return { specs, baseTarget: current };
+}
+
+/**
+ * Applies a single modifier spec to a dice pool.
+ */
+function applyModifierSpec(dice: DieResult[], spec: ModifierSpec): DieResult[] {
+  if (spec.modifier === 'keep') {
+    return spec.selector === 'highest'
+      ? applyKeepHighest(dice, spec.count)
+      : applyKeepLowest(dice, spec.count);
+  }
+  return spec.selector === 'highest'
+    ? applyDropHighest(dice, spec.count)
+    : applyDropLowest(dice, spec.count);
+}
+
+/**
+ * Applies each modifier independently to the full dice pool
+ * and merges drop sets via union. A die is dropped if ANY modifier dropped it.
+ */
+function mergeDropSets(baseDice: DieResult[], specs: ModifierSpec[]): DieResult[] {
+  const droppedIndices = new Set<number>();
+
+  for (const spec of specs) {
+    const result = applyModifierSpec(baseDice, spec);
+    for (let i = 0; i < result.length; i++) {
+      if (result[i]?.modifiers.includes('dropped')) {
+        droppedIndices.add(i);
+      }
+    }
+  }
+
+  return baseDice.map((die, index) => ({
+    ...die,
+    modifiers: droppedIndices.has(index)
+      ? [...die.modifiers.filter((m) => m !== 'kept'), 'dropped']
+      : [...die.modifiers.filter((m) => m !== 'dropped'), 'kept'],
+  }));
+}
+
+function evalModifier(node: ModifierNode, rng: RNG, ctx: EvalContext): number {
+  const { specs, baseTarget } = flattenModifierChain(node, rng);
 
   const targetCtx: EvalContext = { rolls: [], expressionParts: [], renderedParts: [] };
-  evalNode(node.target, rng, targetCtx);
+  evalNode(baseTarget, rng, targetCtx);
 
-  let modifiedDice: DieResult[];
+  const mergedDice = mergeDropSets(targetCtx.rolls, specs);
 
-  if (node.modifier === 'keep') {
-    if (node.selector === 'highest') {
-      modifiedDice = applyKeepHighest(targetCtx.rolls, modCount);
-    } else {
-      modifiedDice = applyKeepLowest(targetCtx.rolls, modCount);
-    }
-  } else {
-    if (node.selector === 'highest') {
-      modifiedDice = applyDropHighest(targetCtx.rolls, modCount);
-    } else {
-      modifiedDice = applyDropLowest(targetCtx.rolls, modCount);
-    }
-  }
+  ctx.rolls.push(...mergedDice);
 
-  ctx.rolls.push(...modifiedDice);
-
-  const total = sumKeptDice(modifiedDice);
+  const total = sumKeptDice(mergedDice);
 
   const targetExpr = targetCtx.expressionParts.join('');
-  const modifierCode =
-    node.modifier === 'keep'
-      ? node.selector === 'highest'
-        ? 'kh'
-        : 'kl'
-      : node.selector === 'highest'
-        ? 'dh'
-        : 'dl';
+  const modifierCodes = specs.map((s) => `${s.code}${s.count}`).join('');
 
-  ctx.expressionParts.push(`${targetExpr}${modifierCode}${modCount}`);
-  ctx.renderedParts.push(`${targetExpr}${renderDice(modifiedDice)}`);
+  ctx.expressionParts.push(`${targetExpr}${modifierCodes}`);
+  ctx.renderedParts.push(`${targetExpr}${renderDice(mergedDice)}`);
 
   return total;
 }

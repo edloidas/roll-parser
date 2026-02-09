@@ -255,6 +255,110 @@ describe('evaluate', () => {
     });
   });
 
+  describe('chained modifiers', () => {
+    test('dl1kh3 drops union of both modifier drop sets', () => {
+      // [3,1,4,2]: dl1 drops {idx1}, kh3 drops {idx1} → union {1} → total 9
+      const ast = parse('4d6dl1kh3');
+      const rng = createMockRng([3, 1, 4, 2]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(9);
+      expect(result.rolls).toHaveLength(4);
+      expect(getDie(result.rolls, 0).modifiers).toContain('kept');
+      expect(getDie(result.rolls, 1).modifiers).toContain('dropped');
+      expect(getDie(result.rolls, 2).modifiers).toContain('kept');
+      expect(getDie(result.rolls, 3).modifiers).toContain('kept');
+    });
+
+    test('kh1dh1 drops all dice when keep and drop conflict', () => {
+      // [1,2,7]: kh1 drops {0,1}, dh1 drops {2} → union {0,1,2} → total 0
+      const ast = parse('3d10kh1dh1');
+      const rng = createMockRng([1, 2, 7]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(0);
+      expect(result.rolls.every((r) => r.modifiers.includes('dropped'))).toBe(true);
+    });
+
+    test('dl1kh1 keeps only the intersection of kept sets', () => {
+      // [3,1,4,2]: kh1 drops {0,1,3}, dl1 drops {1} → union {0,1,3} → keeps idx2 (4)
+      const ast = parse('4d6dl1kh1');
+      const rng = createMockRng([3, 1, 4, 2]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(4);
+      expect(result.rolls.filter((r) => r.modifiers.includes('dropped'))).toHaveLength(3);
+    });
+
+    test('modifier order does not affect result', () => {
+      const ast1 = parse('4d6dl1kh3');
+      const ast2 = parse('4d6kh3dl1');
+      const rng1 = createMockRng([3, 1, 4, 2]);
+      const rng2 = createMockRng([3, 1, 4, 2]);
+
+      expect(evaluate(ast1, rng1).total).toBe(evaluate(ast2, rng2).total);
+    });
+
+    test('triple chain applies all three modifiers independently', () => {
+      // [3,1,4,2]: dl1→{1}, kh3→{1}, dh1→{2} → union {1,2} → total 5
+      const ast = parse('4d6dl1kh3dh1');
+      const rng = createMockRng([3, 1, 4, 2]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(5);
+      expect(result.rolls.filter((r) => r.modifiers.includes('dropped'))).toHaveLength(2);
+    });
+
+    test('expression string includes all modifier codes', () => {
+      const ast = parse('4d6dl1kh3');
+      const rng = createMockRng([3, 1, 4, 2]);
+      const result = evaluate(ast, rng);
+
+      expect(result.expression).toBe('4d6dl1kh3');
+    });
+
+    test('rendered shows dropped dice with strikethrough', () => {
+      const ast = parse('3d10kh1dh1');
+      const rng = createMockRng([1, 2, 7]);
+      const result = evaluate(ast, rng);
+
+      expect(result.rendered).toContain('~~1~~');
+      expect(result.rendered).toContain('~~2~~');
+      expect(result.rendered).toContain('~~7~~');
+    });
+
+    test('same modifier twice does not stack (dl1dl1 ≠ dl2)', () => {
+      // Each dl1 independently drops the same lowest die
+      const ast = parse('4d6dl1dl1');
+      const rng = createMockRng([3, 1, 4, 2]);
+      const result = evaluate(ast, rng);
+
+      // Both dl1s drop idx1 (value 1), union = {1}, total = 9
+      expect(result.total).toBe(9);
+      expect(result.rolls.filter((r) => r.modifiers.includes('dropped'))).toHaveLength(1);
+    });
+
+    test('all tied values with conflicting modifiers drops all', () => {
+      // [3,3,3]: kh1 keeps idx0, drops {1,2}; dl1 drops idx0 → union {0,1,2}
+      const ast = parse('3d6kh1dl1');
+      const rng = createMockRng([3, 3, 3]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(0);
+      expect(result.rolls.every((r) => r.modifiers.includes('dropped'))).toBe(true);
+    });
+
+    test('kh0 in chain drops all dice', () => {
+      // kh0 drops all → {0,1,2,3}; dl1 drops {1} → union = all
+      const ast = parse('4d6kh0dl1');
+      const rng = createMockRng([3, 1, 4, 2]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(0);
+      expect(result.rolls.every((r) => r.modifiers.includes('dropped'))).toBe(true);
+    });
+  });
+
   describe('critical and fumble detection', () => {
     test('detects critical (max value)', () => {
       const ast = parse('1d20');
