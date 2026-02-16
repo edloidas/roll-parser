@@ -40,8 +40,27 @@ Detailed rules in `.cursor/rules/`:
 
 ## Git Commits
 
+Conventional Commits format: `<type>: <description> #<issue>`
+
+Types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `perf`, `build`, `ci`
+
+- Imperative mood ("add feature" not "added feature")
+- Under 72 characters, no period at end
+- Include issue number when related: `feat: add parser #5`
 - Use `Co-Authored-By:` trailer only, no promotional lines
+- Add a concise body describing what changed and why (skip for trivial changes)
+- If a Claude session link is included, format as `[Claude Code session](link)` on its own line
+- Separate subject, body, and link with 1 blank line each
+
+## Issues and PRs
+
 - Issue titles follow commit format: `<type>: <description>`
+- PR titles follow commit format, use the primary change type
+- PR and issue descriptions should concisely explain what and why, skip trivial details
+- If a PR is related to an issue, include a `Closes #<issue>` line
+- If a Claude session link is included, format as `[Claude Code session](link)` on its own line
+- End AI-drafted issue and PR descriptions (not commits) with: `<sub>Drafted with AI assistance</sub>`
+- Separate all sections (summary, closes line, session link, sub tag) with 1 blank line
 
 ## Testing Standards
 
