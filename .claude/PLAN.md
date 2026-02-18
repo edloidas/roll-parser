@@ -230,14 +230,15 @@ export interface RollOptions {
 
 ---
 
-### Phase 6: CLI & Build
+### Phase 6: CLI & Build (#8)
 
 **Goal**: CLI binary and dual-format build output.
 
 **Files:**
-- `/src/cli/index.ts` - CLI entry point
-- `/src/cli/args.ts` - Argument parsing
-- `/bin/roll-parser.ts` - Bin wrapper
+- `/src/cli/index.ts` - CLI entry point (main logic)
+- `/src/cli/args.ts` - Argument parsing (pure, testable)
+- `/src/cli/cli.test.ts` - Argument parser unit tests
+- `/bin/roll-parser.ts` - Dev wrapper with Bun shebang
 
 **Build Output:**
 ```
@@ -245,8 +246,63 @@ dist/
 ├── index.mjs    # ESM
 ├── index.js     # CJS
 ├── index.d.ts   # TypeScript declarations
-└── cli.js       # CLI bundle
+└── cli.js       # CLI bundle (Node target, with #!/usr/bin/env node)
 ```
+
+**Build Pipeline Changes:**
+- Add `build:cli`: `bun build src/cli/index.ts --outfile dist/cli.js --target node`
+- Prepend shebang: `sed -i '1i#!/usr/bin/env node' dist/cli.js`
+- Chain into `build` script after existing steps
+
+**CLI Interface:**
+
+```
+Usage: roll-parser <notation> [options]
+
+Arguments:
+  notation     Dice notation to evaluate (e.g., "2d6+3")
+
+Options:
+  -v, --verbose   Show detailed roll breakdown
+  --seed <value>  Use seed for reproducible rolls
+  -h, --help      Show help
+  --version       Show version
+
+Exit codes:
+  0  Success
+  1  Parse/evaluation error (bad notation)
+  2  Usage error (missing notation, unknown flag)
+```
+
+**Normal output** (just the total):
+```
+$ roll-parser 2d6+3
+11
+```
+
+**Verbose output** (full breakdown):
+```
+$ roll-parser 4d6kh3 --verbose
+Notation:    4d6kh3
+Expression:  4d6kh3
+Rolls:       4d6kh3[~~1~~, 4, 5, ~~2~~]
+Result:      4d6kh3[~~1~~, 4, 5, ~~2~~] = 9
+Total:       9
+```
+
+**Argument Parsing Edge Cases:**
+- `-1d4` starts with `-` but is valid notation → detect by checking
+  if arg contains `d` or starts with digit after `-`
+- `--` separator terminates flags: `roll-parser -- -1d4`
+- Multiple positional args joined: `roll-parser 2d6 + 1d4`
+  is treated as notation `2d6 + 1d4`
+
+**Error Handling:**
+- `LexerError`, `ParseError`, `EvaluatorError` → stderr + exit code 1
+- Missing notation, unknown flags → stderr + exit code 2
+- Error output format: `Error: <message>` (no stack traces)
+
+**VERSION:** Import from `src/index.ts` (already exported as const)
 
 ---
 
