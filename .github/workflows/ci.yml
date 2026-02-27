@@ -100,7 +100,13 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Test CLI help
-        run: bun run dist/cli.js --help 2>/dev/null || echo "CLI not ready yet (expected during development)"
+        run: bun run dist/cli.js --help
+
+      - name: Test CLI version
+        run: bun run dist/cli.js --version
 
       - name: Test CLI roll
-        run: bun run dist/cli.js 2d6 2>/dev/null || echo "CLI not ready yet (expected during development)"
+        run: bun run dist/cli.js 2d6
+
+      - name: Test CLI verbose
+        run: bun run dist/cli.js 4d6kh3 --verbose --seed test
