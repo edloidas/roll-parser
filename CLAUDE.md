@@ -5,103 +5,54 @@ Dice roll notation parser. TypeScript library and CLI. Built with Bun.
 ## Commands
 
 ```bash
-bun check:fix    # Verify changes: typecheck + lint + format (with auto-fix)
-bun run build    # Build library
-bun test         # Run tests
-bun release:dry  # Validate release (dry run)
+bun check:fix   # Typecheck + lint + format with auto-fix — use during iteration
+bun test        # Run tests
+bun validate    # Full check before commit: typecheck + lint + format:check + build + test
 ```
 
-Individual checks:
+## Constraints
 
-```bash
-bun typecheck    # TypeScript only
-bun lint:fix     # Linting with fixes
-bun format       # Format code
-bun run coverage # Tests with coverage
-```
-
-## Critical Constraints
-
-- Runtime: Bun
-- Target: ES2022
-- TypeScript required for all code
+- Runtime: Bun — never use npm, yarn, or pnpm
+- Target: ES2022, TypeScript only
 - Library + CLI dual output (ESM + CJS compiled JS)
 
-## Code Standards
+## Git & GitHub
 
-Detailed rules in `.cursor/rules/`:
-
-- `npm-scripts.mdc` - Available scripts reference (Bun)
-- `typescript.mdc` - Type definitions and coding style
-- `testing.mdc` - Test patterns (Bun test runner, fast-check)
-- `rng.mdc` - RNG interface and MockRNG usage
-- `comments.mdc` - Documentation style
-- `git-conventions.mdc` - Commit, issue, and PR naming
-
-## Git Commits
-
-Conventional Commits format: `<type>: <description> #<issue>`
+Conventional Commits: `<type>: <description> #<issue>`
 
 Types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `perf`, `build`, `ci`
 
-- Imperative mood ("add feature" not "added feature")
-- Under 72 characters, no period at end
+- Imperative mood, under 72 chars, no period
 - Include issue number when related: `feat: add parser #5`
-- Use `Co-Authored-By:` trailer only, no promotional lines
-- Add a concise body describing what changed and why (skip for trivial changes)
-- If a Claude session link is included, format as `[Claude Code session](link)` on its own line
-- Separate subject, body, and link with 1 blank line each
+- `Co-Authored-By:` trailer only, no promotional lines
+- Optional body: past tense, one line per change, backticks for code refs
 
-## Issues and PRs
+### Issues
 
-- Issue titles follow commit format: `<type>: <description>`
-- PR titles follow commit format, use the primary change type
-- PR and issue descriptions should concisely explain what and why, skip trivial details
-- If a PR is related to an issue, include a `Closes #<issue>` line
-- If a Claude session link is included, format as `[Claude Code session](link)` on its own line
-- End AI-drafted issue and PR descriptions (not commits) with: `<sub>Drafted with AI assistance</sub>`
-- Separate all sections (summary, closes line, session link, sub tag) with 1 blank line
+- **Title**: `<type>: <description>`
+- Use `epic: <description>` for issues that aggregate sub-issues and describe a long-form implementation plan. Not used in commits.
+- **Body**: concisely explain what and why, skip trivial details
 
-## Testing Standards
+  ```
+  <4–8 sentence description: what, what's affected, how to reproduce, impact>
 
-- Use MockRNG for deterministic dice tests (see `rng.mdc`)
-- Use fast-check for property-based invariant testing (see `testing.mdc`)
-- Co-locate tests with source: `foo.ts` → `foo.test.ts`
-- Target >90% statement coverage, 100% function coverage
+  ##### Rationale
+  <why this needs to be fixed or implemented>
 
-## Validation
+  <sub>Drafted with AI assistance</sub>
+  ```
 
-During iteration:
+### Pull Requests
 
-```bash
-bun check:fix    # Typecheck + lint + format (with auto-fix)
-bun test         # Run tests
-```
+- **Title**: `<type>: <description> #<number>`
+- **Body**: concise, no emojis, separate all sections with one blank line
 
-Before commit (mirrors CI):
+  ```
+  <summary of changes>
 
-```bash
-bun validate     # typecheck + lint + format:check + build + test
-```
+  Closes #<number>
 
-Task is complete when `bun validate` passes with no errors.
+  [Claude Code session](<link>)
 
-## Planning
-
-For complex tasks, start with plan mode. Ask clarifying questions before implementation.
-
-## Skills
-
-- `npm-release` - Release to npm
-- `issue-writer` - Create or modify GitHub issues
-
-## Release
-
-Package: `roll-parser`. Published to npm via `bun publish`.
-
-## External Docs
-
-Use Context7 MCP for TypeScript, Bun documentation.
-Request specific topics, not full manuals.
-
-For large R&D tasks, use `docs-finder` skill to search documentation effectively.
+  <sub>Drafted with AI assistance</sub>
+  ```

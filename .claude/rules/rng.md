@@ -1,9 +1,3 @@
----
-description: RNG usage standards
-globs: src/rng/**,src/evaluator/**
-alwaysApply: false
----
-
 # RNG Standards
 
 ## Interface
@@ -12,30 +6,29 @@ All dice rolling MUST use the RNG interface:
 
 ```typescript
 interface RNG {
-  next(): number;                              // [0, 1)
-  nextInt(min: number, max: number): number;   // [min, max] inclusive
+  next(): number;                            // [0, 1)
+  nextInt(min: number, max: number): number; // [min, max] inclusive
 }
 ```
 
 ## Rules
 
-1. **Never use Math.random() directly** in roll logic
+1. **Never use `Math.random()` directly** in roll logic
 2. **Inject RNG** via options parameter
-3. **Default to SeededRNG** when no RNG provided
-4. **MockRNG for tests** - returns predefined sequence
+3. **Default to `SeededRNG`** when no RNG is provided
+4. **Use `MockRNG` in tests** — returns a predefined sequence
 
 ## MockRNG Behavior
 
 ```typescript
 const mock = createMockRng([3, 5, 1]);
-mock.nextInt(1, 6);  // Returns 3
-mock.nextInt(1, 6);  // Returns 5
-mock.nextInt(1, 6);  // Returns 1
-mock.nextInt(1, 6);  // Throws! (exhausted)
+mock.nextInt(1, 6); // Returns 3
+mock.nextInt(1, 6); // Returns 5
+mock.nextInt(1, 6); // Returns 1
+mock.nextInt(1, 6); // Throws! (sequence exhausted)
 ```
 
-- MockRNG MUST throw on exhaustion (never wrap)
-- This catches incorrect roll counts in tests
+`MockRNG` MUST throw on exhaustion — this catches incorrect roll counts in tests.
 
 ## Usage in Tests
 
@@ -49,7 +42,7 @@ describe('roll', () => {
 
     const result = roll('3d6', { rng });
 
-    expect(result.total).toBe(12);  // 4 + 2 + 6
+    expect(result.total).toBe(12); // 4 + 2 + 6
     expect(result.rolls).toEqual([
       { result: 4, sides: 6 },
       { result: 2, sides: 6 },
@@ -62,7 +55,7 @@ describe('roll', () => {
 ## SeededRNG for Reproducibility
 
 ```typescript
-// Same seed = same sequence
+// Same seed → same sequence
 const rng1 = new SeededRNG('test-seed');
 const rng2 = new SeededRNG('test-seed');
 

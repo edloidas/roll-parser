@@ -8,8 +8,7 @@
 # AI Assistant
 .claude/plans/
 .codex/
-.cursor/commands/
-.cursor/mcp.json
+.cursor/
 .mcp.json
 settings.local.json
 
