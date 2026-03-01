@@ -2,6 +2,10 @@
 
 > High-performance dice notation parser for Bun runtime, TypeScript-first.
 
+> **Status:** Stage 1 complete (305 tests passing). Stage 2 and 3 are the active
+> roadmap — see [GAPS.md](./GAPS.md) for known bugs and missing features grouped
+> by GitHub issue.
+
 ## 1. Project Overview
 
 **Goal:** Build a market-leading dice parsing library that outperforms existing solutions (dice-roller, rpg-dice-roller) via Pratt Parser architecture.
