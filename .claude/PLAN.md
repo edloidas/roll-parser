@@ -9,24 +9,20 @@
 
 ## Current State Analysis
 
-**v3 Status**: Initialized (PRD + rules only), no TypeScript implementation yet.
+**v3 Status**: Stage 1 complete. All phases implemented, 305 tests passing.
 
 ### What Exists
+- Full TypeScript implementation: lexer, parser, evaluator, RNG, CLI
 - PRD.md with Stage 1/2/3 requirements
-- Cursor rules: typescript.mdc, testing.mdc, npm-scripts.mdc, comments.mdc
+- Claude rules: typescript.md, testing.md, rng.md, comments.md
 - CLAUDE.md with project commands
-- v2 JavaScript source (to be deleted)
-
-### Critical Gaps
-1. **Configuration**: tsconfig.json, bunfig.toml, biome.json missing
-2. **Source**: No TypeScript files, no lexer/parser/evaluator
-3. **Testing**: No mock RNG, no property-based testing setup
+- CI pipeline, Biome linting, dual-format build (ESM + CJS)
 
 ---
 
 ## Implementation Phases
 
-### Phase 0: Project Infrastructure (Current Step - Blocking)
+### Phase 0: Project Infrastructure ✅
 
 **Files to delete:**
 - `/src/*.js` - All v2 JavaScript source files
@@ -69,7 +65,7 @@ Format: Biome (lint + format combined)
 
 ---
 
-### Phase 1: Core Engine - Token System
+### Phase 1: Core Engine - Token System ✅
 
 **Goal**: Lexer that produces token stream from dice notation.
 
@@ -99,7 +95,7 @@ enum TokenType {
 
 ---
 
-### Phase 2: Core Engine - AST & Parser
+### Phase 2: Core Engine - AST & Parser ✅
 
 **Goal**: Pratt parser producing AST from token stream.
 
@@ -138,7 +134,7 @@ kh/kl : 50    (postfix modifiers, tightest)
 
 ---
 
-### Phase 3: Core Engine - RNG System
+### Phase 3: Core Engine - RNG System ✅
 
 **Goal**: Seedable RNG interface for deterministic testing.
 
@@ -163,7 +159,7 @@ interface RNG {
 
 ---
 
-### Phase 4: Core Engine - Evaluator
+### Phase 4: Core Engine - Evaluator ✅
 
 **Goal**: AST evaluator producing roll results.
 
@@ -201,7 +197,7 @@ interface DieResult {
 
 ---
 
-### Phase 5: Public API & Integration
+### Phase 5: Public API & Integration ✅
 
 **Goal**: Expose clean API, wire all components.
 
@@ -230,7 +226,7 @@ export interface RollOptions {
 
 ---
 
-### Phase 6: CLI & Build
+### Phase 6: CLI & Build ✅
 
 **Goal**: CLI binary and dual-format build output.
 
