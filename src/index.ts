@@ -32,7 +32,7 @@ export { SeededRNG } from './rng/seeded';
 export { createMockRng, MockRNGExhaustedError } from './rng/mock';
 
 // * Evaluator exports
-export { evaluate, EvaluatorError } from './evaluator/evaluator';
+export { DEFAULT_MAX_DICE, evaluate, EvaluatorError } from './evaluator/evaluator';
 export type { DieModifier, DieResult, EvaluateOptions, RollResult } from './types';
 
 // * Public API

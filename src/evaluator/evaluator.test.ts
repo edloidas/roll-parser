@@ -8,7 +8,7 @@ import { describe, expect, test } from 'bun:test';
 import { parse } from '../parser/parser';
 import { createMockRng } from '../rng/mock';
 import type { DieResult } from '../types';
-import { evaluate, EvaluatorError } from './evaluator';
+import { DEFAULT_MAX_DICE, evaluate, EvaluatorError } from './evaluator';
 
 /**
  * Helper to safely get a die result at index, throwing if not present.
@@ -524,6 +524,101 @@ describe('evaluate', () => {
 
       expect(result.total).toBe(0);
       expect(result.rolls.every((r) => r.modifiers.includes('dropped'))).toBe(true);
+    });
+  });
+
+  describe('dice count safety limit', () => {
+    test('DEFAULT_MAX_DICE is 10,000', () => {
+      expect(DEFAULT_MAX_DICE).toBe(10_000);
+    });
+
+    test('allows dice count at the limit', () => {
+      const ast = parse('3d6');
+      const rng = createMockRng([1, 2, 3]);
+      const result = evaluate(ast, rng, { maxDice: 3 });
+
+      expect(result.total).toBe(6);
+      expect(result.rolls).toHaveLength(3);
+    });
+
+    test('throws when single group exceeds limit', () => {
+      const ast = parse('5d6');
+      const rng = createMockRng([1, 2, 3, 4, 5]);
+
+      expect(() => evaluate(ast, rng, { maxDice: 4 })).toThrow(EvaluatorError);
+      expect(() => evaluate(ast, rng, { maxDice: 4 })).toThrow(
+        'Total dice count 5 exceeds limit of 4',
+      );
+    });
+
+    test('throws when aggregate across groups exceeds limit', () => {
+      const ast = parse('3d6+3d6');
+      const rng = createMockRng([1, 2, 3, 4, 5, 6]);
+
+      expect(() => evaluate(ast, rng, { maxDice: 5 })).toThrow(EvaluatorError);
+      expect(() => evaluate(ast, rng, { maxDice: 5 })).toThrow(
+        'Total dice count 6 exceeds limit of 5',
+      );
+    });
+
+    test('aggregate limit allows exact total', () => {
+      const ast = parse('3d6+2d6');
+      const rng = createMockRng([1, 2, 3, 4, 5]);
+      const result = evaluate(ast, rng, { maxDice: 5 });
+
+      expect(result.total).toBe(15);
+      expect(result.rolls).toHaveLength(5);
+    });
+
+    test('consumer can raise the limit', () => {
+      const ast = parse('3d6');
+      const rng = createMockRng([1, 2, 3]);
+      const result = evaluate(ast, rng, { maxDice: 100_000 });
+
+      expect(result.total).toBe(6);
+    });
+
+    test('zero dice count passes without incrementing counter', () => {
+      const ast = parse('0d6');
+      const rng = createMockRng([]);
+      const result = evaluate(ast, rng, { maxDice: 1 });
+
+      expect(result.total).toBe(0);
+      expect(result.rolls).toHaveLength(0);
+    });
+
+    test('invalid maxDice falls back to default', () => {
+      const ast = parse('3d6');
+      const vals = [1, 2, 3];
+
+      // NaN, negative, Infinity, zero — all fall back to DEFAULT_MAX_DICE
+      expect(() => evaluate(ast, createMockRng(vals), { maxDice: Number.NaN })).not.toThrow();
+      expect(() => evaluate(ast, createMockRng(vals), { maxDice: -1 })).not.toThrow();
+      expect(() =>
+        evaluate(ast, createMockRng(vals), { maxDice: Number.POSITIVE_INFINITY }),
+      ).not.toThrow();
+      expect(() => evaluate(ast, createMockRng(vals), { maxDice: 0 })).not.toThrow();
+    });
+
+    test('float maxDice is floored', () => {
+      const ast = parse('3d6');
+      const rng = createMockRng([1, 2, 3]);
+
+      // maxDice: 2.9 → floor → 2, so 3d6 should throw
+      expect(() => evaluate(ast, rng, { maxDice: 2.9 })).toThrow(EvaluatorError);
+    });
+
+    test('error message includes actual count and limit', () => {
+      const ast = parse('10d6');
+      const rng = createMockRng(Array.from({ length: 10 }, () => 1));
+
+      try {
+        evaluate(ast, rng, { maxDice: 5 });
+        expect.unreachable('should have thrown');
+      } catch (error) {
+        expect(error).toBeInstanceOf(EvaluatorError);
+        expect((error as EvaluatorError).message).toBe('Total dice count 10 exceeds limit of 5');
+      }
     });
   });
 });

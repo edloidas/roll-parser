@@ -8,14 +8,12 @@ have no issue and are noted at the bottom.
 
 ## Critical
 
-### 1. No dice count safety limit — process hangs on large inputs *(→ [#19](https://github.com/edloidas/roll-parser/issues/19))*
+### ~~1. No dice count safety limit — process hangs on large inputs~~ *(→ [#19](https://github.com/edloidas/roll-parser/issues/19))* ✓ Resolved
 
-`src/evaluator/evaluator.ts:120` — The `evalDice` function loops
-`for (let i = 0; i < count; i++)` with no upper bound. Input like
-`999999999999d6` creates an effectively infinite loop that hangs the process.
-The `maxIterations` option exists in `RollOptions` (`src/roll.ts:23`) but is
-never passed to or used by the evaluator. There is no `MAX_DICE` constant or
-guard. This is a denial-of-service vector for any server-side usage.
+Added `DEFAULT_MAX_DICE` (10,000) with aggregate counter across the full
+expression. `maxDice` option in `RollOptions` and `EvaluateOptions` lets
+consumers override the limit. Invalid values (NaN, Infinity, negatives) fall
+back to the default.
 
 ### 2. CI test job has `continue-on-error: true` *(→ [#20](https://github.com/edloidas/roll-parser/issues/20))*
 
@@ -92,11 +90,10 @@ commas, and strikethrough for dropped dice.
 
 ## Medium — Code Quality
 
-### 12. `maxIterations` option is defined but never used *(→ [#19](https://github.com/edloidas/roll-parser/issues/19))*
+### ~~12. `maxIterations` option is defined but never used~~ *(→ [#19](https://github.com/edloidas/roll-parser/issues/19))* ✓ Resolved
 
-`src/roll.ts:23` declares `maxIterations?: number` with the comment "Stage 2
-exploding dice" but it is never threaded through to the evaluator. Dead API
-surface that will confuse consumers who try to use it.
+Replaced `maxIterations` with `maxDice` in `RollOptions`. Now wired through
+`evaluate()` → `EvalEnv` → `evalDice()` with aggregate tracking.
 
 ### 13. Mock RNG bundled into production entry point *(→ [#24](https://github.com/edloidas/roll-parser/issues/24))*
 

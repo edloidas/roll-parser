@@ -317,4 +317,21 @@ describe('roll() integration', () => {
       expect(result.total).toBe(5);
     });
   });
+
+  describe('dice count safety limit', () => {
+    test('roll() passes maxDice to evaluator', () => {
+      expect(() => roll('5d6', { maxDice: 4 })).toThrow(EvaluatorError);
+      expect(() => roll('5d6', { maxDice: 4 })).toThrow('exceeds limit of 4');
+    });
+
+    test('roll() aggregate limit across groups', () => {
+      expect(() => roll('3d6+3d6', { maxDice: 5 })).toThrow(EvaluatorError);
+    });
+
+    test('roll() respects default limit without maxDice option', () => {
+      // 3d6 is well under the default 10,000 limit
+      const result = roll('3d6', { rng: createMockRng([1, 2, 3]) });
+      expect(result.total).toBe(6);
+    });
+  });
 });
