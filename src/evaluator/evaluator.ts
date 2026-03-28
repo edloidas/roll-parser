@@ -27,8 +27,19 @@ export class EvaluatorError extends Error {
   }
 }
 
+/** Default maximum total dice allowed per evaluation. */
+export const DEFAULT_MAX_DICE = 10_000;
+
 /**
- * Internal evaluation context for tracking state during recursion.
+ * Per-evaluation shared environment (created once, shared across all branches).
+ */
+type EvalEnv = {
+  readonly maxDice: number;
+  totalDiceRolled: number;
+};
+
+/**
+ * Per-branch mutable accumulator for tracking rolls and output during recursion.
  */
 type EvalContext = {
   rolls: DieResult[];
@@ -75,22 +86,22 @@ function renderDice(dice: DieResult[]): string {
 /**
  * Evaluates an AST node, returning value and updating context.
  */
-function evalNode(node: ASTNode, rng: RNG, ctx: EvalContext): number {
+function evalNode(node: ASTNode, rng: RNG, ctx: EvalContext, env: EvalEnv): number {
   switch (node.type) {
     case 'Literal':
       return evalLiteral(node.value, ctx);
 
     case 'Dice':
-      return evalDice(node, rng, ctx);
+      return evalDice(node, rng, ctx, env);
 
     case 'BinaryOp':
-      return evalBinaryOp(node, rng, ctx);
+      return evalBinaryOp(node, rng, ctx, env);
 
     case 'UnaryOp':
-      return evalUnaryOp(node, rng, ctx);
+      return evalUnaryOp(node, rng, ctx, env);
 
     case 'Modifier':
-      return evalModifier(node, rng, ctx);
+      return evalModifier(node, rng, ctx, env);
 
     default: {
       const exhaustive: never = node;
@@ -105,9 +116,19 @@ function evalLiteral(value: number, ctx: EvalContext): number {
   return value;
 }
 
-function evalDice(node: DiceNode, rng: RNG, ctx: EvalContext): number {
-  const count = evalNode(node.count, rng, { rolls: [], expressionParts: [], renderedParts: [] });
-  const sides = evalNode(node.sides, rng, { rolls: [], expressionParts: [], renderedParts: [] });
+function evalDice(node: DiceNode, rng: RNG, ctx: EvalContext, env: EvalEnv): number {
+  const count = evalNode(
+    node.count,
+    rng,
+    { rolls: [], expressionParts: [], renderedParts: [] },
+    env,
+  );
+  const sides = evalNode(
+    node.sides,
+    rng,
+    { rolls: [], expressionParts: [], renderedParts: [] },
+    env,
+  );
 
   if (!Number.isInteger(count) || count < 0) {
     throw new EvaluatorError(`Invalid dice count: ${count}`);
@@ -115,6 +136,13 @@ function evalDice(node: DiceNode, rng: RNG, ctx: EvalContext): number {
   if (!Number.isInteger(sides) || sides < 1) {
     throw new EvaluatorError(`Invalid dice sides: ${sides}`);
   }
+
+  if (env.totalDiceRolled + count > env.maxDice) {
+    throw new EvaluatorError(
+      `Total dice count ${env.totalDiceRolled + count} exceeds limit of ${env.maxDice}`,
+    );
+  }
+  env.totalDiceRolled += count;
 
   const dice: DieResult[] = [];
   for (let i = 0; i < count; i++) {
@@ -134,12 +162,12 @@ function evalDice(node: DiceNode, rng: RNG, ctx: EvalContext): number {
   return total;
 }
 
-function evalBinaryOp(node: BinaryOpNode, rng: RNG, ctx: EvalContext): number {
+function evalBinaryOp(node: BinaryOpNode, rng: RNG, ctx: EvalContext, env: EvalEnv): number {
   const leftCtx: EvalContext = { rolls: [], expressionParts: [], renderedParts: [] };
   const rightCtx: EvalContext = { rolls: [], expressionParts: [], renderedParts: [] };
 
-  const left = evalNode(node.left, rng, leftCtx);
-  const right = evalNode(node.right, rng, rightCtx);
+  const left = evalNode(node.left, rng, leftCtx, env);
+  const right = evalNode(node.right, rng, rightCtx, env);
 
   ctx.rolls.push(...leftCtx.rolls, ...rightCtx.rolls);
 
@@ -177,9 +205,9 @@ function evalBinaryOp(node: BinaryOpNode, rng: RNG, ctx: EvalContext): number {
   }
 }
 
-function evalUnaryOp(node: UnaryOpNode, rng: RNG, ctx: EvalContext): number {
+function evalUnaryOp(node: UnaryOpNode, rng: RNG, ctx: EvalContext, env: EvalEnv): number {
   const innerCtx: EvalContext = { rolls: [], expressionParts: [], renderedParts: [] };
-  const value = evalNode(node.operand, rng, innerCtx);
+  const value = evalNode(node.operand, rng, innerCtx, env);
 
   ctx.rolls.push(...innerCtx.rolls);
 
@@ -199,13 +227,14 @@ function evalUnaryOp(node: UnaryOpNode, rng: RNG, ctx: EvalContext): number {
 function flattenModifierChain(
   node: ModifierNode,
   rng: RNG,
+  env: EvalEnv,
 ): { specs: ModifierSpec[]; baseTarget: ASTNode } {
   const specs: ModifierSpec[] = [];
   let current: ASTNode = node;
 
   while (isModifier(current)) {
     const countCtx: EvalContext = { rolls: [], expressionParts: [], renderedParts: [] };
-    const modCount = evalNode(current.count, rng, countCtx);
+    const modCount = evalNode(current.count, rng, countCtx, env);
 
     if (!Number.isInteger(modCount) || modCount < 0) {
       throw new EvaluatorError(`Invalid modifier count: ${modCount}`);
@@ -266,11 +295,11 @@ function mergeDropSets(baseDice: DieResult[], specs: ModifierSpec[]): DieResult[
   }));
 }
 
-function evalModifier(node: ModifierNode, rng: RNG, ctx: EvalContext): number {
-  const { specs, baseTarget } = flattenModifierChain(node, rng);
+function evalModifier(node: ModifierNode, rng: RNG, ctx: EvalContext, env: EvalEnv): number {
+  const { specs, baseTarget } = flattenModifierChain(node, rng, env);
 
   const targetCtx: EvalContext = { rolls: [], expressionParts: [], renderedParts: [] };
-  evalNode(baseTarget, rng, targetCtx);
+  evalNode(baseTarget, rng, targetCtx, env);
 
   const mergedDice = mergeDropSets(targetCtx.rolls, specs);
 
@@ -304,13 +333,19 @@ function evalModifier(node: ModifierNode, rng: RNG, ctx: EvalContext): number {
  * ```
  */
 export function evaluate(ast: ASTNode, rng: RNG, options: EvaluateOptions = {}): RollResult {
+  const maxDice =
+    options.maxDice != null && Number.isFinite(options.maxDice) && options.maxDice > 0
+      ? Math.floor(options.maxDice)
+      : DEFAULT_MAX_DICE;
+
+  const env: EvalEnv = { maxDice, totalDiceRolled: 0 };
   const ctx: EvalContext = {
     rolls: [],
     expressionParts: [],
     renderedParts: [],
   };
 
-  const total = evalNode(ast, rng, ctx);
+  const total = evalNode(ast, rng, ctx, env);
 
   const expression = ctx.expressionParts.join('');
   const rendered = `${ctx.renderedParts.join('')} = ${total}`;

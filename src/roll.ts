@@ -5,7 +5,7 @@
  */
 
 import type { RNG } from './rng/types';
-import type { RollResult } from './types';
+import type { EvaluateOptions, RollResult } from './types';
 import { evaluate } from './evaluator/evaluator';
 import { lex } from './lexer/lexer';
 import { Parser } from './parser/parser';
@@ -19,8 +19,8 @@ export type RollOptions = {
   rng?: RNG;
   /** Seed for deterministic rolls (ignored if rng provided) */
   seed?: string | number;
-  /** Safety limit for iterations (default: 1000) - Stage 2 exploding dice */
-  maxIterations?: number;
+  /** Maximum total dice allowed per evaluation (default: 10,000) */
+  maxDice?: number;
 };
 
 /**
@@ -50,5 +50,7 @@ export function roll(notation: string, options: RollOptions = {}): RollResult {
   const rng = options.rng ?? new SeededRNG(options.seed);
   const tokens = lex(notation);
   const ast = new Parser(tokens).parse();
-  return evaluate(ast, rng, { notation });
+  const evalOptions: EvaluateOptions = { notation };
+  if (options.maxDice != null) evalOptions.maxDice = options.maxDice;
+  return evaluate(ast, rng, evalOptions);
 }

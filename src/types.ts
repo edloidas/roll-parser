@@ -47,4 +47,6 @@ export type RollResult = {
 export type EvaluateOptions = {
   /** Original notation string (for result metadata) */
   notation?: string;
+  /** Maximum total dice allowed per evaluation (default: 10,000) */
+  maxDice?: number;
 };

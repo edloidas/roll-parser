@@ -4,7 +4,7 @@
  * @module evaluator
  */
 
-export { evaluate, EvaluatorError } from './evaluator';
+export { DEFAULT_MAX_DICE, evaluate, EvaluatorError } from './evaluator';
 export {
   applyDropHighest,
   applyDropLowest,
