@@ -2,7 +2,7 @@
 
 > High-performance dice notation parser for Bun runtime, TypeScript-first.
 
-> **Status:** Stage 1 complete (305 tests passing). Stage 2 and 3 are the active
+> **Status:** Stage 1 complete (326 tests passing). Stage 2 and 3 are the active
 > roadmap — see [GAPS.md](./GAPS.md) for known bugs and missing features grouped
 > by GitHub issue.
 

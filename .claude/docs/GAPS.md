@@ -15,28 +15,22 @@ expression. `maxDice` option in `RollOptions` and `EvaluateOptions` lets
 consumers override the limit. Invalid values (NaN, Infinity, negatives) fall
 back to the default.
 
-### 2. CI test job has `continue-on-error: true` *(→ [#20](https://github.com/edloidas/roll-parser/issues/20))*
+### ~~2. CI test job has `continue-on-error: true`~~ *(→ [#20](https://github.com/edloidas/roll-parser/issues/20))* ✓ Resolved
 
-`.github/workflows/ci.yml:78` — The test step silently swallows failures.
-PRs with broken tests show a green check. This completely defeats the purpose
-of CI testing.
+Removed `continue-on-error: true` from the test step. CI now fails correctly
+on broken tests.
 
 ## High — Bugs
 
-### 3. `4d6d1` parses as `(4d6)d1` — not "roll 4d6, drop 1" *(→ [#21](https://github.com/edloidas/roll-parser/issues/21))*
+### ~~3. `4d6d1` parses as `(4d6)d1` — not "roll 4d6, drop 1"~~ *(→ [#21](https://github.com/edloidas/roll-parser/issues/21))* ✓ Resolved
 
-The lexer cannot distinguish `d` as "drop" from `d` as "dice" when followed by
-a number. `4d6d1` is parsed as two nested dice operations: first roll `4d6`
-(producing e.g. 14), then roll `14d1`. Only `dl`/`dh` syntax works for drop.
-This is a known ambiguity from `Research.md` (section 2.1), but it is not
-documented as a limitation and the README does not warn users.
+Documented as a known limitation in README. The bare `d` token is always the
+dice operator by design; use `dl`/`dh` to drop explicitly: `4d6dl1`.
 
-### 4. `DieResult.modifiers` contains duplicate `"kept"` entries *(→ [#21](https://github.com/edloidas/roll-parser/issues/21))*
+### ~~4. `DieResult.modifiers` contains duplicate `"kept"` entries~~ *(→ [#21](https://github.com/edloidas/roll-parser/issues/21))* ✓ Resolved
 
-`src/evaluator/evaluator.ts:125` calls `markAllKept()` which adds `"kept"`,
-then `mergeDropSets()` at line 275 adds `"kept"` again. Result:
-`modifiers: ["kept", "kept"]` for kept dice. Consumers checking
-`modifiers.length` or doing equality comparisons will get wrong results.
+Fixed `mergeDropSets()` to filter out existing `"kept"`/`"dropped"` flags
+before re-applying them, preventing duplicate entries.
 
 ### 5. Non-integer results from division are not handled *(deferred)*
 
@@ -97,13 +91,13 @@ Replaced `maxIterations` with `maxDice` in `RollOptions`. Now wired through
 
 ### 13. Mock RNG bundled into production entry point *(→ [#24](https://github.com/edloidas/roll-parser/issues/24))*
 
-`src/index.ts:32` exports `createMockRng` and `MockRNGExhaustedError` from the
+`src/index.ts` exports `createMockRng` and `MockRNGExhaustedError` from the
 main package entry. This means test-only code is bundled into `dist/index.js`
 and `dist/index.mjs`. Should be a separate `roll-parser/testing` export path.
 
 ### 14. `VERSION` constant duplicated *(→ [#24](https://github.com/edloidas/roll-parser/issues/24))*
 
-`src/index.ts:42` hardcodes `VERSION = '3.0.0-alpha.0'` which must be manually
+`src/index.ts` hardcodes `VERSION = '3.0.0-alpha.0'` which must be manually
 kept in sync with `package.json` `version`. These will inevitably drift.
 
 ### 15. Very wide public API surface *(→ [#24](https://github.com/edloidas/roll-parser/issues/24))*
@@ -115,7 +109,7 @@ types. This makes the API surface hard to maintain across versions.
 
 ### 16. `bun-types` version is `latest` *(→ [#24](https://github.com/edloidas/roll-parser/issues/24))*
 
-`package.json:67` — Floating version makes builds non-reproducible. Should be
+`package.json` — Floating version makes builds non-reproducible. Should be
 pinned.
 
 ### 17. Power operator with no overflow guard *(deferred)*
@@ -131,10 +125,10 @@ These are extremely common dice notations. `d%` should be equivalent to `d100`.
 `dF` should roll Fate/Fudge dice (-1, 0, +1). Both throw errors currently.
 Not documented as a limitation.
 
-### 19. Implicit modifier count not supported *(→ [#21](https://github.com/edloidas/roll-parser/issues/21))*
+### ~~19. Implicit modifier count not supported~~ *(→ [#21](https://github.com/edloidas/roll-parser/issues/21))* ✓ Resolved
 
-`4d6kh` (meaning `4d6kh1`) throws `ParseError`. Users must always specify the
-count. Many dice systems allow bare `kh`/`kl` to mean keep/drop 1.
+Bare `kh`/`kl`/`dh`/`dl` without a count now default to 1.
+`4d6kh` is equivalent to `4d6kh1`.
 
 ### 20. `EvaluatorError` lacks structured context *(→ [#24](https://github.com/edloidas/roll-parser/issues/24))*
 
@@ -144,46 +138,42 @@ about where in the expression the error occurred. For `2d6+1d0+3`, it throws
 "Invalid dice sides: 0" but no indication that the error is in the second
 dice group.
 
-### 21. `1d1` is both critical and fumble simultaneously *(→ [#21](https://github.com/edloidas/roll-parser/issues/21))*
+### ~~21. `1d1` is both critical and fumble simultaneously~~ *(→ [#21](https://github.com/edloidas/roll-parser/issues/21))* ✓ Resolved
 
-`createDieResult` at `src/evaluator/evaluator.ts:52-60` flags `critical: true`
-when `result === sides` and `fumble: true` when `result === 1`. For `1d1`,
-both are true. This is a semantic ambiguity with no guard.
+`createDieResult` now guards `critical` with `sides > 1`. For `1d1`, only
+`fumble: true` is set.
 
 ### 22. MockRNG ignores `min`/`max` bounds *(→ [#24](https://github.com/edloidas/roll-parser/issues/24))*
 
-`src/rng/mock.ts:57` — `nextInt` returns raw values from the sequence regardless
+`src/rng/mock.ts` — `nextInt` returns raw values from the sequence regardless
 of `min`/`max` parameters. A test providing `createMockRng([100])` for a `1d6`
 roll would produce `DieResult` with `result: 100, sides: 6`. No validation
 against bounds.
 
-### 23. `--seed` CLI flag rejects values starting with `-` *(→ [#21](https://github.com/edloidas/roll-parser/issues/21))*
+### ~~23. `--seed` CLI flag rejects values starting with `-`~~ *(→ [#21](https://github.com/edloidas/roll-parser/issues/21))* ✓ Resolved
 
-`src/cli/args.ts:49` — `next.startsWith('-')` check prevents numeric seeds
-like `--seed -42` via space-separated syntax. Users would need `--seed=-42`
-instead.
+The CLI arg parser now uses a regex check (`/^-\d/`) to allow numeric seeds
+starting with `-`. `--seed -42` is accepted via space-separated syntax.
 
 ## Medium — CI/Config
 
-### 24. No coverage threshold enforcement *(→ [#20](https://github.com/edloidas/roll-parser/issues/20))*
+### ~~24. No coverage threshold enforcement~~ *(→ [#20](https://github.com/edloidas/roll-parser/issues/20))* ✓ Resolved
 
-The `coverage` script exists but CI never runs it. No threshold is enforced.
-Coverage could silently regress.
+CI pipeline reworked with quality gates as part of issue #20.
 
-### 25. No dependency caching in CI *(→ [#20](https://github.com/edloidas/roll-parser/issues/20))*
+### ~~25. No dependency caching in CI~~ *(→ [#20](https://github.com/edloidas/roll-parser/issues/20))* ✓ Resolved
 
-Each CI job runs `bun install` fresh. No Bun cache is used, slowing builds
-unnecessarily.
+Bun dependency caching via `actions/cache@v4` added to all CI jobs.
 
-### 26. Test job has unnecessary `needs: build` dependency *(→ [#20](https://github.com/edloidas/roll-parser/issues/20))*
+### ~~26. Test job has unnecessary `needs: build` dependency~~ *(→ [#20](https://github.com/edloidas/roll-parser/issues/20))* ✓ Resolved
 
-`ci.yml:63` — Tests run against source, not build artifacts. The
-`needs: build` serializes them unnecessarily.
+Test job now runs in parallel with build (`needs: check` instead of
+`needs: build`).
 
-### 27. No matrix testing *(→ [#20](https://github.com/edloidas/roll-parser/issues/20))*
+### ~~27. No matrix testing~~ *(→ [#20](https://github.com/edloidas/roll-parser/issues/20))* ✓ Resolved
 
-CI only tests on `ubuntu-latest` with `bun-version: latest`. No testing across
-multiple Bun versions or Node.js (relevant since CJS build targets Node).
+A dedicated `node-smoke` job now verifies CJS and ESM import compatibility
+under Node.js LTS. Bun is pinned to `1.3.10` for reproducibility.
 
 ### 28. Missing `sideEffects: false` in `package.json` *(→ [#22](https://github.com/edloidas/roll-parser/issues/22))*
 
@@ -191,7 +181,7 @@ Tree-shaking-friendly libraries should declare this for bundler optimization.
 
 ### 29. `biome.json` has dead `bin/**/*.ts` include path *(→ [#22](https://github.com/edloidas/roll-parser/issues/22))*
 
-The `bin/` directory does not exist. Dead configuration.
+The `bin/` directory contains no TypeScript files. The glob matches nothing.
 
 ### 30. Comment line width mismatch *(→ [#24](https://github.com/edloidas/roll-parser/issues/24))*
 
@@ -249,34 +239,42 @@ property for programmatic error handling.
 
 Findings grouped into GitHub issues:
 
-| Issue | Title | Findings |
-|-------|-------|---------|
-| [#19](https://github.com/edloidas/roll-parser/issues/19) | `fix: add dice count safety limit` | #1, #12 |
-| [#20](https://github.com/edloidas/roll-parser/issues/20) | `ci: fix test pipeline and add quality gates` | #2, #24–#27 |
-| [#21](https://github.com/edloidas/roll-parser/issues/21) | `fix: parser and evaluator correctness` | #3, #4, #19, #21, #23 |
-| [#22](https://github.com/edloidas/roll-parser/issues/22) | `build: fix npm publish artifacts` | #6–#8, #28, #29, #32, #33, #35 |
-| [#23](https://github.com/edloidas/roll-parser/issues/23) | `docs: update documentation for v3` | #9–#11, #31, #34 |
-| [#24](https://github.com/edloidas/roll-parser/issues/24) | `refactor: clean up public API surface` | #13–#16, #20, #22, #30, #37, #38 |
-| [#25](https://github.com/edloidas/roll-parser/issues/25) | `epic: implement Stage 2 — system compatibility` | #18 + roadmap below |
+| Issue | Title | Findings | Status |
+|-------|-------|---------|--------|
+| [#19](https://github.com/edloidas/roll-parser/issues/19) | `fix: add dice count safety limit` | #1, #12 | ✓ Closed |
+| [#20](https://github.com/edloidas/roll-parser/issues/20) | `ci: fix test pipeline and add quality gates` | #2, #24–#27 | ✓ Closed |
+| [#21](https://github.com/edloidas/roll-parser/issues/21) | `fix: parser and evaluator correctness` | #3, #4, #19, #21, #23 | ✓ Closed |
+| [#22](https://github.com/edloidas/roll-parser/issues/22) | `build: fix npm publish artifacts` | #6–#8, #28, #29, #32, #33, #35 | Open |
+| [#23](https://github.com/edloidas/roll-parser/issues/23) | `docs: update documentation for v3` | #9–#11, #31, #34 | Open |
+| [#24](https://github.com/edloidas/roll-parser/issues/24) | `refactor: clean up public API surface` | #13–#16, #20, #22, #30, #37, #38 | Open |
+| [#25](https://github.com/edloidas/roll-parser/issues/25) | `epic: implement Stage 2 — system compatibility` | #18 + Stage 2 roadmap | Open |
+| [#30](https://github.com/edloidas/roll-parser/issues/30) | `epic: implement Stage 3 — advanced features` | Stage 3 roadmap | Open |
 
 Deferred (no issue): #5, #17, #36
 
-## Unimplemented Roadmap Features (Stage 2 & 3) → [#25](https://github.com/edloidas/roll-parser/issues/25)
+## Unimplemented Roadmap Features
 
 From `PRD.md`, everything below is still missing:
 
-| Stage | Feature | Syntax |
-|-------|---------|--------|
-| 2 | Exploding dice | `1d6!`, `1d6!!`, `1d6!p` |
-| 2 | Reroll mechanics | `2d6r<2`, `2d6ro<3` |
-| 2 | Success counting | `10d10>=6`, `10d10>=6f1` |
-| 2 | Comparison operators | `>`, `>=`, `<`, `<=` |
-| 2 | PF2e Degrees of Success | `1d20+10 vs 25` |
-| 2 | Math functions | `floor()`, `ceil()`, `round()`, `abs()`, `max()`, `min()` |
-| 2 | Grouped rolls | `{1d8, 1d10}kh1` |
-| 3 | Variable injection | `1d20+@str`, `1d20+@{modifier}` |
-| 3 | Sorting modifiers | `4d6s`, `4d6sd` |
-| 3 | Critical/fumble thresholds | `1d20cs>19`, `1d20cf<2` |
-| 3 | Rich JSON `parts` output | Structured breakdown per sub-expression |
-| — | Percentile dice | `d%` |
-| — | Fate/Fudge dice | `dF` |
+### Stage 2 → [#25](https://github.com/edloidas/roll-parser/issues/25)
+
+| Feature | Syntax |
+|---------|--------|
+| Exploding dice | `1d6!`, `1d6!!`, `1d6!p` |
+| Reroll mechanics | `2d6r<2`, `2d6ro<3` |
+| Success counting | `10d10>=6`, `10d10>=6f1` |
+| Comparison operators | `>`, `>=`, `<`, `<=` |
+| PF2e Degrees of Success | `1d20+10 vs 25` |
+| Math functions | `floor()`, `ceil()`, `round()`, `abs()`, `max()`, `min()` |
+| Percentile dice | `d%` |
+| Fate/Fudge dice | `dF` |
+
+### Stage 3 → [#30](https://github.com/edloidas/roll-parser/issues/30)
+
+| Feature | Syntax |
+|---------|--------|
+| Grouped rolls | `{1d8, 1d10}kh1` |
+| Variable injection | `1d20+@str`, `1d20+@{modifier}` |
+| Sorting modifiers | `4d6s`, `4d6sd` |
+| Critical/fumble thresholds | `1d20cs>19`, `1d20cf<2` |
+| Rich JSON `parts` output | Structured breakdown per sub-expression |
