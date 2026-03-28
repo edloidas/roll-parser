@@ -46,7 +46,7 @@ export function parseArgs(argv: string[]): ParseArgsResult {
       verbose = true;
     } else if (arg === '--seed') {
       const next = argv[i + 1];
-      if (next === undefined || next.startsWith('-')) {
+      if (next === undefined || (next.startsWith('-') && !/^-\d/.test(next))) {
         return { ok: false, error: 'Missing value for --seed' };
       }
       seed = next;

@@ -126,6 +126,19 @@ describe('parseArgs', () => {
       const result = parseArgs(['--seed', '--verbose']);
       expect(result).toEqual({ ok: false, error: 'Missing value for --seed' });
     });
+
+    test('parses --seed with negative numeric value', () => {
+      const result = parseArgs(['2d6', '--seed', '-42']);
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.args.seed).toBe('-42');
+      }
+    });
+
+    test('returns error when --seed is followed by non-numeric flag', () => {
+      const result = parseArgs(['--seed', '-v']);
+      expect(result).toEqual({ ok: false, error: 'Missing value for --seed' });
+    });
   });
 
   describe('flag combinations', () => {
