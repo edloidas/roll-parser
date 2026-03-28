@@ -378,6 +378,15 @@ describe('evaluate', () => {
       expect(getDie(result.rolls, 0).critical).toBe(false);
     });
 
+    test('1d1 is fumble but not critical', () => {
+      const ast = parse('1d1');
+      const rng = createMockRng([1]);
+      const result = evaluate(ast, rng);
+
+      expect(getDie(result.rolls, 0).critical).toBe(false);
+      expect(getDie(result.rolls, 0).fumble).toBe(true);
+    });
+
     test('normal roll has no critical or fumble', () => {
       const ast = parse('1d20');
       const rng = createMockRng([10]);
@@ -475,6 +484,28 @@ describe('evaluate', () => {
       const rng = createMockRng([3]);
 
       expect(() => evaluate(ast, rng)).toThrow('Modulo by zero');
+    });
+
+    test('chained modifiers produce exactly one kept or dropped per die', () => {
+      const ast = parse('4d6dl1kh3');
+      const rng = createMockRng([3, 1, 4, 2]);
+      const result = evaluate(ast, rng);
+
+      for (const die of result.rolls) {
+        const kept = die.modifiers.filter((m) => m === 'kept');
+        const dropped = die.modifiers.filter((m) => m === 'dropped');
+        const total = kept.length + dropped.length;
+        expect(total).toBe(1);
+      }
+    });
+
+    test('implicit modifier count (4d6kh) keeps highest 1', () => {
+      const ast = parse('4d6kh');
+      const rng = createMockRng([3, 5, 2, 6]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(6);
+      expect(result.expression).toBe('4d6kh1');
     });
 
     test('keeps all dice when keep count exceeds pool', () => {

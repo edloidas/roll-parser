@@ -54,7 +54,7 @@ function createDieResult(sides: number, result: number): DieResult {
     sides,
     result,
     modifiers: [],
-    critical: result === sides,
+    critical: result === sides && sides > 1,
     fumble: result === 1,
   };
 }
@@ -261,8 +261,8 @@ function mergeDropSets(baseDice: DieResult[], specs: ModifierSpec[]): DieResult[
   return baseDice.map((die, index) => ({
     ...die,
     modifiers: droppedIndices.has(index)
-      ? [...die.modifiers.filter((m) => m !== 'kept'), 'dropped']
-      : [...die.modifiers.filter((m) => m !== 'dropped'), 'kept'],
+      ? [...die.modifiers.filter((m) => m !== 'kept' && m !== 'dropped'), 'dropped']
+      : [...die.modifiers.filter((m) => m !== 'dropped' && m !== 'kept'), 'kept'],
   }));
 }
 

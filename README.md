@@ -117,6 +117,13 @@ src/
 | World of Darkness | `10d10>=6f1` | 2 |
 | Savage Worlds | `1d6!` | 2 |
 
+## Known Limitations
+
+- **`4d6d1` parses as nested dice, not "drop 1".** The bare `d` token is always
+  interpreted as the dice operator, so `4d6d1` becomes `(4d6)d1` (roll 4d6, then
+  use the result as the count for d1). To drop dice, use the explicit `dl`
+  (drop lowest) or `dh` (drop highest) modifiers: `4d6dl1`.
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines.

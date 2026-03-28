@@ -228,6 +228,30 @@ describe('Parser', () => {
         modifier('keep', 'lowest', literal(1), dice(literal(2), literal(20))),
       );
     });
+
+    it('should default implicit modifier count to 1: 4d6kh', () => {
+      expect(parse('4d6kh')).toEqual(
+        modifier('keep', 'highest', literal(1), dice(literal(4), literal(6))),
+      );
+    });
+
+    it('should default implicit kl count to 1: 4d6kl', () => {
+      expect(parse('4d6kl')).toEqual(
+        modifier('keep', 'lowest', literal(1), dice(literal(4), literal(6))),
+      );
+    });
+
+    it('should default implicit dl count to 1: 4d6dl', () => {
+      expect(parse('4d6dl')).toEqual(
+        modifier('drop', 'lowest', literal(1), dice(literal(4), literal(6))),
+      );
+    });
+
+    it('should default implicit dh count to 1: 4d6dh', () => {
+      expect(parse('4d6dh')).toEqual(
+        modifier('drop', 'highest', literal(1), dice(literal(4), literal(6))),
+      );
+    });
   });
 
   describe('dice + arithmetic', () => {
@@ -318,10 +342,6 @@ describe('Parser', () => {
 
     it('should throw on extra closing parenthesis', () => {
       expect(() => parse('1+2)')).toThrow(ParseError);
-    });
-
-    it('should throw on missing modifier count', () => {
-      expect(() => parse('4d6kh')).toThrow(ParseError);
     });
 
     it('should throw on trailing operator', () => {

@@ -234,19 +234,12 @@ export class Parser {
         ? 'highest'
         : 'lowest';
 
-    // Count is required after modifier (number or parenthesized expression)
+    // Default to 1 when no explicit count follows the modifier (e.g., 4d6kh → 4d6kh1)
     const nextToken = this.peek().type;
-    if (nextToken !== TokenType.NUMBER && nextToken !== TokenType.LPAREN) {
-      throw new ParseError(
-        `Expected number or expression after '${token.value}' modifier`,
-        this.peek().position,
-        this.peek(),
-      );
-    }
-
-    // Use DICE_LEFT to prevent modifiers from appearing in count position (e.g., 4d6kh1kh3)
-    // This allows computed counts like 4d6kh(1+2) but prevents nested modifiers
-    const count = this.parseExpression(BP.DICE_LEFT);
+    const count: ASTNode =
+      nextToken === TokenType.NUMBER || nextToken === TokenType.LPAREN
+        ? this.parseExpression(BP.DICE_LEFT)
+        : { type: 'Literal', value: 1 };
 
     return {
       type: 'Modifier',
