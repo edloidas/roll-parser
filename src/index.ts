@@ -4,12 +4,15 @@
  * @module roll-parser
  */
 
+// * Error hierarchy
+export { RollParserError, isRollParserError } from './errors';
+export type { RollParserErrorCode } from './errors';
+
 // * Lexer exports
-export { lex, Lexer, LexerError } from './lexer/lexer';
-export { TokenType, type Token } from './lexer/tokens';
+export { LexerError } from './lexer/lexer';
 
 // * Parser exports
-export { parse, Parser, ParseError } from './parser/parser';
+export { parse, ParseError } from './parser/parser';
 export type {
   ASTNode,
   BinaryOpNode,
@@ -29,7 +32,6 @@ export {
 // * RNG exports
 export type { RNG } from './rng/types';
 export { SeededRNG } from './rng/seeded';
-export { createMockRng, MockRNGExhaustedError } from './rng/mock';
 
 // * Evaluator exports
 export { DEFAULT_MAX_DICE, evaluate, EvaluatorError } from './evaluator/evaluator';
@@ -39,4 +41,6 @@ export type { DieModifier, DieResult, EvaluateOptions, RollResult } from './type
 export { roll } from './roll';
 export type { RollOptions } from './roll';
 
-export const VERSION = '3.0.0-alpha.0';
+import pkg from '../package.json';
+
+export const VERSION: string = pkg.version;

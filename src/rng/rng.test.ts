@@ -461,12 +461,22 @@ describe('MockRNG', () => {
       expect(rng.next()).toBe(0.75);
     });
 
-    it('should ignore min/max parameters (returns raw values)', () => {
+    it('should accept values within bounds', () => {
       const rng = createMockRng([4, 15, 20]);
 
       expect(rng.nextInt(1, 6)).toBe(4);
       expect(rng.nextInt(1, 20)).toBe(15);
       expect(rng.nextInt(1, 100)).toBe(20);
+    });
+
+    it('should throw RangeError when value is out of bounds', () => {
+      const rng = createMockRng([100]);
+
+      expect(() => rng.nextInt(1, 6)).toThrow(RangeError);
+
+      const rng2 = createMockRng([0]);
+
+      expect(() => rng2.nextInt(1, 6)).toThrow('out of bounds');
     });
 
     it('should allow mixing next and nextInt calls', () => {
