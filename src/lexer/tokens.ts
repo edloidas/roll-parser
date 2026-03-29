@@ -5,41 +5,133 @@
  */
 
 /**
- * Token types for Stage 1 dice notation.
+ * Token types for dice notation.
  *
- * Using numeric enum values for efficient comparisons and switch statements.
+ * Grouped semantically. Numeric values are stable identifiers — the specific
+ * numbers don't matter, but they must be unique.
  */
 export enum TokenType {
+  //
+  // * Literals
+  //
+
   /** Numeric literal: integer or decimal */
   NUMBER = 0,
+
+  //
+  // * Dice operators
+  //
+
   /** Dice operator: 'd' or 'D' */
   DICE = 1,
+  /** Percentile dice operator: 'd%' (alias for d100) */
+  DICE_PERCENT = 2,
+  /** Fate/Fudge dice operator: 'dF' */
+  DICE_FATE = 3,
+
+  //
+  // * Arithmetic operators
+  //
+
   /** Addition operator: '+' */
-  PLUS = 2,
+  PLUS = 4,
   /** Subtraction operator: '-' */
-  MINUS = 3,
+  MINUS = 5,
   /** Multiplication operator: '*' */
-  MULTIPLY = 4,
+  MULTIPLY = 6,
   /** Division operator: '/' */
-  DIVIDE = 5,
+  DIVIDE = 7,
   /** Modulo operator: '%' */
-  MODULO = 6,
+  MODULO = 8,
   /** Power operator: '**' or '^' */
-  POWER = 7,
+  POWER = 9,
+
+  //
+  // * Comparison operators
+  //
+
+  /** Greater than: '>' */
+  GREATER = 10,
+  /** Greater than or equal: '>=' */
+  GREATER_EQUAL = 11,
+  /** Less than: '<' */
+  LESS = 12,
+  /** Less than or equal: '<=' */
+  LESS_EQUAL = 13,
+  /** Equal: '=' */
+  EQUAL = 14,
+
+  //
+  // * Grouping and punctuation
+  //
+
   /** Left parenthesis: '(' */
-  LPAREN = 8,
+  LPAREN = 15,
   /** Right parenthesis: ')' */
-  RPAREN = 9,
+  RPAREN = 16,
+  /** Argument separator: ',' */
+  COMMA = 17,
+
+  //
+  // * Keep/drop modifiers
+  //
+
   /** Keep highest modifier: 'kh' or 'k' */
-  KEEP_HIGH = 10,
+  KEEP_HIGH = 18,
   /** Keep lowest modifier: 'kl' */
-  KEEP_LOW = 11,
+  KEEP_LOW = 19,
   /** Drop highest modifier: 'dh' */
-  DROP_HIGH = 12,
+  DROP_HIGH = 20,
   /** Drop lowest modifier: 'dl' */
-  DROP_LOW = 13,
+  DROP_LOW = 21,
+
+  //
+  // * Explode modifiers
+  //
+
+  /** Standard explode: '!' */
+  EXPLODE = 22,
+  /** Compounding explode: '!!' */
+  EXPLODE_COMPOUND = 23,
+  /** Penetrating explode: '!p' */
+  EXPLODE_PENETRATING = 24,
+
+  //
+  // * Reroll modifiers
+  //
+
+  /** Recursive reroll: 'r' */
+  REROLL = 25,
+  /** Reroll once: 'ro' */
+  REROLL_ONCE = 26,
+
+  //
+  // * Success counting
+  //
+
+  /** Fail marker: 'f' */
+  FAIL = 27,
+
+  //
+  // * Functions
+  //
+
+  /** Math function: 'floor', 'ceil', 'round', 'abs', 'max', 'min' */
+  FUNCTION = 28,
+
+  //
+  // * Keywords
+  //
+
+  /** Versus operator: 'vs' */
+  VS = 29,
+
+  //
+  // * End of input
+  //
+
   /** End of input marker */
-  EOF = 14,
+  EOF = 30,
 }
 
 /**
@@ -48,7 +140,7 @@ export enum TokenType {
 export type Token = {
   /** The type of this token */
   type: TokenType;
-  /** The raw string value from input */
+  /** The raw string value from input (lowercased for identifiers) */
   value: string;
   /** Zero-based position in the input string */
   position: number;

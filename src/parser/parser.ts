@@ -8,6 +8,7 @@ import type { RollParserErrorCode } from '../errors';
 import { RollParserError } from '../errors';
 import { lex } from '../lexer/lexer';
 import { type Token, TokenType } from '../lexer/tokens';
+import type { CompareOp, ComparePoint } from '../types';
 import type {
   ASTNode,
   BinaryOpNode,
@@ -268,6 +269,62 @@ export class Parser {
     };
   }
 
+  // * Compare point utilities
+
+  /**
+   * Checks whether the next token is a comparison operator.
+   */
+  isComparePointAhead(): boolean {
+    const type = this.peek().type;
+    return (
+      type === TokenType.GREATER ||
+      type === TokenType.GREATER_EQUAL ||
+      type === TokenType.LESS ||
+      type === TokenType.LESS_EQUAL ||
+      type === TokenType.EQUAL
+    );
+  }
+
+  /**
+   * Parses a comparison operator followed by a value expression.
+   * Called by modifier parsers (explode, reroll, success counting).
+   *
+   * @returns A ComparePoint with the operator and value AST node
+   * @throws {ParseError} If the next token is not a comparison operator
+   */
+  parseComparePoint(): ComparePoint {
+    const token = this.peek();
+    const operator = this.getCompareOp(token);
+
+    this.advance();
+
+    const value = this.parseExpression(BP.DICE_LEFT);
+
+    return { operator, value };
+  }
+
+  private getCompareOp(token: Token): CompareOp {
+    switch (token.type) {
+      case TokenType.GREATER:
+        return '>';
+      case TokenType.GREATER_EQUAL:
+        return '>=';
+      case TokenType.LESS:
+        return '<';
+      case TokenType.LESS_EQUAL:
+        return '<=';
+      case TokenType.EQUAL:
+        return '=';
+      default:
+        throw new ParseError(
+          `Expected comparison operator but got '${token.value}'`,
+          'EXPECTED_TOKEN',
+          token.position,
+          token,
+        );
+    }
+  }
+
   // * Helpers
 
   private getOperatorSymbol(token: Token): '+' | '-' | '*' | '/' | '%' | '**' {
@@ -314,7 +371,17 @@ export class Parser {
         return BP.MODIFIER;
       case TokenType.RPAREN:
       case TokenType.EOF:
-        // Terminators have negative BP to always break the expression loop
+      // Comparison operators terminate the current expression — they are
+      // consumed by modifier parsers (explode, reroll, success counting),
+      // not by the main Pratt loop.
+      case TokenType.GREATER:
+      case TokenType.GREATER_EQUAL:
+      case TokenType.LESS:
+      case TokenType.LESS_EQUAL:
+      case TokenType.EQUAL:
+      // Punctuation and keywords that terminate expressions
+      case TokenType.COMMA:
+      case TokenType.FUNCTION:
         return -1;
       default:
         return 0;

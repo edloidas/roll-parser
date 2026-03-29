@@ -35,7 +35,14 @@ export { SeededRNG } from './rng/seeded';
 
 // * Evaluator exports
 export { DEFAULT_MAX_DICE, evaluate, EvaluatorError } from './evaluator/evaluator';
-export type { DieModifier, DieResult, EvaluateOptions, RollResult } from './types';
+export type {
+  CompareOp,
+  ComparePoint,
+  DieModifier,
+  DieResult,
+  EvaluateOptions,
+  RollResult,
+} from './types';
 
 // * Public API
 export { roll } from './roll';

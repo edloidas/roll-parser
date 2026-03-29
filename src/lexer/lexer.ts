@@ -23,6 +23,26 @@ export class LexerError extends RollParserError {
   }
 }
 
+/** Known identifier keywords mapped to their token types. */
+const IDENTIFIER_KEYWORDS: Record<string, TokenType> = {
+  kh: TokenType.KEEP_HIGH,
+  kl: TokenType.KEEP_LOW,
+  k: TokenType.KEEP_HIGH,
+  dh: TokenType.DROP_HIGH,
+  dl: TokenType.DROP_LOW,
+  d: TokenType.DICE,
+  r: TokenType.REROLL,
+  ro: TokenType.REROLL_ONCE,
+  f: TokenType.FAIL,
+  vs: TokenType.VS,
+  floor: TokenType.FUNCTION,
+  ceil: TokenType.FUNCTION,
+  round: TokenType.FUNCTION,
+  abs: TokenType.FUNCTION,
+  max: TokenType.FUNCTION,
+  min: TokenType.FUNCTION,
+};
+
 /**
  * Lexer for dice notation.
  *
@@ -70,7 +90,7 @@ export class Lexer {
       return this.scanNumber();
     }
 
-    // * Identifiers and modifiers (d, k, kh, kl, dh, dl)
+    // * Identifiers (d, kh, kl, dh, dl, r, ro, f, vs, floor, ceil, ...)
     if (this.isAlpha(char)) {
       return this.scanIdentifier();
     }
@@ -98,6 +118,29 @@ export class Lexer {
         return this.createTokenAt(TokenType.LPAREN, char, startPos);
       case ')':
         return this.createTokenAt(TokenType.RPAREN, char, startPos);
+      case ',':
+        return this.createTokenAt(TokenType.COMMA, char, startPos);
+      case '>':
+        if (this.match('=')) {
+          return this.createTokenAt(TokenType.GREATER_EQUAL, '>=', startPos);
+        }
+        return this.createTokenAt(TokenType.GREATER, char, startPos);
+      case '<':
+        if (this.match('=')) {
+          return this.createTokenAt(TokenType.LESS_EQUAL, '<=', startPos);
+        }
+        return this.createTokenAt(TokenType.LESS, char, startPos);
+      case '=':
+        return this.createTokenAt(TokenType.EQUAL, char, startPos);
+      case '!':
+        if (this.match('!')) {
+          return this.createTokenAt(TokenType.EXPLODE_COMPOUND, '!!', startPos);
+        }
+        if (!this.isAtEnd() && this.peek().toLowerCase() === 'p') {
+          this.advance();
+          return this.createTokenAt(TokenType.EXPLODE_PENETRATING, '!p', startPos);
+        }
+        return this.createTokenAt(TokenType.EXPLODE, char, startPos);
       default:
         throw new LexerError('Unexpected character', 'UNEXPECTED_CHARACTER', startPos, char);
     }
@@ -131,43 +174,40 @@ export class Lexer {
     return this.createTokenAt(TokenType.NUMBER, value, startPos);
   }
 
+  /**
+   * Scans an identifier using full-accumulation: collects all consecutive
+   * alpha characters, then classifies the result against known keywords.
+   *
+   * Special case: bare 'd' followed by '%' produces DICE_PERCENT.
+   */
   private scanIdentifier(): Token {
     const startPos = this.pos;
-    const char = this.advance().toLowerCase();
+    let value = '';
 
-    // Check for two-character modifiers first (maximal munch)
-    if (!this.isAtEnd()) {
-      const nextChar = this.peek().toLowerCase();
-      const twoChar = char + nextChar;
-
-      if (twoChar === 'kh') {
-        this.advance();
-        return this.createTokenAt(TokenType.KEEP_HIGH, twoChar, startPos);
-      }
-      if (twoChar === 'kl') {
-        this.advance();
-        return this.createTokenAt(TokenType.KEEP_LOW, twoChar, startPos);
-      }
-      if (twoChar === 'dh') {
-        this.advance();
-        return this.createTokenAt(TokenType.DROP_HIGH, twoChar, startPos);
-      }
-      if (twoChar === 'dl') {
-        this.advance();
-        return this.createTokenAt(TokenType.DROP_LOW, twoChar, startPos);
-      }
+    while (!this.isAtEnd() && this.isAlpha(this.peek())) {
+      value += this.advance();
     }
 
-    // Single character tokens
-    if (char === 'd') {
-      return this.createTokenAt(TokenType.DICE, char, startPos);
-    }
-    if (char === 'k') {
-      // 'k' alone is shorthand for 'kh'
-      return this.createTokenAt(TokenType.KEEP_HIGH, char, startPos);
+    const lower = value.toLowerCase();
+
+    // Special case: d% (percentile dice) — '%' is not alpha, so it's not
+    // accumulated above. Check after accumulation if we got bare 'd'.
+    if (lower === 'd' && !this.isAtEnd() && this.peek() === '%') {
+      this.advance();
+      return this.createTokenAt(TokenType.DICE_PERCENT, 'd%', startPos);
     }
 
-    throw new LexerError('Unexpected identifier', 'UNEXPECTED_IDENTIFIER', startPos, char);
+    // Special case: dF — accumulated as 'df', maps to DICE_FATE
+    if (lower === 'df') {
+      return this.createTokenAt(TokenType.DICE_FATE, lower, startPos);
+    }
+
+    const tokenType = IDENTIFIER_KEYWORDS[lower];
+    if (tokenType != null) {
+      return this.createTokenAt(tokenType, lower, startPos);
+    }
+
+    throw new LexerError('Unexpected identifier', 'UNEXPECTED_IDENTIFIER', startPos, lower);
   }
 
   private peek(): string {
