@@ -6,7 +6,8 @@
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
-  "bin": "./dist/cli.js",
+  "bin": { "roll-parser": "./dist/cli.js" },
+  "sideEffects": false,
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -16,7 +17,9 @@
   },
   "files": [
     "dist",
-    "src"
+    "src",
+    "!src/**/*.test.ts",
+    "!src/rng/mock.ts"
   ],
   "keywords": [
     "parser",
@@ -52,8 +55,9 @@
     "build:esm": "bun build src/index.ts --outfile dist/index.mjs --target bun",
     "build:cjs": "bun build src/index.ts --outfile dist/index.js --target node",
     "build:cli": "bun build src/cli/index.ts --outfile dist/cli.js --target node",
-    "build:types": "tsc --emitDeclarationOnly --declaration --noEmit false --outDir dist",
+    "build:types": "tsc --emitDeclarationOnly -p tsconfig.build.json",
     "test": "bun test",
+    "test:node": "node -e \"import('./dist/index.mjs').then(m => { const r = m.roll('1d6'); if (!(r.total >= 1 && r.total <= 6)) throw new Error('ESM smoke failed: total=' + r.total); console.log('Node.js ESM smoke: ok'); })\" && node -e \"const m = require('./dist/index.js'); const r = m.roll('1d6'); if (!(r.total >= 1 && r.total <= 6)) throw new Error('CJS smoke failed: total=' + r.total); console.log('Node.js CJS smoke: ok');\"",
     "test:watch": "bun test --watch",
     "test:ci": "bun test --bail",
     "validate": "bun run check && bun run build && bun test:ci",
