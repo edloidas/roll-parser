@@ -6,10 +6,9 @@ TypeScript-first, Bun-optimized, Pratt parser architecture.
 </p>
 
 <p align="center">
-  <a href="https://github.com/edloidas/roll-parser/actions"><img src="https://github.com/edloidas/roll-parser/actions/workflows/ci.yml/badge.svg" alt="CI Status"></a>
-  <a href="https://www.npmjs.com/package/roll-parser"><img src="https://img.shields.io/npm/v/roll-parser.svg" alt="npm version"></a>
-  <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-5.7-blue.svg" alt="TypeScript"></a>
-  <a href="https://bun.sh/"><img src="https://img.shields.io/badge/Bun-1.0+-black.svg" alt="Bun"></a>
+  <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-6-blue.svg" alt="TypeScript"></a>
+  <a href="https://bun.sh/"><img src="https://img.shields.io/badge/Bun-1.3+-black.svg" alt="Bun"></a>
+  <a href="https://nodejs.org/"><img src="https://img.shields.io/badge/Node.js-22%2B-339933.svg" alt="Node.js"></a>
 </p>
 
 ## Status

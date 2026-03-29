@@ -1,5 +1,7 @@
 [install]
 auto = "fallback"
+minimumReleaseAge = 259200
+minimumReleaseAgeExcludes = ["@biomejs/biome", "@types/bun", "typescript"]
 
 [test]
 coverage = false

@@ -1,12 +1,16 @@
 {
-  "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.4.9/schema.json",
   "vcs": {
     "enabled": true,
     "clientKind": "git",
     "useIgnoreFile": true
   },
-  "organizeImports": {
-    "enabled": true
+  "assist": {
+    "actions": {
+      "source": {
+        "organizeImports": "on"
+      }
+    }
   },
   "linter": {
     "enabled": true,
@@ -14,8 +18,7 @@
       "recommended": true,
       "style": {
         "noNonNullAssertion": "error",
-        "useConst": "error",
-        "noVar": "error"
+        "useConst": "error"
       },
       "suspicious": {
         "noExplicitAny": "error"
@@ -39,7 +42,6 @@
     }
   },
   "files": {
-    "include": ["src/**/*.ts"],
-    "ignore": ["node_modules", "dist", "coverage"]
+    "includes": ["src/**/*.ts"]
   }
 }
