@@ -63,24 +63,19 @@ correctly uses `--target node`.
 
 ## High — Documentation
 
-### 9. CONTRIBUTING.md is entirely stale (v2-era) *(→ [#23](https://github.com/edloidas/roll-parser/issues/23))*
+### ~~9. CONTRIBUTING.md is entirely stale (v2-era)~~ *(→ [#23](https://github.com/edloidas/roll-parser/issues/23))* ✓ Resolved
 
-- Recommends emoji-prefixed commits (`:art:`, `:bug:`) which contradicts
-  CLAUDE.md Conventional Commits format
-- No mention of Bun, TypeScript, Biome, or any v3 tooling
-- References generic "coding conventions" with no link to actual standards
-- PR workflow does not match CLAUDE.md template
+File deleted — will be rewritten when the project is ready for external
+contributions.
 
-### 10. README says Stage 1 is "In Progress" — it is complete *(→ [#23](https://github.com/edloidas/roll-parser/issues/23))*
+### ~~10. README says Stage 1 is "In Progress" — it is complete~~ *(→ [#23](https://github.com/edloidas/roll-parser/issues/23))* ✓ Resolved
 
-All Stage 1 features are implemented with 305 passing tests. The status badge
-is misleading.
+Status section updated to reflect Stage 1 completion (327 tests passing).
 
-### 11. README `rendered` format example is incorrect *(→ [#23](https://github.com/edloidas/roll-parser/issues/23))*
+### ~~11. README `rendered` format example is incorrect~~ *(→ [#23](https://github.com/edloidas/roll-parser/issues/23))* ✓ Resolved
 
-Shows `"4d6kh3[6,5,3,2] = 14"` but actual output is
-`"4d6[3, 6, ~~3~~, 3] = 12"` — no modifier suffix in rendered, spaces after
-commas, and strikethrough for dropped dice.
+Detailed usage examples removed from README. Minimal usage section no longer
+includes `rendered` output.
 
 ## Medium — Code Quality
 
@@ -190,10 +185,9 @@ sets `lineWidth: 100`.
 
 ## Low — Minor Issues
 
-### 31. `PLAN.md` is stale *(→ [#23](https://github.com/edloidas/roll-parser/issues/23), fixed in 27d9cb6)*
+### ~~31. `PLAN.md` is stale~~ *(→ [#23](https://github.com/edloidas/roll-parser/issues/23), fixed in 27d9cb6)* ✓ Resolved
 
-Still says Phase 0 is "Current Step — Blocking" even though all phases are
-complete.
+Phase markers updated in commit 27d9cb6.
 
 ### 32. `tsconfig.json` has confusing `noEmit: true` with `declaration: true` *(→ [#22](https://github.com/edloidas/roll-parser/issues/22))*
 
@@ -206,10 +200,9 @@ the CLI. A separate `tsconfig.build.json` would be cleaner.
 If someone runs `tsc` without `--noEmit`, declarations would be emitted into
 the source tree.
 
-### 34. Issue #1 from v2 still open *(→ [#23](https://github.com/edloidas/roll-parser/issues/23), already closed)*
+### ~~34. Issue #1 from v2 still open~~ *(→ [#23](https://github.com/edloidas/roll-parser/issues/23), already closed)* ✓ Resolved
 
-"More functions similar to Roll20" from 2017 is still open. Should be closed
-or updated to reference the v3 roadmap (Stage 2/3 features).
+Issue #1 closed.
 
 ### 35. `bin` field uses shorthand form *(→ [#22](https://github.com/edloidas/roll-parser/issues/22))*
 
@@ -244,9 +237,9 @@ Findings grouped into GitHub issues:
 | [#19](https://github.com/edloidas/roll-parser/issues/19) | `fix: add dice count safety limit` | #1, #12 | ✓ Closed |
 | [#20](https://github.com/edloidas/roll-parser/issues/20) | `ci: fix test pipeline and add quality gates` | #2, #24–#27 | ✓ Closed |
 | [#21](https://github.com/edloidas/roll-parser/issues/21) | `fix: parser and evaluator correctness` | #3, #4, #19, #21, #23 | ✓ Closed |
-| [#22](https://github.com/edloidas/roll-parser/issues/22) | `build: fix npm publish artifacts` | #6–#8, #28, #29, #32, #33, #35 | Open |
+| [#22](https://github.com/edloidas/roll-parser/issues/22) | `build: fix npm publish artifacts` | #6–#8, #28, #29, #32, #33, #35 | ✓ Closed |
 | [#23](https://github.com/edloidas/roll-parser/issues/23) | `docs: update documentation for v3` | #9–#11, #31, #34 | Open |
-| [#24](https://github.com/edloidas/roll-parser/issues/24) | `refactor: clean up public API surface` | #13–#16, #20, #22, #30, #37, #38 | Open |
+| [#24](https://github.com/edloidas/roll-parser/issues/24) | `refactor: clean up public API surface` | #13–#16, #20, #22, #30, #37, #38 | ✓ Closed |
 | [#25](https://github.com/edloidas/roll-parser/issues/25) | `epic: implement Stage 2 — system compatibility` | #18 + Stage 2 roadmap | Open |
 | [#30](https://github.com/edloidas/roll-parser/issues/30) | `epic: implement Stage 3 — advanced features` | Stage 3 roadmap | Open |
 
