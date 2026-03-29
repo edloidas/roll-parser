@@ -33,11 +33,12 @@ Types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `perf`, `bui
 - **Title**: `<type>: <description>`
 - Use `epic: <description>` for issues that aggregate sub-issues and describe a long-form implementation plan. Not used in commits.
 - **Body**: concisely explain what and why, skip trivial details
+- **Headers**: use `####` (h4) for short issues (1–2 headers), `###` (h3) when there are 3 or more
 
   ```
   <4–8 sentence description: what, what's affected, how to reproduce, impact>
 
-  ##### Rationale
+  #### Rationale
   <why this needs to be fixed or implemented>
 
   <sub>Drafted with AI assistance</sub>
