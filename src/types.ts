@@ -1,8 +1,26 @@
 /**
- * Shared type definitions for roll results.
+ * Shared type definitions for roll results and comparison primitives.
  *
  * @module types
  */
+
+import type { ASTNode } from './parser/ast';
+
+/**
+ * Comparison operator for compare points.
+ */
+export type CompareOp = '>' | '>=' | '<' | '<=' | '=';
+
+/**
+ * A comparison threshold used by exploding dice, reroll, and success counting.
+ *
+ * The value is an ASTNode to support computed thresholds (e.g., `>=ceil(5)`),
+ * matching the pattern used by DiceNode.count and DiceNode.sides.
+ */
+export type ComparePoint = {
+  operator: CompareOp;
+  value: ASTNode;
+};
 
 /**
  * Modifier flags applied to individual die results.
