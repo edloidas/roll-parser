@@ -14,7 +14,8 @@ TypeScript-first, Bun-optimized, Pratt parser architecture.
 
 ## Status
 
-> **v3 in Development** - Complete architectural rewrite in progress.
+> **v3 Alpha** — Stage 1 (Core Engine) is complete with 300+ tests.
+> Stages 2–3 are planned.
 >
 > For production use, install [v2.3.2](https://www.npmjs.com/package/roll-parser/v/2.3.2).
 
@@ -45,77 +46,27 @@ TypeScript-first, Bun-optimized, Pratt parser architecture.
 ## Installation
 
 ```bash
-# When v3 is released
 bun add roll-parser
 npm install roll-parser
 ```
 
-## Usage (v3 API Preview)
+## Usage
 
 ```typescript
-import { roll, parse } from 'roll-parser';
+import { roll } from 'roll-parser';
 
-// Simple roll
 const result = roll('4d6kh3');
-console.log(result.total);      // e.g., 14
-console.log(result.rolls);      // Individual die results
-console.log(result.rendered);   // e.g., "4d6[~~2~~, 4, 5, 6] = 15"
-
-// With seeded RNG for reproducibility
-const seeded = roll('2d20', { seed: 'my-seed' });
-
-// Parse without rolling (for inspection)
-const ast = parse('2d6+5');
+console.log(result.total);    // e.g., 14
+console.log(result.notation); // "4d6kh3"
 ```
 
 ### CLI
 
 ```bash
-# Roll dice from command line
 roll-parser 2d6+3
 roll-parser 4d6kh3
 roll-parser --help
 ```
-
-## Development
-
-```bash
-bun install          # Install dependencies
-bun check:fix        # Type check + lint + format
-bun test             # Run tests
-bun run build        # Build library
-bun release:dry      # Validate release
-```
-
-## Architecture
-
-Built with a Pratt parser for:
-
-- **Clean precedence handling** - Operator binding power, not grammar rules
-- **Easy extensibility** - Add new modifiers without restructuring
-- **Optimal performance** - Target <1ms for complex expressions
-- **Type safety** - Strict TypeScript, no `any`
-
-### Project Structure
-
-```
-src/
-├── lexer/       # Tokenization (d, kh, kl, dh, dl, numbers, operators)
-├── parser/      # Pratt parser with AST generation
-├── evaluator/   # AST evaluation with modifier handling
-├── rng/         # Seedable random number generation
-├── cli/         # Command-line interface
-└── index.ts     # Public API exports
-```
-
-## Supported Systems
-
-| System | Notation Examples | Stage |
-|--------|-------------------|-------|
-| D&D 5e | `2d6`, `1d20+5`, `4d6kh3` | 1 |
-| Pathfinder 2e | `1d20+10 vs 25` | 2 |
-| World of Darkness | `10d10>=6f1` | 2 |
-| Savage Worlds | `1d6!` | 2 |
 
 ## Known Limitations
 
