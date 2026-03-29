@@ -54,6 +54,12 @@ export function createMockRng(values: number[]): RNG {
 
   return {
     next: getNext,
-    nextInt: (_min: number, _max: number): number => getNext(),
+    nextInt: (min: number, max: number): number => {
+      const value = getNext();
+      if (value < min || value > max) {
+        throw new RangeError(`MockRNG value ${value} is out of bounds [${min}, ${max}]`);
+      }
+      return value;
+    },
   };
 }

@@ -29,12 +29,15 @@ mock.nextInt(1, 6); // Throws! (sequence exhausted)
 ```
 
 `MockRNG` MUST throw on exhaustion — this catches incorrect roll counts in tests.
+`MockRNG.nextInt` validates that returned values fall within `[min, max]` — throws `RangeError` if not.
 
 ## Usage in Tests
 
 ```typescript
 import { describe, it, expect } from 'bun:test';
+// Internal tests use relative imports:
 import { createMockRng } from '@/rng/mock';
+// npm consumers use: import { createMockRng } from 'roll-parser/testing';
 
 describe('roll', () => {
   it('should roll exact values with MockRNG', () => {

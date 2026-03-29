@@ -4,6 +4,8 @@
  * @module parser/parser
  */
 
+import type { RollParserErrorCode } from '../errors';
+import { RollParserError } from '../errors';
 import { lex } from '../lexer/lexer';
 import { type Token, TokenType } from '../lexer/tokens';
 import type {
@@ -18,14 +20,15 @@ import type {
 /**
  * Error thrown when the parser encounters invalid syntax.
  */
-export class ParseError extends Error {
-  constructor(
-    message: string,
-    public readonly position: number,
-    public readonly token?: Token,
-  ) {
-    super(`${message} at position ${position}`);
+export class ParseError extends RollParserError {
+  readonly position: number;
+  readonly token: Token | undefined;
+
+  constructor(message: string, code: RollParserErrorCode, position: number, token?: Token) {
+    super(`${message} at position ${position}`, code);
     this.name = 'ParseError';
+    this.position = position;
+    this.token = token ?? undefined;
   }
 }
 
@@ -79,7 +82,7 @@ export class Parser {
    */
   parse(): ASTNode {
     if (this.peek().type === TokenType.EOF) {
-      throw new ParseError('Unexpected end of input', this.peek().position);
+      throw new ParseError('Unexpected end of input', 'UNEXPECTED_END', this.peek().position);
     }
 
     const ast = this.parseExpression(0);
@@ -87,7 +90,12 @@ export class Parser {
     // Ensure we consumed all tokens
     if (this.peek().type !== TokenType.EOF) {
       const token = this.peek();
-      throw new ParseError(`Unexpected token '${token.value}'`, token.position, token);
+      throw new ParseError(
+        `Unexpected token '${token.value}'`,
+        'UNEXPECTED_TOKEN',
+        token.position,
+        token,
+      );
     }
 
     return ast;
@@ -133,10 +141,15 @@ export class Parser {
         return this.parseGrouped();
 
       case TokenType.EOF:
-        throw new ParseError('Unexpected end of input', token.position);
+        throw new ParseError('Unexpected end of input', 'UNEXPECTED_END', token.position);
 
       default:
-        throw new ParseError(`Unexpected token '${token.value}'`, token.position, token);
+        throw new ParseError(
+          `Unexpected token '${token.value}'`,
+          'UNEXPECTED_TOKEN',
+          token.position,
+          token,
+        );
     }
   }
 
@@ -164,7 +177,12 @@ export class Parser {
         return this.parseModifier(left, token);
 
       default:
-        throw new ParseError(`Unexpected infix token '${token.value}'`, token.position, token);
+        throw new ParseError(
+          `Unexpected infix token '${token.value}'`,
+          'UNEXPECTED_TOKEN',
+          token.position,
+          token,
+        );
     }
   }
 
@@ -267,7 +285,12 @@ export class Parser {
       case TokenType.POWER:
         return '**';
       default:
-        throw new ParseError(`Unknown operator '${token.value}'`, token.position, token);
+        throw new ParseError(
+          `Unknown operator '${token.value}'`,
+          'UNEXPECTED_TOKEN',
+          token.position,
+          token,
+        );
     }
   }
 
@@ -330,7 +353,12 @@ export class Parser {
     const token = this.peek();
     if (token.type !== type) {
       const expected = TokenType[type];
-      throw new ParseError(`Expected ${expected} but got '${token.value}'`, token.position, token);
+      throw new ParseError(
+        `Expected ${expected} but got '${token.value}'`,
+        'EXPECTED_TOKEN',
+        token.position,
+        token,
+      );
     }
     return this.advance();
   }

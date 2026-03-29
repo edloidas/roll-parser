@@ -18,8 +18,16 @@
 
   ```ts
   //
-  // * Parser Utils
+  // * Event Handlers
   //
+
+  /* ... */
+
+  //
+  // * Validators
+  //
+
+  /* ... */
   ```
 
 - `// TODO: ` — actionable future work; start with an imperative verb, reference issue if possible
@@ -37,18 +45,6 @@
 - Avoid commenting trivial code (obvious mappings, simple getters).
 - Prefer JSDoc/TSDoc for public API functions instead of inline prose.
 - Keep comments inside function bodies minimal — context belongs in tests or docs.
-- Lines ≤ 80 characters, no emojis, complete sentences starting with a capital letter.
-
-```ts
-function binarySearch(haystack: number[], needle: number): number {
-  // Guard against unsorted input arrays
-  if (!isSorted(haystack)) {
-    // ! Sorting here would hide the caller's bug
-    throw new Error('Input must be pre-sorted');
-  }
-  // Standard binary-search implementation…
-}
-```
 
 ## Maintenance
 

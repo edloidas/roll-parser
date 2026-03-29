@@ -4,6 +4,8 @@
  * @module evaluator/evaluator
  */
 
+import type { RollParserErrorCode } from '../errors';
+import { RollParserError } from '../errors';
 import type { ASTNode, BinaryOpNode, DiceNode, ModifierNode, UnaryOpNode } from '../parser/ast';
 import { isModifier } from '../parser/ast';
 import type { RNG } from '../rng/types';
@@ -20,10 +22,13 @@ import {
 /**
  * Error thrown during AST evaluation.
  */
-export class EvaluatorError extends Error {
-  constructor(message: string) {
-    super(message);
+export class EvaluatorError extends RollParserError {
+  readonly nodeType: string | undefined;
+
+  constructor(message: string, code: RollParserErrorCode, nodeType?: string) {
+    super(message, code);
     this.name = 'EvaluatorError';
+    this.nodeType = nodeType ?? undefined;
   }
 }
 
@@ -105,7 +110,11 @@ function evalNode(node: ASTNode, rng: RNG, ctx: EvalContext, env: EvalEnv): numb
 
     default: {
       const exhaustive: never = node;
-      throw new EvaluatorError(`Unknown node type: ${(exhaustive as ASTNode).type}`);
+      throw new EvaluatorError(
+        `Unknown node type: ${(exhaustive as ASTNode).type}`,
+        'UNKNOWN_NODE_TYPE',
+        (exhaustive as ASTNode).type,
+      );
     }
   }
 }
@@ -131,15 +140,17 @@ function evalDice(node: DiceNode, rng: RNG, ctx: EvalContext, env: EvalEnv): num
   );
 
   if (!Number.isInteger(count) || count < 0) {
-    throw new EvaluatorError(`Invalid dice count: ${count}`);
+    throw new EvaluatorError(`Invalid dice count: ${count}`, 'INVALID_DICE_COUNT', 'Dice');
   }
   if (!Number.isInteger(sides) || sides < 1) {
-    throw new EvaluatorError(`Invalid dice sides: ${sides}`);
+    throw new EvaluatorError(`Invalid dice sides: ${sides}`, 'INVALID_DICE_SIDES', 'Dice');
   }
 
   if (env.totalDiceRolled + count > env.maxDice) {
     throw new EvaluatorError(
       `Total dice count ${env.totalDiceRolled + count} exceeds limit of ${env.maxDice}`,
+      'DICE_LIMIT_EXCEEDED',
+      'Dice',
     );
   }
   env.totalDiceRolled += count;
@@ -188,19 +199,19 @@ function evalBinaryOp(node: BinaryOpNode, rng: RNG, ctx: EvalContext, env: EvalE
       return left * right;
     case '/':
       if (right === 0) {
-        throw new EvaluatorError('Division by zero');
+        throw new EvaluatorError('Division by zero', 'DIVISION_BY_ZERO', 'BinaryOp');
       }
       return left / right;
     case '%':
       if (right === 0) {
-        throw new EvaluatorError('Modulo by zero');
+        throw new EvaluatorError('Modulo by zero', 'MODULO_BY_ZERO', 'BinaryOp');
       }
       return left % right;
     case '**':
       return left ** right;
     default: {
       const exhaustive: never = node.operator;
-      throw new EvaluatorError(`Unknown operator: ${exhaustive}`);
+      throw new EvaluatorError(`Unknown operator: ${exhaustive}`, 'UNKNOWN_OPERATOR', 'BinaryOp');
     }
   }
 }
@@ -237,7 +248,11 @@ function flattenModifierChain(
     const modCount = evalNode(current.count, rng, countCtx, env);
 
     if (!Number.isInteger(modCount) || modCount < 0) {
-      throw new EvaluatorError(`Invalid modifier count: ${modCount}`);
+      throw new EvaluatorError(
+        `Invalid modifier count: ${modCount}`,
+        'INVALID_MODIFIER_COUNT',
+        'Modifier',
+      );
     }
 
     const code =

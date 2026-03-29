@@ -13,13 +13,17 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.mjs",
       "require": "./dist/index.js"
+    },
+    "./testing": {
+      "types": "./dist/testing.d.ts",
+      "import": "./dist/testing.mjs",
+      "require": "./dist/testing.js"
     }
   },
   "files": [
     "dist",
     "src",
-    "!src/**/*.test.ts",
-    "!src/rng/mock.ts"
+    "!src/**/*.test.ts"
   ],
   "keywords": [
     "parser",
@@ -51,9 +55,11 @@
     "check": "bun typecheck && bun lint && bun format:check",
     "check:fix": "bun typecheck && bun lint:fix && bun format",
     "clean": "rm -rf dist coverage",
-    "build": "bun run clean && bun run build:esm && bun run build:cjs && bun run build:cli && bun run build:types",
+    "build": "bun run clean && bun run build:esm && bun run build:cjs && bun run build:esm:testing && bun run build:cjs:testing && bun run build:cli && bun run build:types",
     "build:esm": "bun build src/index.ts --outfile dist/index.mjs --target bun",
     "build:cjs": "bun build src/index.ts --outfile dist/index.js --target node",
+    "build:esm:testing": "bun build src/testing.ts --outfile dist/testing.mjs --target bun",
+    "build:cjs:testing": "bun build src/testing.ts --outfile dist/testing.js --target node",
     "build:cli": "bun build src/cli/index.ts --outfile dist/cli.js --target node",
     "build:types": "tsc --emitDeclarationOnly -p tsconfig.build.json",
     "test": "bun test",
@@ -67,7 +73,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
-    "bun-types": "latest",
+    "@types/bun": "^1.2.0",
     "fast-check": "^3.23.2",
     "typescript": "^5.7.2"
   },

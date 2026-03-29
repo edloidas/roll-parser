@@ -4,19 +4,22 @@
  * @module lexer/lexer
  */
 
+import type { RollParserErrorCode } from '../errors';
+import { RollParserError } from '../errors';
 import { type Token, TokenType } from './tokens';
 
 /**
  * Error thrown when the lexer encounters an invalid character.
  */
-export class LexerError extends Error {
-  constructor(
-    message: string,
-    public readonly position: number,
-    public readonly character: string,
-  ) {
-    super(`${message} at position ${position}: '${character}'`);
+export class LexerError extends RollParserError {
+  readonly position: number;
+  readonly character: string;
+
+  constructor(message: string, code: RollParserErrorCode, position: number, character: string) {
+    super(`${message} at position ${position}: '${character}'`, code);
     this.name = 'LexerError';
+    this.position = position;
+    this.character = character;
   }
 }
 
@@ -96,7 +99,7 @@ export class Lexer {
       case ')':
         return this.createTokenAt(TokenType.RPAREN, char, startPos);
       default:
-        throw new LexerError('Unexpected character', startPos, char);
+        throw new LexerError('Unexpected character', 'UNEXPECTED_CHARACTER', startPos, char);
     }
   }
 
@@ -164,7 +167,7 @@ export class Lexer {
       return this.createTokenAt(TokenType.KEEP_HIGH, char, startPos);
     }
 
-    throw new LexerError('Unexpected identifier', startPos, char);
+    throw new LexerError('Unexpected identifier', 'UNEXPECTED_IDENTIFIER', startPos, char);
   }
 
   private peek(): string {

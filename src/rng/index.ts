@@ -6,4 +6,3 @@
 
 export type { RNG } from './types';
 export { SeededRNG } from './seeded';
-export { createMockRng, MockRNGExhaustedError } from './mock';

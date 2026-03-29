@@ -6,10 +6,8 @@
  * @module cli/index
  */
 
-import { EvaluatorError } from '../evaluator/evaluator';
+import { isRollParserError } from '../errors';
 import { VERSION } from '../index';
-import { LexerError } from '../lexer/lexer';
-import { ParseError } from '../parser/parser';
 import { roll } from '../roll';
 import { parseArgs } from './args';
 import { formatResult } from './format';
@@ -65,11 +63,7 @@ function main(): void {
     const output = formatResult(result, args.verbose);
     process.stdout.write(`${output}\n`);
   } catch (error) {
-    if (
-      error instanceof LexerError ||
-      error instanceof ParseError ||
-      error instanceof EvaluatorError
-    ) {
+    if (isRollParserError(error)) {
       process.stderr.write(`Error: ${error.message}\n`);
       process.exitCode = 1;
       return;
