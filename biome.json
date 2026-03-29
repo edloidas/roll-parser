@@ -39,7 +39,7 @@
     }
   },
   "files": {
-    "include": ["src/**/*.ts", "bin/**/*.ts"],
+    "include": ["src/**/*.ts"],
     "ignore": ["node_modules", "dist", "coverage"]
   }
 }
