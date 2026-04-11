@@ -73,6 +73,67 @@ describe('evaluate', () => {
     });
   });
 
+  describe('percentile dice (d%)', () => {
+    test('d% rolls a d100', () => {
+      const ast = parse('d%');
+      const rng = createMockRng([73]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(73);
+      expect(result.rolls).toHaveLength(1);
+      expect(getDie(result.rolls, 0).sides).toBe(100);
+    });
+
+    test('2d% sums two d100 rolls', () => {
+      const ast = parse('2d%');
+      const rng = createMockRng([42, 88]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(130);
+      expect(result.rolls).toHaveLength(2);
+    });
+
+    test('expression shows canonical 1d100', () => {
+      const ast = parse('d%');
+      const rng = createMockRng([50]);
+      const result = evaluate(ast, rng);
+
+      expect(result.expression).toBe('1d100');
+    });
+
+    test('critical on 100', () => {
+      const ast = parse('d%');
+      const rng = createMockRng([100]);
+      const result = evaluate(ast, rng);
+
+      expect(getDie(result.rolls, 0).critical).toBe(true);
+    });
+
+    test('fumble on 1', () => {
+      const ast = parse('d%');
+      const rng = createMockRng([1]);
+      const result = evaluate(ast, rng);
+
+      expect(getDie(result.rolls, 0).fumble).toBe(true);
+    });
+
+    test('2d%kh1 keeps highest', () => {
+      const ast = parse('2d%kh1');
+      const rng = createMockRng([42, 88]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(88);
+    });
+
+    test('notation preserved when passed via options', () => {
+      const ast = parse('d%');
+      const rng = createMockRng([50]);
+      const result = evaluate(ast, rng, { notation: 'd%' });
+
+      expect(result.notation).toBe('d%');
+    });
+  });
+
   describe('arithmetic operations', () => {
     test('addition', () => {
       const ast = parse('1d6 + 3');

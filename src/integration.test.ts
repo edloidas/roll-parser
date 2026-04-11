@@ -83,6 +83,38 @@ describe('roll() integration', () => {
     });
   });
 
+  describe('percentile dice (d%)', () => {
+    test('basic d%', () => {
+      const result = roll('d%', { rng: createMockRng([73]) });
+      expect(result.total).toBe(73);
+      expect(result.notation).toBe('d%');
+      expect(result.expression).toBe('1d100');
+    });
+
+    test('2d%', () => {
+      const result = roll('2d%', { rng: createMockRng([42, 88]) });
+      expect(result.total).toBe(130);
+      expect(result.notation).toBe('2d%');
+    });
+
+    test('d%+5', () => {
+      const result = roll('d%+5', { rng: createMockRng([50]) });
+      expect(result.total).toBe(55);
+    });
+
+    test('2d%kh1 keeps highest', () => {
+      const result = roll('2d%kh1', { rng: createMockRng([30, 90]) });
+      expect(result.total).toBe(90);
+    });
+
+    test('rendered output shows rolls', () => {
+      const result = roll('d%', { rng: createMockRng([73]) });
+      expect(result.rendered).toContain('1d100');
+      expect(result.rendered).toContain('[73]');
+      expect(result.rendered).toContain('= 73');
+    });
+  });
+
   describe('seeded reproducibility', () => {
     test('same seed produces same result', () => {
       const r1 = roll('4d6', { seed: 'test-seed-123' });

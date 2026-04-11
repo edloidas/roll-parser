@@ -138,6 +138,9 @@ export class Parser {
       case TokenType.DICE:
         return this.parsePrefixDice();
 
+      case TokenType.DICE_PERCENT:
+        return this.parsePrefixDicePercent();
+
       case TokenType.LPAREN:
         return this.parseGrouped();
 
@@ -162,6 +165,9 @@ export class Parser {
     switch (token.type) {
       case TokenType.DICE:
         return this.parseInfixDice(left);
+
+      case TokenType.DICE_PERCENT:
+        return this.parseInfixDicePercent(left);
 
       case TokenType.PLUS:
       case TokenType.MINUS:
@@ -222,6 +228,24 @@ export class Parser {
       type: 'Dice',
       count: left,
       sides,
+    };
+  }
+
+  private parsePrefixDicePercent(): DiceNode {
+    // d% → Dice(1, 100)
+    return {
+      type: 'Dice',
+      count: { type: 'Literal', value: 1 },
+      sides: { type: 'Literal', value: 100 },
+    };
+  }
+
+  private parseInfixDicePercent(left: ASTNode): DiceNode {
+    // 2d% → Dice(2, 100)
+    return {
+      type: 'Dice',
+      count: left,
+      sides: { type: 'Literal', value: 100 },
     };
   }
 
@@ -363,6 +387,7 @@ export class Parser {
       case TokenType.POWER:
         return BP.POW_LEFT;
       case TokenType.DICE:
+      case TokenType.DICE_PERCENT:
         return BP.DICE_LEFT;
       case TokenType.KEEP_HIGH:
       case TokenType.KEEP_LOW:
