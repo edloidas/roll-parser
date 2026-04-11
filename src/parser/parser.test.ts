@@ -96,6 +96,50 @@ describe('Parser', () => {
     });
   });
 
+  describe('percentile dice (d%)', () => {
+    it('should parse prefix d% as 1d100', () => {
+      expect(parse('d%')).toEqual(dice(literal(1), literal(100)));
+    });
+
+    it('should parse infix 2d%', () => {
+      expect(parse('2d%')).toEqual(dice(literal(2), literal(100)));
+    });
+
+    it('should parse d%+5', () => {
+      expect(parse('d%+5')).toEqual(binary('+', dice(literal(1), literal(100)), literal(5)));
+    });
+
+    it('should parse computed count (2)d%', () => {
+      expect(parse('(2)d%')).toEqual(dice(literal(2), literal(100)));
+    });
+
+    it('should parse 2d%kh1 with keep modifier', () => {
+      expect(parse('2d%kh1')).toEqual(
+        modifier('keep', 'highest', literal(1), dice(literal(2), literal(100))),
+      );
+    });
+
+    it('should produce same AST as d100', () => {
+      expect(parse('d%')).toEqual(parse('d100'));
+    });
+
+    it('should be case-insensitive (D%)', () => {
+      expect(parse('D%')).toEqual(dice(literal(1), literal(100)));
+    });
+
+    it('should not affect modulo operator', () => {
+      expect(parse('10%3')).toEqual(binary('%', literal(10), literal(3)));
+    });
+
+    it('should throw on d%%', () => {
+      expect(() => parse('d%%')).toThrow(ParseError);
+    });
+
+    it('should throw on d % 3 (whitespace breaks token)', () => {
+      expect(() => parse('d % 3')).toThrow(ParseError);
+    });
+  });
+
   describe('arithmetic precedence', () => {
     it('should parse addition', () => {
       expect(parse('1+2')).toEqual(binary('+', literal(1), literal(2)));

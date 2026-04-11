@@ -24,6 +24,21 @@ describe('property-based invariants', () => {
       );
     });
 
+    test('Nd% total is always in valid range [N, N*100]', () => {
+      fc.assert(
+        fc.property(fc.integer({ min: 1, max: 10 }), (count) => {
+          const result = roll(`${count}d%`);
+          return (
+            result.total >= count &&
+            result.total <= count * 100 &&
+            result.rolls.length === count &&
+            result.rolls.every((r) => r.sides === 100)
+          );
+        }),
+        { numRuns: 200 },
+      );
+    });
+
     test('0dX always returns 0', () => {
       fc.assert(
         fc.property(fc.integer({ min: 1, max: 100 }), (sides) => {
