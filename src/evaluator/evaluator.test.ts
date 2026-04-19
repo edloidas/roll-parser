@@ -1369,4 +1369,178 @@ describe('evaluate', () => {
       });
     });
   });
+
+  describe('success counting', () => {
+    test('basic count — 10d10>=6 with [1..10]', () => {
+      const ast = parse('10d10>=6');
+      const rng = createMockRng([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(5);
+      expect(result.successes).toBe(5);
+      expect(result.failures).toBe(0);
+      expect(result.expression).toBe('10d10>=6');
+    });
+
+    test('fail threshold subtracts — 10d10>=6f1', () => {
+      const ast = parse('10d10>=6f1');
+      const rng = createMockRng([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(4); // 5 successes - 1 failure
+      expect(result.successes).toBe(5);
+      expect(result.failures).toBe(1);
+    });
+
+    test('success wins on overlap — 3d6>=3f3 with [3,5,1]', () => {
+      const ast = parse('3d6>=3f3');
+      const rng = createMockRng([3, 5, 1]);
+      const result = evaluate(ast, rng);
+
+      // The 3 matches both >=3 and =3, but success wins.
+      expect(result.successes).toBe(2); // 3, 5
+      expect(result.failures).toBe(0);
+      expect(result.total).toBe(2);
+      expect(getDie(result.rolls, 0).modifiers).toContain('success');
+      expect(getDie(result.rolls, 0).modifiers).not.toContain('failure');
+    });
+
+    test('negative total is allowed', () => {
+      const ast = parse('3d6>=6f1');
+      const rng = createMockRng([1, 1, 1]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(-3);
+      expect(result.successes).toBe(0);
+      expect(result.failures).toBe(3);
+    });
+
+    test('strict greater: 5d6>5 with [1,5,6,6,3]', () => {
+      const ast = parse('5d6>5');
+      const rng = createMockRng([1, 5, 6, 6, 3]);
+      const result = evaluate(ast, rng);
+
+      expect(result.successes).toBe(2); // two 6s
+      expect(result.total).toBe(2);
+    });
+
+    test('equals: 5d6=6 with [1,6,6,3,2]', () => {
+      const ast = parse('5d6=6');
+      const rng = createMockRng([1, 6, 6, 3, 2]);
+      const result = evaluate(ast, rng);
+
+      expect(result.successes).toBe(2);
+    });
+
+    test('keep-then-count skips dropped dice — 4d6kh3>=5', () => {
+      const ast = parse('4d6kh3>=5');
+      const rng = createMockRng([1, 5, 6, 3]);
+      const result = evaluate(ast, rng);
+
+      expect(result.successes).toBe(2); // 5 and 6 among kept {5,6,3}
+      expect(result.total).toBe(2);
+      expect(result.rolls).toHaveLength(4);
+      // The dropped die must not be tagged with success/failure.
+      const dropped = result.rolls.find((d) => d.modifiers.includes('dropped'));
+      expect(dropped).toBeDefined();
+      expect(dropped?.modifiers.includes('success')).toBe(false);
+      expect(dropped?.modifiers.includes('failure')).toBe(false);
+    });
+
+    test('reroll-then-count excludes rerolled intermediates — 4d6r<3>=5', () => {
+      // First 4 rolls: [1, 5, 2, 6]. `1` rerolls → 3 (kept). `2` rerolls → 4 (kept).
+      // Final kept pool: [3, 5, 4, 6]. >=5 count: 2.
+      const ast = parse('4d6r<3>=5');
+      const rng = createMockRng([1, 5, 2, 6, 3, 4]);
+      const result = evaluate(ast, rng);
+
+      expect(result.successes).toBe(2);
+      expect(result.total).toBe(2);
+
+      // Intermediate rerolls are 'dropped' and must not carry success/failure.
+      const intermediates = result.rolls.filter((d) => d.modifiers.includes('rerolled'));
+      expect(intermediates.length).toBe(2);
+      for (const d of intermediates) {
+        expect(d.modifiers.includes('success')).toBe(false);
+        expect(d.modifiers.includes('failure')).toBe(false);
+      }
+    });
+
+    test('arithmetic on success count — 5d6>=5+3', () => {
+      const ast = parse('5d6>=5+3');
+      const rng = createMockRng([1, 2, 3, 4, 5]);
+      const result = evaluate(ast, rng);
+
+      // 1 success (the 5) + 3 literal = 4.
+      expect(result.total).toBe(4);
+      expect(result.successes).toBe(1);
+    });
+
+    test('multiplication on success count — 5d6>=5*2', () => {
+      const ast = parse('5d6>=5*2');
+      const rng = createMockRng([5, 5, 2, 6, 1]);
+      const result = evaluate(ast, rng);
+
+      expect(result.successes).toBe(3); // 5, 5, 6
+      expect(result.total).toBe(6); // 3 * 2
+    });
+
+    test('rendered output uses ** and __ markers', () => {
+      const ast = parse('3d6>=5f1');
+      const rng = createMockRng([1, 5, 3]);
+      const result = evaluate(ast, rng);
+
+      expect(result.rendered).toContain('**5**'); // success
+      expect(result.rendered).toContain('__1__'); // failure
+      expect(result.rendered).toContain(', 3'); // unmarked
+    });
+
+    test('Fate dice + success count with negative fail — 4dF>=1f-1', () => {
+      const ast = parse('4dF>=1f-1');
+      // Rolls: [1, 0, -1, 1]
+      const rng = createMockRng([1, 0, -1, 1]);
+      const result = evaluate(ast, rng);
+
+      expect(result.successes).toBe(2); // two +1s
+      expect(result.failures).toBe(1); // one -1
+      expect(result.total).toBe(1);
+    });
+
+    test('computed threshold — 3d6>=(1+4)', () => {
+      const ast = parse('3d6>=(1+4)');
+      const rng = createMockRng([4, 5, 6]);
+      const result = evaluate(ast, rng);
+
+      expect(result.successes).toBe(2); // 5, 6
+    });
+
+    test('success/failure fields absent when no success count used', () => {
+      const ast = parse('3d6+1');
+      const rng = createMockRng([1, 2, 3]);
+      const result = evaluate(ast, rng);
+
+      expect(result.successes).toBeUndefined();
+      expect(result.failures).toBeUndefined();
+    });
+
+    test('failures absent when only threshold used, no fail', () => {
+      const ast = parse('3d6>=5');
+      const rng = createMockRng([5, 6, 1]);
+      const result = evaluate(ast, rng);
+
+      expect(result.successes).toBe(2);
+      expect(result.failures).toBe(0);
+    });
+
+    test('aggregates across multiple success-count subexpressions', () => {
+      const ast = parse('4d6>=5 + 4d6>=4');
+      // Pool 1: [5, 6, 2, 3] → 2 successes
+      // Pool 2: [4, 1, 4, 2] → 2 successes
+      const rng = createMockRng([5, 6, 2, 3, 4, 1, 4, 2]);
+      const result = evaluate(ast, rng);
+
+      expect(result.successes).toBe(4);
+      expect(result.total).toBe(4);
+    });
+  });
 });

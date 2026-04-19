@@ -495,4 +495,47 @@ describe('roll() integration', () => {
       expect(result.total).toBe(1);
     });
   });
+
+  describe('success counting', () => {
+    test('WoD pattern — 10d10>=6f1', () => {
+      const result = roll('10d10>=6f1', {
+        rng: createMockRng([10, 1, 10, 10, 1, 6, 5, 4, 3, 2]),
+      });
+      // Successes: 10,10,10,6 = 4. Failures: 1,1 = 2. Total: 2.
+      expect(result.successes).toBe(4);
+      expect(result.failures).toBe(2);
+      expect(result.total).toBe(2);
+    });
+
+    test('rendered output shows markers', () => {
+      const result = roll('3d6>=5f1', { rng: createMockRng([1, 5, 3]) });
+      expect(result.rendered).toContain('**5**');
+      expect(result.rendered).toContain('__1__');
+    });
+
+    test('seeded success counting is reproducible', () => {
+      const r1 = roll('10d10>=6f1', { seed: 'sc-seed' });
+      const r2 = roll('10d10>=6f1', { seed: 'sc-seed' });
+      expect(r1.total).toBe(r2.total);
+      expect(r1.successes).toBe(r2.successes);
+      expect(r1.failures).toBe(r2.failures);
+    });
+
+    test('impossible threshold yields zero successes — 1d6>=7', () => {
+      const result = roll('1d6>=7', { rng: createMockRng([6]) });
+      expect(result.successes).toBe(0);
+      expect(result.total).toBe(0);
+    });
+
+    test('rejects modifier after success count', () => {
+      expect(() => roll('10d10>=6kh5')).toThrow(ParseError);
+      expect(() => roll('10d10>=6!')).toThrow(ParseError);
+      expect(() => roll('10d10>=6>=5')).toThrow(ParseError);
+    });
+
+    test('rejects non-dice success target', () => {
+      expect(() => roll('1>=3')).toThrow(ParseError);
+      expect(() => roll('(1+2)>=3')).toThrow(ParseError);
+    });
+  });
 });

@@ -14,6 +14,7 @@ import type {
   FateDiceNode,
   ModifierNode,
   RerollNode,
+  SuccessCountNode,
   UnaryOpNode,
 } from '../parser/ast';
 import { isModifier } from '../parser/ast';
@@ -39,6 +40,7 @@ import {
   applyRerollOnce,
   DEFAULT_MAX_REROLL_ITERATIONS,
 } from './modifiers/reroll';
+import { countSuccesses } from './modifiers/success-count';
 
 /**
  * Error thrown during AST evaluation.
@@ -69,6 +71,12 @@ export type EvalEnv = {
   readonly maxExplodeIterations: number;
   readonly maxRerollIterations: number;
   totalDiceRolled: number;
+  /**
+   * Set to `true` by `evalSuccessCount`. Propagates through the shared env
+   * so `evaluate()` can include `successes`/`failures` fields even when no
+   * die was tagged (impossible threshold).
+   */
+  hasSuccessCount: boolean;
 };
 
 /**
@@ -118,12 +126,20 @@ function createFateDieResult(result: number): DieResult {
 }
 
 /**
- * Renders dice results for display (e.g., "[3, 5, 2]" or "[~~3~~, 5, ~~2~~]").
+ * Renders dice results for display. Marker priority: dropped wins over
+ * success/failure (dropped dice are never counted), success wins over
+ * failure (a die cannot be both). Example: `[~~1~~, **6**, __1__, 3]`.
  */
 function renderDice(dice: DieResult[]): string {
   const parts = dice.map((die) => {
     if (die.modifiers.includes('dropped')) {
       return `~~${die.result}~~`;
+    }
+    if (die.modifiers.includes('success')) {
+      return `**${die.result}**`;
+    }
+    if (die.modifiers.includes('failure')) {
+      return `__${die.result}__`;
     }
     return String(die.result);
   });
@@ -158,6 +174,9 @@ function evalNode(node: ASTNode, rng: RNG, ctx: EvalContext, env: EvalEnv): numb
 
     case 'Reroll':
       return evalReroll(node, rng, ctx, env);
+
+    case 'SuccessCount':
+      return evalSuccessCount(node, rng, ctx, env);
 
     default: {
       const exhaustive: never = node;
@@ -501,6 +520,67 @@ function evalModifier(node: ModifierNode, rng: RNG, ctx: EvalContext, env: EvalE
   return total;
 }
 
+function resolveThreshold(
+  value: ASTNode,
+  rng: RNG,
+  env: EvalEnv,
+  role: 'threshold' | 'fail threshold',
+): number {
+  const thresholdCtx: EvalContext = { rolls: [], expressionParts: [], renderedParts: [] };
+  const resolved = evalNode(value, rng, thresholdCtx, env);
+
+  if (!Number.isFinite(resolved)) {
+    throw new EvaluatorError(`Invalid ${role}: ${resolved}`, 'INVALID_THRESHOLD', 'SuccessCount');
+  }
+
+  return resolved;
+}
+
+function evalSuccessCount(
+  node: SuccessCountNode,
+  rng: RNG,
+  ctx: EvalContext,
+  env: EvalEnv,
+): number {
+  const targetCtx: EvalContext = { rolls: [], expressionParts: [], renderedParts: [] };
+  const targetValue = evalNode(node.target, rng, targetCtx, env);
+  const targetExpr = targetCtx.expressionParts.join('');
+
+  const thresholdValue = resolveThreshold(node.threshold.value, rng, env, 'threshold');
+  const failValue =
+    node.failThreshold != null
+      ? resolveThreshold(node.failThreshold.value, rng, env, 'fail threshold')
+      : undefined;
+
+  const code = `${node.threshold.operator}${thresholdValue}${
+    failValue != null ? `f${failValue}` : ''
+  }`;
+
+  // No-op when the target produced no dice in its pool. `containsDice` should
+  // already reject this at parse time, but guard defensively.
+  if (targetCtx.rolls.length === 0) {
+    ctx.expressionParts.push(`${targetExpr}${code}`);
+    ctx.renderedParts.push(`${targetExpr}${code}`);
+    return targetValue;
+  }
+
+  const result = countSuccesses(
+    targetCtx.rolls,
+    { operator: node.threshold.operator, value: thresholdValue },
+    failValue != null && node.failThreshold != null
+      ? { operator: node.failThreshold.operator, value: failValue }
+      : undefined,
+  );
+
+  env.hasSuccessCount = true;
+
+  ctx.rolls.push(...targetCtx.rolls);
+  ctx.expressionParts.push(`${targetExpr}${code}`);
+  ctx.renderedParts.push(`${targetExpr}${code}${renderDice(targetCtx.rolls)}`);
+
+  return result.total;
+}
+
 /**
  * Evaluates a parsed AST and returns the roll result.
  *
@@ -542,6 +622,7 @@ export function evaluate(ast: ASTNode, rng: RNG, options: EvaluateOptions = {}):
     maxExplodeIterations,
     maxRerollIterations,
     totalDiceRolled: 0,
+    hasSuccessCount: false,
   };
   const ctx: EvalContext = {
     rolls: [],
@@ -554,11 +635,24 @@ export function evaluate(ast: ASTNode, rng: RNG, options: EvaluateOptions = {}):
   const expression = ctx.expressionParts.join('');
   const rendered = `${ctx.renderedParts.join('')} = ${total}`;
 
-  return {
+  const result: RollResult = {
     total,
     notation: options.notation ?? expression,
     expression,
     rendered,
     rolls: ctx.rolls,
   };
+
+  if (env.hasSuccessCount) {
+    let successes = 0;
+    let failures = 0;
+    for (const die of ctx.rolls) {
+      if (die.modifiers.includes('success')) successes += 1;
+      else if (die.modifiers.includes('failure')) failures += 1;
+    }
+    result.successes = successes;
+    result.failures = failures;
+  }
+
+  return result;
 }

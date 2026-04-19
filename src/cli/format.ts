@@ -27,11 +27,19 @@ export function formatResult(result: RollResult, verbose: boolean): string {
 }
 
 /**
- * Converts markdown strikethrough to terminal-friendly parentheses.
+ * Converts markdown-style dice markers to terminal-friendly forms.
  *
- * The evaluator uses `~~value~~` for dropped dice in the rendered field.
- * This replaces those with `(value)` for clear terminal display.
+ * The evaluator uses markdown syntax in the rendered field:
+ *   `~~value~~` — dropped dice
+ *   `**value**` — dice counted as success
+ *   `__value__` — dice counted as failure
+ *
+ * For plain terminals these become `(value)`, `[value]`, and `{value}` so
+ * the per-die classification stays visible without any markup dependency.
  */
 function formatRendered(rendered: string): string {
-  return rendered.replace(/~~(-?\d+)~~/g, '($1)');
+  return rendered
+    .replace(/~~(-?\d+)~~/g, '($1)')
+    .replace(/\*\*(-?\d+)\*\*/g, '[$1]')
+    .replace(/__(-?\d+)__/g, '{$1}');
 }

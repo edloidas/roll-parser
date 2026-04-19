@@ -12,28 +12,12 @@
 import type { RNG } from '../../rng/types';
 import type { CompareOp, DieResult } from '../../types';
 import { EvaluatorError, type EvalEnv } from '../evaluator';
+import { matchesCondition } from './compare';
 
 /** Default maximum reroll iterations per die. */
 export const DEFAULT_MAX_REROLL_ITERATIONS = 1_000;
 
-/**
- * Compares a die result against a fixed comparison threshold. Reusable across
- * reroll and success-counting modifiers (the only difference is who calls it).
- */
-export function matchesCondition(result: number, operator: CompareOp, value: number): boolean {
-  switch (operator) {
-    case '>':
-      return result > value;
-    case '>=':
-      return result >= value;
-    case '<':
-      return result < value;
-    case '<=':
-      return result <= value;
-    case '=':
-      return result === value;
-  }
-}
+export { matchesCondition };
 
 /**
  * Rolls a replacement die for the given sides, charging it against the global

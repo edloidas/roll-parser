@@ -18,8 +18,10 @@ import type {
   LiteralNode,
   ModifierNode,
   RerollNode,
+  SuccessCountNode,
   UnaryOpNode,
 } from './ast';
+import { containsDice, isSuccessCount } from './ast';
 
 /**
  * Error thrown when the parser encounters invalid syntax.
@@ -201,6 +203,13 @@ export class Parser {
       case TokenType.REROLL_ONCE:
         return this.parseReroll(left, token);
 
+      case TokenType.GREATER:
+      case TokenType.GREATER_EQUAL:
+      case TokenType.LESS:
+      case TokenType.LESS_EQUAL:
+      case TokenType.EQUAL:
+        return this.parseSuccessCount(left, token);
+
       default:
         throw new ParseError(
           `Unexpected infix token '${token.value}'`,
@@ -304,7 +313,20 @@ export class Parser {
     };
   }
 
+  private rejectSuccessCountTarget(target: ASTNode, token: Token): void {
+    if (isSuccessCount(target)) {
+      throw new ParseError(
+        `Cannot apply modifier after success counting`,
+        'INVALID_SUCCESS_COUNT_TARGET',
+        token.position,
+        token,
+      );
+    }
+  }
+
   private parseModifier(target: ASTNode, token: Token): ModifierNode {
+    this.rejectSuccessCountTarget(target, token);
+
     const modifier =
       token.type === TokenType.KEEP_HIGH || token.type === TokenType.KEEP_LOW ? 'keep' : 'drop';
 
@@ -330,6 +352,8 @@ export class Parser {
   }
 
   private parseExplode(target: ASTNode, token: Token): ExplodeNode {
+    this.rejectSuccessCountTarget(target, token);
+
     // ? Reject nested explodes (e.g., `1d6!!!`) — a second explode token atop
     //   an ExplodeNode has no meaningful semantics and is rejected per spec.
     if (target.type === 'Explode') {
@@ -356,6 +380,8 @@ export class Parser {
   }
 
   private parseReroll(target: ASTNode, token: Token): RerollNode {
+    this.rejectSuccessCountTarget(target, token);
+
     // A reroll token must be followed by a comparison — bare `r` / `ro` is invalid.
     if (!this.isComparePointAhead()) {
       throw new ParseError(
@@ -370,6 +396,38 @@ export class Parser {
     const condition = this.parseComparePoint();
 
     return { type: 'Reroll', once, condition, target };
+  }
+
+  private parseSuccessCount(target: ASTNode, token: Token): SuccessCountNode {
+    // Success counting is terminal: chaining (`>=5>=3`) has no semantics.
+    this.rejectSuccessCountTarget(target, token);
+
+    // Reject non-dice targets like `1>=3` or `(1+2)>=3`. Success counting
+    // operates on a dice pool; a sum has no pool to count.
+    if (!containsDice(target)) {
+      throw new ParseError(
+        `Success counting requires a dice expression`,
+        'INVALID_SUCCESS_COUNT_TARGET',
+        token.position,
+        token,
+      );
+    }
+
+    const operator = this.getCompareOp(token);
+    const value = this.parseExpression(BP.DICE_LEFT);
+    const node: SuccessCountNode = {
+      type: 'SuccessCount',
+      target,
+      threshold: { operator, value },
+    };
+
+    if (this.peek().type === TokenType.FAIL) {
+      this.advance();
+      const failValue = this.parseExpression(BP.DICE_LEFT);
+      node.failThreshold = { operator: '=', value: failValue };
+    }
+
+    return node;
   }
 
   // * Compare point utilities
@@ -478,17 +536,17 @@ export class Parser {
       case TokenType.EXPLODE_PENETRATING:
       case TokenType.REROLL:
       case TokenType.REROLL_ONCE:
-        return BP.MODIFIER;
-      case TokenType.RPAREN:
-      case TokenType.EOF:
-      // Comparison operators terminate the current expression — they are
-      // consumed by modifier parsers (explode, reroll, success counting),
-      // not by the main Pratt loop.
+      // Comparison operators act as LED-dispatched success-count modifiers
+      // at the Pratt level. Inside `parseComparePoint` (called manually by
+      // explode/reroll) they are consumed directly and this BP is bypassed.
       case TokenType.GREATER:
       case TokenType.GREATER_EQUAL:
       case TokenType.LESS:
       case TokenType.LESS_EQUAL:
       case TokenType.EQUAL:
+        return BP.MODIFIER;
+      case TokenType.RPAREN:
+      case TokenType.EOF:
       // Punctuation and keywords that terminate expressions
       case TokenType.COMMA:
       case TokenType.FUNCTION:
