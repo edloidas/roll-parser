@@ -5,6 +5,7 @@ import type {
   ASTNode,
   BinaryOpNode,
   DiceNode,
+  FateDiceNode,
   LiteralNode,
   ModifierNode,
   UnaryOpNode,
@@ -18,6 +19,10 @@ function literal(value: number): LiteralNode {
 
 function dice(count: ASTNode, sides: ASTNode): DiceNode {
   return { type: 'Dice', count, sides };
+}
+
+function fateDice(count: ASTNode): FateDiceNode {
+  return { type: 'FateDice', count };
 }
 
 function binary(operator: BinaryOpNode['operator'], left: ASTNode, right: ASTNode): BinaryOpNode {
@@ -137,6 +142,48 @@ describe('Parser', () => {
 
     it('should throw on d % 3 (whitespace breaks token)', () => {
       expect(() => parse('d % 3')).toThrow(ParseError);
+    });
+  });
+
+  describe('fate dice (dF)', () => {
+    it('should parse prefix dF as FateDice(1)', () => {
+      expect(parse('dF')).toEqual(fateDice(literal(1)));
+    });
+
+    it('should parse infix 4dF', () => {
+      expect(parse('4dF')).toEqual(fateDice(literal(4)));
+    });
+
+    it('should parse computed count (2+2)dF', () => {
+      expect(parse('(2+2)dF')).toEqual(fateDice(binary('+', literal(2), literal(2))));
+    });
+
+    it('should parse dF+5 with trailing arithmetic', () => {
+      expect(parse('dF+5')).toEqual(binary('+', fateDice(literal(1)), literal(5)));
+    });
+
+    it('should parse 4dFkh2 with keep modifier', () => {
+      expect(parse('4dFkh2')).toEqual(
+        modifier('keep', 'highest', literal(2), fateDice(literal(4))),
+      );
+    });
+
+    it('should parse 4dFdl1 with drop modifier', () => {
+      expect(parse('4dFdl1')).toEqual(modifier('drop', 'lowest', literal(1), fateDice(literal(4))));
+    });
+
+    it('should parse -dF as unary minus over fate dice', () => {
+      expect(parse('-dF')).toEqual(unary(fateDice(literal(1))));
+    });
+
+    it('should parse (-1)dF with unary count (evaluator rejects at runtime)', () => {
+      expect(parse('(-1)dF')).toEqual(fateDice(unary(literal(1))));
+    });
+
+    it('should be case-insensitive (DF, Df, df)', () => {
+      expect(parse('DF')).toEqual(fateDice(literal(1)));
+      expect(parse('Df')).toEqual(fateDice(literal(1)));
+      expect(parse('df')).toEqual(fateDice(literal(1)));
     });
   });
 

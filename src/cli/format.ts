@@ -33,5 +33,5 @@ export function formatResult(result: RollResult, verbose: boolean): string {
  * This replaces those with `(value)` for clear terminal display.
  */
 function formatRendered(rendered: string): string {
-  return rendered.replace(/~~(\d+)~~/g, '($1)');
+  return rendered.replace(/~~(-?\d+)~~/g, '($1)');
 }

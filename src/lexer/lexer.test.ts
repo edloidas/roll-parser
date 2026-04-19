@@ -429,6 +429,53 @@ describe('Lexer', () => {
       expect(lex('dl')[0]?.type).toBe(TokenType.DROP_LOW);
       expect(lex('dF')[0]?.type).toBe(TokenType.DICE_FATE);
     });
+
+    it('should tokenize 4dFkh2 without greedy identifier merge', () => {
+      const tokens = lex('4dFkh2');
+
+      expect(tokens).toHaveLength(5);
+      expect(tokens[0]).toEqual({ type: TokenType.NUMBER, value: '4', position: 0 });
+      expect(tokens[1]).toEqual({ type: TokenType.DICE_FATE, value: 'df', position: 1 });
+      expect(tokens[2]).toEqual({ type: TokenType.KEEP_HIGH, value: 'kh', position: 3 });
+      expect(tokens[3]).toEqual({ type: TokenType.NUMBER, value: '2', position: 5 });
+    });
+
+    it('should tokenize 4dFdl1 without greedy identifier merge', () => {
+      const tokens = lex('4dFdl1');
+
+      expect(tokens).toHaveLength(5);
+      expect(tokens[0]?.type).toBe(TokenType.NUMBER);
+      expect(tokens[1]?.type).toBe(TokenType.DICE_FATE);
+      expect(tokens[2]?.type).toBe(TokenType.DROP_LOW);
+      expect(tokens[3]?.type).toBe(TokenType.NUMBER);
+    });
+
+    it('should tokenize dFdF as two consecutive fate tokens', () => {
+      const tokens = lex('dFdF');
+
+      expect(tokens).toHaveLength(3);
+      expect(tokens[0]).toEqual({ type: TokenType.DICE_FATE, value: 'df', position: 0 });
+      expect(tokens[1]).toEqual({ type: TokenType.DICE_FATE, value: 'df', position: 2 });
+    });
+
+    it('should tokenize dF+5 with trailing arithmetic', () => {
+      const tokens = lex('dF+5');
+
+      expect(tokens).toHaveLength(4);
+      expect(tokens[0]?.type).toBe(TokenType.DICE_FATE);
+      expect(tokens[1]?.type).toBe(TokenType.PLUS);
+      expect(tokens[2]?.type).toBe(TokenType.NUMBER);
+    });
+
+    it('should tokenize 2dFd20 with a following dice expression', () => {
+      const tokens = lex('2dFd20');
+
+      expect(tokens).toHaveLength(5);
+      expect(tokens[0]?.type).toBe(TokenType.NUMBER);
+      expect(tokens[1]?.type).toBe(TokenType.DICE_FATE);
+      expect(tokens[2]?.type).toBe(TokenType.DICE);
+      expect(tokens[3]?.type).toBe(TokenType.NUMBER);
+    });
   });
 
   describe('fail token', () => {

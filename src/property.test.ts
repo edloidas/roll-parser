@@ -39,6 +39,28 @@ describe('property-based invariants', () => {
       );
     });
 
+    test('NdF total is always an integer in [-N, +N]', () => {
+      fc.assert(
+        fc.property(fc.integer({ min: 0, max: 20 }), (count) => {
+          const result = roll(`${count}dF`);
+          return (
+            Number.isInteger(result.total) &&
+            result.total >= -count &&
+            result.total <= count &&
+            result.rolls.length === count &&
+            result.rolls.every(
+              (r) =>
+                r.sides === 0 &&
+                r.critical === false &&
+                r.fumble === false &&
+                (r.result === -1 || r.result === 0 || r.result === 1),
+            )
+          );
+        }),
+        { numRuns: 300 },
+      );
+    });
+
     test('0dX always returns 0', () => {
       fc.assert(
         fc.property(fc.integer({ min: 1, max: 100 }), (sides) => {

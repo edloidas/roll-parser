@@ -178,10 +178,25 @@ export class Lexer {
    * Scans an identifier using full-accumulation: collects all consecutive
    * alpha characters, then classifies the result against known keywords.
    *
-   * Special case: bare 'd' followed by '%' produces DICE_PERCENT.
+   * Special cases run before/after the accumulation loop:
+   * - `dF` / `Df` / `dF` / `DF` produces DICE_FATE. Must be handled BEFORE
+   *   the loop because `F` is alpha and would otherwise be greedily merged
+   *   into identifiers like `dfkh` (from `4dFkh2`) or `dfdf` (from `dFdF`).
+   *   Reserves the `d[fF]` prefix namespace for Fate dice.
+   * - Bare `d` followed by `%` produces DICE_PERCENT. `%` is not alpha so the
+   *   accumulation loop stops naturally and the post-loop check handles it.
    */
   private scanIdentifier(): Token {
     const startPos = this.pos;
+
+    const first = this.peek();
+    const second = this.peekNext();
+    if ((first === 'd' || first === 'D') && (second === 'f' || second === 'F')) {
+      this.advance();
+      this.advance();
+      return this.createTokenAt(TokenType.DICE_FATE, 'df', startPos);
+    }
+
     let value = '';
 
     while (!this.isAtEnd() && this.isAlpha(this.peek())) {
@@ -190,16 +205,9 @@ export class Lexer {
 
     const lower = value.toLowerCase();
 
-    // Special case: d% (percentile dice) — '%' is not alpha, so it's not
-    // accumulated above. Check after accumulation if we got bare 'd'.
     if (lower === 'd' && !this.isAtEnd() && this.peek() === '%') {
       this.advance();
       return this.createTokenAt(TokenType.DICE_PERCENT, 'd%', startPos);
-    }
-
-    // Special case: dF — accumulated as 'df', maps to DICE_FATE
-    if (lower === 'df') {
-      return this.createTokenAt(TokenType.DICE_FATE, lower, startPos);
     }
 
     const tokenType = IDENTIFIER_KEYWORDS[lower];

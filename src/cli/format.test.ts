@@ -44,5 +44,15 @@ describe('formatResult', () => {
       const result = roll('1d20', { rng: createMockRng([15]) });
       expect(formatResult(result, true)).toBe('1d20[15] = 15');
     });
+
+    test('replaces strikethrough around negative values (dropped fate dice)', () => {
+      const result = roll('4dFkh2', { rng: createMockRng([-1, 0, 1, 1]) });
+      const output = formatResult(result, true);
+
+      expect(output).toContain('(-1)');
+      expect(output).toContain('(0)');
+      expect(output).not.toContain('~~');
+      expect(output).toBe('4dF[(-1), (0), 1, 1] = 2');
+    });
   });
 });

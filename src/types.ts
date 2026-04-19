@@ -31,15 +31,19 @@ export type DieModifier = 'dropped' | 'kept' | 'exploded' | 'rerolled';
  * Individual die roll result with metadata.
  */
 export type DieResult = {
-  /** Number of sides on the die */
+  /**
+   * Number of sides on the die. Normal dice use `sides >= 1`. Fate/Fudge
+   * dice use `sides = 0` as a sentinel — they have no configurable sides
+   * and always produce results in {-1, 0, +1}.
+   */
   sides: number;
   /** The rolled value */
   result: number;
   /** Modifiers applied to this die */
   modifiers: DieModifier[];
-  /** True if rolled the maximum value */
+  /** True if rolled the maximum value (always false for Fate dice) */
   critical: boolean;
-  /** True if rolled 1 */
+  /** True if rolled 1 (always false for Fate dice) */
   fumble: boolean;
 };
 

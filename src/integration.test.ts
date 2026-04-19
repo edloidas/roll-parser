@@ -115,6 +115,43 @@ describe('roll() integration', () => {
     });
   });
 
+  describe('fate dice (dF)', () => {
+    test('basic 4dF', () => {
+      const result = roll('4dF', { rng: createMockRng([-1, 0, 1, 1]) });
+
+      expect(result.total).toBe(1);
+      expect(result.notation).toBe('4dF');
+      expect(result.expression).toBe('4dF');
+      expect(result.rolls).toHaveLength(4);
+      for (const die of result.rolls) {
+        expect(die.sides).toBe(0);
+        expect(die.critical).toBe(false);
+        expect(die.fumble).toBe(false);
+      }
+    });
+
+    test('dF+5 combines fate with arithmetic', () => {
+      const result = roll('dF+5', { rng: createMockRng([0]) });
+      expect(result.total).toBe(5);
+    });
+
+    test('seeded reproducibility for dF', () => {
+      const r1 = roll('4dF', { seed: 'fate-seed-xyz' });
+      const r2 = roll('4dF', { seed: 'fate-seed-xyz' });
+
+      expect(r1.total).toBe(r2.total);
+      expect(r1.rolls.map((r) => r.result)).toEqual(r2.rolls.map((r) => r.result));
+      for (const die of r1.rolls) {
+        expect([-1, 0, 1]).toContain(die.result);
+      }
+    });
+
+    test('rendered output shows fate notation and results', () => {
+      const result = roll('4dF', { rng: createMockRng([-1, 0, 1, 1]) });
+      expect(result.rendered).toBe('4dF[-1, 0, 1, 1] = 1');
+    });
+  });
+
   describe('seeded reproducibility', () => {
     test('same seed produces same result', () => {
       const r1 = roll('4d6', { seed: 'test-seed-123' });

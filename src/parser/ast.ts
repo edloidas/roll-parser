@@ -23,6 +23,15 @@ export type DiceNode = {
 };
 
 /**
+ * Fate/Fudge dice node (`dF`).
+ * Each die produces a result in {-1, 0, +1}. No configurable sides.
+ */
+export type FateDiceNode = {
+  type: 'FateDice';
+  count: ASTNode;
+};
+
+/**
  * Binary operation node.
  */
 export type BinaryOpNode = {
@@ -56,7 +65,13 @@ export type ModifierNode = {
 /**
  * Union type of all AST nodes.
  */
-export type ASTNode = LiteralNode | DiceNode | BinaryOpNode | UnaryOpNode | ModifierNode;
+export type ASTNode =
+  | LiteralNode
+  | DiceNode
+  | FateDiceNode
+  | BinaryOpNode
+  | UnaryOpNode
+  | ModifierNode;
 
 /**
  * Type guard for LiteralNode.
@@ -70,6 +85,13 @@ export function isLiteral(node: ASTNode): node is LiteralNode {
  */
 export function isDice(node: ASTNode): node is DiceNode {
   return node.type === 'Dice';
+}
+
+/**
+ * Type guard for FateDiceNode.
+ */
+export function isFateDice(node: ASTNode): node is FateDiceNode {
+  return node.type === 'FateDice';
 }
 
 /**
