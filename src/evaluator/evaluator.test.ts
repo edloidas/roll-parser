@@ -1826,4 +1826,134 @@ describe('evaluate', () => {
       expect(getDie(result.rolls, 1).result).toBe(8);
     });
   });
+
+  describe('math functions', () => {
+    test('floor rounds down: floor(10/3)', () => {
+      const ast = parse('floor(10/3)');
+      const result = evaluate(ast, createMockRng([]));
+
+      expect(result.total).toBe(3);
+      expect(result.rolls).toHaveLength(0);
+    });
+
+    test('ceil rounds up: ceil(10/3)', () => {
+      const ast = parse('ceil(10/3)');
+      const result = evaluate(ast, createMockRng([]));
+
+      expect(result.total).toBe(4);
+    });
+
+    test('round returns nearest: round(10/3) = 3', () => {
+      const ast = parse('round(10/3)');
+      const result = evaluate(ast, createMockRng([]));
+
+      expect(result.total).toBe(3);
+    });
+
+    test('round uses half-up: round(2.5) = 3', () => {
+      const ast = parse('round(2.5)');
+      const result = evaluate(ast, createMockRng([]));
+
+      expect(result.total).toBe(3);
+    });
+
+    test('abs of negative literal: abs(-5)', () => {
+      const ast = parse('abs(-5)');
+      const result = evaluate(ast, createMockRng([]));
+
+      expect(result.total).toBe(5);
+    });
+
+    test('abs of dice expression: abs(1d4-5) with roll=1', () => {
+      const ast = parse('abs(1d4-5)');
+      const result = evaluate(ast, createMockRng([1]));
+
+      expect(result.total).toBe(4);
+      expect(result.rolls).toHaveLength(1);
+    });
+
+    test('floor with dice: floor(1d6/3) with roll=5', () => {
+      const ast = parse('floor(1d6/3)');
+      const result = evaluate(ast, createMockRng([5]));
+
+      expect(result.total).toBe(1);
+      expect(result.rolls).toHaveLength(1);
+      expect(getDie(result.rolls, 0).result).toBe(5);
+    });
+
+    test('max returns higher: max(1d6, 1d8) with rolls=[3, 7]', () => {
+      const ast = parse('max(1d6, 1d8)');
+      const result = evaluate(ast, createMockRng([3, 7]));
+
+      expect(result.total).toBe(7);
+      expect(result.rolls).toHaveLength(2);
+    });
+
+    test('min returns lower: min(10, 1d20+5) with roll=3', () => {
+      const ast = parse('min(10, 1d20+5)');
+      const result = evaluate(ast, createMockRng([3]));
+
+      expect(result.total).toBe(8);
+      expect(result.rolls).toHaveLength(1);
+    });
+
+    test('max variadic 3 args: max(1, 2, 3)', () => {
+      const ast = parse('max(1, 2, 3)');
+      const result = evaluate(ast, createMockRng([]));
+
+      expect(result.total).toBe(3);
+    });
+
+    test('nested functions: floor(floor(10/3)/2)', () => {
+      const ast = parse('floor(floor(10/3)/2)');
+      const result = evaluate(ast, createMockRng([]));
+
+      expect(result.total).toBe(1);
+    });
+
+    test('nested with dice: floor(max(1d6, 1d8)) with rolls=[3, 7]', () => {
+      const ast = parse('floor(max(1d6, 1d8))');
+      const result = evaluate(ast, createMockRng([3, 7]));
+
+      expect(result.total).toBe(7);
+      expect(result.rolls).toHaveLength(2);
+    });
+
+    test('rendered output shows dice inside function: floor(1d6/3)', () => {
+      const ast = parse('floor(1d6/3)');
+      const result = evaluate(ast, createMockRng([5]));
+
+      expect(result.rendered).toBe('floor(1d6[5] / 3) = 1');
+      expect(result.expression).toBe('floor(1d6 / 3)');
+    });
+
+    test('rendered output shows both dice in max: max(1d6, 1d8)', () => {
+      const ast = parse('max(1d6, 1d8)');
+      const result = evaluate(ast, createMockRng([3, 7]));
+
+      expect(result.rendered).toBe('max(1d6[3], 1d8[7]) = 7');
+    });
+
+    test('function in arithmetic: 2*floor(1d6/2) with roll=5', () => {
+      const ast = parse('2*floor(1d6/2)');
+      const result = evaluate(ast, createMockRng([5]));
+
+      expect(result.total).toBe(4);
+    });
+
+    test('evaluator throws UNKNOWN_FUNCTION for unregistered name (defensive)', () => {
+      // Build an AST directly — bypass the parser so we can test the defensive branch.
+      const ast = {
+        type: 'FunctionCall' as const,
+        name: 'sqrt',
+        args: [{ type: 'Literal' as const, value: 4 }],
+      };
+      expect(() => evaluate(ast, createMockRng([]))).toThrow(EvaluatorError);
+      try {
+        evaluate(ast, createMockRng([]));
+      } catch (err) {
+        expect((err as EvaluatorError).code).toBe('UNKNOWN_FUNCTION');
+      }
+    });
+  });
 });

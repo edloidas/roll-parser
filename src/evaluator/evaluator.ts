@@ -12,6 +12,7 @@ import type {
   DiceNode,
   ExplodeNode,
   FateDiceNode,
+  FunctionCallNode,
   ModifierNode,
   RerollNode,
   SuccessCountNode,
@@ -201,6 +202,9 @@ function evalNode(node: ASTNode, rng: RNG, ctx: EvalContext, env: EvalEnv): numb
     case 'Versus':
       return evalVersus(node, rng, ctx, env);
 
+    case 'FunctionCall':
+      return evalFunctionCall(node, rng, ctx, env);
+
     default: {
       const exhaustive: never = node;
       throw new EvaluatorError(
@@ -361,6 +365,67 @@ function evalUnaryOp(node: UnaryOpNode, rng: RNG, ctx: EvalContext, env: EvalEnv
   ctx.renderedParts.push(`-${innerRendered}`);
 
   return -value;
+}
+
+function evalFunctionCall(
+  node: FunctionCallNode,
+  rng: RNG,
+  ctx: EvalContext,
+  env: EvalEnv,
+): number {
+  const argCtxs: EvalContext[] = [];
+  const values: number[] = [];
+
+  for (const arg of node.args) {
+    const argCtx: EvalContext = { rolls: [], expressionParts: [], renderedParts: [] };
+    values.push(evalNode(arg, rng, argCtx, env));
+    argCtxs.push(argCtx);
+  }
+
+  for (const argCtx of argCtxs) {
+    ctx.rolls.push(...argCtx.rolls);
+  }
+
+  const argExprs = argCtxs.map((c) => c.expressionParts.join(''));
+  const argRendereds = argCtxs.map((c) => c.renderedParts.join(''));
+
+  ctx.expressionParts.push(`${node.name}(${argExprs.join(', ')})`);
+  ctx.renderedParts.push(`${node.name}(${argRendereds.join(', ')})`);
+
+  return applyFunction(node.name, values);
+}
+
+function applyFunction(name: string, values: number[]): number {
+  switch (name) {
+    case 'floor':
+      return Math.floor(requireUnaryArg(name, values));
+    case 'ceil':
+      return Math.ceil(requireUnaryArg(name, values));
+    case 'round':
+      return Math.round(requireUnaryArg(name, values));
+    case 'abs':
+      return Math.abs(requireUnaryArg(name, values));
+    case 'max':
+      return Math.max(...values);
+    case 'min':
+      return Math.min(...values);
+    default:
+      throw new EvaluatorError(`Unknown function: ${name}`, 'UNKNOWN_FUNCTION', 'FunctionCall');
+  }
+}
+
+function requireUnaryArg(name: string, values: number[]): number {
+  const [x] = values;
+  if (x === undefined) {
+    // ? Unreachable: parser validates arity before evaluation. Defensive for
+    // `noNonNullAssertion`.
+    throw new EvaluatorError(
+      `Function '${name}' requires an argument`,
+      'UNKNOWN_FUNCTION',
+      'FunctionCall',
+    );
+  }
+  return x;
 }
 
 /**

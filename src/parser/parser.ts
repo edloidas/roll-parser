@@ -15,6 +15,7 @@ import type {
   DiceNode,
   ExplodeNode,
   FateDiceNode,
+  FunctionCallNode,
   LiteralNode,
   ModifierNode,
   RerollNode,
@@ -73,6 +74,19 @@ const BP = {
   DICE_LEFT: 40,
   DICE_RIGHT: 41,
 } as const;
+
+/**
+ * Arity table for math functions. `min` and `max` are inclusive.
+ * `POSITIVE_INFINITY` means unbounded (variadic).
+ */
+const FUNCTION_ARITY: Record<string, { min: number; max: number }> = {
+  floor: { min: 1, max: 1 },
+  ceil: { min: 1, max: 1 },
+  round: { min: 1, max: 1 },
+  abs: { min: 1, max: 1 },
+  max: { min: 2, max: Number.POSITIVE_INFINITY },
+  min: { min: 2, max: Number.POSITIVE_INFINITY },
+};
 
 /**
  * Pratt parser for dice notation.
@@ -156,6 +170,9 @@ export class Parser {
 
       case TokenType.LPAREN:
         return this.parseGrouped();
+
+      case TokenType.FUNCTION:
+        return this.parseFunctionCall(token);
 
       case TokenType.EOF:
         throw new ParseError('Unexpected end of input', 'UNEXPECTED_END', token.position);
@@ -306,6 +323,54 @@ export class Parser {
     const expr = this.parseExpression(0);
     this.expect(TokenType.RPAREN);
     return expr;
+  }
+
+  private parseFunctionCall(token: Token): FunctionCallNode {
+    // `FUNCTION` has BP = -1 so callers stop here; `COMMA` and `RPAREN` also
+    // terminate inner `parseExpression(0)` calls, so argument boundaries are
+    // natural.
+    this.expect(TokenType.LPAREN);
+
+    const args: ASTNode[] = [];
+    if (this.peek().type !== TokenType.RPAREN) {
+      args.push(this.parseExpression(0));
+      while (this.peek().type === TokenType.COMMA) {
+        this.advance();
+        args.push(this.parseExpression(0));
+      }
+    }
+
+    this.expect(TokenType.RPAREN);
+
+    const arity = FUNCTION_ARITY[token.value];
+    if (arity === undefined) {
+      // ? Unreachable in practice: lexer only emits FUNCTION for registered
+      // names. Kept defensive to keep parser/evaluator error-code contract
+      // symmetrical.
+      throw new ParseError(
+        `Unknown function '${token.value}'`,
+        'UNKNOWN_FUNCTION',
+        token.position,
+        token,
+      );
+    }
+
+    if (args.length < arity.min || args.length > arity.max) {
+      const expected =
+        arity.max === Number.POSITIVE_INFINITY
+          ? `at least ${arity.min}`
+          : arity.min === arity.max
+            ? `${arity.min}`
+            : `${arity.min}–${arity.max}`;
+      throw new ParseError(
+        `Function '${token.value}' expects ${expected} argument${arity.min === 1 && arity.max === 1 ? '' : 's'}, got ${args.length}`,
+        'INVALID_FUNCTION_ARITY',
+        token.position,
+        token,
+      );
+    }
+
+    return { type: 'FunctionCall', name: token.value, args };
   }
 
   private parseBinaryOp(left: ASTNode, token: Token): BinaryOpNode {
