@@ -15,7 +15,8 @@ Generate a `## [<version>] - <YYYY-MM-DD>` section in `CHANGELOG.md` by summariz
 ## Procedure
 
 1. Run `git log <base>..HEAD --pretty='%h %s%n%b' --no-merges` and read every entry.
-2. Parse Conventional Commit types and map to Keep a Changelog sections:
+2. **Honor the `Changelog:` opt-out trailer.** For each commit, scan the body for a line matching `^Changelog:\s*(skip|none|no|false)\s*$` (case-insensitive). If present, drop the commit entirely — do not emit a bullet. Log each skipped commit hash + subject in your working output so the maintainer can verify intent. This overrides everything else in the mapping below; even a `feat:` or breaking change is suppressed when explicitly opted out.
+3. Parse Conventional Commit types and map to Keep a Changelog sections:
    - `feat:` → **Added**
    - `fix:` → **Fixed**
    - `perf:` → **Changed** (prefix the bullet with "performance:")
@@ -23,11 +24,11 @@ Generate a `## [<version>] - <YYYY-MM-DD>` section in `CHANGELOG.md` by summariz
    - `docs:` → **Documentation**
    - `build:` / `ci:` / `chore:` / `style:` / `test:` → skip unless user-visible
    - `BREAKING CHANGE:` body or `!` marker → **Changed** with a leading **BREAKING:** label
-3. For each commit, produce one bullet in present tense, user-facing voice (not "add X" — "X support", "Support for X"). Group bullets by section in this order: Added, Changed, Deprecated, Removed, Fixed, Security, Documentation.
-4. When a commit title ends in ` #NN`, render the reference as ` ([#NN](https://github.com/edloidas/roll-parser/issues/NN))` at the end of the bullet.
-5. Insert the new section **above** the most recent version section but **below** `## [Unreleased]`. Keep `## [Unreleased]` empty (or with pending entries only).
-6. Update the `[Unreleased]` link footer to `.../compare/v<version>...HEAD`.
-7. Append a new link footer: `[<version>]: https://github.com/edloidas/roll-parser/releases/tag/v<version>`.
+4. For each commit, produce one bullet in present tense, user-facing voice (not "add X" — "X support", "Support for X"). Group bullets by section in this order: Added, Changed, Deprecated, Removed, Fixed, Security, Documentation.
+5. When a commit title ends in ` #NN`, render the reference as ` ([#NN](https://github.com/edloidas/roll-parser/issues/NN))` at the end of the bullet.
+6. Insert the new section **above** the most recent version section but **below** `## [Unreleased]`. Keep `## [Unreleased]` empty (or with pending entries only).
+7. Update the `[Unreleased]` link footer to `.../compare/v<version>...HEAD`.
+8. Append a new link footer: `[<version>]: https://github.com/edloidas/roll-parser/releases/tag/v<version>`.
 
 ## Don'ts
 

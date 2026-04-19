@@ -26,6 +26,7 @@ Types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `perf`, `bui
 - Include issue number when related: `feat: add parser #5`
 - `Co-Authored-By:` trailer only, no promotional lines
 - Optional body: past tense, one line per change, backticks for code refs
+- Use `Changelog: skip` body trailer to exclude a commit from release notes (honored by the `release-changelog` skill)
 - PRs should contain a single commit on merge; squash locally and force-push before merging unless the PR combines work from several tasks
 
 ### Issues
