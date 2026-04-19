@@ -13,6 +13,7 @@ import type {
   ASTNode,
   BinaryOpNode,
   DiceNode,
+  FateDiceNode,
   LiteralNode,
   ModifierNode,
   UnaryOpNode,
@@ -141,6 +142,9 @@ export class Parser {
       case TokenType.DICE_PERCENT:
         return this.parsePrefixDicePercent();
 
+      case TokenType.DICE_FATE:
+        return this.parsePrefixFateDice();
+
       case TokenType.LPAREN:
         return this.parseGrouped();
 
@@ -168,6 +172,9 @@ export class Parser {
 
       case TokenType.DICE_PERCENT:
         return this.parseInfixDicePercent(left);
+
+      case TokenType.DICE_FATE:
+        return this.parseInfixFateDice(left);
 
       case TokenType.PLUS:
       case TokenType.MINUS:
@@ -246,6 +253,24 @@ export class Parser {
       type: 'Dice',
       count: left,
       sides: { type: 'Literal', value: 100 },
+    };
+  }
+
+  private parsePrefixFateDice(): FateDiceNode {
+    // dF → FateDice(1)
+    return {
+      type: 'FateDice',
+      count: { type: 'Literal', value: 1 },
+    };
+  }
+
+  private parseInfixFateDice(left: ASTNode): FateDiceNode {
+    // 4dF → FateDice(4). Unlike parseInfixDice, there is no sides sub-parse,
+    // so modifiers (`kh`, `dl`, …) naturally bind at the outer Pratt loop
+    // without BP competition against a right-operand.
+    return {
+      type: 'FateDice',
+      count: left,
     };
   }
 
@@ -388,6 +413,7 @@ export class Parser {
         return BP.POW_LEFT;
       case TokenType.DICE:
       case TokenType.DICE_PERCENT:
+      case TokenType.DICE_FATE:
         return BP.DICE_LEFT;
       case TokenType.KEEP_HIGH:
       case TokenType.KEEP_LOW:

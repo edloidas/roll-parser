@@ -17,6 +17,7 @@ export type {
   ASTNode,
   BinaryOpNode,
   DiceNode,
+  FateDiceNode,
   LiteralNode,
   ModifierNode,
   UnaryOpNode,
@@ -24,6 +25,7 @@ export type {
 export {
   isBinaryOp,
   isDice,
+  isFateDice,
   isLiteral,
   isModifier,
   isUnaryOp,

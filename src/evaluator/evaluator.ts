@@ -6,7 +6,14 @@
 
 import type { RollParserErrorCode } from '../errors';
 import { RollParserError } from '../errors';
-import type { ASTNode, BinaryOpNode, DiceNode, ModifierNode, UnaryOpNode } from '../parser/ast';
+import type {
+  ASTNode,
+  BinaryOpNode,
+  DiceNode,
+  FateDiceNode,
+  ModifierNode,
+  UnaryOpNode,
+} from '../parser/ast';
 import { isModifier } from '../parser/ast';
 import type { RNG } from '../rng/types';
 import type { DieResult, EvaluateOptions, RollResult } from '../types';
@@ -76,6 +83,20 @@ function createDieResult(sides: number, result: number): DieResult {
 }
 
 /**
+ * Creates a Fate/Fudge die result. Uses `sides = 0` as a sentinel — Fate dice
+ * have no max-face concept, so `critical` and `fumble` are always `false`.
+ */
+function createFateDieResult(result: number): DieResult {
+  return {
+    sides: 0,
+    result,
+    modifiers: [],
+    critical: false,
+    fumble: false,
+  };
+}
+
+/**
  * Renders dice results for display (e.g., "[3, 5, 2]" or "[~~3~~, 5, ~~2~~]").
  */
 function renderDice(dice: DieResult[]): string {
@@ -98,6 +119,9 @@ function evalNode(node: ASTNode, rng: RNG, ctx: EvalContext, env: EvalEnv): numb
 
     case 'Dice':
       return evalDice(node, rng, ctx, env);
+
+    case 'FateDice':
+      return evalFateDice(node, rng, ctx, env);
 
     case 'BinaryOp':
       return evalBinaryOp(node, rng, ctx, env);
@@ -166,6 +190,45 @@ function evalDice(node: DiceNode, rng: RNG, ctx: EvalContext, env: EvalEnv): num
 
   const total = sumKeptDice(markedDice);
   const notation = `${count}d${sides}`;
+
+  ctx.expressionParts.push(notation);
+  ctx.renderedParts.push(`${notation}${renderDice(markedDice)}`);
+
+  return total;
+}
+
+function evalFateDice(node: FateDiceNode, rng: RNG, ctx: EvalContext, env: EvalEnv): number {
+  const count = evalNode(
+    node.count,
+    rng,
+    { rolls: [], expressionParts: [], renderedParts: [] },
+    env,
+  );
+
+  if (!Number.isInteger(count) || count < 0) {
+    throw new EvaluatorError(`Invalid dice count: ${count}`, 'INVALID_DICE_COUNT', 'FateDice');
+  }
+
+  if (env.totalDiceRolled + count > env.maxDice) {
+    throw new EvaluatorError(
+      `Total dice count ${env.totalDiceRolled + count} exceeds limit of ${env.maxDice}`,
+      'DICE_LIMIT_EXCEEDED',
+      'FateDice',
+    );
+  }
+  env.totalDiceRolled += count;
+
+  const dice: DieResult[] = [];
+  for (let i = 0; i < count; i++) {
+    const result = rng.nextInt(-1, 1);
+    dice.push(createFateDieResult(result));
+  }
+
+  const markedDice = markAllKept(dice);
+  ctx.rolls.push(...markedDice);
+
+  const total = sumKeptDice(markedDice);
+  const notation = `${count}dF`;
 
   ctx.expressionParts.push(notation);
   ctx.renderedParts.push(`${notation}${renderDice(markedDice)}`);

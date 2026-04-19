@@ -134,6 +134,156 @@ describe('evaluate', () => {
     });
   });
 
+  describe('fate dice (dF)', () => {
+    test('dF rolls a single fate die', () => {
+      const ast = parse('dF');
+      const rng = createMockRng([-1]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(-1);
+      expect(result.rolls).toHaveLength(1);
+      const die = getDie(result.rolls, 0);
+      expect(die.sides).toBe(0);
+      expect(die.result).toBe(-1);
+      expect(die.critical).toBe(false);
+      expect(die.fumble).toBe(false);
+      expect(die.modifiers).toEqual(['kept']);
+    });
+
+    test('dF with zero result produces exact 0 total', () => {
+      const ast = parse('dF');
+      const rng = createMockRng([0]);
+      const result = evaluate(ast, rng);
+
+      expect(Object.is(result.total, 0)).toBe(true);
+    });
+
+    test('dF with +1 is not flagged as fumble', () => {
+      const ast = parse('dF');
+      const rng = createMockRng([1]);
+      const result = evaluate(ast, rng);
+
+      expect(getDie(result.rolls, 0).fumble).toBe(false);
+      expect(getDie(result.rolls, 0).critical).toBe(false);
+    });
+
+    test('4dF sums all four fate results', () => {
+      const ast = parse('4dF');
+      const rng = createMockRng([-1, 0, 1, 1]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(1);
+      expect(result.rolls).toHaveLength(4);
+      for (const die of result.rolls) {
+        expect(die.sides).toBe(0);
+      }
+    });
+
+    test('expression is canonical "1dF" / "4dF" (not d0)', () => {
+      const single = evaluate(parse('dF'), createMockRng([0]));
+      const four = evaluate(parse('4dF'), createMockRng([0, 0, 0, 0]));
+
+      expect(single.expression).toBe('1dF');
+      expect(four.expression).toBe('4dF');
+    });
+
+    test('rendered shows negative values', () => {
+      const ast = parse('4dF');
+      const rng = createMockRng([-1, 0, 1, 1]);
+      const result = evaluate(ast, rng);
+
+      expect(result.rendered).toBe('4dF[-1, 0, 1, 1] = 1');
+    });
+
+    test('4dFkh2 keeps the two highest fate results', () => {
+      const ast = parse('4dFkh2');
+      const rng = createMockRng([-1, 0, 1, 1]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(2);
+      const dropped = result.rolls.filter((d) => d.modifiers.includes('dropped'));
+      expect(dropped).toHaveLength(2);
+      expect(dropped.map((d) => d.result).sort()).toEqual([-1, 0]);
+    });
+
+    test('4dFdl1 drops the lowest fate result', () => {
+      const ast = parse('4dFdl1');
+      const rng = createMockRng([-1, 0, 1, 1]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(2);
+      const dropped = result.rolls.filter((d) => d.modifiers.includes('dropped'));
+      expect(dropped).toHaveLength(1);
+      expect(dropped[0]?.result).toBe(-1);
+    });
+
+    test('0dF produces total 0 and no rolls', () => {
+      const ast = parse('0dF');
+      const rng = createMockRng([]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(0);
+      expect(result.rolls).toHaveLength(0);
+    });
+
+    test('dF+5 adds modifier to fate result', () => {
+      const ast = parse('dF+5');
+      const rng = createMockRng([0]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(5);
+    });
+
+    test('-dF negates the fate result', () => {
+      const ast = parse('-dF');
+      const rng = createMockRng([1]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(-1);
+    });
+
+    test('(-1)dF throws INVALID_DICE_COUNT', () => {
+      const ast = parse('(-1)dF');
+      const rng = createMockRng([]);
+
+      expect(() => evaluate(ast, rng)).toThrow(EvaluatorError);
+      try {
+        evaluate(ast, rng);
+      } catch (err) {
+        expect(err).toBeInstanceOf(EvaluatorError);
+        if (err instanceof EvaluatorError) {
+          expect(err.code).toBe('INVALID_DICE_COUNT');
+          expect(err.nodeType).toBe('FateDice');
+        }
+      }
+    });
+
+    test('5dF with maxDice=4 throws DICE_LIMIT_EXCEEDED', () => {
+      const ast = parse('5dF');
+      const rng = createMockRng([0, 0, 0, 0, 0]);
+
+      try {
+        evaluate(ast, rng, { maxDice: 4 });
+        throw new Error('expected DICE_LIMIT_EXCEEDED');
+      } catch (err) {
+        expect(err).toBeInstanceOf(EvaluatorError);
+        if (err instanceof EvaluatorError) {
+          expect(err.code).toBe('DICE_LIMIT_EXCEEDED');
+          expect(err.nodeType).toBe('FateDice');
+        }
+      }
+    });
+
+    test('(2+2)dF evaluates count expression', () => {
+      const ast = parse('(2+2)dF');
+      const rng = createMockRng([1, 1, 1, 1]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(4);
+      expect(result.rolls).toHaveLength(4);
+    });
+  });
+
   describe('arithmetic operations', () => {
     test('addition', () => {
       const ast = parse('1d6 + 3');
