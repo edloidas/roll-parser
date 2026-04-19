@@ -10,13 +10,21 @@ import type {
   ASTNode,
   BinaryOpNode,
   DiceNode,
+  ExplodeNode,
   FateDiceNode,
   ModifierNode,
   UnaryOpNode,
 } from '../parser/ast';
 import { isModifier } from '../parser/ast';
 import type { RNG } from '../rng/types';
-import type { DieResult, EvaluateOptions, RollResult } from '../types';
+import type { ComparePoint, DieResult, EvaluateOptions, RollResult } from '../types';
+import {
+  applyCompoundExplode,
+  applyPenetratingExplode,
+  applyStandardExplode,
+  buildShouldExplode,
+  DEFAULT_MAX_EXPLODE_ITERATIONS,
+} from './modifiers/explode';
 import {
   applyDropHighest,
   applyDropLowest,
@@ -42,11 +50,17 @@ export class EvaluatorError extends RollParserError {
 /** Default maximum total dice allowed per evaluation. */
 export const DEFAULT_MAX_DICE = 10_000;
 
+export { DEFAULT_MAX_EXPLODE_ITERATIONS };
+
 /**
  * Per-evaluation shared environment (created once, shared across all branches).
+ *
+ * Exported for use by modifier implementations under `./modifiers/*`. Not part
+ * of the public library API.
  */
-type EvalEnv = {
+export type EvalEnv = {
   readonly maxDice: number;
+  readonly maxExplodeIterations: number;
   totalDiceRolled: number;
 };
 
@@ -131,6 +145,9 @@ function evalNode(node: ASTNode, rng: RNG, ctx: EvalContext, env: EvalEnv): numb
 
     case 'Modifier':
       return evalModifier(node, rng, ctx, env);
+
+    case 'Explode':
+      return evalExplode(node, rng, ctx, env);
 
     default: {
       const exhaustive: never = node;
@@ -373,6 +390,58 @@ function mergeDropSets(baseDice: DieResult[], specs: ModifierSpec[]): DieResult[
   }));
 }
 
+/**
+ * Builds the notation string for an explode modifier, e.g. `!`, `!!>=3`, `!p>5`.
+ */
+function formatExplodeCode(
+  variant: ExplodeNode['variant'],
+  threshold: ComparePoint | undefined,
+  thresholdValue: number | undefined,
+): string {
+  const marker = variant === 'standard' ? '!' : variant === 'compound' ? '!!' : '!p';
+  if (threshold == null || thresholdValue == null) return marker;
+  return `${marker}${threshold.operator}${thresholdValue}`;
+}
+
+function evalExplode(node: ExplodeNode, rng: RNG, ctx: EvalContext, env: EvalEnv): number {
+  const targetCtx: EvalContext = { rolls: [], expressionParts: [], renderedParts: [] };
+  const targetValue = evalNode(node.target, rng, targetCtx, env);
+  const targetExpr = targetCtx.expressionParts.join('');
+
+  let thresholdValue: number | undefined;
+  if (node.threshold != null) {
+    const thresholdCtx: EvalContext = { rolls: [], expressionParts: [], renderedParts: [] };
+    thresholdValue = evalNode(node.threshold.value, rng, thresholdCtx, env);
+  }
+
+  const code = formatExplodeCode(node.variant, node.threshold, thresholdValue);
+
+  // No-op when the target produced no dice (e.g., `(1+2)!`).
+  if (targetCtx.rolls.length === 0) {
+    ctx.expressionParts.push(`${targetExpr}${code}`);
+    ctx.renderedParts.push(`${targetExpr}${code}`);
+    return targetValue;
+  }
+
+  const shouldExplode = buildShouldExplode(node.threshold?.operator, thresholdValue);
+
+  const expanded =
+    node.variant === 'standard'
+      ? applyStandardExplode(targetCtx.rolls, shouldExplode, rng, env)
+      : node.variant === 'compound'
+        ? applyCompoundExplode(targetCtx.rolls, shouldExplode, rng, env)
+        : applyPenetratingExplode(targetCtx.rolls, shouldExplode, rng, env);
+
+  ctx.rolls.push(...expanded);
+  ctx.expressionParts.push(`${targetExpr}${code}`);
+  // ? Include the explode code in rendered output so readers can attribute
+  //   the extra dice. Modifier rendering (kh/dl) skips its code because
+  //   dropped dice are visible; explosion-origin is otherwise invisible.
+  ctx.renderedParts.push(`${targetExpr}${code}${renderDice(expanded)}`);
+
+  return sumKeptDice(expanded);
+}
+
 function evalModifier(node: ModifierNode, rng: RNG, ctx: EvalContext, env: EvalEnv): number {
   const { specs, baseTarget } = flattenModifierChain(node, rng, env);
 
@@ -416,7 +485,14 @@ export function evaluate(ast: ASTNode, rng: RNG, options: EvaluateOptions = {}):
       ? Math.floor(options.maxDice)
       : DEFAULT_MAX_DICE;
 
-  const env: EvalEnv = { maxDice, totalDiceRolled: 0 };
+  const maxExplodeIterations =
+    options.maxExplodeIterations != null &&
+    Number.isFinite(options.maxExplodeIterations) &&
+    options.maxExplodeIterations >= 0
+      ? Math.floor(options.maxExplodeIterations)
+      : DEFAULT_MAX_EXPLODE_ITERATIONS;
+
+  const env: EvalEnv = { maxDice, maxExplodeIterations, totalDiceRolled: 0 };
   const ctx: EvalContext = {
     rolls: [],
     expressionParts: [],

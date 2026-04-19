@@ -4,6 +4,8 @@
  * @module parser/ast
  */
 
+import type { ComparePoint } from '../types';
+
 /**
  * Numeric literal node.
  */
@@ -63,6 +65,18 @@ export type ModifierNode = {
 };
 
 /**
+ * Exploding dice node (`!`, `!!`, `!p`, `!>Y`).
+ * Wraps a dice expression with a standard, compounding, or penetrating
+ * explosion. An absent `threshold` means "explode on the die's maximum face".
+ */
+export type ExplodeNode = {
+  type: 'Explode';
+  variant: 'standard' | 'compound' | 'penetrating';
+  threshold?: ComparePoint;
+  target: ASTNode;
+};
+
+/**
  * Union type of all AST nodes.
  */
 export type ASTNode =
@@ -71,7 +85,8 @@ export type ASTNode =
   | FateDiceNode
   | BinaryOpNode
   | UnaryOpNode
-  | ModifierNode;
+  | ModifierNode
+  | ExplodeNode;
 
 /**
  * Type guard for LiteralNode.
@@ -113,4 +128,11 @@ export function isUnaryOp(node: ASTNode): node is UnaryOpNode {
  */
 export function isModifier(node: ASTNode): node is ModifierNode {
   return node.type === 'Modifier';
+}
+
+/**
+ * Type guard for ExplodeNode.
+ */
+export function isExplode(node: ASTNode): node is ExplodeNode {
+  return node.type === 'Explode';
 }

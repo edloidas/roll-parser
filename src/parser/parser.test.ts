@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'bun:test';
 import { parse, ParseError, Parser } from './parser';
 import { lex } from '../lexer/lexer';
+import type { ComparePoint } from '../types';
 import type {
   ASTNode,
   BinaryOpNode,
   DiceNode,
+  ExplodeNode,
   FateDiceNode,
   LiteralNode,
   ModifierNode,
@@ -40,6 +42,20 @@ function modifier(
   target: ASTNode,
 ): ModifierNode {
   return { type: 'Modifier', modifier: mod, selector: sel, count, target };
+}
+
+function explode(
+  variant: ExplodeNode['variant'],
+  target: ASTNode,
+  threshold?: ComparePoint,
+): ExplodeNode {
+  const node: ExplodeNode = { type: 'Explode', variant, target };
+  if (threshold) node.threshold = threshold;
+  return node;
+}
+
+function cp(operator: ComparePoint['operator'], value: ASTNode): ComparePoint {
+  return { operator, value };
 }
 
 describe('Parser', () => {
@@ -554,6 +570,121 @@ describe('Parser', () => {
       const ast = parser.parse();
 
       expect(ast).toEqual(dice(literal(2), literal(6)));
+    });
+  });
+
+  describe('exploding dice', () => {
+    it('should parse standard explode: 1d6!', () => {
+      expect(parse('1d6!')).toEqual(explode('standard', dice(literal(1), literal(6))));
+    });
+
+    it('should parse compound explode: 1d6!!', () => {
+      expect(parse('1d6!!')).toEqual(explode('compound', dice(literal(1), literal(6))));
+    });
+
+    it('should parse penetrating explode: 1d6!p', () => {
+      expect(parse('1d6!p')).toEqual(explode('penetrating', dice(literal(1), literal(6))));
+    });
+
+    it('should parse explode with greater-than threshold: 1d6!>5', () => {
+      expect(parse('1d6!>5')).toEqual(
+        explode('standard', dice(literal(1), literal(6)), cp('>', literal(5))),
+      );
+    });
+
+    it('should parse compound explode with greater-equal threshold: 1d6!!>=3', () => {
+      expect(parse('1d6!!>=3')).toEqual(
+        explode('compound', dice(literal(1), literal(6)), cp('>=', literal(3))),
+      );
+    });
+
+    it('should parse penetrating explode with threshold: 1d6!p>3', () => {
+      expect(parse('1d6!p>3')).toEqual(
+        explode('penetrating', dice(literal(1), literal(6)), cp('>', literal(3))),
+      );
+    });
+
+    it('should parse explode with equals threshold: 1d6!=6', () => {
+      expect(parse('1d6!=6')).toEqual(
+        explode('standard', dice(literal(1), literal(6)), cp('=', literal(6))),
+      );
+    });
+
+    it('should parse explode with less-than threshold: 1d6!<2', () => {
+      expect(parse('1d6!<2')).toEqual(
+        explode('standard', dice(literal(1), literal(6)), cp('<', literal(2))),
+      );
+    });
+
+    it('should reject nested explode (1d6!!!): compound then standard', () => {
+      // Lexer maximal-munch: `!!!` → EXPLODE_COMPOUND + EXPLODE. The second
+      // EXPLODE targets an ExplodeNode, which parseExplode rejects.
+      expect(() => parse('1d6!!!')).toThrow(ParseError);
+      try {
+        parse('1d6!!!');
+      } catch (err) {
+        expect((err as ParseError).code).toBe('INVALID_EXPLODE_TARGET');
+      }
+    });
+
+    it('should parse explode-then-keep: 4d6!kh3', () => {
+      expect(parse('4d6!kh3')).toEqual(
+        modifier('keep', 'highest', literal(3), explode('standard', dice(literal(4), literal(6)))),
+      );
+    });
+
+    it('should parse keep-then-explode: 4d6kh3!', () => {
+      expect(parse('4d6kh3!')).toEqual(
+        explode('standard', modifier('keep', 'highest', literal(3), dice(literal(4), literal(6)))),
+      );
+    });
+
+    it('should parse explode and keep inside binary op: 4d6!kh3+5', () => {
+      expect(parse('4d6!kh3+5')).toEqual(
+        binary(
+          '+',
+          modifier(
+            'keep',
+            'highest',
+            literal(3),
+            explode('standard', dice(literal(4), literal(6))),
+          ),
+          literal(5),
+        ),
+      );
+    });
+
+    it('should parse prefix-dice explode: d6!', () => {
+      expect(parse('d6!')).toEqual(explode('standard', dice(literal(1), literal(6))));
+    });
+
+    it('should parse percentile explode: 1d%!', () => {
+      expect(parse('1d%!')).toEqual(explode('standard', dice(literal(1), literal(100))));
+    });
+
+    it('should parse explode with computed threshold: 1d6!>(1+2)', () => {
+      expect(parse('1d6!>(1+2)')).toEqual(
+        explode(
+          'standard',
+          dice(literal(1), literal(6)),
+          cp('>', binary('+', literal(1), literal(2))),
+        ),
+      );
+    });
+
+    it('should parse explode on grouped expression: (1+2)!', () => {
+      expect(parse('(1+2)!')).toEqual(explode('standard', binary('+', literal(1), literal(2))));
+    });
+
+    it('should parse d6!d20 as computed dice count (exploded d6 becomes count)', () => {
+      // `d6!d20` = Dice(count=Explode(Dice(1,6)), sides=20) — an exploded
+      // d6 supplies the count for the outer d20. Unusual, but a legal
+      // consequence of the Pratt precedence: EXPLODE (BP.MODIFIER=35) binds
+      // to `d6` first, then the second DICE token (BP.DICE_LEFT=40) binds
+      // to the result as infix dice.
+      expect(parse('d6!d20')).toEqual(
+        dice(explode('standard', dice(literal(1), literal(6))), literal(20)),
+      );
     });
   });
 });

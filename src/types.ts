@@ -71,4 +71,6 @@ export type EvaluateOptions = {
   notation?: string;
   /** Maximum total dice allowed per evaluation (default: 10,000) */
   maxDice?: number;
+  /** Maximum explosion iterations allowed per die (default: 1,000) */
+  maxExplodeIterations?: number;
 };

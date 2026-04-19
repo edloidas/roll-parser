@@ -403,4 +403,50 @@ describe('roll() integration', () => {
       expect(result.total).toBe(6);
     });
   });
+
+  describe('exploding dice', () => {
+    test('standard explode via roll()', () => {
+      const result = roll('1d6!', { rng: createMockRng([6, 2]) });
+      expect(result.total).toBe(8);
+      expect(result.rolls).toHaveLength(2);
+      expect(result.notation).toBe('1d6!');
+    });
+
+    test('compound explode via roll()', () => {
+      const result = roll('1d6!!', { rng: createMockRng([6, 6, 3]) });
+      expect(result.total).toBe(15);
+      expect(result.rolls).toHaveLength(1);
+    });
+
+    test('penetrating explode via roll()', () => {
+      const result = roll('1d6!p', { rng: createMockRng([6, 3]) });
+      expect(result.total).toBe(8);
+    });
+
+    test('explode with threshold via roll()', () => {
+      const result = roll('1d6!>=5', { rng: createMockRng([5, 2]) });
+      expect(result.total).toBe(7);
+      expect(result.rolls).toHaveLength(2);
+    });
+
+    test('maxExplodeIterations threads through roll()', () => {
+      expect(() =>
+        roll('1d6!', { rng: createMockRng([6, 6, 6, 6]), maxExplodeIterations: 2 }),
+      ).toThrow(EvaluatorError);
+    });
+
+    test('seeded explode is reproducible', () => {
+      const r1 = roll('2d6!', { seed: 'explode-seed' });
+      const r2 = roll('2d6!', { seed: 'explode-seed' });
+      expect(r1.total).toBe(r2.total);
+      expect(r1.rolls.length).toBe(r2.rolls.length);
+    });
+
+    test('explode combined with keep highest', () => {
+      // 4d6!kh3 — RNG [6,3,1,4,2]: explode on the 6 → pool [6,2,3,1,4];
+      // kh3 keeps {6,4,3} = 13.
+      const result = roll('4d6!kh3', { rng: createMockRng([6, 3, 1, 4, 2]) });
+      expect(result.total).toBe(13);
+    });
+  });
 });
