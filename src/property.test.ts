@@ -390,4 +390,91 @@ describe('property-based invariants', () => {
       );
     });
   });
+
+  describe('exploding dice invariants', () => {
+    test('NdX! total is always >= N (never fewer kept dice than original count)', () => {
+      fc.assert(
+        fc.property(
+          fc.integer({ min: 1, max: 5 }),
+          fc.integer({ min: 2, max: 20 }),
+          (count, sides) => {
+            const result = roll(`${count}d${sides}!`);
+            // Minimum: every original die rolled 1 → total >= count.
+            return result.total >= count && result.rolls.length >= count;
+          },
+        ),
+        { numRuns: 200 },
+      );
+    });
+
+    test('original dice count is preserved (exploded + non-exploded partitioning)', () => {
+      fc.assert(
+        fc.property(
+          fc.string({ minLength: 1, maxLength: 12 }),
+          fc.integer({ min: 1, max: 3 }),
+          fc.integer({ min: 2, max: 8 }),
+          (seed, count, sides) => {
+            const result = roll(`${count}d${sides}!`, { seed });
+            const nonExploded = result.rolls.filter((d) => !d.modifiers.includes('exploded'));
+            // Every original die stays unmarked; explosions only add to the pool.
+            return (
+              nonExploded.length === count &&
+              result.rolls.every((d) => d.modifiers.includes('kept'))
+            );
+          },
+        ),
+        { numRuns: 100 },
+      );
+    });
+
+    test('compound explode pool size equals original count', () => {
+      fc.assert(
+        fc.property(
+          fc.string({ minLength: 1, maxLength: 12 }),
+          fc.integer({ min: 1, max: 5 }),
+          fc.integer({ min: 2, max: 10 }),
+          (seed, count, sides) => {
+            const result = roll(`${count}d${sides}!!`, { seed });
+            return result.rolls.length === count;
+          },
+        ),
+        { numRuns: 100 },
+      );
+    });
+
+    test('seeded explode is reproducible', () => {
+      fc.assert(
+        fc.property(
+          fc.string({ minLength: 1, maxLength: 20 }),
+          fc.integer({ min: 1, max: 5 }),
+          fc.integer({ min: 2, max: 12 }),
+          fc.constantFrom('!', '!!', '!p'),
+          (seed, count, sides, variant) => {
+            const r1 = roll(`${count}d${sides}${variant}`, { seed });
+            const r2 = roll(`${count}d${sides}${variant}`, { seed });
+            return r1.total === r2.total && r1.rolls.length === r2.rolls.length;
+          },
+        ),
+        { numRuns: 100 },
+      );
+    });
+
+    test('NdX! total >= NdX total for same seed (explosions only add value)', () => {
+      fc.assert(
+        fc.property(
+          fc.string({ minLength: 1, maxLength: 20 }),
+          fc.integer({ min: 1, max: 3 }),
+          fc.integer({ min: 4, max: 20 }),
+          (seed, count, sides) => {
+            const base = roll(`${count}d${sides}`, { seed });
+            const exploded = roll(`${count}d${sides}!`, { seed });
+            // Both runs roll the same first N dice from the seeded RNG, then
+            // `!` potentially adds more. So exploded.total >= base.total.
+            return exploded.total >= base.total;
+          },
+        ),
+        { numRuns: 100 },
+      );
+    });
+  });
 });

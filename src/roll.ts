@@ -21,6 +21,8 @@ export type RollOptions = {
   seed?: string | number;
   /** Maximum total dice allowed per evaluation (default: 10,000) */
   maxDice?: number;
+  /** Maximum explosion iterations allowed per die (default: 1,000) */
+  maxExplodeIterations?: number;
 };
 
 /**
@@ -52,5 +54,8 @@ export function roll(notation: string, options: RollOptions = {}): RollResult {
   const ast = new Parser(tokens).parse();
   const evalOptions: EvaluateOptions = { notation };
   if (options.maxDice != null) evalOptions.maxDice = options.maxDice;
+  if (options.maxExplodeIterations != null) {
+    evalOptions.maxExplodeIterations = options.maxExplodeIterations;
+  }
   return evaluate(ast, rng, evalOptions);
 }

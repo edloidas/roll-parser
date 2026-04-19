@@ -17,6 +17,7 @@ export type {
   ASTNode,
   BinaryOpNode,
   DiceNode,
+  ExplodeNode,
   FateDiceNode,
   LiteralNode,
   ModifierNode,
@@ -25,6 +26,7 @@ export type {
 export {
   isBinaryOp,
   isDice,
+  isExplode,
   isFateDice,
   isLiteral,
   isModifier,
@@ -36,7 +38,12 @@ export type { RNG } from './rng/types';
 export { SeededRNG } from './rng/seeded';
 
 // * Evaluator exports
-export { DEFAULT_MAX_DICE, evaluate, EvaluatorError } from './evaluator/evaluator';
+export {
+  DEFAULT_MAX_DICE,
+  DEFAULT_MAX_EXPLODE_ITERATIONS,
+  evaluate,
+  EvaluatorError,
+} from './evaluator/evaluator';
 export type {
   CompareOp,
   ComparePoint,

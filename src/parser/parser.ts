@@ -13,6 +13,7 @@ import type {
   ASTNode,
   BinaryOpNode,
   DiceNode,
+  ExplodeNode,
   FateDiceNode,
   LiteralNode,
   ModifierNode,
@@ -190,6 +191,11 @@ export class Parser {
       case TokenType.DROP_LOW:
         return this.parseModifier(left, token);
 
+      case TokenType.EXPLODE:
+      case TokenType.EXPLODE_COMPOUND:
+      case TokenType.EXPLODE_PENETRATING:
+        return this.parseExplode(left, token);
+
       default:
         throw new ParseError(
           `Unexpected infix token '${token.value}'`,
@@ -318,6 +324,32 @@ export class Parser {
     };
   }
 
+  private parseExplode(target: ASTNode, token: Token): ExplodeNode {
+    // ? Reject nested explodes (e.g., `1d6!!!`) — a second explode token atop
+    //   an ExplodeNode has no meaningful semantics and is rejected per spec.
+    if (target.type === 'Explode') {
+      throw new ParseError(
+        `Cannot chain explode modifiers`,
+        'INVALID_EXPLODE_TARGET',
+        token.position,
+        token,
+      );
+    }
+
+    const variant: ExplodeNode['variant'] =
+      token.type === TokenType.EXPLODE
+        ? 'standard'
+        : token.type === TokenType.EXPLODE_COMPOUND
+          ? 'compound'
+          : 'penetrating';
+
+    const node: ExplodeNode = { type: 'Explode', variant, target };
+    if (this.isComparePointAhead()) {
+      node.threshold = this.parseComparePoint();
+    }
+    return node;
+  }
+
   // * Compare point utilities
 
   /**
@@ -419,6 +451,9 @@ export class Parser {
       case TokenType.KEEP_LOW:
       case TokenType.DROP_HIGH:
       case TokenType.DROP_LOW:
+      case TokenType.EXPLODE:
+      case TokenType.EXPLODE_COMPOUND:
+      case TokenType.EXPLODE_PENETRATING:
         return BP.MODIFIER;
       case TokenType.RPAREN:
       case TokenType.EOF:

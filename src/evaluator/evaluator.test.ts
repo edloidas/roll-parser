@@ -832,4 +832,298 @@ describe('evaluate', () => {
       }
     });
   });
+
+  describe('exploding dice', () => {
+    describe('standard explode (!)', () => {
+      test('no explosion when roll does not match', () => {
+        const ast = parse('1d6!');
+        const rng = createMockRng([3]);
+        const result = evaluate(ast, rng);
+
+        expect(result.total).toBe(3);
+        expect(result.rolls).toHaveLength(1);
+        expect(getDie(result.rolls, 0).modifiers).toContain('kept');
+        expect(getDie(result.rolls, 0).modifiers).not.toContain('exploded');
+      });
+
+      test('one explosion appends new die', () => {
+        const ast = parse('1d6!');
+        const rng = createMockRng([6, 3]);
+        const result = evaluate(ast, rng);
+
+        expect(result.total).toBe(9);
+        expect(result.rolls).toHaveLength(2);
+        expect(getDie(result.rolls, 0).modifiers).not.toContain('exploded');
+        expect(getDie(result.rolls, 1).modifiers).toEqual(['exploded', 'kept']);
+      });
+
+      test('chained explosions keep appending', () => {
+        const ast = parse('1d6!');
+        const rng = createMockRng([6, 6, 2]);
+        const result = evaluate(ast, rng);
+
+        expect(result.total).toBe(14);
+        expect(result.rolls).toHaveLength(3);
+      });
+
+      test('multi-die pool explodes independently (explosion interleaved with originals)', () => {
+        // RNG [6, 3, 2]: initial pool [6, 3]. Die 0 (=6) explodes → 2.
+        // Final pool order: [6, 2, 3] — explosions appended right after their
+        // triggering die.
+        const ast = parse('2d6!');
+        const rng = createMockRng([6, 3, 2]);
+        const result = evaluate(ast, rng);
+
+        expect(result.total).toBe(11);
+        expect(result.rolls).toHaveLength(3);
+        expect(getDie(result.rolls, 0).result).toBe(6);
+        expect(getDie(result.rolls, 1).result).toBe(2);
+        expect(getDie(result.rolls, 1).modifiers).toEqual(['exploded', 'kept']);
+        expect(getDie(result.rolls, 2).result).toBe(3);
+      });
+
+      test('infinite-explode d1 throws EXPLODE_LIMIT_EXCEEDED', () => {
+        const ast = parse('1d1!');
+        const rng = createMockRng(Array.from({ length: 2000 }, () => 1));
+
+        expect(() => evaluate(ast, rng)).toThrow(EvaluatorError);
+        try {
+          evaluate(parse('1d1!'), createMockRng(Array.from({ length: 2000 }, () => 1)));
+        } catch (err) {
+          expect((err as EvaluatorError).code).toBe('EXPLODE_LIMIT_EXCEEDED');
+        }
+      });
+
+      test('maxExplodeIterations option caps per-die chain', () => {
+        const ast = parse('1d6!');
+        const rng = createMockRng([6, 6, 6, 6, 6, 6]);
+
+        expect(() => evaluate(ast, rng, { maxExplodeIterations: 2 })).toThrow(EvaluatorError);
+      });
+
+      test('maxExplodeIterations of 0 rejects any explosion', () => {
+        const ast = parse('1d6!');
+        const rng = createMockRng([6, 2]);
+
+        expect(() => evaluate(ast, rng, { maxExplodeIterations: 0 })).toThrow(EvaluatorError);
+      });
+    });
+
+    describe('compound explode (!!)', () => {
+      test('accumulates into single die result', () => {
+        const ast = parse('1d6!!');
+        const rng = createMockRng([6, 6, 3]);
+        const result = evaluate(ast, rng);
+
+        expect(result.total).toBe(15);
+        expect(result.rolls).toHaveLength(1);
+        expect(getDie(result.rolls, 0).result).toBe(15);
+        expect(getDie(result.rolls, 0).sides).toBe(6);
+        expect(getDie(result.rolls, 0).modifiers).toContain('exploded');
+        expect(getDie(result.rolls, 0).modifiers).toContain('kept');
+      });
+
+      test('no-op without explosion preserves single-kept die', () => {
+        const ast = parse('1d6!!');
+        const rng = createMockRng([3]);
+        const result = evaluate(ast, rng);
+
+        expect(result.total).toBe(3);
+        expect(result.rolls).toHaveLength(1);
+        expect(getDie(result.rolls, 0).result).toBe(3);
+        expect(getDie(result.rolls, 0).modifiers).toContain('kept');
+        expect(getDie(result.rolls, 0).modifiers).not.toContain('exploded');
+      });
+
+      test('threshold compound: 1d6!!>=5', () => {
+        const ast = parse('1d6!!>=5');
+        const rng = createMockRng([5, 6, 2]);
+        const result = evaluate(ast, rng);
+
+        expect(result.total).toBe(13);
+        expect(result.rolls).toHaveLength(1);
+        expect(getDie(result.rolls, 0).result).toBe(13);
+      });
+    });
+
+    describe('penetrating explode (!p)', () => {
+      test('explosion result decremented by 1', () => {
+        const ast = parse('1d6!p');
+        const rng = createMockRng([6, 3]);
+        const result = evaluate(ast, rng);
+
+        expect(result.total).toBe(8);
+        expect(result.rolls).toHaveLength(2);
+        expect(getDie(result.rolls, 1).result).toBe(2);
+        expect(getDie(result.rolls, 1).modifiers).toEqual(['exploded', 'kept']);
+      });
+
+      test('penetrating can produce 0', () => {
+        const ast = parse('1d6!p');
+        const rng = createMockRng([6, 1]);
+        const result = evaluate(ast, rng);
+
+        expect(result.total).toBe(6);
+        expect(getDie(result.rolls, 1).result).toBe(0);
+      });
+
+      test('explosion predicate uses raw roll', () => {
+        // RNG = [6, 6, 2]: raw 6 triggers, raw 6 triggers again, raw 2 stops.
+        // Stored results: [6, 5, 1] → total 12.
+        const ast = parse('1d6!p');
+        const rng = createMockRng([6, 6, 2]);
+        const result = evaluate(ast, rng);
+
+        expect(result.total).toBe(12);
+        expect(result.rolls).toHaveLength(3);
+        expect(getDie(result.rolls, 1).result).toBe(5);
+        expect(getDie(result.rolls, 2).result).toBe(1);
+      });
+    });
+
+    describe('thresholds', () => {
+      test('explode when >4', () => {
+        const ast = parse('1d6!>4');
+        const rng = createMockRng([5, 3]);
+        const result = evaluate(ast, rng);
+
+        expect(result.total).toBe(8);
+        expect(result.rolls).toHaveLength(2);
+      });
+
+      test('explode when >=5', () => {
+        const ast = parse('1d6!>=5');
+        const rng = createMockRng([5, 3]);
+        const result = evaluate(ast, rng);
+
+        expect(result.total).toBe(8);
+      });
+
+      test('explode when =6', () => {
+        const ast = parse('1d6!=6');
+        const rng = createMockRng([6, 3]);
+        const result = evaluate(ast, rng);
+
+        expect(result.total).toBe(9);
+      });
+
+      test('explode when <2 (low exploder)', () => {
+        const ast = parse('1d6!<2');
+        const rng = createMockRng([1, 4]);
+        const result = evaluate(ast, rng);
+
+        expect(result.total).toBe(5);
+        expect(result.rolls).toHaveLength(2);
+      });
+    });
+
+    describe('modifier chain interaction', () => {
+      test('4d6!kh3 explodes first, then keeps highest 3', () => {
+        // RNG: 4 dice then one explosion. [6, 3, 1, 4, 2]:
+        //   initial pool [6, 3, 1, 4]; 6 triggers explosion → [6, 3, 1, 4, 2]
+        //   kh3 keeps top 3 by result: 6, 4, 3 → total 13
+        const ast = parse('4d6!kh3');
+        const rng = createMockRng([6, 3, 1, 4, 2]);
+        const result = evaluate(ast, rng);
+
+        expect(result.total).toBe(13);
+        expect(result.rolls).toHaveLength(5);
+      });
+
+      test('4d6kh3! keeps highest 3 first, then explodes only kept dice', () => {
+        // RNG: 4 dice. Initial [6, 3, 1, 4]. kh3 keeps 6,4,3 and drops 1.
+        // Explode only kept dice with max = 6 → kept die rolling 6 explodes.
+        // Next RNG value consumed is the explosion roll.
+        const ast = parse('4d6kh3!');
+        const rng = createMockRng([6, 3, 1, 4, 2]);
+        const result = evaluate(ast, rng);
+
+        // Kept dice: 6 (then +2 exploded), 4, 3 = 6 + 2 + 4 + 3 = 15
+        // Dropped: 1
+        expect(result.total).toBe(15);
+        // Pool: 4 original + 1 explosion = 5, but 1 is marked dropped.
+        expect(result.rolls).toHaveLength(5);
+      });
+
+      test('explosion counts against global maxDice', () => {
+        // 2d6! with all sixes would grow unboundedly. maxDice=4 lets the
+        // initial 2 rolls plus 2 explosions occur before the next explosion
+        // would exceed the cap.
+        const ast = parse('2d6!');
+        const rng = createMockRng([6, 6, 6, 6, 6, 6]);
+
+        expect(() => evaluate(ast, rng, { maxDice: 4 })).toThrow(EvaluatorError);
+      });
+    });
+
+    describe('edge cases', () => {
+      test('(1+2)! is a no-op on non-dice target', () => {
+        const ast = parse('(1+2)!');
+        const rng = createMockRng([]);
+        const result = evaluate(ast, rng);
+
+        expect(result.total).toBe(3);
+        expect(result.rolls).toHaveLength(0);
+      });
+
+      test('0d6! empty pool explodes nothing', () => {
+        const ast = parse('0d6!');
+        const rng = createMockRng([]);
+        const result = evaluate(ast, rng);
+
+        expect(result.total).toBe(0);
+        expect(result.rolls).toHaveLength(0);
+      });
+
+      test('Fate dice + explode: defensive skip (sides=0 never explodes)', () => {
+        const ast = parse('1dF!');
+        const rng = createMockRng([0]);
+        const result = evaluate(ast, rng);
+
+        expect(result.total).toBe(0);
+        expect(result.rolls).toHaveLength(1);
+        expect(getDie(result.rolls, 0).modifiers).not.toContain('exploded');
+      });
+
+      test('expression string includes explode notation', () => {
+        const ast = parse('1d6!');
+        const rng = createMockRng([3]);
+        const result = evaluate(ast, rng);
+
+        expect(result.expression).toContain('1d6!');
+      });
+
+      test('expression string includes threshold', () => {
+        const ast = parse('1d6!>4');
+        const rng = createMockRng([3]);
+        const result = evaluate(ast, rng);
+
+        expect(result.expression).toContain('1d6!>4');
+      });
+
+      test('compound explode expression string uses !!', () => {
+        const ast = parse('1d6!!');
+        const rng = createMockRng([3]);
+        const result = evaluate(ast, rng);
+
+        expect(result.expression).toContain('1d6!!');
+      });
+
+      test('penetrating explode expression string uses !p', () => {
+        const ast = parse('1d6!p');
+        const rng = createMockRng([3]);
+        const result = evaluate(ast, rng);
+
+        expect(result.expression).toContain('1d6!p');
+      });
+
+      test('rendered string contains expanded pool', () => {
+        const ast = parse('1d6!');
+        const rng = createMockRng([6, 3]);
+        const result = evaluate(ast, rng);
+
+        expect(result.rendered).toContain('[6, 3]');
+      });
+    });
+  });
 });
