@@ -22,6 +22,7 @@ export type {
   LiteralNode,
   ModifierNode,
   RerollNode,
+  SuccessCountNode,
   UnaryOpNode,
 } from './parser/ast';
 export {
@@ -32,6 +33,7 @@ export {
   isLiteral,
   isModifier,
   isReroll,
+  isSuccessCount,
   isUnaryOp,
 } from './parser/ast';
 

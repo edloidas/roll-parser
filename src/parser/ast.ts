@@ -90,6 +90,21 @@ export type RerollNode = {
 };
 
 /**
+ * Success counting node (`>=T`, `>T`, `<T`, `<=T`, `=T`, with optional `f=F`).
+ *
+ * Transforms a dice pool into a success count: each die meeting `threshold`
+ * adds +1, each die meeting `failThreshold` subtracts 1. Terminal — no further
+ * postfix modifiers may wrap a `SuccessCountNode`. The `failThreshold`
+ * operator is always `=` (fail on an exact value).
+ */
+export type SuccessCountNode = {
+  type: 'SuccessCount';
+  target: ASTNode;
+  threshold: ComparePoint;
+  failThreshold?: ComparePoint;
+};
+
+/**
  * Union type of all AST nodes.
  */
 export type ASTNode =
@@ -100,7 +115,8 @@ export type ASTNode =
   | UnaryOpNode
   | ModifierNode
   | ExplodeNode
-  | RerollNode;
+  | RerollNode
+  | SuccessCountNode;
 
 /**
  * Type guard for LiteralNode.
@@ -156,4 +172,40 @@ export function isExplode(node: ASTNode): node is ExplodeNode {
  */
 export function isReroll(node: ASTNode): node is RerollNode {
   return node.type === 'Reroll';
+}
+
+/**
+ * Type guard for SuccessCountNode.
+ */
+export function isSuccessCount(node: ASTNode): node is SuccessCountNode {
+  return node.type === 'SuccessCount';
+}
+
+/**
+ * Returns `true` if the AST contains a `Dice` or `FateDice` node reachable
+ * through structural composition (BinaryOp, UnaryOp, keep/drop, explode,
+ * reroll, success-count wrappers). Meta-expressions — dice count/sides,
+ * modifier counts, and ComparePoint values — are treated as leaves and
+ * never recursed into.
+ *
+ * Used by the parser to reject success-counting targets that don't actually
+ * roll any dice (e.g. `1>=3`, `(1+2)>=3`).
+ */
+export function containsDice(node: ASTNode): boolean {
+  switch (node.type) {
+    case 'Dice':
+    case 'FateDice':
+      return true;
+    case 'Literal':
+      return false;
+    case 'BinaryOp':
+      return containsDice(node.left) || containsDice(node.right);
+    case 'UnaryOp':
+      return containsDice(node.operand);
+    case 'Modifier':
+    case 'Explode':
+    case 'Reroll':
+    case 'SuccessCount':
+      return containsDice(node.target);
+  }
 }

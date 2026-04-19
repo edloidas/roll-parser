@@ -64,5 +64,15 @@ describe('formatResult', () => {
       expect(output).not.toContain('~~');
       expect(output).toContain('= 8');
     });
+
+    test('converts success/failure markers to brackets and braces', () => {
+      const result = roll('3d6>=5f1', { rng: createMockRng([1, 5, 3]) });
+      const output = formatResult(result, true);
+
+      expect(output).toContain('[5]');
+      expect(output).toContain('{1}');
+      expect(output).not.toContain('**');
+      expect(output).not.toContain('__');
+    });
   });
 });

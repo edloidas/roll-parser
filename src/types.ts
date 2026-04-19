@@ -25,7 +25,7 @@ export type ComparePoint = {
 /**
  * Modifier flags applied to individual die results.
  */
-export type DieModifier = 'dropped' | 'kept' | 'exploded' | 'rerolled';
+export type DieModifier = 'dropped' | 'kept' | 'exploded' | 'rerolled' | 'success' | 'failure';
 
 /**
  * Individual die roll result with metadata.
@@ -61,6 +61,18 @@ export type RollResult = {
   rendered: string;
   /** All individual die results */
   rolls: DieResult[];
+  /**
+   * Number of dice tagged as success across the whole expression. Present
+   * only when a success-counting modifier was used. Independent of `total` —
+   * arithmetic on top of a success count (e.g. `5d6>=5 * 2`) affects `total`
+   * but not `successes`.
+   */
+  successes?: number;
+  /**
+   * Number of dice tagged as failure across the whole expression. Present
+   * only when a success-counting modifier with a fail threshold was used.
+   */
+  failures?: number;
 };
 
 /**

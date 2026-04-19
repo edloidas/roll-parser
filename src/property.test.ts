@@ -134,6 +134,30 @@ describe('property-based invariants', () => {
       );
     });
 
+    test('success count bounds — NdX>=T f1 satisfies -N <= total <= N', () => {
+      fc.assert(
+        fc.property(
+          fc.integer({ min: 1, max: 20 }),
+          fc.integer({ min: 2, max: 20 }),
+          fc.integer({ min: 1, max: 20 }),
+          (count, sides, threshold) => {
+            const result = roll(`${count}d${sides}>=${threshold}f1`);
+            const successes = result.successes ?? 0;
+            const failures = result.failures ?? 0;
+            return (
+              successes >= 0 &&
+              failures >= 0 &&
+              successes + failures <= count &&
+              result.total >= -count &&
+              result.total <= count &&
+              result.total === successes - failures
+            );
+          },
+        ),
+        { numRuns: 200 },
+      );
+    });
+
     test('keep highest total >= keep lowest total (for same rolls)', () => {
       fc.assert(
         fc.property(

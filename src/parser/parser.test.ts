@@ -11,6 +11,7 @@ import type {
   LiteralNode,
   ModifierNode,
   RerollNode,
+  SuccessCountNode,
   UnaryOpNode,
 } from './ast';
 
@@ -57,6 +58,16 @@ function explode(
 
 function reroll(once: boolean, condition: ComparePoint, target: ASTNode): RerollNode {
   return { type: 'Reroll', once, condition, target };
+}
+
+function successCount(
+  target: ASTNode,
+  threshold: ComparePoint,
+  failThreshold?: ComparePoint,
+): SuccessCountNode {
+  const node: SuccessCountNode = { type: 'SuccessCount', target, threshold };
+  if (failThreshold) node.failThreshold = failThreshold;
+  return node;
 }
 
 function cp(operator: ComparePoint['operator'], value: ASTNode): ComparePoint {
@@ -788,6 +799,171 @@ describe('Parser', () => {
     it('should parse reroll in binary expression: 2d6r<2+5', () => {
       expect(parse('2d6r<2+5')).toEqual(
         binary('+', reroll(false, cp('<', literal(2)), dice(literal(2), literal(6))), literal(5)),
+      );
+    });
+  });
+
+  describe('success counting', () => {
+    it('should parse 10d10>=6', () => {
+      expect(parse('10d10>=6')).toEqual(
+        successCount(dice(literal(10), literal(10)), cp('>=', literal(6))),
+      );
+    });
+
+    it('should parse all comparison operators', () => {
+      expect(parse('10d10>5')).toEqual(
+        successCount(dice(literal(10), literal(10)), cp('>', literal(5))),
+      );
+      expect(parse('10d10<3')).toEqual(
+        successCount(dice(literal(10), literal(10)), cp('<', literal(3))),
+      );
+      expect(parse('10d10<=2')).toEqual(
+        successCount(dice(literal(10), literal(10)), cp('<=', literal(2))),
+      );
+      expect(parse('10d10=1')).toEqual(
+        successCount(dice(literal(10), literal(10)), cp('=', literal(1))),
+      );
+    });
+
+    it('should parse with fail threshold: 10d10>=6f1', () => {
+      expect(parse('10d10>=6f1')).toEqual(
+        successCount(dice(literal(10), literal(10)), cp('>=', literal(6)), cp('=', literal(1))),
+      );
+    });
+
+    it('should parse with negative fail value: 10d10>=6f-1', () => {
+      expect(parse('10d10>=6f-1')).toEqual(
+        successCount(
+          dice(literal(10), literal(10)),
+          cp('>=', literal(6)),
+          cp('=', unary(literal(1))),
+        ),
+      );
+    });
+
+    it('should attach outer + as BinaryOp on SuccessCount: 5d6>=5+3', () => {
+      expect(parse('5d6>=5+3')).toEqual(
+        binary('+', successCount(dice(literal(5), literal(6)), cp('>=', literal(5))), literal(3)),
+      );
+    });
+
+    it('should attach outer * as BinaryOp on SuccessCount: 5d6>=5 * 2', () => {
+      expect(parse('5d6>=5 * 2')).toEqual(
+        binary('*', successCount(dice(literal(5), literal(6)), cp('>=', literal(5))), literal(2)),
+      );
+    });
+
+    it('should wrap keep-highest-then-count: 4d6kh3>=5', () => {
+      expect(parse('4d6kh3>=5')).toEqual(
+        successCount(
+          modifier('keep', 'highest', literal(3), dice(literal(4), literal(6))),
+          cp('>=', literal(5)),
+        ),
+      );
+    });
+
+    it('should bind compare to explode threshold, not success count: 10d10!>=6', () => {
+      // ? Explode greedily consumes a trailing ComparePoint as its own
+      //   threshold, so `10d10!>=6` means "explode on >=6", not "explode
+      //   then count successes". Disambiguate with parentheses.
+      expect(parse('10d10!>=6')).toEqual(
+        explode('standard', dice(literal(10), literal(10)), cp('>=', literal(6))),
+      );
+    });
+
+    it('should wrap parenthesized explode then count: (10d10!)>=6', () => {
+      expect(parse('(10d10!)>=6')).toEqual(
+        successCount(explode('standard', dice(literal(10), literal(10))), cp('>=', literal(6))),
+      );
+    });
+
+    it('should wrap explicit-threshold explode then count: 10d10!=10>=6', () => {
+      expect(parse('10d10!=10>=6')).toEqual(
+        successCount(
+          explode('standard', dice(literal(10), literal(10)), cp('=', literal(10))),
+          cp('>=', literal(6)),
+        ),
+      );
+    });
+
+    it('should wrap reroll-then-count: 4d6r<3>=5', () => {
+      expect(parse('4d6r<3>=5')).toEqual(
+        successCount(
+          reroll(false, cp('<', literal(3)), dice(literal(4), literal(6))),
+          cp('>=', literal(5)),
+        ),
+      );
+    });
+
+    it('should parse Fate success with fail: 4dF>=1f-1', () => {
+      expect(parse('4dF>=1f-1')).toEqual(
+        successCount(fateDice(literal(4)), cp('>=', literal(1)), cp('=', unary(literal(1)))),
+      );
+    });
+
+    it('should parse with computed threshold: 2d6>=(1+4)', () => {
+      expect(parse('2d6>=(1+4)')).toEqual(
+        successCount(dice(literal(2), literal(6)), cp('>=', binary('+', literal(1), literal(4)))),
+      );
+    });
+
+    it('should reject modifier after success count: 10d10>=6kh5', () => {
+      expect(() => parse('10d10>=6kh5')).toThrow(ParseError);
+      try {
+        parse('10d10>=6kh5');
+      } catch (err) {
+        expect((err as ParseError).code).toBe('INVALID_SUCCESS_COUNT_TARGET');
+      }
+    });
+
+    it('should reject explode after success count: 10d10>=6!', () => {
+      expect(() => parse('10d10>=6!')).toThrow(ParseError);
+      try {
+        parse('10d10>=6!');
+      } catch (err) {
+        expect((err as ParseError).code).toBe('INVALID_SUCCESS_COUNT_TARGET');
+      }
+    });
+
+    it('should reject reroll after success count: 10d10>=6r<3', () => {
+      expect(() => parse('10d10>=6r<3')).toThrow(ParseError);
+      try {
+        parse('10d10>=6r<3');
+      } catch (err) {
+        expect((err as ParseError).code).toBe('INVALID_SUCCESS_COUNT_TARGET');
+      }
+    });
+
+    it('should reject chained success count: 10d10>=6>=5', () => {
+      expect(() => parse('10d10>=6>=5')).toThrow(ParseError);
+      try {
+        parse('10d10>=6>=5');
+      } catch (err) {
+        expect((err as ParseError).code).toBe('INVALID_SUCCESS_COUNT_TARGET');
+      }
+    });
+
+    it('should reject non-dice target: 1>=3', () => {
+      expect(() => parse('1>=3')).toThrow(ParseError);
+      try {
+        parse('1>=3');
+      } catch (err) {
+        expect((err as ParseError).code).toBe('INVALID_SUCCESS_COUNT_TARGET');
+      }
+    });
+
+    it('should reject parenthesized non-dice target: (1+2)>=3', () => {
+      expect(() => parse('(1+2)>=3')).toThrow(ParseError);
+      try {
+        parse('(1+2)>=3');
+      } catch (err) {
+        expect((err as ParseError).code).toBe('INVALID_SUCCESS_COUNT_TARGET');
+      }
+    });
+
+    it('should accept dice inside binary target: (1d6+2)>=3', () => {
+      expect(parse('(1d6+2)>=3')).toEqual(
+        successCount(binary('+', dice(literal(1), literal(6)), literal(2)), cp('>=', literal(3))),
       );
     });
   });
