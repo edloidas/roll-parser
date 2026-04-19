@@ -121,6 +121,20 @@ export type VersusNode = {
 };
 
 /**
+ * Math function call node (`floor(expr)`, `max(a, b, ...)`, etc.).
+ *
+ * Supports the fixed-arity functions `floor`, `ceil`, `round`, `abs`, and the
+ * variadic functions `max`, `min` (minimum 2 args). Arity is validated at
+ * parse time against a static table; by the time the evaluator sees a
+ * `FunctionCallNode`, `args.length` is guaranteed to match the function.
+ */
+export type FunctionCallNode = {
+  type: 'FunctionCall';
+  name: string;
+  args: ASTNode[];
+};
+
+/**
  * Union type of all AST nodes.
  */
 export type ASTNode =
@@ -133,7 +147,8 @@ export type ASTNode =
   | ExplodeNode
   | RerollNode
   | SuccessCountNode
-  | VersusNode;
+  | VersusNode
+  | FunctionCallNode;
 
 /**
  * Type guard for LiteralNode.
@@ -206,6 +221,13 @@ export function isVersus(node: ASTNode): node is VersusNode {
 }
 
 /**
+ * Type guard for FunctionCallNode.
+ */
+export function isFunctionCall(node: ASTNode): node is FunctionCallNode {
+  return node.type === 'FunctionCall';
+}
+
+/**
  * Returns `true` if the AST contains a `Dice` or `FateDice` node reachable
  * through structural composition (BinaryOp, UnaryOp, keep/drop, explode,
  * reroll, success-count wrappers). Meta-expressions — dice count/sides,
@@ -233,5 +255,7 @@ export function containsDice(node: ASTNode): boolean {
       return containsDice(node.target);
     case 'Versus':
       return containsDice(node.roll) || containsDice(node.dc);
+    case 'FunctionCall':
+      return node.args.some(containsDice);
   }
 }

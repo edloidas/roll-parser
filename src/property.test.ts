@@ -574,4 +574,74 @@ describe('property-based invariants', () => {
       );
     });
   });
+
+  describe('math functions', () => {
+    test('floor(NdX/Y) <= NdX/Y for the same seeded roll', () => {
+      fc.assert(
+        fc.property(
+          fc.string({ minLength: 1, maxLength: 20 }),
+          fc.integer({ min: 1, max: 10 }),
+          fc.integer({ min: 2, max: 20 }),
+          fc.integer({ min: 2, max: 10 }),
+          (seed, count, sides, divisor) => {
+            const raw = roll(`${count}d${sides}/${divisor}`, { seed });
+            const floored = roll(`floor(${count}d${sides}/${divisor})`, { seed });
+            return floored.total <= raw.total && Number.isInteger(floored.total);
+          },
+        ),
+        { numRuns: 200 },
+      );
+    });
+
+    test('ceil(NdX/Y) >= NdX/Y for the same seeded roll', () => {
+      fc.assert(
+        fc.property(
+          fc.string({ minLength: 1, maxLength: 20 }),
+          fc.integer({ min: 1, max: 10 }),
+          fc.integer({ min: 2, max: 20 }),
+          fc.integer({ min: 2, max: 10 }),
+          (seed, count, sides, divisor) => {
+            const raw = roll(`${count}d${sides}/${divisor}`, { seed });
+            const ceiled = roll(`ceil(${count}d${sides}/${divisor})`, { seed });
+            return ceiled.total >= raw.total && Number.isInteger(ceiled.total);
+          },
+        ),
+        { numRuns: 200 },
+      );
+    });
+
+    test('abs(expr) is always >= 0', () => {
+      fc.assert(
+        fc.property(
+          fc.string({ minLength: 1, maxLength: 20 }),
+          fc.integer({ min: 1, max: 20 }),
+          fc.integer({ min: 2, max: 20 }),
+          fc.integer({ min: -100, max: 100 }),
+          (seed, count, sides, shift) => {
+            const result = roll(`abs(${count}d${sides}${shift >= 0 ? '+' : ''}${shift})`, {
+              seed,
+            });
+            return result.total >= 0;
+          },
+        ),
+        { numRuns: 200 },
+      );
+    });
+
+    test('max(a, b) >= min(a, b) for two independent dice', () => {
+      fc.assert(
+        fc.property(
+          fc.string({ minLength: 1, maxLength: 20 }),
+          fc.integer({ min: 2, max: 20 }),
+          fc.integer({ min: 2, max: 20 }),
+          (seed, sidesA, sidesB) => {
+            const maxed = roll(`max(1d${sidesA}, 1d${sidesB})`, { seed });
+            const minned = roll(`min(1d${sidesA}, 1d${sidesB})`, { seed });
+            return maxed.total >= minned.total;
+          },
+        ),
+        { numRuns: 200 },
+      );
+    });
+  });
 });

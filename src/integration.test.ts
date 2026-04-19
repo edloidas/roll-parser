@@ -591,4 +591,49 @@ describe('roll() integration', () => {
       expect(() => roll('1d20 vs (5 vs 3)', { rng: createMockRng([12]) })).toThrow(EvaluatorError);
     });
   });
+
+  describe('math functions', () => {
+    test('floor(1d6/3) with roll=5 → integer result', () => {
+      const result = roll('floor(1d6/3)', { rng: createMockRng([5]) });
+      expect(result.total).toBe(1);
+      expect(result.rolls).toHaveLength(1);
+    });
+
+    test('ceil(1d6/3) with roll=5 → rounds up', () => {
+      const result = roll('ceil(1d6/3)', { rng: createMockRng([5]) });
+      expect(result.total).toBe(2);
+    });
+
+    test('max(1d6, 1d8) with rolls=[4, 7] → higher', () => {
+      const result = roll('max(1d6, 1d8)', { rng: createMockRng([4, 7]) });
+      expect(result.total).toBe(7);
+      expect(result.rolls).toHaveLength(2);
+    });
+
+    test('min(10, 1d20+5) with roll=3 → cap', () => {
+      const result = roll('min(10, 1d20+5)', { rng: createMockRng([3]) });
+      expect(result.total).toBe(8);
+    });
+
+    test('abs(1d4-5) with roll=1 → 4', () => {
+      const result = roll('abs(1d4-5)', { rng: createMockRng([1]) });
+      expect(result.total).toBe(4);
+    });
+
+    test('case-insensitive: FLOOR(10/3)', () => {
+      const result = roll('FLOOR(10/3)');
+      expect(result.total).toBe(3);
+    });
+
+    test('rendered output includes function name', () => {
+      const result = roll('floor(1d6/3)', { rng: createMockRng([5]) });
+      expect(result.rendered).toBe('floor(1d6[5] / 3) = 1');
+    });
+
+    test('rejects wrong arity', () => {
+      expect(() => roll('floor()')).toThrow(ParseError);
+      expect(() => roll('floor(1, 2)')).toThrow(ParseError);
+      expect(() => roll('max(1d6)', { rng: createMockRng([3]) })).toThrow(ParseError);
+    });
+  });
 });

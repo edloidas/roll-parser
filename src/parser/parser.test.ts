@@ -8,6 +8,7 @@ import type {
   DiceNode,
   ExplodeNode,
   FateDiceNode,
+  FunctionCallNode,
   LiteralNode,
   ModifierNode,
   RerollNode,
@@ -77,6 +78,10 @@ function cp(operator: ComparePoint['operator'], value: ASTNode): ComparePoint {
 
 function versus(roll: ASTNode, dc: ASTNode): VersusNode {
   return { type: 'Versus', roll, dc };
+}
+
+function functionCall(name: string, args: ASTNode[]): FunctionCallNode {
+  return { type: 'FunctionCall', name, args };
 }
 
 describe('Parser', () => {
@@ -1046,6 +1051,114 @@ describe('Parser', () => {
         parse('1d20+5 vs 15 vs 20');
       } catch (err) {
         expect((err as ParseError).code).toBe('NESTED_VERSUS');
+      }
+    });
+  });
+
+  describe('math functions', () => {
+    it('should parse unary function: floor(10)', () => {
+      expect(parse('floor(10)')).toEqual(functionCall('floor', [literal(10)]));
+    });
+
+    it('should parse function with expression arg: floor(10/3)', () => {
+      expect(parse('floor(10/3)')).toEqual(
+        functionCall('floor', [binary('/', literal(10), literal(3))]),
+      );
+    });
+
+    it('should parse function with dice arg: floor(1d6/3)', () => {
+      expect(parse('floor(1d6/3)')).toEqual(
+        functionCall('floor', [binary('/', dice(literal(1), literal(6)), literal(3))]),
+      );
+    });
+
+    it('should parse all unary functions', () => {
+      expect(parse('ceil(1.5)')).toEqual(functionCall('ceil', [literal(1.5)]));
+      expect(parse('round(1.5)')).toEqual(functionCall('round', [literal(1.5)]));
+      expect(parse('abs(-5)')).toEqual(functionCall('abs', [unary(literal(5))]));
+    });
+
+    it('should parse variadic max with two args: max(1d6, 1d8)', () => {
+      expect(parse('max(1d6, 1d8)')).toEqual(
+        functionCall('max', [dice(literal(1), literal(6)), dice(literal(1), literal(8))]),
+      );
+    });
+
+    it('should parse variadic max with three args: max(1, 2, 3)', () => {
+      expect(parse('max(1, 2, 3)')).toEqual(
+        functionCall('max', [literal(1), literal(2), literal(3)]),
+      );
+    });
+
+    it('should parse variadic min: min(10, 1d20+5)', () => {
+      expect(parse('min(10, 1d20+5)')).toEqual(
+        functionCall('min', [literal(10), binary('+', dice(literal(1), literal(20)), literal(5))]),
+      );
+    });
+
+    it('should parse nested function calls: floor(floor(10/3)/2)', () => {
+      expect(parse('floor(floor(10/3)/2)')).toEqual(
+        functionCall('floor', [
+          binary('/', functionCall('floor', [binary('/', literal(10), literal(3))]), literal(2)),
+        ]),
+      );
+    });
+
+    it('should parse function in arithmetic: 2*floor(1d6/2)', () => {
+      expect(parse('2*floor(1d6/2)')).toEqual(
+        binary(
+          '*',
+          literal(2),
+          functionCall('floor', [binary('/', dice(literal(1), literal(6)), literal(2))]),
+        ),
+      );
+    });
+
+    it('should parse case-insensitive: FLOOR(10/3)', () => {
+      expect(parse('FLOOR(10/3)')).toEqual(
+        functionCall('floor', [binary('/', literal(10), literal(3))]),
+      );
+    });
+
+    it('should tolerate whitespace between name and paren: floor (10/3)', () => {
+      expect(parse('floor (10/3)')).toEqual(
+        functionCall('floor', [binary('/', literal(10), literal(3))]),
+      );
+    });
+
+    it('should throw INVALID_FUNCTION_ARITY for zero args: floor()', () => {
+      expect(() => parse('floor()')).toThrow(ParseError);
+      try {
+        parse('floor()');
+      } catch (err) {
+        expect((err as ParseError).code).toBe('INVALID_FUNCTION_ARITY');
+      }
+    });
+
+    it('should throw INVALID_FUNCTION_ARITY for too many args: floor(1, 2)', () => {
+      expect(() => parse('floor(1, 2)')).toThrow(ParseError);
+      try {
+        parse('floor(1, 2)');
+      } catch (err) {
+        expect((err as ParseError).code).toBe('INVALID_FUNCTION_ARITY');
+      }
+    });
+
+    it('should throw INVALID_FUNCTION_ARITY when max has only 1 arg: max(1d6)', () => {
+      expect(() => parse('max(1d6)')).toThrow(ParseError);
+      try {
+        parse('max(1d6)');
+      } catch (err) {
+        expect((err as ParseError).code).toBe('INVALID_FUNCTION_ARITY');
+      }
+    });
+
+    it('should throw EXPECTED_TOKEN when function has no parens: floor + 3', () => {
+      expect(() => parse('floor + 3')).toThrow(ParseError);
+      try {
+        parse('floor + 3');
+      } catch (err) {
+        expect((err as ParseError).code).toBe('EXPECTED_TOKEN');
       }
     });
   });
