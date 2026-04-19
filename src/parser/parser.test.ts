@@ -13,6 +13,7 @@ import type {
   RerollNode,
   SuccessCountNode,
   UnaryOpNode,
+  VersusNode,
 } from './ast';
 
 // * Helper functions for readable assertions
@@ -72,6 +73,10 @@ function successCount(
 
 function cp(operator: ComparePoint['operator'], value: ASTNode): ComparePoint {
   return { operator, value };
+}
+
+function versus(roll: ASTNode, dc: ASTNode): VersusNode {
+  return { type: 'Versus', roll, dc };
 }
 
 describe('Parser', () => {
@@ -965,6 +970,83 @@ describe('Parser', () => {
       expect(parse('(1d6+2)>=3')).toEqual(
         successCount(binary('+', dice(literal(1), literal(6)), literal(2)), cp('>=', literal(3))),
       );
+    });
+  });
+
+  describe('versus (PF2e degrees of success)', () => {
+    it('should parse simple versus: 1d20 vs 15', () => {
+      expect(parse('1d20 vs 15')).toEqual(versus(dice(literal(1), literal(20)), literal(15)));
+    });
+
+    it('should be case-insensitive: 1d20 VS 15', () => {
+      expect(parse('1d20 VS 15')).toEqual(versus(dice(literal(1), literal(20)), literal(15)));
+    });
+
+    it('should bind below addition: 1d20+10 vs 25', () => {
+      expect(parse('1d20+10 vs 25')).toEqual(
+        versus(binary('+', dice(literal(1), literal(20)), literal(10)), literal(25)),
+      );
+    });
+
+    it('should allow expression on DC side: 1d20 vs 15+10', () => {
+      expect(parse('1d20 vs 15+10')).toEqual(
+        versus(dice(literal(1), literal(20)), binary('+', literal(15), literal(10))),
+      );
+    });
+
+    it('should allow expressions on both sides: 1d20+10 vs 15+10', () => {
+      expect(parse('1d20+10 vs 15+10')).toEqual(
+        versus(
+          binary('+', dice(literal(1), literal(20)), literal(10)),
+          binary('+', literal(15), literal(10)),
+        ),
+      );
+    });
+
+    it('should allow dice on DC side (contested): 1d20 vs 1d20+10', () => {
+      expect(parse('1d20 vs 1d20+10')).toEqual(
+        versus(
+          dice(literal(1), literal(20)),
+          binary('+', dice(literal(1), literal(20)), literal(10)),
+        ),
+      );
+    });
+
+    it('should allow modifiers on the roll side: 2d20kh1+5 vs 20', () => {
+      expect(parse('2d20kh1+5 vs 20')).toEqual(
+        versus(
+          binary(
+            '+',
+            modifier('keep', 'highest', literal(1), dice(literal(2), literal(20))),
+            literal(5),
+          ),
+          literal(20),
+        ),
+      );
+    });
+
+    it('should parse paren-nested DC (evaluator catches nesting): 1d20 vs (5 vs 3)', () => {
+      expect(parse('1d20 vs (5 vs 3)')).toEqual(
+        versus(dice(literal(1), literal(20)), versus(literal(5), literal(3))),
+      );
+    });
+
+    it('should reject chained versus: 1d20 vs 15 vs 20', () => {
+      expect(() => parse('1d20 vs 15 vs 20')).toThrow(ParseError);
+      try {
+        parse('1d20 vs 15 vs 20');
+      } catch (err) {
+        expect((err as ParseError).code).toBe('NESTED_VERSUS');
+      }
+    });
+
+    it('should reject chained versus with modifiers: 1d20+5 vs 15 vs 20', () => {
+      expect(() => parse('1d20+5 vs 15 vs 20')).toThrow(ParseError);
+      try {
+        parse('1d20+5 vs 15 vs 20');
+      } catch (err) {
+        expect((err as ParseError).code).toBe('NESTED_VERSUS');
+      }
     });
   });
 });

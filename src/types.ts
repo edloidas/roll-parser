@@ -28,6 +28,18 @@ export type ComparePoint = {
 export type DieModifier = 'dropped' | 'kept' | 'exploded' | 'rerolled' | 'success' | 'failure';
 
 /**
+ * PF2e Degree of Success. Produced by the `vs` operator when comparing a
+ * roll against a Difficulty Class. Ordering is significant — natural 20
+ * upgrades one step and natural 1 downgrades one step.
+ */
+export enum DegreeOfSuccess {
+  CriticalFailure = 0,
+  Failure = 1,
+  Success = 2,
+  CriticalSuccess = 3,
+}
+
+/**
  * Individual die roll result with metadata.
  */
 export type DieResult = {
@@ -73,6 +85,16 @@ export type RollResult = {
    * only when a success-counting modifier with a fail threshold was used.
    */
   failures?: number;
+  /**
+   * PF2e Degree of Success. Present only when the expression used the `vs`
+   * operator at the top level (e.g. `1d20+10 vs 25`).
+   */
+  degree?: DegreeOfSuccess;
+  /**
+   * Natural d20 value used for PF2e upgrade/downgrade — present only when
+   * exactly one kept d20 was rolled on the roll side of a `vs` expression.
+   */
+  natural?: number;
 };
 
 /**

@@ -20,6 +20,7 @@ import type {
   RerollNode,
   SuccessCountNode,
   UnaryOpNode,
+  VersusNode,
 } from './ast';
 import { containsDice, isSuccessCount } from './ast';
 
@@ -43,6 +44,7 @@ export class ParseError extends RollParserError {
  * Higher values bind tighter. Right < Left for right-associativity.
  *
  * Precedence order (lowest to highest):
+ * - Versus (`vs`): 2-3 (lowest — full expressions on both sides)
  * - Addition/subtraction: 10
  * - Multiplication/division/modulo: 20
  * - Unary minus: 25 (binds to complete dice expr: -1d4 = -(1d4))
@@ -51,6 +53,9 @@ export class ParseError extends RollParserError {
  * - Dice: 40-41
  */
 const BP = {
+  // Versus (left-associative, lowest precedence — `1d20+10 vs 25+10` = `(1d20+10) vs (25+10)`)
+  VS_LEFT: 2,
+  VS_RIGHT: 3,
   // Addition/subtraction (left-associative)
   ADD_LEFT: 10,
   ADD_RIGHT: 11,
@@ -209,6 +214,9 @@ export class Parser {
       case TokenType.LESS_EQUAL:
       case TokenType.EQUAL:
         return this.parseSuccessCount(left, token);
+
+      case TokenType.VS:
+        return this.parseVersus(left, token);
 
       default:
         throw new ParseError(
@@ -430,6 +438,19 @@ export class Parser {
     return node;
   }
 
+  private parseVersus(left: ASTNode, token: Token): VersusNode {
+    // ? Chained `a vs b vs c` has no semantics — a degree is a scalar, not a
+    //   comparable. Parens (`a vs (b vs c)`) slip past this check and are
+    //   caught by the evaluator via `EvalEnv.insideVersus`.
+    if (left.type === 'Versus') {
+      throw new ParseError('Cannot chain versus operators', 'NESTED_VERSUS', token.position, token);
+    }
+
+    const dc = this.parseExpression(BP.VS_RIGHT);
+
+    return { type: 'Versus', roll: left, dc };
+  }
+
   // * Compare point utilities
 
   /**
@@ -514,6 +535,8 @@ export class Parser {
 
   private getLeftBp(token: Token): number {
     switch (token.type) {
+      case TokenType.VS:
+        return BP.VS_LEFT;
       case TokenType.PLUS:
       case TokenType.MINUS:
         return BP.ADD_LEFT;
@@ -558,6 +581,8 @@ export class Parser {
 
   private getRightBp(token: Token): number {
     switch (token.type) {
+      case TokenType.VS:
+        return BP.VS_RIGHT;
       case TokenType.PLUS:
       case TokenType.MINUS:
         return BP.ADD_RIGHT;
