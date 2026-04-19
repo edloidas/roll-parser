@@ -23,6 +23,8 @@ export type RollOptions = {
   maxDice?: number;
   /** Maximum explosion iterations allowed per die (default: 1,000) */
   maxExplodeIterations?: number;
+  /** Maximum reroll iterations allowed per die (default: 1,000) */
+  maxRerollIterations?: number;
 };
 
 /**
@@ -56,6 +58,9 @@ export function roll(notation: string, options: RollOptions = {}): RollResult {
   if (options.maxDice != null) evalOptions.maxDice = options.maxDice;
   if (options.maxExplodeIterations != null) {
     evalOptions.maxExplodeIterations = options.maxExplodeIterations;
+  }
+  if (options.maxRerollIterations != null) {
+    evalOptions.maxRerollIterations = options.maxRerollIterations;
   }
   return evaluate(ast, rng, evalOptions);
 }

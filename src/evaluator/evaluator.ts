@@ -13,6 +13,7 @@ import type {
   ExplodeNode,
   FateDiceNode,
   ModifierNode,
+  RerollNode,
   UnaryOpNode,
 } from '../parser/ast';
 import { isModifier } from '../parser/ast';
@@ -33,6 +34,11 @@ import {
   markAllKept,
   sumKeptDice,
 } from './modifiers/keep-drop';
+import {
+  applyRecursiveReroll,
+  applyRerollOnce,
+  DEFAULT_MAX_REROLL_ITERATIONS,
+} from './modifiers/reroll';
 
 /**
  * Error thrown during AST evaluation.
@@ -50,7 +56,7 @@ export class EvaluatorError extends RollParserError {
 /** Default maximum total dice allowed per evaluation. */
 export const DEFAULT_MAX_DICE = 10_000;
 
-export { DEFAULT_MAX_EXPLODE_ITERATIONS };
+export { DEFAULT_MAX_EXPLODE_ITERATIONS, DEFAULT_MAX_REROLL_ITERATIONS };
 
 /**
  * Per-evaluation shared environment (created once, shared across all branches).
@@ -61,6 +67,7 @@ export { DEFAULT_MAX_EXPLODE_ITERATIONS };
 export type EvalEnv = {
   readonly maxDice: number;
   readonly maxExplodeIterations: number;
+  readonly maxRerollIterations: number;
   totalDiceRolled: number;
 };
 
@@ -148,6 +155,9 @@ function evalNode(node: ASTNode, rng: RNG, ctx: EvalContext, env: EvalEnv): numb
 
     case 'Explode':
       return evalExplode(node, rng, ctx, env);
+
+    case 'Reroll':
+      return evalReroll(node, rng, ctx, env);
 
     default: {
       const exhaustive: never = node;
@@ -442,6 +452,34 @@ function evalExplode(node: ExplodeNode, rng: RNG, ctx: EvalContext, env: EvalEnv
   return sumKeptDice(expanded);
 }
 
+function evalReroll(node: RerollNode, rng: RNG, ctx: EvalContext, env: EvalEnv): number {
+  const targetCtx: EvalContext = { rolls: [], expressionParts: [], renderedParts: [] };
+  evalNode(node.target, rng, targetCtx, env);
+  const targetExpr = targetCtx.expressionParts.join('');
+
+  const thresholdCtx: EvalContext = { rolls: [], expressionParts: [], renderedParts: [] };
+  const thresholdValue = evalNode(node.condition.value, rng, thresholdCtx, env);
+
+  const code = `${node.once ? 'ro' : 'r'}${node.condition.operator}${thresholdValue}`;
+
+  // No-op when the target produced no dice (e.g., `(1+2)r<5`).
+  if (targetCtx.rolls.length === 0) {
+    ctx.expressionParts.push(`${targetExpr}${code}`);
+    ctx.renderedParts.push(`${targetExpr}${code}`);
+    return sumKeptDice(targetCtx.rolls);
+  }
+
+  const pool = node.once
+    ? applyRerollOnce(targetCtx.rolls, node.condition.operator, thresholdValue, rng, env)
+    : applyRecursiveReroll(targetCtx.rolls, node.condition.operator, thresholdValue, rng, env);
+
+  ctx.rolls.push(...pool);
+  ctx.expressionParts.push(`${targetExpr}${code}`);
+  ctx.renderedParts.push(`${targetExpr}${code}${renderDice(pool)}`);
+
+  return sumKeptDice(pool);
+}
+
 function evalModifier(node: ModifierNode, rng: RNG, ctx: EvalContext, env: EvalEnv): number {
   const { specs, baseTarget } = flattenModifierChain(node, rng, env);
 
@@ -492,7 +530,19 @@ export function evaluate(ast: ASTNode, rng: RNG, options: EvaluateOptions = {}):
       ? Math.floor(options.maxExplodeIterations)
       : DEFAULT_MAX_EXPLODE_ITERATIONS;
 
-  const env: EvalEnv = { maxDice, maxExplodeIterations, totalDiceRolled: 0 };
+  const maxRerollIterations =
+    options.maxRerollIterations != null &&
+    Number.isFinite(options.maxRerollIterations) &&
+    options.maxRerollIterations >= 0
+      ? Math.floor(options.maxRerollIterations)
+      : DEFAULT_MAX_REROLL_ITERATIONS;
+
+  const env: EvalEnv = {
+    maxDice,
+    maxExplodeIterations,
+    maxRerollIterations,
+    totalDiceRolled: 0,
+  };
   const ctx: EvalContext = {
     rolls: [],
     expressionParts: [],

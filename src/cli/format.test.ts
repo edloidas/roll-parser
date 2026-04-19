@@ -54,5 +54,15 @@ describe('formatResult', () => {
       expect(output).not.toContain('~~');
       expect(output).toBe('4dF[(-1), (0), 1, 1] = 2');
     });
+
+    test('converts intermediate rerolled dice to terminal-friendly parentheses', () => {
+      // 2d6r<2 with RNG [1, 5, 3] — die 0 rerolls 1 → 3.
+      const result = roll('2d6r<2', { rng: createMockRng([1, 5, 3]) });
+      const output = formatResult(result, true);
+
+      expect(output).toContain('(1)');
+      expect(output).not.toContain('~~');
+      expect(output).toContain('= 8');
+    });
   });
 });

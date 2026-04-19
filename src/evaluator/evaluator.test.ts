@@ -1126,4 +1126,247 @@ describe('evaluate', () => {
       });
     });
   });
+
+  describe('reroll mechanics', () => {
+    describe('recursive reroll (r)', () => {
+      test('single match re-rolls until condition fails', () => {
+        const ast = parse('2d6r<2');
+        // RNG: die 0 rolls 1, die 1 rolls 5, die 0 re-rolls 3.
+        // Pool ordering: intermediate + final for die 0 first, then die 1.
+        const rng = createMockRng([1, 5, 3]);
+        const result = evaluate(ast, rng);
+
+        expect(result.total).toBe(8);
+        expect(result.rolls).toHaveLength(3);
+        expect(getDie(result.rolls, 0).result).toBe(1);
+        expect(getDie(result.rolls, 0).modifiers).toContain('rerolled');
+        expect(getDie(result.rolls, 0).modifiers).toContain('dropped');
+        expect(getDie(result.rolls, 1).result).toBe(3);
+        expect(getDie(result.rolls, 1).modifiers).toContain('kept');
+        expect(getDie(result.rolls, 2).result).toBe(5);
+        expect(getDie(result.rolls, 2).modifiers).toContain('kept');
+      });
+
+      test('multiple matches on same die keep re-rolling', () => {
+        const ast = parse('1d6r<3');
+        // 1 (match) → 2 (match) → 5 (stop).
+        const rng = createMockRng([1, 2, 5]);
+        const result = evaluate(ast, rng);
+
+        expect(result.total).toBe(5);
+        expect(result.rolls).toHaveLength(3);
+        expect(getDie(result.rolls, 0).modifiers).toEqual(['rerolled', 'dropped']);
+        expect(getDie(result.rolls, 1).modifiers).toEqual(['rerolled', 'dropped']);
+        expect(getDie(result.rolls, 2).modifiers).toEqual(['kept']);
+      });
+
+      test('always-matching condition throws REROLL_LIMIT_EXCEEDED', () => {
+        // `1d6r<7` — all d6 results are < 7 → infinite.
+        expect(() =>
+          evaluate(parse('1d6r<7'), createMockRng(Array.from({ length: 2000 }, () => 1))),
+        ).toThrow(EvaluatorError);
+
+        try {
+          evaluate(parse('1d6r<7'), createMockRng(Array.from({ length: 2000 }, () => 1)));
+        } catch (err) {
+          expect((err as EvaluatorError).code).toBe('REROLL_LIMIT_EXCEEDED');
+        }
+      });
+
+      test('maxRerollIterations caps the chain', () => {
+        expect(() =>
+          evaluate(parse('1d6r<6'), createMockRng([1, 1, 1, 1, 5]), { maxRerollIterations: 2 }),
+        ).toThrow(EvaluatorError);
+      });
+
+      test('maxRerollIterations of 0 rejects any reroll', () => {
+        expect(() =>
+          evaluate(parse('1d6r<3'), createMockRng([1, 5]), { maxRerollIterations: 0 }),
+        ).toThrow(EvaluatorError);
+      });
+
+      test('non-matching dice pass through untouched', () => {
+        const ast = parse('2d6r<2');
+        const rng = createMockRng([3, 5]);
+        const result = evaluate(ast, rng);
+
+        expect(result.total).toBe(8);
+        expect(result.rolls).toHaveLength(2);
+        expect(getDie(result.rolls, 0).modifiers).toEqual(['kept']);
+        expect(getDie(result.rolls, 1).modifiers).toEqual(['kept']);
+      });
+
+      test('negative compare value with Fate dice (4dFr=-1)', () => {
+        const ast = parse('4dFr=-1');
+        // Dice: -1 (match) → 0, 0, 1, -1 (match) → 0.
+        const rng = createMockRng([-1, 0, 1, -1, 0, 0]);
+        const result = evaluate(ast, rng);
+
+        expect(result.total).toBe(1); // 0 + 0 + 1 + 0
+
+        // Two intermediate rerolled -1s should appear in rolls.
+        const rerolled = result.rolls.filter((d) => d.modifiers.includes('rerolled'));
+        expect(rerolled).toHaveLength(2);
+        expect(rerolled.every((d) => d.result === -1)).toBe(true);
+        expect(rerolled.every((d) => d.modifiers.includes('dropped'))).toBe(true);
+      });
+
+      test('rendered output marks intermediate dice with strikethrough', () => {
+        const ast = parse('2d6r<2');
+        const rng = createMockRng([1, 5, 3]);
+        const result = evaluate(ast, rng);
+
+        expect(result.rendered).toContain('~~1~~');
+        expect(result.rendered).toContain('5');
+        expect(result.rendered).toContain('3');
+      });
+
+      test('expression string retains the reroll code', () => {
+        const ast = parse('2d6r<2');
+        const rng = createMockRng([3, 4]);
+        const result = evaluate(ast, rng);
+
+        expect(result.expression).toContain('r<2');
+      });
+    });
+
+    describe('reroll-once (ro)', () => {
+      test('keeps second result regardless of match', () => {
+        const ast = parse('2d6ro<3');
+        // Die 0: 2 (match) → 1 (still matches, but kept). Die 1: 5.
+        const rng = createMockRng([2, 5, 1]);
+        const result = evaluate(ast, rng);
+
+        expect(result.total).toBe(6); // 1 + 5
+        expect(result.rolls).toHaveLength(3);
+        expect(getDie(result.rolls, 0).result).toBe(2);
+        expect(getDie(result.rolls, 0).modifiers).toEqual(['rerolled', 'dropped']);
+        expect(getDie(result.rolls, 1).result).toBe(1);
+        expect(getDie(result.rolls, 1).modifiers).toEqual(['kept']);
+        expect(getDie(result.rolls, 2).result).toBe(5);
+      });
+
+      test('always terminates even when condition remains satisfiable', () => {
+        const ast = parse('1d6ro<7');
+        const rng = createMockRng([3, 5]);
+        const result = evaluate(ast, rng);
+
+        expect(result.total).toBe(5);
+        expect(result.rolls).toHaveLength(2);
+      });
+
+      test('no-op when condition does not match', () => {
+        const ast = parse('2d6ro<3');
+        const rng = createMockRng([4, 5]);
+        const result = evaluate(ast, rng);
+
+        expect(result.total).toBe(9);
+        expect(result.rolls).toHaveLength(2);
+        expect(getDie(result.rolls, 0).modifiers).toEqual(['kept']);
+        expect(getDie(result.rolls, 1).modifiers).toEqual(['kept']);
+      });
+    });
+
+    describe('modifier chain interactions', () => {
+      test('reroll then keep highest: intermediate high roll does not win kh', () => {
+        // `2d6r>4kh1` — die 0 rolls 6 (>4, rerolled → 2), die 1 rolls 3.
+        // Final pool is [2, 3]. kh1 should pick 3, not the rerolled 6.
+        const ast = parse('2d6r>4kh1');
+        const rng = createMockRng([6, 3, 2]);
+        const result = evaluate(ast, rng);
+
+        expect(result.total).toBe(3);
+      });
+
+      test('reroll then keep highest: 2d6r<2kh1', () => {
+        // Die 0: 1 (match) → 4. Die 1: 2. kh1 picks 4.
+        const ast = parse('2d6r<2kh1');
+        const rng = createMockRng([1, 2, 4]);
+        const result = evaluate(ast, rng);
+
+        expect(result.total).toBe(4);
+      });
+
+      test('keep highest then reroll only runs on the survivor', () => {
+        // Parse: Reroll(r<2, Modifier(kh1, Dice)). kh1 keeps higher, reroll
+        // only touches the kept die.
+        const ast = parse('2d6kh1r<2');
+        // Rolls: 5, 1. kh1 keeps 5 (index 0); 1 is dropped. Reroll on 5 — no match.
+        const rng = createMockRng([5, 1]);
+        const result = evaluate(ast, rng);
+
+        expect(result.total).toBe(5);
+      });
+
+      test('chained reroll-once then recursive: 2d6ro<2r<3', () => {
+        // Parse: Reroll(r<3, Reroll(ro<2, Dice)).
+        // Die 0: 1 (ro<2 matches) → 2. Then outer r<3: 2 matches → 5 (stop).
+        // Die 1: 4. ro<2 no match (kept → 4). Outer r<3: 4 no match.
+        const ast = parse('2d6ro<2r<3');
+        const rng = createMockRng([1, 4, 2, 5]);
+        const result = evaluate(ast, rng);
+
+        expect(result.total).toBe(9); // 5 + 4
+      });
+
+      test('dropped target: pre-dropped die is not rerolled', () => {
+        // `2d6dl1r<5` — dl1 drops the lowest; reroll leaves it alone.
+        // Rolls: 3, 5. dl1 drops 3. Reroll(r<5) on [3(dropped), 5(kept)] —
+        // only 5 is eligible, 5 is not <5 → no reroll.
+        const ast = parse('2d6dl1r<5');
+        const rng = createMockRng([3, 5]);
+        const result = evaluate(ast, rng);
+
+        expect(result.total).toBe(5);
+      });
+
+      test('reroll then explode preserves modifier semantics', () => {
+        // `2d6r<2!` — reroll first, then explode.
+        const ast = parse('2d6r<2!');
+        // Die 0: 1 → 3. Die 1: 6 (triggers explode) → 2.
+        const rng = createMockRng([1, 6, 3, 2]);
+        const result = evaluate(ast, rng);
+
+        expect(result.total).toBe(11); // 3 + 6 + 2
+      });
+    });
+
+    describe('edge cases', () => {
+      test('zero-count dice: 0d6r<2 is a no-op', () => {
+        const ast = parse('0d6r<2');
+        const rng = createMockRng([]);
+        const result = evaluate(ast, rng);
+
+        expect(result.total).toBe(0);
+        expect(result.rolls).toHaveLength(0);
+      });
+
+      test('impossible condition never matches', () => {
+        const ast = parse('2d6r<1');
+        const rng = createMockRng([3, 5]);
+        const result = evaluate(ast, rng);
+
+        expect(result.total).toBe(8);
+        expect(result.rolls).toHaveLength(2);
+        expect(result.rolls.every((d) => !d.modifiers.includes('rerolled'))).toBe(true);
+      });
+
+      test('reroll in binary op: 2d6r<2+5', () => {
+        const ast = parse('2d6r<2+5');
+        const rng = createMockRng([1, 4, 3]);
+        const result = evaluate(ast, rng);
+
+        expect(result.total).toBe(12); // 3 + 4 + 5
+      });
+
+      test('reroll Fate dice without negative: 4dFr=1', () => {
+        const ast = parse('4dFr=1');
+        // Rolls: 1 (match) → 0, -1, 0, 1 (match) → -1.
+        const rng = createMockRng([1, -1, 0, 1, 0, -1]);
+        const result = evaluate(ast, rng);
+
+        expect(result.total).toBe(-2); // 0 + -1 + 0 + -1
+      });
+    });
+  });
 });

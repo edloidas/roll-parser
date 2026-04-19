@@ -10,6 +10,7 @@ import type {
   FateDiceNode,
   LiteralNode,
   ModifierNode,
+  RerollNode,
   UnaryOpNode,
 } from './ast';
 
@@ -52,6 +53,10 @@ function explode(
   const node: ExplodeNode = { type: 'Explode', variant, target };
   if (threshold) node.threshold = threshold;
   return node;
+}
+
+function reroll(once: boolean, condition: ComparePoint, target: ASTNode): RerollNode {
+  return { type: 'Reroll', once, condition, target };
 }
 
 function cp(operator: ComparePoint['operator'], value: ASTNode): ComparePoint {
@@ -684,6 +689,105 @@ describe('Parser', () => {
       // to the result as infix dice.
       expect(parse('d6!d20')).toEqual(
         dice(explode('standard', dice(literal(1), literal(6))), literal(20)),
+      );
+    });
+  });
+
+  describe('reroll mechanics', () => {
+    it('should parse recursive reroll: 2d6r<2', () => {
+      expect(parse('2d6r<2')).toEqual(
+        reroll(false, cp('<', literal(2)), dice(literal(2), literal(6))),
+      );
+    });
+
+    it('should parse reroll-once: 2d6ro<3', () => {
+      expect(parse('2d6ro<3')).toEqual(
+        reroll(true, cp('<', literal(3)), dice(literal(2), literal(6))),
+      );
+    });
+
+    it('should parse reroll with equals: 2d6r=1', () => {
+      expect(parse('2d6r=1')).toEqual(
+        reroll(false, cp('=', literal(1)), dice(literal(2), literal(6))),
+      );
+    });
+
+    it('should parse reroll-once with greater-equal: 2d6ro>=5', () => {
+      expect(parse('2d6ro>=5')).toEqual(
+        reroll(true, cp('>=', literal(5)), dice(literal(2), literal(6))),
+      );
+    });
+
+    it('should parse Fate dice reroll with negative compare value: 4dFr=-1', () => {
+      expect(parse('4dFr=-1')).toEqual(
+        reroll(false, cp('=', unary(literal(1))), fateDice(literal(4))),
+      );
+    });
+
+    it('should parse reroll with computed threshold: 2d6r<(1+1)', () => {
+      expect(parse('2d6r<(1+1)')).toEqual(
+        reroll(false, cp('<', binary('+', literal(1), literal(1))), dice(literal(2), literal(6))),
+      );
+    });
+
+    it('should reject bare r without comparison', () => {
+      expect(() => parse('2d6r')).toThrow(ParseError);
+      try {
+        parse('2d6r');
+      } catch (err) {
+        expect((err as ParseError).code).toBe('EXPECTED_TOKEN');
+      }
+    });
+
+    it('should reject bare ro without comparison', () => {
+      expect(() => parse('2d6ro')).toThrow(ParseError);
+      try {
+        parse('2d6ro');
+      } catch (err) {
+        expect((err as ParseError).code).toBe('EXPECTED_TOKEN');
+      }
+    });
+
+    it('should parse reroll-then-keep: 2d6r<2kh1', () => {
+      expect(parse('2d6r<2kh1')).toEqual(
+        modifier(
+          'keep',
+          'highest',
+          literal(1),
+          reroll(false, cp('<', literal(2)), dice(literal(2), literal(6))),
+        ),
+      );
+    });
+
+    it('should parse keep-then-reroll: 2d6kh1r<2', () => {
+      expect(parse('2d6kh1r<2')).toEqual(
+        reroll(
+          false,
+          cp('<', literal(2)),
+          modifier('keep', 'highest', literal(1), dice(literal(2), literal(6))),
+        ),
+      );
+    });
+
+    it('should parse chained reroll-once then recursive: 2d6ro<2r<3', () => {
+      expect(parse('2d6ro<2r<3')).toEqual(
+        reroll(
+          false,
+          cp('<', literal(3)),
+          reroll(true, cp('<', literal(2)), dice(literal(2), literal(6))),
+        ),
+      );
+    });
+
+    it('should parse reroll-then-explode: 2d6r<2!', () => {
+      expect(parse('2d6r<2!')).toEqual(
+        explode('standard', reroll(false, cp('<', literal(2)), dice(literal(2), literal(6)))),
+      );
+    });
+
+    it('should parse reroll in binary expression: 2d6r<2+5', () => {
+      expect(parse('2d6r<2+5')).toEqual(
+        binary('+', reroll(false, cp('<', literal(2)), dice(literal(2), literal(6))), literal(5)),
       );
     });
   });

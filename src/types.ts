@@ -73,4 +73,6 @@ export type EvaluateOptions = {
   maxDice?: number;
   /** Maximum explosion iterations allowed per die (default: 1,000) */
   maxExplodeIterations?: number;
+  /** Maximum reroll iterations allowed per die (default: 1,000) */
+  maxRerollIterations?: number;
 };

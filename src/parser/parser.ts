@@ -17,6 +17,7 @@ import type {
   FateDiceNode,
   LiteralNode,
   ModifierNode,
+  RerollNode,
   UnaryOpNode,
 } from './ast';
 
@@ -196,6 +197,10 @@ export class Parser {
       case TokenType.EXPLODE_PENETRATING:
         return this.parseExplode(left, token);
 
+      case TokenType.REROLL:
+      case TokenType.REROLL_ONCE:
+        return this.parseReroll(left, token);
+
       default:
         throw new ParseError(
           `Unexpected infix token '${token.value}'`,
@@ -350,6 +355,23 @@ export class Parser {
     return node;
   }
 
+  private parseReroll(target: ASTNode, token: Token): RerollNode {
+    // A reroll token must be followed by a comparison — bare `r` / `ro` is invalid.
+    if (!this.isComparePointAhead()) {
+      throw new ParseError(
+        `Expected comparison operator after '${token.value}'`,
+        'EXPECTED_TOKEN',
+        token.position,
+        token,
+      );
+    }
+
+    const once = token.type === TokenType.REROLL_ONCE;
+    const condition = this.parseComparePoint();
+
+    return { type: 'Reroll', once, condition, target };
+  }
+
   // * Compare point utilities
 
   /**
@@ -454,6 +476,8 @@ export class Parser {
       case TokenType.EXPLODE:
       case TokenType.EXPLODE_COMPOUND:
       case TokenType.EXPLODE_PENETRATING:
+      case TokenType.REROLL:
+      case TokenType.REROLL_ONCE:
         return BP.MODIFIER;
       case TokenType.RPAREN:
       case TokenType.EOF:
