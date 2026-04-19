@@ -46,6 +46,9 @@
     "type": "git",
     "url": "git+https://github.com/edloidas/roll-parser.git"
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "typecheck": "tsc --noEmit",
     "lint": "biome lint .",
@@ -54,6 +57,8 @@
     "format:check": "biome format .",
     "check": "bun typecheck && bun lint && bun format:check",
     "check:fix": "bun typecheck && bun lint:fix && bun format",
+    "check:version": "bun scripts/check-version.ts",
+    "check:changelog": "bun scripts/check-changelog.ts",
     "clean": "rm -rf dist coverage",
     "build": "bun run clean && bun run build:esm && bun run build:cjs && bun run build:esm:testing && bun run build:cjs:testing && bun run build:cli && bun run build:types",
     "build:esm": "bun build src/index.ts --outfile dist/index.mjs --target bun",
@@ -68,7 +73,7 @@
     "test:ci": "bun test --bail",
     "validate": "bun run check && bun run build && bun test:ci",
     "coverage": "bun test --coverage",
-    "release:dry": "bun run check && bun run build && bun test",
+    "release:dry": "bun run check:version && bun run check:changelog && bun run check && bun run build && bun test",
     "prepublishOnly": "bun run release:dry"
   },
   "devDependencies": {
