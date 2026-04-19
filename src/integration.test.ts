@@ -9,6 +9,7 @@ import { EvaluatorError } from './evaluator/evaluator';
 import { ParseError } from './parser/parser';
 import { createMockRng } from './rng/mock';
 import { roll } from './roll';
+import { DegreeOfSuccess } from './types';
 
 describe('roll() integration', () => {
   describe('full pipeline', () => {
@@ -536,6 +537,58 @@ describe('roll() integration', () => {
     test('rejects non-dice success target', () => {
       expect(() => roll('1>=3')).toThrow(ParseError);
       expect(() => roll('(1+2)>=3')).toThrow(ParseError);
+    });
+  });
+
+  describe('versus (PF2e degrees of success)', () => {
+    test('basic Success: 1d20+10 vs 25 roll=15', () => {
+      const result = roll('1d20+10 vs 25', { rng: createMockRng([15]) });
+      expect(result.total).toBe(25);
+      expect(result.degree).toBe(DegreeOfSuccess.Success);
+      expect(result.natural).toBe(15);
+      expect(result.rendered).toBe('1d20[15] + 10 vs 25 = Success');
+    });
+
+    test('Critical Success by margin: 1d20+10 vs 15 roll=15', () => {
+      const result = roll('1d20+10 vs 15', { rng: createMockRng([15]) });
+      expect(result.total).toBe(25);
+      expect(result.degree).toBe(DegreeOfSuccess.CriticalSuccess);
+    });
+
+    test('Nat-20 upgrades Failure to Success', () => {
+      const result = roll('1d20-2 vs 25', { rng: createMockRng([20]) });
+      expect(result.total).toBe(18);
+      expect(result.natural).toBe(20);
+      expect(result.degree).toBe(DegreeOfSuccess.Success);
+    });
+
+    test('Nat-1 downgrades Success to Failure', () => {
+      const result = roll('1d20+15 vs 15', { rng: createMockRng([1]) });
+      expect(result.total).toBe(16);
+      expect(result.natural).toBe(1);
+      expect(result.degree).toBe(DegreeOfSuccess.Failure);
+    });
+
+    test('seeded versus is reproducible', () => {
+      const r1 = roll('1d20+5 vs 18', { seed: 'vs-seed' });
+      const r2 = roll('1d20+5 vs 18', { seed: 'vs-seed' });
+      expect(r1.total).toBe(r2.total);
+      expect(r1.degree).toBe(r2.degree);
+      expect(r1.natural).toBe(r2.natural);
+    });
+
+    test('non-versus rolls do not set degree or natural', () => {
+      const result = roll('1d20+10', { rng: createMockRng([15]) });
+      expect(result.degree).toBeUndefined();
+      expect(result.natural).toBeUndefined();
+    });
+
+    test('rejects chained versus', () => {
+      expect(() => roll('1d20 vs 15 vs 20')).toThrow(ParseError);
+    });
+
+    test('rejects paren-nested versus at eval time', () => {
+      expect(() => roll('1d20 vs (5 vs 3)', { rng: createMockRng([12]) })).toThrow(EvaluatorError);
     });
   });
 });

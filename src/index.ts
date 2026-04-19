@@ -24,6 +24,7 @@ export type {
   RerollNode,
   SuccessCountNode,
   UnaryOpNode,
+  VersusNode,
 } from './parser/ast';
 export {
   isBinaryOp,
@@ -35,6 +36,7 @@ export {
   isReroll,
   isSuccessCount,
   isUnaryOp,
+  isVersus,
 } from './parser/ast';
 
 // * RNG exports
@@ -57,6 +59,7 @@ export type {
   EvaluateOptions,
   RollResult,
 } from './types';
+export { DegreeOfSuccess } from './types';
 
 // * Public API
 export { roll } from './roll';

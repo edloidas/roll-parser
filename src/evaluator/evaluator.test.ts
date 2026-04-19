@@ -8,6 +8,7 @@ import { describe, expect, test } from 'bun:test';
 import { parse } from '../parser/parser';
 import { createMockRng } from '../rng/mock';
 import type { DieResult } from '../types';
+import { DegreeOfSuccess } from '../types';
 import { DEFAULT_MAX_DICE, evaluate, EvaluatorError } from './evaluator';
 
 /**
@@ -1541,6 +1542,288 @@ describe('evaluate', () => {
 
       expect(result.successes).toBe(4);
       expect(result.total).toBe(4);
+    });
+  });
+
+  describe('versus (PF2e degrees of success)', () => {
+    test('Failure: 1d20 vs 15 roll=12', () => {
+      const ast = parse('1d20 vs 15');
+      const rng = createMockRng([12]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(12);
+      expect(result.degree).toBe(DegreeOfSuccess.Failure);
+      expect(result.natural).toBe(12);
+    });
+
+    test('Success: 1d20 vs 15 roll=15', () => {
+      const ast = parse('1d20 vs 15');
+      const rng = createMockRng([15]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(15);
+      expect(result.degree).toBe(DegreeOfSuccess.Success);
+    });
+
+    test('CriticalSuccess: 1d20+10 vs 15 roll=15 (total=25 ≥ 25)', () => {
+      const ast = parse('1d20+10 vs 15');
+      const rng = createMockRng([15]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(25);
+      expect(result.degree).toBe(DegreeOfSuccess.CriticalSuccess);
+    });
+
+    test('CriticalFailure: 1d20 vs 15 roll=4 (total=4 ≤ 5)', () => {
+      const ast = parse('1d20 vs 15');
+      const rng = createMockRng([4]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(4);
+      expect(result.degree).toBe(DegreeOfSuccess.CriticalFailure);
+    });
+
+    test('Failure boundary: 1d20 vs 15 roll=5 (total=5 > dc-10=5 is false)', () => {
+      // total > dc-10 → 5 > 5 is false → CriticalFailure
+      const ast = parse('1d20 vs 15');
+      const rng = createMockRng([5]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(5);
+      expect(result.degree).toBe(DegreeOfSuccess.CriticalFailure);
+    });
+
+    test('Failure boundary: 1d20 vs 15 roll=6 (total=6 > 5)', () => {
+      const ast = parse('1d20 vs 15');
+      const rng = createMockRng([6]);
+      const result = evaluate(ast, rng);
+
+      expect(result.degree).toBe(DegreeOfSuccess.Failure);
+    });
+
+    test('Nat-20 upgrade: 1d20-2 vs 25 roll=20 (total=18, base=Failure → Success)', () => {
+      const ast = parse('1d20-2 vs 25');
+      const rng = createMockRng([20]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(18);
+      expect(result.natural).toBe(20);
+      expect(result.degree).toBe(DegreeOfSuccess.Success);
+    });
+
+    test('Nat-1 downgrade: 1d20+15 vs 15 roll=1 (total=16, base=Success → Failure)', () => {
+      const ast = parse('1d20+15 vs 15');
+      const rng = createMockRng([1]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(16);
+      expect(result.natural).toBe(1);
+      expect(result.degree).toBe(DegreeOfSuccess.Failure);
+    });
+
+    test('Nat-20 does not double-crit: 1d20+20 vs 15 roll=20 already CriticalSuccess', () => {
+      const ast = parse('1d20+20 vs 15');
+      const rng = createMockRng([20]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(40);
+      expect(result.natural).toBe(20);
+      expect(result.degree).toBe(DegreeOfSuccess.CriticalSuccess);
+    });
+
+    test('Nat-1 does not double-fumble: 1d20-20 vs 15 roll=1 already CriticalFailure', () => {
+      const ast = parse('1d20-20 vs 15');
+      const rng = createMockRng([1]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(-19);
+      expect(result.natural).toBe(1);
+      expect(result.degree).toBe(DegreeOfSuccess.CriticalFailure);
+    });
+
+    test('Advantage: 2d20kh1+5 vs 20 rolls=[7,18] → natural=18, Success', () => {
+      const ast = parse('2d20kh1+5 vs 20');
+      const rng = createMockRng([7, 18]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(23);
+      expect(result.natural).toBe(18);
+      expect(result.degree).toBe(DegreeOfSuccess.Success);
+    });
+
+    test('Disadvantage: 2d20kl1+5 vs 20 rolls=[7,18] → natural=7, Failure', () => {
+      const ast = parse('2d20kl1+5 vs 20');
+      const rng = createMockRng([7, 18]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(12);
+      expect(result.natural).toBe(7);
+      expect(result.degree).toBe(DegreeOfSuccess.Failure);
+    });
+
+    test('No d20: 1d6+10 vs 15 roll=3 → natural undefined, Failure', () => {
+      const ast = parse('1d6+10 vs 15');
+      const rng = createMockRng([3]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(13);
+      expect(result.degree).toBe(DegreeOfSuccess.Failure);
+      expect(result.natural).toBeUndefined();
+    });
+
+    test('No d20, roll=1: no downgrade applies because no natural d20', () => {
+      // 1d6 roll=1 is a natural 1 on a d6, not a d20 — no downgrade
+      const ast = parse('1d6+14 vs 15');
+      const rng = createMockRng([1]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(15);
+      expect(result.degree).toBe(DegreeOfSuccess.Success);
+      expect(result.natural).toBeUndefined();
+    });
+
+    test('Two kept d20s: 1d20+1d20 vs 25 → natural undefined', () => {
+      const ast = parse('1d20+1d20 vs 25');
+      const rng = createMockRng([6, 10]);
+      const result = evaluate(ast, rng);
+
+      // total=16, dc=25: 16 < 25 and 16 > 15 → Failure
+      expect(result.total).toBe(16);
+      expect(result.natural).toBeUndefined();
+      expect(result.degree).toBe(DegreeOfSuccess.Failure);
+    });
+
+    test('Two kept d20s with nat-20 present: natural still undefined (ambiguous)', () => {
+      const ast = parse('1d20+1d20 vs 25');
+      const rng = createMockRng([20, 10]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(30);
+      expect(result.natural).toBeUndefined();
+      // Base: 30 ≥ 25+10=35? no; 30 ≥ 25? yes → Success (no upgrade, natural undefined)
+      expect(result.degree).toBe(DegreeOfSuccess.Success);
+    });
+
+    test('Contested check: 1d20 vs 1d20+10 — dc dice on DC side', () => {
+      const ast = parse('1d20 vs 1d20+10');
+      const rng = createMockRng([15, 10]);
+      const result = evaluate(ast, rng);
+
+      // roll total = 15, dc total = 10 + 10 = 20 → 15 < 20 → Failure
+      expect(result.total).toBe(15);
+      expect(result.natural).toBe(15);
+      expect(result.degree).toBe(DegreeOfSuccess.Failure);
+    });
+
+    test('Contested check: DC dice do not count as natural d20 source', () => {
+      // Roll-side has no d20; DC-side has a d20 that rolls 20 — must not
+      // influence natural extraction.
+      const ast = parse('1d6+10 vs 1d20');
+      const rng = createMockRng([3, 20]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(13);
+      expect(result.natural).toBeUndefined();
+      // total=13, dc=20 → 13 < 20 but 13 > 10 → Failure
+      expect(result.degree).toBe(DegreeOfSuccess.Failure);
+    });
+
+    test('No rolls at all: 10 vs 15 → natural undefined, Failure', () => {
+      const ast = parse('10 vs 15');
+      const rng = createMockRng([]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(10);
+      expect(result.natural).toBeUndefined();
+      expect(result.degree).toBe(DegreeOfSuccess.Failure);
+    });
+
+    test('Rendered output replaces total with degree label', () => {
+      const ast = parse('1d20+10 vs 25');
+      const rng = createMockRng([15]);
+      const result = evaluate(ast, rng);
+
+      expect(result.rendered).toBe('1d20[15] + 10 vs 25 = Success');
+    });
+
+    test('Rendered output: Critical Success label', () => {
+      const ast = parse('1d20+20 vs 15');
+      const rng = createMockRng([20]);
+      const result = evaluate(ast, rng);
+
+      expect(result.rendered).toBe('1d20[20] + 20 vs 15 = Critical Success');
+    });
+
+    test('Rendered output: Critical Failure label', () => {
+      const ast = parse('1d20 vs 15');
+      const rng = createMockRng([2]);
+      const result = evaluate(ast, rng);
+
+      expect(result.rendered).toBe('1d20[2] vs 15 = Critical Failure');
+    });
+
+    test('Rendered output: advantage with dropped die shown', () => {
+      const ast = parse('2d20kh1+5 vs 20');
+      const rng = createMockRng([7, 18]);
+      const result = evaluate(ast, rng);
+
+      expect(result.rendered).toBe('2d20[~~7~~, 18] + 5 vs 20 = Success');
+    });
+
+    test('Paren-nested versus throws NESTED_VERSUS at eval time', () => {
+      // Parser allows this (left of `vs` is a literal, not Versus); evaluator
+      // rejects during dc-side evaluation.
+      const ast = parse('1d20 vs (5 vs 3)');
+
+      try {
+        evaluate(ast, createMockRng([15]));
+        throw new Error('expected evaluate to throw');
+      } catch (err) {
+        expect(err).toBeInstanceOf(EvaluatorError);
+        expect((err as EvaluatorError).code).toBe('NESTED_VERSUS');
+      }
+    });
+
+    test('Sibling versus in arithmetic do not falsely throw NESTED_VERSUS', () => {
+      // `(a vs b) + (c vs d)` — two independent checks under arithmetic.
+      // insideVersus must reset between siblings via try/finally.
+      const ast = parse('(1d20 vs 15) + (1d20 vs 20)');
+      const rng = createMockRng([12, 18]);
+
+      expect(() => evaluate(ast, rng)).not.toThrow();
+    });
+
+    test('degree/natural undefined when vs is not the root expression', () => {
+      // `(1d20 vs 15) + 5` — versus is a sub-expression, so versusMetadata
+      // lives on a sub-ctx and does not populate RollResult. Documented
+      // v1 limitation.
+      const ast = parse('(1d20 vs 15) + 5');
+      const rng = createMockRng([18]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(23);
+      expect(result.degree).toBeUndefined();
+      expect(result.natural).toBeUndefined();
+    });
+
+    test('RollResult.total is the numeric roll total, not the degree enum', () => {
+      const ast = parse('1d20+10 vs 25');
+      const rng = createMockRng([15]);
+      const result = evaluate(ast, rng);
+
+      expect(typeof result.total).toBe('number');
+      expect(result.total).toBe(25);
+      expect(result.total).not.toBe(DegreeOfSuccess.Success);
+    });
+
+    test('All rolls from both sides present on RollResult.rolls', () => {
+      const ast = parse('1d20 vs 1d20+10');
+      const rng = createMockRng([15, 8]);
+      const result = evaluate(ast, rng);
+
+      expect(result.rolls).toHaveLength(2);
+      expect(getDie(result.rolls, 0).result).toBe(15);
+      expect(getDie(result.rolls, 1).result).toBe(8);
     });
   });
 });

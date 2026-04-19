@@ -16,10 +16,12 @@ import type {
   RerollNode,
   SuccessCountNode,
   UnaryOpNode,
+  VersusNode,
 } from '../parser/ast';
 import { isModifier } from '../parser/ast';
 import type { RNG } from '../rng/types';
 import type { ComparePoint, DieResult, EvaluateOptions, RollResult } from '../types';
+import { DegreeOfSuccess } from '../types';
 import {
   applyCompoundExplode,
   applyPenetratingExplode,
@@ -77,6 +79,13 @@ export type EvalEnv = {
    * die was tagged (impossible threshold).
    */
   hasSuccessCount: boolean;
+  /**
+   * `true` while the evaluator is inside a `VersusNode`'s roll or DC
+   * sub-evaluation. `evalVersus` rejects nesting via this flag — catches
+   * paren-nested versus (`1d20 vs (5 vs 3)`) that slip past the parser's
+   * left-chain check.
+   */
+  insideVersus: boolean;
 };
 
 /**
@@ -86,6 +95,17 @@ type EvalContext = {
   rolls: DieResult[];
   expressionParts: string[];
   renderedParts: string[];
+  /**
+   * Populated by `evalVersus` with the resolved degree and natural value.
+   * `evaluate()` reads this from the top-level ctx to surface `degree` and
+   * `natural` on the final `RollResult`. Only populated when `vs` is the
+   * root of the expression.
+   */
+  versusMetadata?: {
+    degree: DegreeOfSuccess;
+    natural: number | undefined;
+    dcTotal: number;
+  };
 };
 
 /**
@@ -177,6 +197,9 @@ function evalNode(node: ASTNode, rng: RNG, ctx: EvalContext, env: EvalEnv): numb
 
     case 'SuccessCount':
       return evalSuccessCount(node, rng, ctx, env);
+
+    case 'Versus':
+      return evalVersus(node, rng, ctx, env);
 
     default: {
       const exhaustive: never = node;
@@ -582,6 +605,86 @@ function evalSuccessCount(
 }
 
 /**
+ * Extracts the "natural" d20 value from a roll-side dice pool. Returns the
+ * single value when exactly one kept d20 is present; otherwise `undefined`.
+ *
+ * Excludes dropped (`kh`/`kl`/`dh`/`dl`) and rerolled (`r`/`ro`) dice — these
+ * aren't the final kept result. Multiple kept d20s (e.g., `1d20+1d20`) yield
+ * `undefined` so no ambiguous upgrade/downgrade is applied.
+ */
+function extractNatural(rolls: DieResult[]): number | undefined {
+  const keptD20s = rolls.filter(
+    (d) => d.sides === 20 && !d.modifiers.includes('dropped') && !d.modifiers.includes('rerolled'),
+  );
+  return keptD20s.length === 1 ? keptD20s[0]?.result : undefined;
+}
+
+/**
+ * PF2e degree of success: compares `total` to `dc` at three thresholds and
+ * applies natural 20 upgrade / natural 1 downgrade with clamping.
+ */
+function calculateDegree(total: number, dc: number, natural: number | undefined): DegreeOfSuccess {
+  let degree: DegreeOfSuccess;
+  if (total >= dc + 10) degree = DegreeOfSuccess.CriticalSuccess;
+  else if (total >= dc) degree = DegreeOfSuccess.Success;
+  else if (total > dc - 10) degree = DegreeOfSuccess.Failure;
+  else degree = DegreeOfSuccess.CriticalFailure;
+
+  if (natural === 20 && degree < DegreeOfSuccess.CriticalSuccess) degree++;
+  if (natural === 1 && degree > DegreeOfSuccess.CriticalFailure) degree--;
+
+  return degree;
+}
+
+function degreeLabel(degree: DegreeOfSuccess): string {
+  switch (degree) {
+    case DegreeOfSuccess.CriticalFailure:
+      return 'Critical Failure';
+    case DegreeOfSuccess.Failure:
+      return 'Failure';
+    case DegreeOfSuccess.Success:
+      return 'Success';
+    case DegreeOfSuccess.CriticalSuccess:
+      return 'Critical Success';
+  }
+}
+
+function evalVersus(node: VersusNode, rng: RNG, ctx: EvalContext, env: EvalEnv): number {
+  if (env.insideVersus) {
+    throw new EvaluatorError('Cannot nest versus operators', 'NESTED_VERSUS', 'Versus');
+  }
+
+  env.insideVersus = true;
+  try {
+    const rollCtx: EvalContext = { rolls: [], expressionParts: [], renderedParts: [] };
+    const rollTotal = evalNode(node.roll, rng, rollCtx, env);
+    // ? Extract natural from rollCtx directly — the roll-side pool is isolated
+    //   here, so no index slicing on the merged parent pool is needed.
+    const natural = extractNatural(rollCtx.rolls);
+
+    const dcCtx: EvalContext = { rolls: [], expressionParts: [], renderedParts: [] };
+    const dcTotal = evalNode(node.dc, rng, dcCtx, env);
+
+    const degree = calculateDegree(rollTotal, dcTotal, natural);
+
+    ctx.rolls.push(...rollCtx.rolls, ...dcCtx.rolls);
+
+    const rollExpr = rollCtx.expressionParts.join('');
+    const dcExpr = dcCtx.expressionParts.join('');
+    const rollRendered = rollCtx.renderedParts.join('');
+    const dcRendered = dcCtx.renderedParts.join('');
+
+    ctx.expressionParts.push(`${rollExpr} vs ${dcExpr}`);
+    ctx.renderedParts.push(`${rollRendered} vs ${dcRendered}`);
+    ctx.versusMetadata = { degree, natural, dcTotal };
+
+    return rollTotal;
+  } finally {
+    env.insideVersus = false;
+  }
+}
+
+/**
  * Evaluates a parsed AST and returns the roll result.
  *
  * @param ast - The parsed AST node
@@ -623,6 +726,7 @@ export function evaluate(ast: ASTNode, rng: RNG, options: EvaluateOptions = {}):
     maxRerollIterations,
     totalDiceRolled: 0,
     hasSuccessCount: false,
+    insideVersus: false,
   };
   const ctx: EvalContext = {
     rolls: [],
@@ -633,7 +737,10 @@ export function evaluate(ast: ASTNode, rng: RNG, options: EvaluateOptions = {}):
   const total = evalNode(ast, rng, ctx, env);
 
   const expression = ctx.expressionParts.join('');
-  const rendered = `${ctx.renderedParts.join('')} = ${total}`;
+  // ? Versus replaces the numeric total with the degree label in the rendered
+  //   form; `RollResult.total` remains the numeric roll total.
+  const trailing = ctx.versusMetadata ? degreeLabel(ctx.versusMetadata.degree) : String(total);
+  const rendered = `${ctx.renderedParts.join('')} = ${trailing}`;
 
   const result: RollResult = {
     total,
@@ -652,6 +759,13 @@ export function evaluate(ast: ASTNode, rng: RNG, options: EvaluateOptions = {}):
     }
     result.successes = successes;
     result.failures = failures;
+  }
+
+  if (ctx.versusMetadata) {
+    result.degree = ctx.versusMetadata.degree;
+    if (ctx.versusMetadata.natural !== undefined) {
+      result.natural = ctx.versusMetadata.natural;
+    }
   }
 
   return result;

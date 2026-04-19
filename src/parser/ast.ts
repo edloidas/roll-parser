@@ -105,6 +105,22 @@ export type SuccessCountNode = {
 };
 
 /**
+ * Versus node (`<roll> vs <dc>`) — PF2e Degrees of Success.
+ *
+ * Both sides are full expressions. The `roll` side is evaluated and compared
+ * against the `dc` side total, producing a `DegreeOfSuccess` with natural
+ * d20 upgrade/downgrade applied when exactly one kept d20 appears on the
+ * roll side. Lowest-precedence operator — chaining (`a vs b vs c`) is
+ * rejected at parse time; nesting via parens (`a vs (b vs c)`) is rejected
+ * at evaluation time.
+ */
+export type VersusNode = {
+  type: 'Versus';
+  roll: ASTNode;
+  dc: ASTNode;
+};
+
+/**
  * Union type of all AST nodes.
  */
 export type ASTNode =
@@ -116,7 +132,8 @@ export type ASTNode =
   | ModifierNode
   | ExplodeNode
   | RerollNode
-  | SuccessCountNode;
+  | SuccessCountNode
+  | VersusNode;
 
 /**
  * Type guard for LiteralNode.
@@ -182,6 +199,13 @@ export function isSuccessCount(node: ASTNode): node is SuccessCountNode {
 }
 
 /**
+ * Type guard for VersusNode.
+ */
+export function isVersus(node: ASTNode): node is VersusNode {
+  return node.type === 'Versus';
+}
+
+/**
  * Returns `true` if the AST contains a `Dice` or `FateDice` node reachable
  * through structural composition (BinaryOp, UnaryOp, keep/drop, explode,
  * reroll, success-count wrappers). Meta-expressions — dice count/sides,
@@ -207,5 +231,7 @@ export function containsDice(node: ASTNode): boolean {
     case 'Reroll':
     case 'SuccessCount':
       return containsDice(node.target);
+    case 'Versus':
+      return containsDice(node.roll) || containsDice(node.dc);
   }
 }
