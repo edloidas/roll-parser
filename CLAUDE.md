@@ -58,3 +58,10 @@ Types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `perf`, `bui
 
   <sub>Drafted with AI assistance</sub>
   ```
+
+## Releasing
+
+Use the `/npm-release` skill. Project-specific conventions the skill must honor:
+
+- **Release commit message**: `chore: release v<version>`.
+- **CHANGELOG gate**: update `CHANGELOG.md` via the local `release-changelog` skill before bumping — `bun run release:dry` fails at `check:changelog` without it.
