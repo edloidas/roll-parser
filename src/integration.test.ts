@@ -449,4 +449,50 @@ describe('roll() integration', () => {
       expect(result.total).toBe(13);
     });
   });
+
+  describe('reroll mechanics', () => {
+    test('recursive reroll via roll()', () => {
+      // 2d6r<2 — die 0: 1 → 3, die 1: 5. Total = 8.
+      const result = roll('2d6r<2', { rng: createMockRng([1, 5, 3]) });
+      expect(result.total).toBe(8);
+      expect(result.rolls).toHaveLength(3);
+      expect(result.notation).toBe('2d6r<2');
+    });
+
+    test('reroll-once via roll()', () => {
+      // 2d6ro<3 — die 0: 2 → 1 (kept), die 1: 5. Total = 6.
+      const result = roll('2d6ro<3', { rng: createMockRng([2, 5, 1]) });
+      expect(result.total).toBe(6);
+      expect(result.rolls).toHaveLength(3);
+    });
+
+    test('maxRerollIterations threads through roll()', () => {
+      expect(() =>
+        roll('1d6r<6', {
+          rng: createMockRng([1, 1, 1, 1, 5]),
+          maxRerollIterations: 2,
+        }),
+      ).toThrow(EvaluatorError);
+    });
+
+    test('seeded reroll is reproducible', () => {
+      const r1 = roll('4d6r<2', { seed: 'reroll-seed' });
+      const r2 = roll('4d6r<2', { seed: 'reroll-seed' });
+      expect(r1.total).toBe(r2.total);
+      expect(r1.rolls.length).toBe(r2.rolls.length);
+    });
+
+    test('reroll combined with keep highest (regression for keep/drop pre-drop fix)', () => {
+      // 2d6r>4kh1 — die 0 rolls 6 (>4, rerolled → 2), die 1 rolls 3.
+      // Final pool is [2, 3]. kh1 must skip the rerolled 6 and pick 3.
+      const result = roll('2d6r>4kh1', { rng: createMockRng([6, 3, 2]) });
+      expect(result.total).toBe(3);
+    });
+
+    test('Fate + reroll with negative compare value', () => {
+      // 4dFr=-1 — rerolls each -1. With [-1,0,1,-1,0,0]: two rerolls yield 0.
+      const result = roll('4dFr=-1', { rng: createMockRng([-1, 0, 1, -1, 0, 0]) });
+      expect(result.total).toBe(1);
+    });
+  });
 });

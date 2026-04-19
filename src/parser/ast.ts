@@ -77,6 +77,19 @@ export type ExplodeNode = {
 };
 
 /**
+ * Reroll node (`r<COND>`, `ro<COND>`).
+ * Re-rolls dice that match a comparison condition. `once: true` for `ro`
+ * keeps the second result regardless of match; `once: false` for `r`
+ * re-rolls recursively until the condition no longer matches.
+ */
+export type RerollNode = {
+  type: 'Reroll';
+  once: boolean;
+  condition: ComparePoint;
+  target: ASTNode;
+};
+
+/**
  * Union type of all AST nodes.
  */
 export type ASTNode =
@@ -86,7 +99,8 @@ export type ASTNode =
   | BinaryOpNode
   | UnaryOpNode
   | ModifierNode
-  | ExplodeNode;
+  | ExplodeNode
+  | RerollNode;
 
 /**
  * Type guard for LiteralNode.
@@ -135,4 +149,11 @@ export function isModifier(node: ASTNode): node is ModifierNode {
  */
 export function isExplode(node: ASTNode): node is ExplodeNode {
   return node.type === 'Explode';
+}
+
+/**
+ * Type guard for RerollNode.
+ */
+export function isReroll(node: ASTNode): node is RerollNode {
+  return node.type === 'Reroll';
 }

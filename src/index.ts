@@ -21,6 +21,7 @@ export type {
   FateDiceNode,
   LiteralNode,
   ModifierNode,
+  RerollNode,
   UnaryOpNode,
 } from './parser/ast';
 export {
@@ -30,6 +31,7 @@ export {
   isFateDice,
   isLiteral,
   isModifier,
+  isReroll,
   isUnaryOp,
 } from './parser/ast';
 
@@ -41,6 +43,7 @@ export { SeededRNG } from './rng/seeded';
 export {
   DEFAULT_MAX_DICE,
   DEFAULT_MAX_EXPLODE_ITERATIONS,
+  DEFAULT_MAX_REROLL_ITERATIONS,
   evaluate,
   EvaluatorError,
 } from './evaluator/evaluator';

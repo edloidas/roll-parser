@@ -477,4 +477,77 @@ describe('property-based invariants', () => {
       );
     });
   });
+
+  describe('reroll invariants', () => {
+    test('recursive reroll: every kept die fails the condition', () => {
+      // `r<2` on sides >= 2 terminates: result 1 matches, 2+ does not.
+      fc.assert(
+        fc.property(
+          fc.string({ minLength: 1, maxLength: 20 }),
+          fc.integer({ min: 1, max: 5 }),
+          fc.integer({ min: 4, max: 20 }),
+          (seed, count, sides) => {
+            const result = roll(`${count}d${sides}r<2`, { seed });
+            const kept = result.rolls.filter((d) => !d.modifiers.includes('dropped'));
+            return kept.length === count && kept.every((d) => d.result >= 2);
+          },
+        ),
+        { numRuns: 100 },
+      );
+    });
+
+    test('reroll-once always produces exactly N kept dice', () => {
+      // `ro` terminates regardless of match probability.
+      fc.assert(
+        fc.property(
+          fc.string({ minLength: 1, maxLength: 20 }),
+          fc.integer({ min: 1, max: 5 }),
+          fc.integer({ min: 2, max: 20 }),
+          (seed, count, sides) => {
+            const result = roll(`${count}d${sides}ro<${sides}`, { seed });
+            const kept = result.rolls.filter((d) => !d.modifiers.includes('dropped'));
+            return kept.length === count;
+          },
+        ),
+        { numRuns: 100 },
+      );
+    });
+
+    test('rerolled intermediate dice are always marked rerolled+dropped', () => {
+      // Use `ro` so the chain always terminates — the invariant is about
+      // modifier flags, not termination behavior.
+      fc.assert(
+        fc.property(
+          fc.string({ minLength: 1, maxLength: 20 }),
+          fc.integer({ min: 1, max: 5 }),
+          fc.integer({ min: 2, max: 20 }),
+          (seed, count, sides) => {
+            const result = roll(`${count}d${sides}ro<${sides}`, { seed });
+            const intermediates = result.rolls.filter((d) => d.modifiers.includes('rerolled'));
+            return intermediates.every((d) => d.modifiers.includes('dropped'));
+          },
+        ),
+        { numRuns: 100 },
+      );
+    });
+
+    test('seeded reroll is reproducible', () => {
+      // Constrain to cases where recursive reroll terminates: threshold
+      // must be strictly less than `sides` so some results exceed it.
+      fc.assert(
+        fc.property(
+          fc.string({ minLength: 1, maxLength: 20 }),
+          fc.integer({ min: 1, max: 5 }),
+          fc.integer({ min: 4, max: 12 }),
+          fc.constantFrom('r', 'ro'),
+          (seed, count, sides, variant) => {
+            const r1 = roll(`${count}d${sides}${variant}<2`, { seed });
+            const r2 = roll(`${count}d${sides}${variant}<2`, { seed });
+            return r1.total === r2.total && r1.rolls.length === r2.rolls.length;
+          },
+        ),
+        { numRuns: 100 },
+      );
+    });
+  });
 });
