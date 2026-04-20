@@ -64,5 +64,5 @@ Types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `perf`, `bui
 
 Use the `/npm-release` skill. Project-specific conventions the skill must honor:
 
-- **Release commit message**: `chore: release v<version>`.
+- **Dedicated release commit**: bump `package.json`, commit as `chore: release v<version>`, then tag that commit. Never tag a pre-existing unrelated commit — if the version already matches the target, stop and ask before proceeding.
 - **CHANGELOG gate**: update `CHANGELOG.md` via the local `release-changelog` skill before bumping — `bun run release:dry` fails at `check:changelog` without it.
