@@ -1374,6 +1374,28 @@ describe('evaluate', () => {
       expect(result.failures).toBe(1);
     });
 
+    test('fail threshold with < operator — 4dF>=0f<0', () => {
+      const ast = parse('4dF>=0f<0');
+      const rng = createMockRng([-1, 0, 1, -1]);
+      const result = evaluate(ast, rng);
+
+      // `>=0` matches 0 and 1 (2 successes); `<0` matches the two -1s (2 failures).
+      expect(result.successes).toBe(2);
+      expect(result.failures).toBe(2);
+      expect(result.total).toBe(0);
+    });
+
+    test('fail threshold with <= operator — 10d10>=8f<=2', () => {
+      const ast = parse('10d10>=8f<=2');
+      const rng = createMockRng([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+      const result = evaluate(ast, rng);
+
+      // `>=8` matches 8,9,10 (3 successes); `<=2` matches 1,2 (2 failures).
+      expect(result.successes).toBe(3);
+      expect(result.failures).toBe(2);
+      expect(result.total).toBe(1);
+    });
+
     test('success wins on overlap — 3d6>=3f3 with [3,5,1]', () => {
       const ast = parse('3d6>=3f3');
       const rng = createMockRng([3, 5, 1]);

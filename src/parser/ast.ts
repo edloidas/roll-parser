@@ -96,7 +96,7 @@ export type RerollNode = {
  * adds +1, each die meeting `failThreshold` subtracts 1. Terminal — a
  * `SuccessCountNode` may not be wrapped by any postfix modifier, binary
  * operator, unary operator, versus operand, or function argument. The
- * `failThreshold` operator is always `=` (fail on an exact value).
+ * `failThreshold` accepts any `CompareOp`; bare `fN` defaults to `operator: '='`.
  */
 export type SuccessCountNode = {
   type: 'SuccessCount';

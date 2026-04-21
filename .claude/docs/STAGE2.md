@@ -413,7 +413,8 @@ negative values in strikethrough.
 - LED handler for comparison tokens (GREATER, GREATER_EQUAL, LESS, LESS_EQUAL, EQUAL)
   when they appear after a dice expression
 - After parsing threshold, check for `FAIL` token → if present, consume and parse
-  fail value as `ComparePoint` with `operator: '='`
+  fail value as `ComparePoint` via `parseComparePoint()` when a comparison operator
+  follows, or as `{ operator: '=', value: … }` for the bare `fN` shorthand
 - `getLeftBp` for comparison tokens: `BP.MODIFIER` (35)
 - `FAIL` has `BP = -1` (consumed inside `parseSuccessCount`, never standalone)
 - Terminal constraint: if `target.type === 'SuccessCount'`, throw ParseError
