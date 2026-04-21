@@ -1159,6 +1159,88 @@ describe('Parser', () => {
       });
     });
 
+    describe('explode rejects Fate dice pools', () => {
+      it('should reject 4dF!', () => {
+        expect(() => parse('4dF!')).toThrow(ParseError);
+        try {
+          parse('4dF!');
+        } catch (err) {
+          expect((err as ParseError).code).toBe('INVALID_EXPLODE_TARGET');
+        }
+      });
+
+      it('should reject 4dF!>0', () => {
+        expect(() => parse('4dF!>0')).toThrow(ParseError);
+        try {
+          parse('4dF!>0');
+        } catch (err) {
+          expect((err as ParseError).code).toBe('INVALID_EXPLODE_TARGET');
+        }
+      });
+
+      it('should reject 4dF!!', () => {
+        expect(() => parse('4dF!!')).toThrow(ParseError);
+        try {
+          parse('4dF!!');
+        } catch (err) {
+          expect((err as ParseError).code).toBe('INVALID_EXPLODE_TARGET');
+        }
+      });
+
+      it('should reject 4dF!!>0', () => {
+        expect(() => parse('4dF!!>0')).toThrow(ParseError);
+        try {
+          parse('4dF!!>0');
+        } catch (err) {
+          expect((err as ParseError).code).toBe('INVALID_EXPLODE_TARGET');
+        }
+      });
+
+      it('should reject 4dF!p', () => {
+        expect(() => parse('4dF!p')).toThrow(ParseError);
+        try {
+          parse('4dF!p');
+        } catch (err) {
+          expect((err as ParseError).code).toBe('INVALID_EXPLODE_TARGET');
+        }
+      });
+
+      it('should reject 4dF!p>0', () => {
+        expect(() => parse('4dF!p>0')).toThrow(ParseError);
+        try {
+          parse('4dF!p>0');
+        } catch (err) {
+          expect((err as ParseError).code).toBe('INVALID_EXPLODE_TARGET');
+        }
+      });
+
+      it('should reject (4dF)!', () => {
+        expect(() => parse('(4dF)!')).toThrow(ParseError);
+        try {
+          parse('(4dF)!');
+        } catch (err) {
+          expect((err as ParseError).code).toBe('INVALID_EXPLODE_TARGET');
+        }
+      });
+
+      it('should reject Fate pool wrapped in a chained pool modifier (4dFr=-1)!', () => {
+        expect(() => parse('(4dFr=-1)!')).toThrow(ParseError);
+        try {
+          parse('(4dFr=-1)!');
+        } catch (err) {
+          expect((err as ParseError).code).toBe('INVALID_EXPLODE_TARGET');
+        }
+      });
+
+      it('should carry a descriptive message mentioning Fate dice', () => {
+        try {
+          parse('4dF!');
+        } catch (err) {
+          expect((err as ParseError).message).toContain('Fate');
+        }
+      });
+    });
+
     describe('reroll rejects non-pool targets', () => {
       it('should reject (1d6+5)r<3', () => {
         expect(() => parse('(1d6+5)r<3')).toThrow(ParseError);

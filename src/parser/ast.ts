@@ -284,3 +284,26 @@ export function containsDicePool(node: ASTNode): boolean {
       return false;
   }
 }
+
+/**
+ * Returns `true` if the pool this node resolves to is (or wraps) a `FateDice`
+ * pool. Walks through chained pool modifiers (`Modifier` / `Explode` /
+ * `Reroll`) but not arithmetic wrappers — callers should run
+ * `containsDicePool` first to reject those.
+ *
+ * Used by the parser to reject `!`, `!!`, `!p` applied to Fate pools
+ * (`4dF!`, `(4dF)kh2!`, etc.). Fate explosion semantics are undefined, so
+ * parse-time rejection is preferred over a silent evaluator no-op.
+ */
+export function containsFatePool(node: ASTNode): boolean {
+  switch (node.type) {
+    case 'FateDice':
+      return true;
+    case 'Modifier':
+    case 'Explode':
+    case 'Reroll':
+      return containsFatePool(node.target);
+    default:
+      return false;
+  }
+}
