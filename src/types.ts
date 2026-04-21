@@ -25,7 +25,14 @@ export type ComparePoint = {
 /**
  * Modifier flags applied to individual die results.
  */
-export type DieModifier = 'dropped' | 'kept' | 'exploded' | 'rerolled' | 'success' | 'failure';
+export type DieModifier =
+  | 'dropped'
+  | 'kept'
+  | 'exploded'
+  | 'rerolled'
+  | 'success'
+  | 'failure'
+  | 'meta';
 
 /**
  * PF2e Degree of Success. Produced by the `vs` operator when comparing a

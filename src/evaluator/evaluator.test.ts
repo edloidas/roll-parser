@@ -1993,4 +1993,174 @@ describe('evaluate', () => {
       }
     });
   });
+
+  describe('meta-expression dice (#54)', () => {
+    test('computed dice count preserves sub-expression dice as meta', () => {
+      const ast = parse('(1d4)d6');
+      const rng = createMockRng([2, 3, 5]);
+      const result = evaluate(ast, rng);
+
+      expect(result.rolls).toHaveLength(3);
+
+      const metaDie = getDie(result.rolls, 0);
+      expect(metaDie.sides).toBe(4);
+      expect(metaDie.result).toBe(2);
+      expect(metaDie.modifiers).toContain('meta');
+      expect(metaDie.modifiers).toContain('dropped');
+
+      expect(getDie(result.rolls, 1).sides).toBe(6);
+      expect(getDie(result.rolls, 2).sides).toBe(6);
+      expect(result.total).toBe(8);
+    });
+
+    test('computed dice sides preserves sub-expression dice as meta', () => {
+      const ast = parse('2d(1d4+2)');
+      const rng = createMockRng([4, 3, 5]);
+      const result = evaluate(ast, rng);
+
+      expect(result.rolls).toHaveLength(3);
+
+      const metaDie = getDie(result.rolls, 0);
+      expect(metaDie.sides).toBe(4);
+      expect(metaDie.modifiers).toContain('meta');
+      expect(metaDie.modifiers).toContain('dropped');
+
+      expect(getDie(result.rolls, 1).sides).toBe(6);
+      expect(getDie(result.rolls, 2).sides).toBe(6);
+      expect(result.total).toBe(8);
+    });
+
+    test('computed Fate dice count preserves meta die', () => {
+      const ast = parse('(1d2)dF');
+      const rng = createMockRng([2, 0, -1]);
+      const result = evaluate(ast, rng);
+
+      expect(result.rolls).toHaveLength(3);
+
+      const metaDie = getDie(result.rolls, 0);
+      expect(metaDie.sides).toBe(2);
+      expect(metaDie.modifiers).toContain('meta');
+      expect(metaDie.modifiers).toContain('dropped');
+
+      expect(getDie(result.rolls, 1).sides).toBe(0);
+      expect(getDie(result.rolls, 2).sides).toBe(0);
+      expect(result.total).toBe(-1);
+    });
+
+    test('computed modifier count (kh) preserves meta die', () => {
+      // d2 rolls 2 → kh2 → keep the two highest of [1, 3, 5, 6] = [5, 6].
+      const ast = parse('4d6kh(1d2)');
+      const rng = createMockRng([2, 1, 3, 5, 6]);
+      const result = evaluate(ast, rng);
+
+      expect(result.rolls).toHaveLength(5);
+
+      const metaDie = getDie(result.rolls, 0);
+      expect(metaDie.sides).toBe(2);
+      expect(metaDie.result).toBe(2);
+      expect(metaDie.modifiers).toContain('meta');
+      expect(metaDie.modifiers).toContain('dropped');
+
+      expect(result.total).toBe(5 + 6);
+    });
+
+    test('computed explode threshold preserves meta die', () => {
+      // RNG order: d6 target → d2 threshold → explosion d6.
+      // ctx.rolls order: [meta, target, exploded] — meta pushed before target.
+      const ast = parse('1d6!>(1d2+3)');
+      const rng = createMockRng([6, 2, 3]);
+      const result = evaluate(ast, rng);
+
+      expect(result.rolls).toHaveLength(3);
+
+      const metaDie = getDie(result.rolls, 0);
+      expect(metaDie.sides).toBe(2);
+      expect(metaDie.result).toBe(2);
+      expect(metaDie.modifiers).toContain('meta');
+      expect(metaDie.modifiers).toContain('dropped');
+
+      const target = getDie(result.rolls, 1);
+      expect(target.sides).toBe(6);
+      expect(target.result).toBe(6);
+
+      const exploded = getDie(result.rolls, 2);
+      expect(exploded.sides).toBe(6);
+      expect(exploded.result).toBe(3);
+      expect(exploded.modifiers).toContain('exploded');
+      expect(result.total).toBe(6 + 3);
+    });
+
+    test('computed reroll threshold preserves meta die', () => {
+      // RNG order: 2d6 target → d2 threshold → reroll for low d6.
+      // ctx.rolls order: [meta, rerolled-original, new-roll, untouched-kept].
+      const ast = parse('2d6r<(1d2+1)');
+      const rng = createMockRng([1, 5, 1, 3]);
+      const result = evaluate(ast, rng);
+
+      const metaDie = getDie(result.rolls, 0);
+      expect(metaDie.sides).toBe(2);
+      expect(metaDie.result).toBe(1);
+      expect(metaDie.modifiers).toContain('meta');
+      expect(metaDie.modifiers).toContain('dropped');
+
+      const rerolled = getDie(result.rolls, 1);
+      expect(rerolled.sides).toBe(6);
+      expect(rerolled.result).toBe(1);
+      expect(rerolled.modifiers).toContain('rerolled');
+
+      const newRoll = getDie(result.rolls, 2);
+      expect(newRoll.sides).toBe(6);
+      expect(newRoll.result).toBe(3);
+
+      const kept = getDie(result.rolls, 3);
+      expect(kept.sides).toBe(6);
+      expect(kept.result).toBe(5);
+
+      expect(result.total).toBe(3 + 5);
+    });
+
+    test('computed success threshold and fail threshold both preserved', () => {
+      // RNG order: 4d6 target → d2 threshold → d2 fail threshold.
+      // ctx.rolls order: [meta-threshold, meta-fail, ...4d6] — meta pushed before pool.
+      const ast = parse('4d6>=(1d2+3)f(1d2)');
+      const rng = createMockRng([5, 3, 6, 2, 2, 1]);
+      const result = evaluate(ast, rng);
+
+      expect(result.rolls).toHaveLength(6);
+
+      const thresholdMeta = getDie(result.rolls, 0);
+      expect(thresholdMeta.sides).toBe(2);
+      expect(thresholdMeta.result).toBe(2);
+      expect(thresholdMeta.modifiers).toContain('meta');
+      expect(thresholdMeta.modifiers).toContain('dropped');
+
+      const failMeta = getDie(result.rolls, 1);
+      expect(failMeta.sides).toBe(2);
+      expect(failMeta.result).toBe(1);
+      expect(failMeta.modifiers).toContain('meta');
+      expect(failMeta.modifiers).toContain('dropped');
+
+      const pool = result.rolls.slice(2);
+      expect(pool).toHaveLength(4);
+      expect(pool.every((d) => d.sides === 6)).toBe(true);
+    });
+
+    test('meta dice do not appear in rendered output', () => {
+      const ast = parse('(1d4)d6');
+      const rng = createMockRng([2, 3, 5]);
+      const result = evaluate(ast, rng);
+
+      expect(result.rendered).not.toContain('~~2~~');
+      expect(result.rendered).toContain('3');
+      expect(result.rendered).toContain('5');
+    });
+
+    test('meta dice count against maxDice (budget enforced)', () => {
+      const ast = parse('(1d4)d6');
+      const rng = createMockRng([2, 3, 5]);
+      const result = evaluate(ast, rng, { maxDice: 3 });
+
+      expect(result.rolls).toHaveLength(3);
+    });
+  });
 });
