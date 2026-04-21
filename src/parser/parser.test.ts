@@ -698,10 +698,6 @@ describe('Parser', () => {
       );
     });
 
-    it('should parse explode on grouped expression: (1+2)!', () => {
-      expect(parse('(1+2)!')).toEqual(explode('standard', binary('+', literal(1), literal(2))));
-    });
-
     it('should parse d6!d20 as computed dice count (exploded d6 becomes count)', () => {
       // `d6!d20` = Dice(count=Explode(Dice(1,6)), sides=20) — an exploded
       // d6 supplies the count for the outer d20. Unusual, but a legal
@@ -975,6 +971,160 @@ describe('Parser', () => {
       expect(parse('(1d6+2)>=3')).toEqual(
         successCount(binary('+', dice(literal(1), literal(6)), literal(2)), cp('>=', literal(3))),
       );
+    });
+  });
+
+  describe('postfix modifier target validation', () => {
+    // Postfix pool modifiers (kh/kl/dh/dl, !/!!/!p, r/ro) require a dice-pool
+    // target. Wrapping arithmetic silently drops user math — must parse-error.
+
+    describe('keep/drop reject non-pool targets', () => {
+      it('should reject (1d6+5)kh1', () => {
+        expect(() => parse('(1d6+5)kh1')).toThrow(ParseError);
+        try {
+          parse('(1d6+5)kh1');
+        } catch (err) {
+          expect((err as ParseError).code).toBe('INVALID_MODIFIER_TARGET');
+        }
+      });
+
+      it('should reject floor(1d6/2)kh1', () => {
+        expect(() => parse('floor(1d6/2)kh1')).toThrow(ParseError);
+        try {
+          parse('floor(1d6/2)kh1');
+        } catch (err) {
+          expect((err as ParseError).code).toBe('INVALID_MODIFIER_TARGET');
+        }
+      });
+
+      it('should reject 4d6+2kh3 (modifier binds to literal 2)', () => {
+        expect(() => parse('4d6+2kh3')).toThrow(ParseError);
+        try {
+          parse('4d6+2kh3');
+        } catch (err) {
+          expect((err as ParseError).code).toBe('INVALID_MODIFIER_TARGET');
+        }
+      });
+
+      it('should reject (1+2)dl1', () => {
+        expect(() => parse('(1+2)dl1')).toThrow(ParseError);
+        try {
+          parse('(1+2)dl1');
+        } catch (err) {
+          expect((err as ParseError).code).toBe('INVALID_MODIFIER_TARGET');
+        }
+      });
+    });
+
+    describe('explode rejects non-pool targets', () => {
+      it('should reject (1d6+5)!', () => {
+        expect(() => parse('(1d6+5)!')).toThrow(ParseError);
+        try {
+          parse('(1d6+5)!');
+        } catch (err) {
+          expect((err as ParseError).code).toBe('INVALID_EXPLODE_TARGET');
+        }
+      });
+
+      it('should reject (1d6+5)!!', () => {
+        expect(() => parse('(1d6+5)!!')).toThrow(ParseError);
+        try {
+          parse('(1d6+5)!!');
+        } catch (err) {
+          expect((err as ParseError).code).toBe('INVALID_EXPLODE_TARGET');
+        }
+      });
+
+      it('should reject (1d6+5)!p', () => {
+        expect(() => parse('(1d6+5)!p')).toThrow(ParseError);
+        try {
+          parse('(1d6+5)!p');
+        } catch (err) {
+          expect((err as ParseError).code).toBe('INVALID_EXPLODE_TARGET');
+        }
+      });
+
+      it('should reject floor(1d6/2)!', () => {
+        expect(() => parse('floor(1d6/2)!')).toThrow(ParseError);
+        try {
+          parse('floor(1d6/2)!');
+        } catch (err) {
+          expect((err as ParseError).code).toBe('INVALID_EXPLODE_TARGET');
+        }
+      });
+
+      it('should reject (4d6+1d4)! (sum of pools is not a single pool)', () => {
+        expect(() => parse('(4d6+1d4)!')).toThrow(ParseError);
+        try {
+          parse('(4d6+1d4)!');
+        } catch (err) {
+          expect((err as ParseError).code).toBe('INVALID_EXPLODE_TARGET');
+        }
+      });
+    });
+
+    describe('reroll rejects non-pool targets', () => {
+      it('should reject (1d6+5)r<3', () => {
+        expect(() => parse('(1d6+5)r<3')).toThrow(ParseError);
+        try {
+          parse('(1d6+5)r<3');
+        } catch (err) {
+          expect((err as ParseError).code).toBe('INVALID_REROLL_TARGET');
+        }
+      });
+
+      it('should reject floor(1d6/2)ro<3', () => {
+        expect(() => parse('floor(1d6/2)ro<3')).toThrow(ParseError);
+        try {
+          parse('floor(1d6/2)ro<3');
+        } catch (err) {
+          expect((err as ParseError).code).toBe('INVALID_REROLL_TARGET');
+        }
+      });
+    });
+
+    describe('valid dice-pool targets still parse', () => {
+      it('should accept (4d6)kh3', () => {
+        expect(parse('(4d6)kh3')).toEqual(
+          modifier('keep', 'highest', literal(3), dice(literal(4), literal(6))),
+        );
+      });
+
+      it('should accept (4d6)!', () => {
+        expect(parse('(4d6)!')).toEqual(explode('standard', dice(literal(4), literal(6))));
+      });
+
+      it('should accept 4dFkh2', () => {
+        expect(parse('4dFkh2')).toEqual(
+          modifier('keep', 'highest', literal(2), fateDice(literal(4))),
+        );
+      });
+
+      it('should accept chained 4d6!kh3', () => {
+        expect(parse('4d6!kh3')).toEqual(
+          modifier(
+            'keep',
+            'highest',
+            literal(3),
+            explode('standard', dice(literal(4), literal(6))),
+          ),
+        );
+      });
+
+      it('should accept chained 4d6kh3!', () => {
+        expect(parse('4d6kh3!')).toEqual(
+          explode(
+            'standard',
+            modifier('keep', 'highest', literal(3), dice(literal(4), literal(6))),
+          ),
+        );
+      });
+
+      it('should accept chained 4d6!r<2', () => {
+        expect(parse('4d6!r<2')).toEqual(
+          reroll(false, cp('<', literal(2)), explode('standard', dice(literal(4), literal(6)))),
+        );
+      });
     });
   });
 

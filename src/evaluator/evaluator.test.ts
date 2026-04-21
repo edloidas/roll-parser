@@ -1058,15 +1058,6 @@ describe('evaluate', () => {
     });
 
     describe('edge cases', () => {
-      test('(1+2)! is a no-op on non-dice target', () => {
-        const ast = parse('(1+2)!');
-        const rng = createMockRng([]);
-        const result = evaluate(ast, rng);
-
-        expect(result.total).toBe(3);
-        expect(result.rolls).toHaveLength(0);
-      });
-
       test('0d6! empty pool explodes nothing', () => {
         const ast = parse('0d6!');
         const rng = createMockRng([]);

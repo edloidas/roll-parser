@@ -259,3 +259,27 @@ export function containsDice(node: ASTNode): boolean {
       return node.args.some(containsDice);
   }
 }
+
+/**
+ * Returns `true` only when `node`'s direct result is a dice pool —
+ * `Dice`, `FateDice`, or a chained pool modifier (`Modifier` / `Explode` /
+ * `Reroll`). Unlike `containsDice`, this does NOT recurse through arithmetic
+ * wrappers (`BinaryOp`, `UnaryOp`, `FunctionCall`), so `(1d6+5)` and
+ * `floor(1d6/2)` are rejected.
+ *
+ * Used by the parser to reject postfix pool-modifier targets (kh/kl/dh/dl,
+ * !/!!/!p, r/ro) that wrap a non-pool expression. Operating on the inner
+ * dice pool would silently drop the surrounding arithmetic.
+ */
+export function containsDicePool(node: ASTNode): boolean {
+  switch (node.type) {
+    case 'Dice':
+    case 'FateDice':
+    case 'Modifier':
+    case 'Explode':
+    case 'Reroll':
+      return true;
+    default:
+      return false;
+  }
+}
