@@ -23,7 +23,7 @@ import type {
   UnaryOpNode,
   VersusNode,
 } from './ast';
-import { containsDice, isSuccessCount } from './ast';
+import { containsDice, containsDicePool, isSuccessCount } from './ast';
 
 /**
  * Error thrown when the parser encounters invalid syntax.
@@ -400,6 +400,17 @@ export class Parser {
   private parseModifier(target: ASTNode, token: Token): ModifierNode {
     this.rejectSuccessCountTarget(target, token);
 
+    // Keep/drop modifiers need a dice pool to select from. Wrapping arithmetic
+    // (e.g. `(1d6+5)kh1`, `4d6+2kh3`) would silently drop user math.
+    if (!containsDicePool(target)) {
+      throw new ParseError(
+        `Keep/drop modifiers require a dice pool target`,
+        'INVALID_MODIFIER_TARGET',
+        token.position,
+        token,
+      );
+    }
+
     const modifier =
       token.type === TokenType.KEEP_HIGH || token.type === TokenType.KEEP_LOW ? 'keep' : 'drop';
 
@@ -426,6 +437,17 @@ export class Parser {
 
   private parseExplode(target: ASTNode, token: Token): ExplodeNode {
     this.rejectSuccessCountTarget(target, token);
+
+    // Explode needs a dice pool to explode on. Wrapping arithmetic (e.g.
+    // `(1d6+5)!`, `floor(1d6/2)!`) would silently drop user math.
+    if (!containsDicePool(target)) {
+      throw new ParseError(
+        `Explode modifier requires a dice pool target`,
+        'INVALID_EXPLODE_TARGET',
+        token.position,
+        token,
+      );
+    }
 
     // ? Reject nested explodes (e.g., `1d6!!!`) — a second explode token atop
     //   an ExplodeNode has no meaningful semantics and is rejected per spec.
@@ -454,6 +476,17 @@ export class Parser {
 
   private parseReroll(target: ASTNode, token: Token): RerollNode {
     this.rejectSuccessCountTarget(target, token);
+
+    // Reroll needs a dice pool to inspect. Wrapping arithmetic (e.g.
+    // `(1d6+5)r<3`, `floor(1d6/2)ro<3`) would silently drop user math.
+    if (!containsDicePool(target)) {
+      throw new ParseError(
+        `Reroll modifier requires a dice pool target`,
+        'INVALID_REROLL_TARGET',
+        token.position,
+        token,
+      );
+    }
 
     // A reroll token must be followed by a comparison — bare `r` / `ro` is invalid.
     if (!this.isComparePointAhead()) {
