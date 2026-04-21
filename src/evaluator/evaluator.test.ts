@@ -1745,26 +1745,67 @@ describe('evaluate', () => {
       }
     });
 
-    test('Sibling versus in arithmetic do not falsely throw NESTED_VERSUS', () => {
-      // `(a vs b) + (c vs d)` — two independent checks under arithmetic.
-      // insideVersus must reset between siblings via try/finally.
+    test('Sibling versus in arithmetic throw NESTED_VERSUS at merge', () => {
+      // `(a vs b) + (c vs d)` — two independent checks collide on one
+      // `RollResult`. There is no semantics for combining two degrees, so the
+      // merge rejects the ambiguity rather than silently dropping one side.
       const ast = parse('(1d20 vs 15) + (1d20 vs 20)');
       const rng = createMockRng([12, 18]);
 
-      expect(() => evaluate(ast, rng)).not.toThrow();
+      try {
+        evaluate(ast, rng);
+        throw new Error('expected evaluate to throw');
+      } catch (err) {
+        expect(err).toBeInstanceOf(EvaluatorError);
+        expect((err as EvaluatorError).code).toBe('NESTED_VERSUS');
+      }
     });
 
-    test('degree/natural undefined when vs is not the root expression', () => {
-      // `(1d20 vs 15) + 5` — versus is a sub-expression, so versusMetadata
-      // lives on a sub-ctx and does not populate RollResult. Documented
-      // v1 limitation.
+    test('degree/natural populated when vs is wrapped in arithmetic', () => {
       const ast = parse('(1d20 vs 15) + 5');
       const rng = createMockRng([18]);
       const result = evaluate(ast, rng);
 
       expect(result.total).toBe(23);
-      expect(result.degree).toBeUndefined();
-      expect(result.natural).toBeUndefined();
+      expect(result.degree).toBe(DegreeOfSuccess.Success);
+      expect(result.natural).toBe(18);
+    });
+
+    test('floor(1d20+10 vs 25) — degree/natural propagate through function call', () => {
+      const ast = parse('floor(1d20+10 vs 25)');
+      const rng = createMockRng([15]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(25);
+      expect(result.degree).toBe(DegreeOfSuccess.Success);
+      expect(result.natural).toBe(15);
+    });
+
+    test('max(1d20+5 vs 20, 0) — metadata propagates through multi-arg function', () => {
+      const ast = parse('max(1d20+5 vs 20, 0)');
+      const rng = createMockRng([12]);
+      const result = evaluate(ast, rng);
+
+      expect(result.degree).toBeDefined();
+      expect(result.natural).toBe(12);
+    });
+
+    test('(1d20+10 vs 25) + 0 — metadata propagates through binary op', () => {
+      const ast = parse('(1d20+10 vs 25) + 0');
+      const rng = createMockRng([15]);
+      const result = evaluate(ast, rng);
+
+      expect(result.degree).toBe(DegreeOfSuccess.Success);
+      expect(result.natural).toBe(15);
+    });
+
+    test('-(1d20 vs 15) — metadata propagates through unary op', () => {
+      const ast = parse('-(1d20 vs 15)');
+      const rng = createMockRng([18]);
+      const result = evaluate(ast, rng);
+
+      expect(result.degree).toBe(DegreeOfSuccess.Success);
+      expect(result.natural).toBe(18);
     });
 
     test('RollResult.total is the numeric roll total, not the degree enum', () => {
