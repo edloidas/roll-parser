@@ -23,7 +23,7 @@ import type {
   UnaryOpNode,
   VersusNode,
 } from './ast';
-import { containsDice, containsDicePool, isSuccessCount } from './ast';
+import { containsDicePool, isSuccessCount } from './ast';
 
 /**
  * Error thrown when the parser encounters invalid syntax.
@@ -57,6 +57,10 @@ const BP = {
   // Versus (left-associative, lowest precedence — `1d20+10 vs 25+10` = `(1d20+10) vs (25+10)`)
   VS_LEFT: 2,
   VS_RIGHT: 3,
+  // Comparison operators used as the success-count LED. Must be below
+  // ADD/MUL so `XdY+N>T` parses as `(XdY+N)>T` and fails the pool-target
+  // guard with a clear error, instead of the `>` stealing `N` from the `+`.
+  COMPARE: 8,
   // Addition/subtraction (left-associative)
   ADD_LEFT: 10,
   ADD_RIGHT: 11,
@@ -157,7 +161,7 @@ export class Parser {
         return this.parseLiteral(token);
 
       case TokenType.MINUS:
-        return this.parseUnaryMinus();
+        return this.parseUnaryMinus(token);
 
       case TokenType.DICE:
         return this.parsePrefixDice();
@@ -254,8 +258,9 @@ export class Parser {
     };
   }
 
-  private parseUnaryMinus(): UnaryOpNode {
+  private parseUnaryMinus(token: Token): UnaryOpNode {
     const operand = this.parseExpression(BP.UNARY);
+    this.rejectSuccessCountTarget(operand, token);
     return {
       type: 'UnaryOp',
       operator: '-',
@@ -333,10 +338,14 @@ export class Parser {
 
     const args: ASTNode[] = [];
     if (this.peek().type !== TokenType.RPAREN) {
-      args.push(this.parseExpression(0));
+      const first = this.parseExpression(0);
+      this.rejectSuccessCountTarget(first, token);
+      args.push(first);
       while (this.peek().type === TokenType.COMMA) {
         this.advance();
-        args.push(this.parseExpression(0));
+        const next = this.parseExpression(0);
+        this.rejectSuccessCountTarget(next, token);
+        args.push(next);
       }
     }
 
@@ -374,9 +383,13 @@ export class Parser {
   }
 
   private parseBinaryOp(left: ASTNode, token: Token): BinaryOpNode {
+    this.rejectSuccessCountTarget(left, token);
+
     const operator = this.getOperatorSymbol(token);
     const rightBp = this.getRightBp(token);
     const right = this.parseExpression(rightBp);
+
+    this.rejectSuccessCountTarget(right, token);
 
     return {
       type: 'BinaryOp',
@@ -508,11 +521,12 @@ export class Parser {
     // Success counting is terminal: chaining (`>=5>=3`) has no semantics.
     this.rejectSuccessCountTarget(target, token);
 
-    // Reject non-dice targets like `1>=3` or `(1+2)>=3`. Success counting
-    // operates on a dice pool; a sum has no pool to count.
-    if (!containsDice(target)) {
+    // Reject non-pool targets like `1>=3`, `(1+2)>=3`, `(1d6*2)>=10`, or
+    // `(1d20 vs 15)>=1`. Success counting operates on a raw dice pool; any
+    // arithmetic or composition wrapping would be silently ignored.
+    if (!containsDicePool(target)) {
       throw new ParseError(
-        `Success counting requires a dice expression`,
+        `Success counting requires a dice pool target`,
         'INVALID_SUCCESS_COUNT_TARGET',
         token.position,
         token,
@@ -537,6 +551,8 @@ export class Parser {
   }
 
   private parseVersus(left: ASTNode, token: Token): VersusNode {
+    this.rejectSuccessCountTarget(left, token);
+
     // ? Chained `a vs b vs c` has no semantics — a degree is a scalar, not a
     //   comparable. Parens (`a vs (b vs c)`) slip past this check and are
     //   caught by the evaluator via `EvalEnv.insideVersus`.
@@ -545,6 +561,7 @@ export class Parser {
     }
 
     const dc = this.parseExpression(BP.VS_RIGHT);
+    this.rejectSuccessCountTarget(dc, token);
 
     return { type: 'Versus', roll: left, dc };
   }
@@ -657,15 +674,19 @@ export class Parser {
       case TokenType.EXPLODE_PENETRATING:
       case TokenType.REROLL:
       case TokenType.REROLL_ONCE:
+        return BP.MODIFIER;
       // Comparison operators act as LED-dispatched success-count modifiers
-      // at the Pratt level. Inside `parseComparePoint` (called manually by
-      // explode/reroll) they are consumed directly and this BP is bypassed.
+      // at the Pratt level. Sit below ADD/MUL so arithmetic on a dice pool
+      // completes before success counting wraps it — `5d6+2>4` parses as
+      // `(5d6+2)>4` and then cleanly fails the pool-target guard, rather
+      // than the `>` stealing `2` from the `+`. Inside `parseComparePoint`
+      // (called manually by explode/reroll) this BP is bypassed.
       case TokenType.GREATER:
       case TokenType.GREATER_EQUAL:
       case TokenType.LESS:
       case TokenType.LESS_EQUAL:
       case TokenType.EQUAL:
-        return BP.MODIFIER;
+        return BP.COMPARE;
       case TokenType.RPAREN:
       case TokenType.EOF:
       // Punctuation and keywords that terminate expressions

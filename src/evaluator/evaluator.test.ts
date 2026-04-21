@@ -1458,25 +1458,6 @@ describe('evaluate', () => {
       }
     });
 
-    test('arithmetic on success count — 5d6>=5+3', () => {
-      const ast = parse('5d6>=5+3');
-      const rng = createMockRng([1, 2, 3, 4, 5]);
-      const result = evaluate(ast, rng);
-
-      // 1 success (the 5) + 3 literal = 4.
-      expect(result.total).toBe(4);
-      expect(result.successes).toBe(1);
-    });
-
-    test('multiplication on success count — 5d6>=5*2', () => {
-      const ast = parse('5d6>=5*2');
-      const rng = createMockRng([5, 5, 2, 6, 1]);
-      const result = evaluate(ast, rng);
-
-      expect(result.successes).toBe(3); // 5, 5, 6
-      expect(result.total).toBe(6); // 3 * 2
-    });
-
     test('rendered output uses ** and __ markers', () => {
       const ast = parse('3d6>=5f1');
       const rng = createMockRng([1, 5, 3]);
@@ -1522,17 +1503,6 @@ describe('evaluate', () => {
 
       expect(result.successes).toBe(2);
       expect(result.failures).toBe(0);
-    });
-
-    test('aggregates across multiple success-count subexpressions', () => {
-      const ast = parse('4d6>=5 + 4d6>=4');
-      // Pool 1: [5, 6, 2, 3] → 2 successes
-      // Pool 2: [4, 1, 4, 2] → 2 successes
-      const rng = createMockRng([5, 6, 2, 3, 4, 1, 4, 2]);
-      const result = evaluate(ast, rng);
-
-      expect(result.successes).toBe(4);
-      expect(result.total).toBe(4);
     });
   });
 

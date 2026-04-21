@@ -847,16 +847,22 @@ describe('Parser', () => {
       );
     });
 
-    it('should attach outer + as BinaryOp on SuccessCount: 5d6>=5+3', () => {
-      expect(parse('5d6>=5+3')).toEqual(
-        binary('+', successCount(dice(literal(5), literal(6)), cp('>=', literal(5))), literal(3)),
-      );
+    it('should reject outer + on SuccessCount: 5d6>=5+3', () => {
+      expect(() => parse('5d6>=5+3')).toThrow(ParseError);
+      try {
+        parse('5d6>=5+3');
+      } catch (err) {
+        expect((err as ParseError).code).toBe('INVALID_SUCCESS_COUNT_TARGET');
+      }
     });
 
-    it('should attach outer * as BinaryOp on SuccessCount: 5d6>=5 * 2', () => {
-      expect(parse('5d6>=5 * 2')).toEqual(
-        binary('*', successCount(dice(literal(5), literal(6)), cp('>=', literal(5))), literal(2)),
-      );
+    it('should reject outer * on SuccessCount: 5d6>=5 * 2', () => {
+      expect(() => parse('5d6>=5 * 2')).toThrow(ParseError);
+      try {
+        parse('5d6>=5 * 2');
+      } catch (err) {
+        expect((err as ParseError).code).toBe('INVALID_SUCCESS_COUNT_TARGET');
+      }
     });
 
     it('should wrap keep-highest-then-count: 4d6kh3>=5', () => {
@@ -967,9 +973,99 @@ describe('Parser', () => {
       }
     });
 
-    it('should accept dice inside binary target: (1d6+2)>=3', () => {
-      expect(parse('(1d6+2)>=3')).toEqual(
-        successCount(binary('+', dice(literal(1), literal(6)), literal(2)), cp('>=', literal(3))),
+    it('should reject non-pool arithmetic target: (1d6+2)>=3', () => {
+      expect(() => parse('(1d6+2)>=3')).toThrow(ParseError);
+      try {
+        parse('(1d6+2)>=3');
+      } catch (err) {
+        expect((err as ParseError).code).toBe('INVALID_SUCCESS_COUNT_TARGET');
+      }
+    });
+
+    it('should reject non-pool multiplication target: (1d6*2)>=10', () => {
+      expect(() => parse('(1d6*2)>=10')).toThrow(ParseError);
+      try {
+        parse('(1d6*2)>=10');
+      } catch (err) {
+        expect((err as ParseError).code).toBe('INVALID_SUCCESS_COUNT_TARGET');
+      }
+    });
+
+    it('should reject versus inside success-count target: (1d20 vs 15)>=1', () => {
+      expect(() => parse('(1d20 vs 15)>=1')).toThrow(ParseError);
+      try {
+        parse('(1d20 vs 15)>=1');
+      } catch (err) {
+        expect((err as ParseError).code).toBe('INVALID_SUCCESS_COUNT_TARGET');
+      }
+    });
+
+    it('should reject XdY+N>T (BP keeps arithmetic ahead of compare): 5d6+2>4', () => {
+      expect(() => parse('5d6+2>4')).toThrow(ParseError);
+      try {
+        parse('5d6+2>4');
+      } catch (err) {
+        expect((err as ParseError).code).toBe('INVALID_SUCCESS_COUNT_TARGET');
+      }
+    });
+
+    it('should reject XdY+N>=T: 5d6+2>=4', () => {
+      expect(() => parse('5d6+2>=4')).toThrow(ParseError);
+      try {
+        parse('5d6+2>=4');
+      } catch (err) {
+        expect((err as ParseError).code).toBe('INVALID_SUCCESS_COUNT_TARGET');
+      }
+    });
+
+    it('should reject binary wrapping on success count: 2 * (1d6>=5)', () => {
+      expect(() => parse('2 * (1d6>=5)')).toThrow(ParseError);
+      try {
+        parse('2 * (1d6>=5)');
+      } catch (err) {
+        expect((err as ParseError).code).toBe('INVALID_SUCCESS_COUNT_TARGET');
+      }
+    });
+
+    it('should reject parenthesized + on success count: (1d6>=5) + 3', () => {
+      expect(() => parse('(1d6>=5) + 3')).toThrow(ParseError);
+      try {
+        parse('(1d6>=5) + 3');
+      } catch (err) {
+        expect((err as ParseError).code).toBe('INVALID_SUCCESS_COUNT_TARGET');
+      }
+    });
+
+    it('should reject success count inside function arg: max(1d6>=5, 2)', () => {
+      expect(() => parse('max(1d6>=5, 2)')).toThrow(ParseError);
+      try {
+        parse('max(1d6>=5, 2)');
+      } catch (err) {
+        expect((err as ParseError).code).toBe('INVALID_SUCCESS_COUNT_TARGET');
+      }
+    });
+
+    it('should reject success count as vs roll side: 10d10>=6 vs 8', () => {
+      expect(() => parse('10d10>=6 vs 8')).toThrow(ParseError);
+      try {
+        parse('10d10>=6 vs 8');
+      } catch (err) {
+        expect((err as ParseError).code).toBe('INVALID_SUCCESS_COUNT_TARGET');
+      }
+    });
+
+    it('should reject unary minus on success count: -(1d6>=5)', () => {
+      expect(() => parse('-(1d6>=5)')).toThrow(ParseError);
+      try {
+        parse('-(1d6>=5)');
+      } catch (err) {
+        expect((err as ParseError).code).toBe('INVALID_SUCCESS_COUNT_TARGET');
+      }
+    });
+
+    it('should still parse plain pool success count: 5d6>=5', () => {
+      expect(parse('5d6>=5')).toEqual(
+        successCount(dice(literal(5), literal(6)), cp('>=', literal(5))),
       );
     });
   });
