@@ -680,6 +680,10 @@ function evalSuccessCount(
   ctx: EvalContext,
   env: EvalEnv,
 ): number {
+  // ? Flag tracks syntactic presence of success-count notation, not pool size —
+  //   set before any early return so empty pools still populate successes/failures.
+  env.hasSuccessCount = true;
+
   const targetCtx: EvalContext = { rolls: [], expressionParts: [], renderedParts: [] };
   const targetValue = evalNode(node.target, rng, targetCtx, env);
   const targetExpr = targetCtx.expressionParts.join('');
@@ -709,8 +713,6 @@ function evalSuccessCount(
       ? { operator: node.failThreshold.operator, value: failValue }
       : undefined,
   );
-
-  env.hasSuccessCount = true;
 
   ctx.rolls.push(...targetCtx.rolls);
   ctx.expressionParts.push(`${targetExpr}${code}`);

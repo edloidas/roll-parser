@@ -1494,6 +1494,26 @@ describe('evaluate', () => {
       expect(result.successes).toBe(2);
       expect(result.failures).toBe(0);
     });
+
+    test('empty pool still populates successes/failures — 0d6>=6f1', () => {
+      const ast = parse('0d6>=6f1');
+      const rng = createMockRng([]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(0);
+      expect(result.rolls).toHaveLength(0);
+      expect(result.successes).toBe(0);
+      expect(result.failures).toBe(0);
+    });
+
+    test('empty pool success is numeric — 0d10>=6 arithmetic does not NaN', () => {
+      const ast = parse('0d10>=6');
+      const rng = createMockRng([]);
+      const result = evaluate(ast, rng);
+
+      expect(result.successes).toBe(0);
+      expect((result.successes ?? Number.NaN) + 5).toBe(5);
+    });
   });
 
   describe('versus (PF2e degrees of success)', () => {
