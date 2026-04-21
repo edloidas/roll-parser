@@ -51,6 +51,13 @@ export type DieResult = {
   sides: number;
   /** The rolled value */
   result: number;
+  /**
+   * Raw first roll before any mutation (e.g., compound-explode accumulation).
+   * Only populated when `result` has been overwritten with a computed value.
+   * Consumers that need the original face (nat-20 / nat-1 detection) should
+   * read `initialResult ?? result`.
+   */
+  initialResult?: number;
   /** Modifiers applied to this die */
   modifiers: DieModifier[];
   /** True if rolled the maximum value (always false for Fate dice) */
