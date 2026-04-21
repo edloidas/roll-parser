@@ -1786,6 +1786,41 @@ describe('evaluate', () => {
       expect(getDie(result.rolls, 0).result).toBe(15);
       expect(getDie(result.rolls, 1).result).toBe(8);
     });
+
+    test('Compound explode nat-20: 1d20!! vs 30 rolls=[20,5] → natural=20, upgrade Failure→Success', () => {
+      const ast = parse('1d20!! vs 30');
+      const rng = createMockRng([20, 5]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(25);
+      expect(result.natural).toBe(20);
+      expect(result.degree).toBe(DegreeOfSuccess.Success);
+      expect(getDie(result.rolls, 0).result).toBe(25);
+      expect(getDie(result.rolls, 0).initialResult).toBe(20);
+    });
+
+    test('Compound explode nat-1: 1d20!!<=1 vs 5 rolls=[1,3] → natural=1, downgrade Failure→CriticalFailure', () => {
+      const ast = parse('1d20!!<=1 vs 5');
+      const rng = createMockRng([1, 3]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(4);
+      expect(result.natural).toBe(1);
+      expect(result.degree).toBe(DegreeOfSuccess.CriticalFailure);
+      expect(getDie(result.rolls, 0).result).toBe(4);
+      expect(getDie(result.rolls, 0).initialResult).toBe(1);
+    });
+
+    test('Compound explode without trigger: initialResult is undefined, natural uses result', () => {
+      const ast = parse('1d20!! vs 15');
+      const rng = createMockRng([18]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(18);
+      expect(result.natural).toBe(18);
+      expect(result.degree).toBe(DegreeOfSuccess.Success);
+      expect(getDie(result.rolls, 0).initialResult).toBeUndefined();
+    });
   });
 
   describe('math functions', () => {

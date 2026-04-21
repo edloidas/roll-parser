@@ -160,6 +160,7 @@ export function applyCompoundExplode(
     return {
       sides,
       result: accumulated,
+      initialResult: original.result,
       modifiers: original.modifiers.includes('exploded')
         ? original.modifiers
         : [...original.modifiers, 'exploded'],

@@ -681,7 +681,9 @@ function extractNatural(rolls: DieResult[]): number | undefined {
   const keptD20s = rolls.filter(
     (d) => d.sides === 20 && !d.modifiers.includes('dropped') && !d.modifiers.includes('rerolled'),
   );
-  return keptD20s.length === 1 ? keptD20s[0]?.result : undefined;
+  if (keptD20s.length !== 1) return undefined;
+  const die = keptD20s[0];
+  return die?.initialResult ?? die?.result;
 }
 
 /**
