@@ -309,6 +309,29 @@ function evalFateDice(node: FateDiceNode, rng: RNG, ctx: EvalContext, env: EvalE
   return total;
 }
 
+/**
+ * Merges a child sub-context back into its parent. Copies `rolls` and
+ * propagates `versusMetadata` so `degree`/`natural` survive wrappers like
+ * `floor(...)`, `(vs) + 0`, or `-(vs)`. Throws `NESTED_VERSUS` if both sides
+ * carry metadata — two versus results cannot occupy the same `RollResult`.
+ *
+ * Does not merge `expressionParts` / `renderedParts` — each wrapper formats
+ * those with its own operator/function syntax.
+ */
+function mergeContext(parent: EvalContext, child: EvalContext): void {
+  parent.rolls.push(...child.rolls);
+  if (child.versusMetadata) {
+    if (parent.versusMetadata) {
+      throw new EvaluatorError(
+        'Multiple versus operators in the same expression',
+        'NESTED_VERSUS',
+        'Versus',
+      );
+    }
+    parent.versusMetadata = child.versusMetadata;
+  }
+}
+
 function evalBinaryOp(node: BinaryOpNode, rng: RNG, ctx: EvalContext, env: EvalEnv): number {
   const leftCtx: EvalContext = { rolls: [], expressionParts: [], renderedParts: [] };
   const rightCtx: EvalContext = { rolls: [], expressionParts: [], renderedParts: [] };
@@ -316,7 +339,8 @@ function evalBinaryOp(node: BinaryOpNode, rng: RNG, ctx: EvalContext, env: EvalE
   const left = evalNode(node.left, rng, leftCtx, env);
   const right = evalNode(node.right, rng, rightCtx, env);
 
-  ctx.rolls.push(...leftCtx.rolls, ...rightCtx.rolls);
+  mergeContext(ctx, leftCtx);
+  mergeContext(ctx, rightCtx);
 
   const leftExpr = leftCtx.expressionParts.join('');
   const rightExpr = rightCtx.expressionParts.join('');
@@ -356,7 +380,7 @@ function evalUnaryOp(node: UnaryOpNode, rng: RNG, ctx: EvalContext, env: EvalEnv
   const innerCtx: EvalContext = { rolls: [], expressionParts: [], renderedParts: [] };
   const value = evalNode(node.operand, rng, innerCtx, env);
 
-  ctx.rolls.push(...innerCtx.rolls);
+  mergeContext(ctx, innerCtx);
 
   const innerExpr = innerCtx.expressionParts.join('');
   const innerRendered = innerCtx.renderedParts.join('');
@@ -383,7 +407,7 @@ function evalFunctionCall(
   }
 
   for (const argCtx of argCtxs) {
-    ctx.rolls.push(...argCtx.rolls);
+    mergeContext(ctx, argCtx);
   }
 
   const argExprs = argCtxs.map((c) => c.expressionParts.join(''));
