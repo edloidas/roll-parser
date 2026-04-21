@@ -158,6 +158,27 @@ describe('property-based invariants', () => {
       );
     });
 
+    test('success count always defines numeric successes/failures, even on empty pools', () => {
+      fc.assert(
+        fc.property(
+          fc.integer({ min: 0, max: 5 }),
+          fc.integer({ min: 2, max: 20 }),
+          fc.integer({ min: 0, max: 0xffffffff }),
+          (count, sides, seed) => {
+            const threshold = Math.max(1, Math.min(sides, 1 + (seed % sides)));
+            const result = roll(`${count}d${sides}>=${threshold}`, { seed: `prop-sc-${seed}` });
+            return (
+              typeof result.successes === 'number' &&
+              typeof result.failures === 'number' &&
+              result.successes >= 0 &&
+              result.failures >= 0
+            );
+          },
+        ),
+        { numRuns: 100 },
+      );
+    });
+
     test('keep highest total >= keep lowest total (for same rolls)', () => {
       fc.assert(
         fc.property(
