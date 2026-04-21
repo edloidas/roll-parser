@@ -93,9 +93,10 @@ export type RerollNode = {
  * Success counting node (`>=T`, `>T`, `<T`, `<=T`, `=T`, with optional `f=F`).
  *
  * Transforms a dice pool into a success count: each die meeting `threshold`
- * adds +1, each die meeting `failThreshold` subtracts 1. Terminal — no further
- * postfix modifiers may wrap a `SuccessCountNode`. The `failThreshold`
- * operator is always `=` (fail on an exact value).
+ * adds +1, each die meeting `failThreshold` subtracts 1. Terminal — a
+ * `SuccessCountNode` may not be wrapped by any postfix modifier, binary
+ * operator, unary operator, versus operand, or function argument. The
+ * `failThreshold` operator is always `=` (fail on an exact value).
  */
 export type SuccessCountNode = {
   type: 'SuccessCount';

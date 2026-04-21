@@ -644,8 +644,8 @@ function evalSuccessCount(
     failValue != null ? `f${failValue}` : ''
   }`;
 
-  // No-op when the target produced no dice in its pool. `containsDice` should
-  // already reject this at parse time, but guard defensively.
+  // No-op when the target produced no dice in its pool. `containsDicePool`
+  // should already reject this at parse time, but guard defensively.
   if (targetCtx.rolls.length === 0) {
     ctx.expressionParts.push(`${targetExpr}${code}`);
     ctx.renderedParts.push(`${targetExpr}${code}`);
