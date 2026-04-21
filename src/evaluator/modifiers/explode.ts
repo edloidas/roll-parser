@@ -75,8 +75,11 @@ function explodeLimitError(maxIterations: number): EvaluatorError {
  * Returns true when the die is eligible to start exploding: it must not
  * already be dropped by a prior modifier, and its `sides` must be rollable.
  *
- * Fate dice (sides = 0) are skipped defensively — `rng.nextInt(1, 0)` is
- * invalid. Fate + explode is out of scope for the current feature set.
+ * The `sides < 1` branch is a defense-in-depth fallback — Fate dice
+ * (sides = 0) are rejected at parse time via `INVALID_EXPLODE_TARGET`
+ * (see `parseExplode` in `src/parser/parser.ts`), so this guard should
+ * never fire during normal flow. Keeping it ensures `rng.nextInt(1, 0)`
+ * can never be reached if a future AST path slips past the parser gate.
  */
 function canExplode(die: DieResult): boolean {
   if (die.modifiers.includes('dropped')) return false;

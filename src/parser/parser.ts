@@ -23,7 +23,7 @@ import type {
   UnaryOpNode,
   VersusNode,
 } from './ast';
-import { containsDicePool, isSuccessCount } from './ast';
+import { containsDicePool, containsFatePool, isSuccessCount } from './ast';
 
 /**
  * Error thrown when the parser encounters invalid syntax.
@@ -456,6 +456,18 @@ export class Parser {
     if (!containsDicePool(target)) {
       throw new ParseError(
         `Explode modifier requires a dice pool target`,
+        'INVALID_EXPLODE_TARGET',
+        token.position,
+        token,
+      );
+    }
+
+    // Fate dice (sides = 0) cannot explode — the symmetric -1/0/+1 range has
+    // no natural "max" trigger, so semantics are undefined. Reject at parse
+    // time rather than silently no-op in the evaluator.
+    if (containsFatePool(target)) {
+      throw new ParseError(
+        `Fate dice cannot explode`,
         'INVALID_EXPLODE_TARGET',
         token.position,
         token,

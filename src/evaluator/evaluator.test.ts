@@ -1067,16 +1067,6 @@ describe('evaluate', () => {
         expect(result.rolls).toHaveLength(0);
       });
 
-      test('Fate dice + explode: defensive skip (sides=0 never explodes)', () => {
-        const ast = parse('1dF!');
-        const rng = createMockRng([0]);
-        const result = evaluate(ast, rng);
-
-        expect(result.total).toBe(0);
-        expect(result.rolls).toHaveLength(1);
-        expect(getDie(result.rolls, 0).modifiers).not.toContain('exploded');
-      });
-
       test('expression string includes explode notation', () => {
         const ast = parse('1d6!');
         const rng = createMockRng([3]);
