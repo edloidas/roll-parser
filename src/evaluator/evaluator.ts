@@ -150,21 +150,49 @@ function createFateDieResult(result: number): DieResult {
  * Renders dice results for display. Marker priority: dropped wins over
  * success/failure (dropped dice are never counted), success wins over
  * failure (a die cannot be both). Example: `[~~1~~, **6**, __1__, 3]`.
+ *
+ * Dice tagged `'meta'` (rolled to compute sub-expression parameters such as
+ * count/sides/threshold) are hidden from the rendered output — they exist in
+ * `RollResult.rolls` for audit, not for display.
  */
 function renderDice(dice: DieResult[]): string {
-  const parts = dice.map((die) => {
-    if (die.modifiers.includes('dropped')) {
-      return `~~${die.result}~~`;
-    }
-    if (die.modifiers.includes('success')) {
-      return `**${die.result}**`;
-    }
-    if (die.modifiers.includes('failure')) {
-      return `__${die.result}__`;
-    }
-    return String(die.result);
-  });
+  const parts = dice
+    .filter((die) => !die.modifiers.includes('meta'))
+    .map((die) => {
+      if (die.modifiers.includes('dropped')) {
+        return `~~${die.result}~~`;
+      }
+      if (die.modifiers.includes('success')) {
+        return `**${die.result}**`;
+      }
+      if (die.modifiers.includes('failure')) {
+        return `__${die.result}__`;
+      }
+      return String(die.result);
+    });
   return `[${parts.join(', ')}]`;
+}
+
+/**
+ * Forwards rolls from a throwaway sub-expression context into the parent
+ * audit trail, tagging them as `'meta'` + `'dropped'`. Meta dice are dice
+ * rolled to compute parameters (dice count, sides, threshold, modifier
+ * count) — they consume RNG and count against `maxDice`, so they must be
+ * inspectable. Tagging them `'dropped'` keeps totals correct via
+ * `sumKeptDice`; `'meta'` lets renderers hide them and lets callers
+ * distinguish them from ordinary pool dice.
+ */
+function mergeMetaRolls(parent: EvalContext, source: EvalContext): void {
+  for (const die of source.rolls) {
+    parent.rolls.push({
+      ...die,
+      modifiers: [
+        ...die.modifiers.filter((m) => m !== 'kept' && m !== 'dropped'),
+        'meta',
+        'dropped',
+      ],
+    });
+  }
 }
 
 /**
@@ -223,18 +251,13 @@ function evalLiteral(value: number, ctx: EvalContext): number {
 }
 
 function evalDice(node: DiceNode, rng: RNG, ctx: EvalContext, env: EvalEnv): number {
-  const count = evalNode(
-    node.count,
-    rng,
-    { rolls: [], expressionParts: [], renderedParts: [] },
-    env,
-  );
-  const sides = evalNode(
-    node.sides,
-    rng,
-    { rolls: [], expressionParts: [], renderedParts: [] },
-    env,
-  );
+  const countCtx: EvalContext = { rolls: [], expressionParts: [], renderedParts: [] };
+  const count = evalNode(node.count, rng, countCtx, env);
+  mergeMetaRolls(ctx, countCtx);
+
+  const sidesCtx: EvalContext = { rolls: [], expressionParts: [], renderedParts: [] };
+  const sides = evalNode(node.sides, rng, sidesCtx, env);
+  mergeMetaRolls(ctx, sidesCtx);
 
   if (!Number.isInteger(count) || count < 0) {
     throw new EvaluatorError(`Invalid dice count: ${count}`, 'INVALID_DICE_COUNT', 'Dice');
@@ -271,12 +294,9 @@ function evalDice(node: DiceNode, rng: RNG, ctx: EvalContext, env: EvalEnv): num
 }
 
 function evalFateDice(node: FateDiceNode, rng: RNG, ctx: EvalContext, env: EvalEnv): number {
-  const count = evalNode(
-    node.count,
-    rng,
-    { rolls: [], expressionParts: [], renderedParts: [] },
-    env,
-  );
+  const countCtx: EvalContext = { rolls: [], expressionParts: [], renderedParts: [] };
+  const count = evalNode(node.count, rng, countCtx, env);
+  mergeMetaRolls(ctx, countCtx);
 
   if (!Number.isInteger(count) || count < 0) {
     throw new EvaluatorError(`Invalid dice count: ${count}`, 'INVALID_DICE_COUNT', 'FateDice');
@@ -459,6 +479,7 @@ function requireUnaryArg(name: string, values: number[]): number {
 function flattenModifierChain(
   node: ModifierNode,
   rng: RNG,
+  ctx: EvalContext,
   env: EvalEnv,
 ): { specs: ModifierSpec[]; baseTarget: ASTNode } {
   const specs: ModifierSpec[] = [];
@@ -467,6 +488,7 @@ function flattenModifierChain(
   while (isModifier(current)) {
     const countCtx: EvalContext = { rolls: [], expressionParts: [], renderedParts: [] };
     const modCount = evalNode(current.count, rng, countCtx, env);
+    mergeMetaRolls(ctx, countCtx);
 
     if (!Number.isInteger(modCount) || modCount < 0) {
       throw new EvaluatorError(
@@ -553,6 +575,7 @@ function evalExplode(node: ExplodeNode, rng: RNG, ctx: EvalContext, env: EvalEnv
   if (node.threshold != null) {
     const thresholdCtx: EvalContext = { rolls: [], expressionParts: [], renderedParts: [] };
     thresholdValue = evalNode(node.threshold.value, rng, thresholdCtx, env);
+    mergeMetaRolls(ctx, thresholdCtx);
   }
 
   const code = formatExplodeCode(node.variant, node.threshold, thresholdValue);
@@ -590,6 +613,7 @@ function evalReroll(node: RerollNode, rng: RNG, ctx: EvalContext, env: EvalEnv):
 
   const thresholdCtx: EvalContext = { rolls: [], expressionParts: [], renderedParts: [] };
   const thresholdValue = evalNode(node.condition.value, rng, thresholdCtx, env);
+  mergeMetaRolls(ctx, thresholdCtx);
 
   const code = `${node.once ? 'ro' : 'r'}${node.condition.operator}${thresholdValue}`;
 
@@ -612,7 +636,7 @@ function evalReroll(node: RerollNode, rng: RNG, ctx: EvalContext, env: EvalEnv):
 }
 
 function evalModifier(node: ModifierNode, rng: RNG, ctx: EvalContext, env: EvalEnv): number {
-  const { specs, baseTarget } = flattenModifierChain(node, rng, env);
+  const { specs, baseTarget } = flattenModifierChain(node, rng, ctx, env);
 
   const targetCtx: EvalContext = { rolls: [], expressionParts: [], renderedParts: [] };
   evalNode(baseTarget, rng, targetCtx, env);
@@ -635,11 +659,13 @@ function evalModifier(node: ModifierNode, rng: RNG, ctx: EvalContext, env: EvalE
 function resolveThreshold(
   value: ASTNode,
   rng: RNG,
+  ctx: EvalContext,
   env: EvalEnv,
   role: 'threshold' | 'fail threshold',
 ): number {
   const thresholdCtx: EvalContext = { rolls: [], expressionParts: [], renderedParts: [] };
   const resolved = evalNode(value, rng, thresholdCtx, env);
+  mergeMetaRolls(ctx, thresholdCtx);
 
   if (!Number.isFinite(resolved)) {
     throw new EvaluatorError(`Invalid ${role}: ${resolved}`, 'INVALID_THRESHOLD', 'SuccessCount');
@@ -658,10 +684,10 @@ function evalSuccessCount(
   const targetValue = evalNode(node.target, rng, targetCtx, env);
   const targetExpr = targetCtx.expressionParts.join('');
 
-  const thresholdValue = resolveThreshold(node.threshold.value, rng, env, 'threshold');
+  const thresholdValue = resolveThreshold(node.threshold.value, rng, ctx, env, 'threshold');
   const failValue =
     node.failThreshold != null
-      ? resolveThreshold(node.failThreshold.value, rng, env, 'fail threshold')
+      ? resolveThreshold(node.failThreshold.value, rng, ctx, env, 'fail threshold')
       : undefined;
 
   const code = `${node.threshold.operator}${thresholdValue}${
