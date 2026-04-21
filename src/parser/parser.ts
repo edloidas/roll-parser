@@ -555,8 +555,12 @@ export class Parser {
 
     if (this.peek().type === TokenType.FAIL) {
       this.advance();
-      const failValue = this.parseExpression(BP.DICE_LEFT);
-      node.failThreshold = { operator: '=', value: failValue };
+      if (this.isComparePointAhead()) {
+        node.failThreshold = this.parseComparePoint();
+      } else {
+        const failValue = this.parseExpression(BP.DICE_LEFT);
+        node.failThreshold = { operator: '=', value: failValue };
+      }
     }
 
     return node;

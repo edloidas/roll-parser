@@ -847,6 +847,42 @@ describe('Parser', () => {
       );
     });
 
+    it('should parse fail threshold with <: 10d10>=6f<2', () => {
+      expect(parse('10d10>=6f<2')).toEqual(
+        successCount(dice(literal(10), literal(10)), cp('>=', literal(6)), cp('<', literal(2))),
+      );
+    });
+
+    it('should parse fail threshold with <=: 10d10>=6f<=2', () => {
+      expect(parse('10d10>=6f<=2')).toEqual(
+        successCount(dice(literal(10), literal(10)), cp('>=', literal(6)), cp('<=', literal(2))),
+      );
+    });
+
+    it('should parse fail threshold with >: 10d10>=6f>8', () => {
+      expect(parse('10d10>=6f>8')).toEqual(
+        successCount(dice(literal(10), literal(10)), cp('>=', literal(6)), cp('>', literal(8))),
+      );
+    });
+
+    it('should parse fail threshold with >=: 10d10>=6f>=8', () => {
+      expect(parse('10d10>=6f>=8')).toEqual(
+        successCount(dice(literal(10), literal(10)), cp('>=', literal(6)), cp('>=', literal(8))),
+      );
+    });
+
+    it('should parse fail threshold with explicit =: 10d10>=6f=1', () => {
+      expect(parse('10d10>=6f=1')).toEqual(
+        successCount(dice(literal(10), literal(10)), cp('>=', literal(6)), cp('=', literal(1))),
+      );
+    });
+
+    it('should parse Fate success with <: 4dF>=0f<0', () => {
+      expect(parse('4dF>=0f<0')).toEqual(
+        successCount(fateDice(literal(4)), cp('>=', literal(0)), cp('<', literal(0))),
+      );
+    });
+
     it('should reject outer + on SuccessCount: 5d6>=5+3', () => {
       expect(() => parse('5d6>=5+3')).toThrow(ParseError);
       try {
