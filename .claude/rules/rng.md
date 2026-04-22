@@ -31,6 +31,25 @@ mock.nextInt(1, 6); // Throws! (sequence exhausted)
 `MockRNG` MUST throw on exhaustion — this catches incorrect roll counts in tests.
 `MockRNG.nextInt` validates that returned values fall within `[min, max]` — throws `RangeError` if not.
 
+## Draw Order
+
+When authoring `MockRNG` sequences for dice expressions, follow this order:
+
+1. **Inside `evalDice`**: `count` expression → `sides` expression → pool dice (one `nextInt` per die, left-to-right).
+2. **Inside `flattenModifierChain`**: modifier-argument meta-expressions are drawn **before** the base dice pool. For `4d6kh(1d2)` the inner `1d2` draws first, then the `4d6` pool.
+
+Worked example — `4d6kh(1d2)` with `createMockRng([1, 5, 3, 4, 6])`:
+
+| Draw | Source | Value |
+|------|--------|-------|
+| 1 | `1d2` (keep-count meta-expression) | `1` |
+| 2 | `4d6` pool, die 1 | `5` |
+| 3 | `4d6` pool, die 2 | `3` |
+| 4 | `4d6` pool, die 3 | `4` |
+| 5 | `4d6` pool, die 4 | `6` |
+
+Kept result: `6` (highest of `[5, 3, 4, 6]`).
+
 ## Usage in Tests
 
 ```typescript

@@ -254,6 +254,14 @@ function evalLiteral(value: number, ctx: EvalContext): number {
   return value;
 }
 
+/**
+ * RNG draw order: `count` expression → `sides` expression → pool dice
+ * (one `nextInt` per die, left-to-right). Meta-expressions on `count`/`sides`
+ * (e.g. `(1+1)d(3*2)`) draw before the pool. For modifier-argument
+ * meta-expressions like `4d6kh(1d2)`, `flattenModifierChain` draws the
+ * modifier args first, then `evalModifier` calls `evalDice` for the base
+ * pool. See `.claude/rules/rng.md` for the full draw-order spec.
+ */
 function evalDice(node: DiceNode, rng: RNG, ctx: EvalContext, env: EvalEnv): number {
   const countCtx: EvalContext = { rolls: [], expressionParts: [], renderedParts: [] };
   const count = evalNode(node.count, rng, countCtx, env);
@@ -462,6 +470,9 @@ function applyFunction(name: string, values: number[]): number {
     case 'ceil':
       return Math.ceil(requireUnaryArg(name, values));
     case 'round':
+      // ? Delegates to `Math.round`, which rounds half-values toward +∞
+      //   (IEEE-754 half-up). So `round(2.5) === 3` but `round(-2.5) === -2`,
+      //   not `-3`. Users needing symmetric rounding must compose via `floor`.
       return Math.round(requireUnaryArg(name, values));
     case 'abs':
       return Math.abs(requireUnaryArg(name, values));
@@ -741,14 +752,14 @@ function evalSuccessCount(
  * Extracts the "natural" d20 value from a roll-side dice pool. Returns the
  * single value when exactly one kept d20 is present; otherwise `undefined`.
  *
- * Excludes dropped (`kh`/`kl`/`dh`/`dl`) and rerolled (`r`/`ro`) dice — these
- * aren't the final kept result. Multiple kept d20s (e.g., `1d20+1d20`) yield
- * `undefined` so no ambiguous upgrade/downgrade is applied.
+ * Excludes dropped (`kh`/`kl`/`dh`/`dl`/`r`/`ro`) dice — these aren't the
+ * final kept result. Multiple kept d20s (e.g., `1d20+1d20`) yield `undefined`
+ * so no ambiguous upgrade/downgrade is applied.
  */
 function extractNatural(rolls: DieResult[]): number | undefined {
-  const keptD20s = rolls.filter(
-    (d) => d.sides === 20 && !d.modifiers.includes('dropped') && !d.modifiers.includes('rerolled'),
-  );
+  // Rerolled intermediates are always stamped `['rerolled', 'dropped']`
+  // (see `modifiers/reroll.ts`), so filtering by `'dropped'` covers them.
+  const keptD20s = rolls.filter((d) => d.sides === 20 && !d.modifiers.includes('dropped'));
   if (keptD20s.length !== 1) return undefined;
   const die = keptD20s[0];
   return die?.initialResult ?? die?.result;
