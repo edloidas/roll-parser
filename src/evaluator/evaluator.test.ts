@@ -351,6 +351,79 @@ describe('evaluate', () => {
     });
   });
 
+  describe('grouped expressions — round-trip', () => {
+    test('parenthesized sum inside product: (1d20+5)*2', () => {
+      const ast = parse('(1d20+5)*2');
+      const result = evaluate(ast, createMockRng([10]));
+
+      expect(result.total).toBe(30);
+      expect(result.expression).toBe('(1d20 + 5) * 2');
+      expect(result.rendered).toBe('(1d20[10] + 5) * 2 = 30');
+    });
+
+    test('parenthesized sum after product: 2*(1d6+1)', () => {
+      const ast = parse('2*(1d6+1)');
+      const result = evaluate(ast, createMockRng([4]));
+
+      expect(result.total).toBe(10);
+      expect(result.expression).toBe('2 * (1d6 + 1)');
+      expect(result.rendered).toBe('2 * (1d6[4] + 1) = 10');
+    });
+
+    test('parenthesized subtraction disables left-associative flattening: 1-(2-3)', () => {
+      const ast = parse('1-(2-3)');
+      const result = evaluate(ast, createMockRng([]));
+
+      expect(result.total).toBe(2);
+      expect(result.expression).toBe('1 - (2 - 3)');
+    });
+
+    test('unary minus on grouped sum: -(1d6+1)', () => {
+      const ast = parse('-(1d6+1)');
+      const result = evaluate(ast, createMockRng([3]));
+
+      expect(result.total).toBe(-4);
+      expect(result.expression).toBe('-(1d6 + 1)');
+      expect(result.rendered).toBe('-(1d6[3] + 1) = -4');
+    });
+
+    test('grouped arithmetic inside function call: floor((1d20+5)/2)', () => {
+      const ast = parse('floor((1d20+5)/2)');
+      const result = evaluate(ast, createMockRng([10]));
+
+      expect(result.total).toBe(7); // floor((10+5)/2) = floor(7.5)
+      expect(result.expression).toBe('floor((1d20 + 5) / 2)');
+    });
+
+    test('nested groups are preserved: ((1d6))', () => {
+      const ast = parse('((1d6))');
+      const result = evaluate(ast, createMockRng([4]));
+
+      expect(result.total).toBe(4);
+      expect(result.expression).toBe('((1d6))');
+      expect(result.rendered).toBe('((1d6[4])) = 4');
+    });
+
+    test('grouped versus roll side: (1d20+3) vs 15', () => {
+      const ast = parse('(1d20+3) vs 15');
+      const result = evaluate(ast, createMockRng([12]));
+
+      expect(result.total).toBe(15);
+      expect(result.expression).toBe('(1d20 + 3) vs 15');
+      expect(result.degree).toBe(DegreeOfSuccess.Success);
+    });
+
+    test('standalone parenthesized versus preserves grouping and degree', () => {
+      const ast = parse('(1d20 vs 15)');
+      const result = evaluate(ast, createMockRng([18]));
+
+      expect(result.total).toBe(18);
+      expect(result.expression).toBe('(1d20 vs 15)');
+      expect(result.degree).toBe(DegreeOfSuccess.Success);
+      expect(result.natural).toBe(18);
+    });
+  });
+
   describe('negative numbers - CRITICAL', () => {
     test('negative result is NOT clamped to zero', () => {
       const ast = parse('1d4 - 5');

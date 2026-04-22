@@ -13,6 +13,7 @@ import type {
   ExplodeNode,
   FateDiceNode,
   FunctionCallNode,
+  GroupedNode,
   ModifierNode,
   RerollNode,
   SuccessCountNode,
@@ -233,6 +234,9 @@ function evalNode(node: ASTNode, rng: RNG, ctx: EvalContext, env: EvalEnv): numb
     case 'FunctionCall':
       return evalFunctionCall(node, rng, ctx, env);
 
+    case 'Grouped':
+      return evalGrouped(node, rng, ctx, env);
+
     default: {
       const exhaustive: never = node;
       throw new EvaluatorError(
@@ -409,6 +413,18 @@ function evalUnaryOp(node: UnaryOpNode, rng: RNG, ctx: EvalContext, env: EvalEnv
   ctx.renderedParts.push(`-${innerRendered}`);
 
   return -value;
+}
+
+function evalGrouped(node: GroupedNode, rng: RNG, ctx: EvalContext, env: EvalEnv): number {
+  const innerCtx: EvalContext = { rolls: [], expressionParts: [], renderedParts: [] };
+  const value = evalNode(node.expression, rng, innerCtx, env);
+
+  mergeContext(ctx, innerCtx);
+
+  ctx.expressionParts.push(`(${innerCtx.expressionParts.join('')})`);
+  ctx.renderedParts.push(`(${innerCtx.renderedParts.join('')})`);
+
+  return value;
 }
 
 function evalFunctionCall(
