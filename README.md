@@ -88,6 +88,20 @@ roll-parser --help
   kept d20" rule makes natural-value detection return `undefined`. Use the
   compound form when the nat-20 upgrade must be preserved through an
   explode.
+- **Meta-expressions in `result.expression` are substituted with their
+  resolved values.** Dice counts, sides, modifier counts, and threshold
+  expressions are rendered as the integer they evaluated to, not the original
+  sub-expression — so `result.expression` does not round-trip through `parse`
+  when meta-expressions are present.
+
+  ```typescript
+  roll('(1d4)d6').expression;       // '2d6' (if 1d4 rolled 2)
+  roll('1d6!>(1d2+3)').expression;  // '1d6!>5'
+  ```
+
+  The round-trip property test does not exercise meta-expressions, so the
+  gap is invisible to CI. Do not rely on `result.expression` as a faithful
+  re-parseable form when your notation contains meta-expressions.
 
 ## License
 
