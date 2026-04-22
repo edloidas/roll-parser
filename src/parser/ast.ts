@@ -136,6 +136,19 @@ export type FunctionCallNode = {
 };
 
 /**
+ * Parenthesized group node (`(<expr>)`).
+ *
+ * Preserves explicit grouping typed by the user so that
+ * `RollResult.expression` and `RollResult.rendered` round-trip through
+ * `parse` without losing precedence information. Semantically transparent:
+ * evaluation returns the inner expression's value unchanged.
+ */
+export type GroupedNode = {
+  type: 'Grouped';
+  expression: ASTNode;
+};
+
+/**
  * Union type of all AST nodes.
  */
 export type ASTNode =
@@ -149,7 +162,8 @@ export type ASTNode =
   | RerollNode
   | SuccessCountNode
   | VersusNode
-  | FunctionCallNode;
+  | FunctionCallNode
+  | GroupedNode;
 
 /**
  * Type guard for LiteralNode.
@@ -229,6 +243,13 @@ export function isFunctionCall(node: ASTNode): node is FunctionCallNode {
 }
 
 /**
+ * Type guard for GroupedNode.
+ */
+export function isGrouped(node: ASTNode): node is GroupedNode {
+  return node.type === 'Grouped';
+}
+
+/**
  * Returns `true` if the AST contains a `Dice` or `FateDice` node reachable
  * through structural composition (BinaryOp, UnaryOp, keep/drop, explode,
  * reroll, success-count wrappers). Meta-expressions — dice count/sides,
@@ -258,6 +279,8 @@ export function containsDice(node: ASTNode): boolean {
       return containsDice(node.roll) || containsDice(node.dc);
     case 'FunctionCall':
       return node.args.some(containsDice);
+    case 'Grouped':
+      return containsDice(node.expression);
   }
 }
 
@@ -280,6 +303,8 @@ export function containsDicePool(node: ASTNode): boolean {
     case 'Explode':
     case 'Reroll':
       return true;
+    case 'Grouped':
+      return containsDicePool(node.expression);
     default:
       return false;
   }
@@ -303,6 +328,8 @@ export function containsFatePool(node: ASTNode): boolean {
     case 'Explode':
     case 'Reroll':
       return containsFatePool(node.target);
+    case 'Grouped':
+      return containsFatePool(node.expression);
     default:
       return false;
   }

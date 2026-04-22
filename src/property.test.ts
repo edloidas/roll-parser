@@ -270,6 +270,51 @@ describe('property-based invariants', () => {
     });
   });
 
+  describe('expression round-trip', () => {
+    test('reparsing result.expression yields the same total on a replayed seed', () => {
+      // Shapes exercise BinaryOp, UnaryOp, dice count/sides, and function
+      // call argument sites, with randomly injected parentheses around any
+      // subexpression.
+      const shapes = [
+        '({L})*{C}d{S}',
+        '{C}d{S} + ({L}*{L})',
+        '-({C}d{S}+{L})',
+        '(({C}d{S}+{L}))*{L}',
+        'floor(({C}d{S}+{L})/{L})',
+        '({L}-{L})*{C}d{S}',
+        '(({C})d{S})+{L}',
+        'max({C}d{S}, ({L}+{L}))',
+        '({C}d{S}kh{L}) * {L}',
+      ];
+
+      fc.assert(
+        fc.property(
+          fc.nat({ max: shapes.length - 1 }),
+          fc.integer({ min: 1, max: 4 }),
+          fc.integer({ min: 2, max: 20 }),
+          fc.integer({ min: 1, max: 6 }),
+          fc.integer({ min: 0, max: 0xffffffff }),
+          (shapeIdx, count, sides, lit, seed) => {
+            // ? `kh{L}` needs a selector < count; clamp to keep the notation
+            //   legal across all shape generators.
+            const keep = Math.min(lit, count);
+            const notation = (shapes[shapeIdx] ?? '')
+              .replaceAll('{C}', String(count))
+              .replaceAll('{S}', String(sides))
+              .replaceAll('{L}', String(shapeIdx === 8 ? keep : lit));
+            const seedStr = `round-trip-${seed}`;
+
+            const original = roll(notation, { seed: seedStr });
+            const reparsed = roll(original.expression, { seed: seedStr });
+
+            return original.total === reparsed.total;
+          },
+        ),
+        { numRuns: 200 },
+      );
+    });
+  });
+
   describe('result structure invariants', () => {
     test('rolls array length matches dice count', () => {
       fc.assert(

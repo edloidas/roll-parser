@@ -16,6 +16,7 @@ import type {
   ExplodeNode,
   FateDiceNode,
   FunctionCallNode,
+  GroupedNode,
   LiteralNode,
   ModifierNode,
   RerollNode,
@@ -324,10 +325,10 @@ export class Parser {
     };
   }
 
-  private parseGrouped(): ASTNode {
-    const expr = this.parseExpression(0);
+  private parseGrouped(): GroupedNode {
+    const expression = this.parseExpression(0);
     this.expect(TokenType.RPAREN);
-    return expr;
+    return { type: 'Grouped', expression };
   }
 
   private parseFunctionCall(token: Token): FunctionCallNode {
@@ -400,7 +401,11 @@ export class Parser {
   }
 
   private rejectSuccessCountTarget(target: ASTNode, token: Token): void {
-    if (isSuccessCount(target)) {
+    let node = target;
+    while (node.type === 'Grouped') {
+      node = node.expression;
+    }
+    if (isSuccessCount(node)) {
       throw new ParseError(
         `Cannot apply modifier after success counting`,
         'INVALID_SUCCESS_COUNT_TARGET',

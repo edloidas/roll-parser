@@ -9,6 +9,7 @@ import type {
   ExplodeNode,
   FateDiceNode,
   FunctionCallNode,
+  GroupedNode,
   LiteralNode,
   ModifierNode,
   RerollNode,
@@ -84,6 +85,10 @@ function functionCall(name: string, args: ASTNode[]): FunctionCallNode {
   return { type: 'FunctionCall', name, args };
 }
 
+function grouped(expression: ASTNode): GroupedNode {
+  return { type: 'Grouped', expression };
+}
+
 describe('Parser', () => {
   describe('literal parsing', () => {
     it('should parse integer literals', () => {
@@ -113,7 +118,7 @@ describe('Parser', () => {
     });
 
     it('should parse negative parenthesized expression', () => {
-      expect(parse('-(1+2)')).toEqual(unary(binary('+', literal(1), literal(2))));
+      expect(parse('-(1+2)')).toEqual(unary(grouped(binary('+', literal(1), literal(2)))));
     });
 
     it('should parse double negative', () => {
@@ -157,7 +162,7 @@ describe('Parser', () => {
     });
 
     it('should parse computed count (2)d%', () => {
-      expect(parse('(2)d%')).toEqual(dice(literal(2), literal(100)));
+      expect(parse('(2)d%')).toEqual(dice(grouped(literal(2)), literal(100)));
     });
 
     it('should parse 2d%kh1 with keep modifier', () => {
@@ -197,7 +202,7 @@ describe('Parser', () => {
     });
 
     it('should parse computed count (2+2)dF', () => {
-      expect(parse('(2+2)dF')).toEqual(fateDice(binary('+', literal(2), literal(2))));
+      expect(parse('(2+2)dF')).toEqual(fateDice(grouped(binary('+', literal(2), literal(2)))));
     });
 
     it('should parse dF+5 with trailing arithmetic', () => {
@@ -219,7 +224,7 @@ describe('Parser', () => {
     });
 
     it('should parse (-1)dF with unary count (evaluator rejects at runtime)', () => {
-      expect(parse('(-1)dF')).toEqual(fateDice(unary(literal(1))));
+      expect(parse('(-1)dF')).toEqual(fateDice(grouped(unary(literal(1)))));
     });
 
     it('should be case-insensitive (DF, Df, df)', () => {
@@ -296,25 +301,32 @@ describe('Parser', () => {
   describe('parentheses', () => {
     it('should override precedence: (1+2)*3', () => {
       expect(parse('(1+2)*3')).toEqual(
-        binary('*', binary('+', literal(1), literal(2)), literal(3)),
+        binary('*', grouped(binary('+', literal(1), literal(2))), literal(3)),
       );
     });
 
     it('should handle nested parentheses', () => {
-      expect(parse('((1+2))')).toEqual(binary('+', literal(1), literal(2)));
+      expect(parse('((1+2))')).toEqual(grouped(grouped(binary('+', literal(1), literal(2)))));
     });
 
     it('should handle computed dice count: (1+1)d6', () => {
-      expect(parse('(1+1)d6')).toEqual(dice(binary('+', literal(1), literal(1)), literal(6)));
+      expect(parse('(1+1)d6')).toEqual(
+        dice(grouped(binary('+', literal(1), literal(1))), literal(6)),
+      );
     });
 
     it('should handle computed dice sides: 1d(3*2)', () => {
-      expect(parse('1d(3*2)')).toEqual(dice(literal(1), binary('*', literal(3), literal(2))));
+      expect(parse('1d(3*2)')).toEqual(
+        dice(literal(1), grouped(binary('*', literal(3), literal(2)))),
+      );
     });
 
     it('should handle both computed: (1+1)d(3*2)', () => {
       expect(parse('(1+1)d(3*2)')).toEqual(
-        dice(binary('+', literal(1), literal(1)), binary('*', literal(3), literal(2))),
+        dice(
+          grouped(binary('+', literal(1), literal(1))),
+          grouped(binary('*', literal(3), literal(2))),
+        ),
       );
     });
   });
@@ -405,7 +417,7 @@ describe('Parser', () => {
 
     it('should parse complex: (1d20+5)*2', () => {
       expect(parse('(1d20+5)*2')).toEqual(
-        binary('*', binary('+', dice(literal(1), literal(20)), literal(5)), literal(2)),
+        binary('*', grouped(binary('+', dice(literal(1), literal(20)), literal(5))), literal(2)),
       );
     });
   });
@@ -511,7 +523,7 @@ describe('Parser', () => {
     });
 
     it('should handle deeply nested expression', () => {
-      expect(parse('(((1)))')).toEqual(literal(1));
+      expect(parse('(((1)))')).toEqual(grouped(grouped(grouped(literal(1)))));
     });
 
     it('should handle prefix d with arithmetic', () => {
@@ -565,7 +577,7 @@ describe('Parser', () => {
         modifier(
           'keep',
           'highest',
-          binary('+', literal(1), literal(2)),
+          grouped(binary('+', literal(1), literal(2))),
           dice(literal(4), literal(6)),
         ),
       );
@@ -693,7 +705,7 @@ describe('Parser', () => {
         explode(
           'standard',
           dice(literal(1), literal(6)),
-          cp('>', binary('+', literal(1), literal(2))),
+          cp('>', grouped(binary('+', literal(1), literal(2)))),
         ),
       );
     });
@@ -743,7 +755,11 @@ describe('Parser', () => {
 
     it('should parse reroll with computed threshold: 2d6r<(1+1)', () => {
       expect(parse('2d6r<(1+1)')).toEqual(
-        reroll(false, cp('<', binary('+', literal(1), literal(1))), dice(literal(2), literal(6))),
+        reroll(
+          false,
+          cp('<', grouped(binary('+', literal(1), literal(1)))),
+          dice(literal(2), literal(6)),
+        ),
       );
     });
 
@@ -921,7 +937,10 @@ describe('Parser', () => {
 
     it('should wrap parenthesized explode then count: (10d10!)>=6', () => {
       expect(parse('(10d10!)>=6')).toEqual(
-        successCount(explode('standard', dice(literal(10), literal(10))), cp('>=', literal(6))),
+        successCount(
+          grouped(explode('standard', dice(literal(10), literal(10)))),
+          cp('>=', literal(6)),
+        ),
       );
     });
 
@@ -951,7 +970,10 @@ describe('Parser', () => {
 
     it('should parse with computed threshold: 2d6>=(1+4)', () => {
       expect(parse('2d6>=(1+4)')).toEqual(
-        successCount(dice(literal(2), literal(6)), cp('>=', binary('+', literal(1), literal(4)))),
+        successCount(
+          dice(literal(2), literal(6)),
+          cp('>=', grouped(binary('+', literal(1), literal(4)))),
+        ),
       );
     });
 
@@ -1300,12 +1322,12 @@ describe('Parser', () => {
     describe('valid dice-pool targets still parse', () => {
       it('should accept (4d6)kh3', () => {
         expect(parse('(4d6)kh3')).toEqual(
-          modifier('keep', 'highest', literal(3), dice(literal(4), literal(6))),
+          modifier('keep', 'highest', literal(3), grouped(dice(literal(4), literal(6)))),
         );
       });
 
       it('should accept (4d6)!', () => {
-        expect(parse('(4d6)!')).toEqual(explode('standard', dice(literal(4), literal(6))));
+        expect(parse('(4d6)!')).toEqual(explode('standard', grouped(dice(literal(4), literal(6)))));
       });
 
       it('should accept 4dFkh2', () => {
@@ -1396,7 +1418,7 @@ describe('Parser', () => {
 
     it('should parse paren-nested DC (evaluator catches nesting): 1d20 vs (5 vs 3)', () => {
       expect(parse('1d20 vs (5 vs 3)')).toEqual(
-        versus(dice(literal(1), literal(20)), versus(literal(5), literal(3))),
+        versus(dice(literal(1), literal(20)), grouped(versus(literal(5), literal(3)))),
       );
     });
 
