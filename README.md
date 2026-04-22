@@ -73,6 +73,14 @@ roll-parser --help
   interpreted as the dice operator, so `4d6d1` becomes `(4d6)d1` (roll 4d6, then
   use the result as the count for d1). To drop dice, use the explicit `dl`
   (drop lowest) or `dh` (drop highest) modifiers: `4d6dl1`.
+- **Threshold comparisons bind tight.** In explode and reroll thresholds,
+  `1d6!>=5+2` parses as `(1d6!>=5)+2` and `2d6r<=1+1` as `(2d6r<=1)+1` — the
+  comparison binds to the dice pool, not the arithmetic after it. For a
+  computed threshold, parenthesize: `1d6!>=(5+2)`. Success-count thresholds
+  bind the same way, but wrapping the resulting `SuccessCountNode` is a parse
+  error (terminal by design), so `1d6>=5+2` and `10d10>=6f1+1` throw —
+  parenthesize the threshold to keep everything inside the success-count:
+  `1d6>=(5+2)`, `10d10>=6f(1+1)`.
 
 ## License
 

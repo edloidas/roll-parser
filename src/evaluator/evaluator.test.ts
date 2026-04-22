@@ -1999,6 +1999,13 @@ describe('evaluate', () => {
       expect(result.total).toBe(3);
     });
 
+    test('round uses half-toward-+∞ for negatives: round(-2.5) = -2', () => {
+      const ast = parse('round(-2.5)');
+      const result = evaluate(ast, createMockRng([]));
+
+      expect(result.total).toBe(-2);
+    });
+
     test('abs of negative literal: abs(-5)', () => {
       const ast = parse('abs(-5)');
       const result = evaluate(ast, createMockRng([]));

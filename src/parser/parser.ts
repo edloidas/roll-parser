@@ -551,6 +551,7 @@ export class Parser {
     }
 
     const operator = this.getCompareOp(token);
+    // ? Threshold binding: `BP.DICE_LEFT` — see `parseComparePoint` JSDoc.
     const value = this.parseExpression(BP.DICE_LEFT);
     const node: SuccessCountNode = {
       type: 'SuccessCount',
@@ -563,6 +564,7 @@ export class Parser {
       if (this.isComparePointAhead()) {
         node.failThreshold = this.parseComparePoint();
       } else {
+        // ? Same threshold binding as above (BP.DICE_LEFT).
         const failValue = this.parseExpression(BP.DICE_LEFT);
         node.failThreshold = { operator: '=', value: failValue };
       }
@@ -606,6 +608,13 @@ export class Parser {
   /**
    * Parses a comparison operator followed by a value expression.
    * Called by modifier parsers (explode, reroll, success counting).
+   *
+   * The threshold value is parsed at `BP.DICE_LEFT`, which binds tighter than
+   * arithmetic. This keeps the comparison bound to the dice pool on the left
+   * rather than letting arithmetic to the right be consumed into the
+   * threshold. As a consequence, `1d6>=5+2` parses as `(1d6>=5)+2` with
+   * threshold `5` — not `7`. Computed thresholds require parens:
+   * `1d6>=(5+2)`. Same binding applies to `parseSuccessCount` below.
    *
    * @returns A ComparePoint with the operator and value AST node
    * @throws {ParseError} If the next token is not a comparison operator
