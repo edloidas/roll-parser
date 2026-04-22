@@ -1225,6 +1225,103 @@ describe('Parser', () => {
     });
   });
 
+  describe('versus rejected in meta-expression positions', () => {
+    // Versus produces a PF2e degree — a terminal scalar, not a valid
+    // meta-expression input. Symmetric with the SuccessCount rejections
+    // above; prevents `versusMetadata` from being silently dropped in
+    // `mergeMetaRolls` sites.
+
+    it('should reject Versus as keep-modifier count: 4d6kh(1d20 vs 10)', () => {
+      expect(() => parse('4d6kh(1d20 vs 10)')).toThrow(ParseError);
+      try {
+        parse('4d6kh(1d20 vs 10)');
+      } catch (err) {
+        expect((err as ParseError).code).toBe('NESTED_VERSUS');
+      }
+    });
+
+    it('should reject Versus as prefix dice sides: d(1d20 vs 10)', () => {
+      expect(() => parse('d(1d20 vs 10)')).toThrow(ParseError);
+      try {
+        parse('d(1d20 vs 10)');
+      } catch (err) {
+        expect((err as ParseError).code).toBe('NESTED_VERSUS');
+      }
+    });
+
+    it('should reject Versus as infix dice sides: 4d(1d20 vs 10)', () => {
+      expect(() => parse('4d(1d20 vs 10)')).toThrow(ParseError);
+      try {
+        parse('4d(1d20 vs 10)');
+      } catch (err) {
+        expect((err as ParseError).code).toBe('NESTED_VERSUS');
+      }
+    });
+
+    it('should reject Versus as infix dice count: (1d20 vs 10)d6', () => {
+      expect(() => parse('(1d20 vs 10)d6')).toThrow(ParseError);
+      try {
+        parse('(1d20 vs 10)d6');
+      } catch (err) {
+        expect((err as ParseError).code).toBe('NESTED_VERSUS');
+      }
+    });
+
+    it('should reject Versus as percentile dice count: (1d20 vs 10)d%', () => {
+      expect(() => parse('(1d20 vs 10)d%')).toThrow(ParseError);
+      try {
+        parse('(1d20 vs 10)d%');
+      } catch (err) {
+        expect((err as ParseError).code).toBe('NESTED_VERSUS');
+      }
+    });
+
+    it('should reject Versus as Fate dice count: (1d20 vs 10)dF', () => {
+      expect(() => parse('(1d20 vs 10)dF')).toThrow(ParseError);
+      try {
+        parse('(1d20 vs 10)dF');
+      } catch (err) {
+        expect((err as ParseError).code).toBe('NESTED_VERSUS');
+      }
+    });
+
+    it('should reject Versus as threshold value: 5d10>=(1d20 vs 10)', () => {
+      expect(() => parse('5d10>=(1d20 vs 10)')).toThrow(ParseError);
+      try {
+        parse('5d10>=(1d20 vs 10)');
+      } catch (err) {
+        expect((err as ParseError).code).toBe('NESTED_VERSUS');
+      }
+    });
+
+    it('should reject Versus as bare fN value: 5d10>=6f(1d20 vs 10)', () => {
+      expect(() => parse('5d10>=6f(1d20 vs 10)')).toThrow(ParseError);
+      try {
+        parse('5d10>=6f(1d20 vs 10)');
+      } catch (err) {
+        expect((err as ParseError).code).toBe('NESTED_VERSUS');
+      }
+    });
+
+    it('should reject Versus as explode compare-point value: 1d6!>=(1d20 vs 10)', () => {
+      expect(() => parse('1d6!>=(1d20 vs 10)')).toThrow(ParseError);
+      try {
+        parse('1d6!>=(1d20 vs 10)');
+      } catch (err) {
+        expect((err as ParseError).code).toBe('NESTED_VERSUS');
+      }
+    });
+
+    it('should reject Versus as reroll compare-point value: 1d6r<=(1d20 vs 10)', () => {
+      expect(() => parse('1d6r<=(1d20 vs 10)')).toThrow(ParseError);
+      try {
+        parse('1d6r<=(1d20 vs 10)');
+      } catch (err) {
+        expect((err as ParseError).code).toBe('NESTED_VERSUS');
+      }
+    });
+  });
+
   describe('postfix modifier target validation', () => {
     // Postfix pool modifiers (kh/kl/dh/dl, !/!!/!p, r/ro) require a dice-pool
     // target. Wrapping arithmetic silently drops user math — must parse-error.
@@ -1532,6 +1629,17 @@ describe('Parser', () => {
       expect(() => parse('1d20+5 vs 15 vs 20')).toThrow(ParseError);
       try {
         parse('1d20+5 vs 15 vs 20');
+      } catch (err) {
+        expect((err as ParseError).code).toBe('NESTED_VERSUS');
+      }
+    });
+
+    it('should reject paren-wrapped chained versus at parse: (1d20 vs 15) vs 10', () => {
+      // Chain guard unwraps `Grouped`, so parens do not bypass the parse-time
+      // check. Previously parsed and threw at eval via `mergeContext`.
+      expect(() => parse('(1d20 vs 15) vs 10')).toThrow(ParseError);
+      try {
+        parse('(1d20 vs 15) vs 10');
       } catch (err) {
         expect((err as ParseError).code).toBe('NESTED_VERSUS');
       }

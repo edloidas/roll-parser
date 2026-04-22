@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Parser now rejects `SuccessCount` wrapped in meta-expression positions — modifier count, dice count/sides (infix and prefix), Fate/percentile dice count, SuccessCount threshold and bare `fN` value, and compare-point values used by Explode/Reroll. `mergeMetaRolls` also strips `success`/`failure` modifier tags on meta-forwarded dice as defense-in-depth ([#69](https://github.com/edloidas/roll-parser/issues/69))
+- Parser now rejects `Versus` wrapped in the same meta-expression positions so a PF2e `vs` outcome cannot be silently dropped by `mergeMetaRolls`, and the `parseVersus` chain guard unwraps `Grouped` so `(1d20 vs 15) vs 10` throws `NESTED_VERSUS` at parse time instead of at eval ([#70](https://github.com/edloidas/roll-parser/issues/70))
 
 ## [3.0.0-alpha.0] - 2026-04-20
 
