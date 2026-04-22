@@ -165,7 +165,7 @@ export class Parser {
         return this.parseUnaryMinus(token);
 
       case TokenType.DICE:
-        return this.parsePrefixDice();
+        return this.parsePrefixDice(token);
 
       case TokenType.DICE_PERCENT:
         return this.parsePrefixDicePercent();
@@ -199,13 +199,13 @@ export class Parser {
   private parseLed(left: ASTNode, token: Token): ASTNode {
     switch (token.type) {
       case TokenType.DICE:
-        return this.parseInfixDice(left);
+        return this.parseInfixDice(left, token);
 
       case TokenType.DICE_PERCENT:
-        return this.parseInfixDicePercent(left);
+        return this.parseInfixDicePercent(left, token);
 
       case TokenType.DICE_FATE:
-        return this.parseInfixFateDice(left);
+        return this.parseInfixFateDice(left, token);
 
       case TokenType.PLUS:
       case TokenType.MINUS:
@@ -269,9 +269,10 @@ export class Parser {
     };
   }
 
-  private parsePrefixDice(): DiceNode {
+  private parsePrefixDice(token: Token): DiceNode {
     // d20 → Dice(1, 20)
     const sides = this.parseExpression(BP.DICE_RIGHT);
+    this.rejectSuccessCountTarget(sides, token);
     return {
       type: 'Dice',
       count: { type: 'Literal', value: 1 },
@@ -279,9 +280,11 @@ export class Parser {
     };
   }
 
-  private parseInfixDice(left: ASTNode): DiceNode {
+  private parseInfixDice(left: ASTNode, token: Token): DiceNode {
     // 4d6 → Dice(4, 6)
+    this.rejectSuccessCountTarget(left, token);
     const sides = this.parseExpression(BP.DICE_RIGHT);
+    this.rejectSuccessCountTarget(sides, token);
     return {
       type: 'Dice',
       count: left,
@@ -298,8 +301,9 @@ export class Parser {
     };
   }
 
-  private parseInfixDicePercent(left: ASTNode): DiceNode {
+  private parseInfixDicePercent(left: ASTNode, token: Token): DiceNode {
     // 2d% → Dice(2, 100)
+    this.rejectSuccessCountTarget(left, token);
     return {
       type: 'Dice',
       count: left,
@@ -315,10 +319,11 @@ export class Parser {
     };
   }
 
-  private parseInfixFateDice(left: ASTNode): FateDiceNode {
+  private parseInfixFateDice(left: ASTNode, token: Token): FateDiceNode {
     // 4dF → FateDice(4). Unlike parseInfixDice, there is no sides sub-parse,
     // so modifiers (`kh`, `dl`, …) naturally bind at the outer Pratt loop
     // without BP competition against a right-operand.
+    this.rejectSuccessCountTarget(left, token);
     return {
       type: 'FateDice',
       count: left,
@@ -443,6 +448,7 @@ export class Parser {
       nextToken === TokenType.NUMBER || nextToken === TokenType.LPAREN
         ? this.parseExpression(BP.DICE_LEFT)
         : { type: 'Literal', value: 1 };
+    this.rejectSuccessCountTarget(count, token);
 
     return {
       type: 'Modifier',
@@ -553,6 +559,7 @@ export class Parser {
     const operator = this.getCompareOp(token);
     // ? Threshold binding: `BP.DICE_LEFT` — see `parseComparePoint` JSDoc.
     const value = this.parseExpression(BP.DICE_LEFT);
+    this.rejectSuccessCountTarget(value, token);
     const node: SuccessCountNode = {
       type: 'SuccessCount',
       target,
@@ -566,6 +573,7 @@ export class Parser {
       } else {
         // ? Same threshold binding as above (BP.DICE_LEFT).
         const failValue = this.parseExpression(BP.DICE_LEFT);
+        this.rejectSuccessCountTarget(failValue, token);
         node.failThreshold = { operator: '=', value: failValue };
       }
     }
@@ -626,6 +634,7 @@ export class Parser {
     this.advance();
 
     const value = this.parseExpression(BP.DICE_LEFT);
+    this.rejectSuccessCountTarget(value, token);
 
     return { operator, value };
   }
