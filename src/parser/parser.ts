@@ -273,6 +273,7 @@ export class Parser {
     // d20 → Dice(1, 20)
     const sides = this.parseExpression(BP.DICE_RIGHT);
     this.rejectSuccessCountTarget(sides, token);
+    this.rejectVersusTarget(sides, token);
     return {
       type: 'Dice',
       count: { type: 'Literal', value: 1 },
@@ -283,8 +284,10 @@ export class Parser {
   private parseInfixDice(left: ASTNode, token: Token): DiceNode {
     // 4d6 → Dice(4, 6)
     this.rejectSuccessCountTarget(left, token);
+    this.rejectVersusTarget(left, token);
     const sides = this.parseExpression(BP.DICE_RIGHT);
     this.rejectSuccessCountTarget(sides, token);
+    this.rejectVersusTarget(sides, token);
     return {
       type: 'Dice',
       count: left,
@@ -304,6 +307,7 @@ export class Parser {
   private parseInfixDicePercent(left: ASTNode, token: Token): DiceNode {
     // 2d% → Dice(2, 100)
     this.rejectSuccessCountTarget(left, token);
+    this.rejectVersusTarget(left, token);
     return {
       type: 'Dice',
       count: left,
@@ -324,6 +328,7 @@ export class Parser {
     // so modifiers (`kh`, `dl`, …) naturally bind at the outer Pratt loop
     // without BP competition against a right-operand.
     this.rejectSuccessCountTarget(left, token);
+    this.rejectVersusTarget(left, token);
     return {
       type: 'FateDice',
       count: left,
@@ -420,6 +425,26 @@ export class Parser {
     }
   }
 
+  private rejectVersusTarget(target: ASTNode, token: Token): void {
+    // ? Versus produces a PF2e degree outcome — a terminal scalar, not a
+    //   valid input to dice count/sides/thresholds. Symmetric with
+    //   `rejectSuccessCountTarget`; wrappers like `floor(vs)+0` still
+    //   propagate `versusMetadata` via `mergeContext`, so this only blocks
+    //   `mergeMetaRolls` sites where metadata would silently vanish.
+    let node = target;
+    while (node.type === 'Grouped') {
+      node = node.expression;
+    }
+    if (node.type === 'Versus') {
+      throw new ParseError(
+        `Versus cannot be used as a meta-expression`,
+        'NESTED_VERSUS',
+        token.position,
+        token,
+      );
+    }
+  }
+
   private parseModifier(target: ASTNode, token: Token): ModifierNode {
     this.rejectSuccessCountTarget(target, token);
 
@@ -449,6 +474,7 @@ export class Parser {
         ? this.parseExpression(BP.DICE_LEFT)
         : { type: 'Literal', value: 1 };
     this.rejectSuccessCountTarget(count, token);
+    this.rejectVersusTarget(count, token);
 
     return {
       type: 'Modifier',
@@ -560,6 +586,7 @@ export class Parser {
     // ? Threshold binding: `BP.DICE_LEFT` — see `parseComparePoint` JSDoc.
     const value = this.parseExpression(BP.DICE_LEFT);
     this.rejectSuccessCountTarget(value, token);
+    this.rejectVersusTarget(value, token);
     const node: SuccessCountNode = {
       type: 'SuccessCount',
       target,
@@ -574,6 +601,7 @@ export class Parser {
         // ? Same threshold binding as above (BP.DICE_LEFT).
         const failValue = this.parseExpression(BP.DICE_LEFT);
         this.rejectSuccessCountTarget(failValue, token);
+        this.rejectVersusTarget(failValue, token);
         node.failThreshold = { operator: '=', value: failValue };
       }
     }
@@ -585,9 +613,14 @@ export class Parser {
     this.rejectSuccessCountTarget(left, token);
 
     // ? Chained `a vs b vs c` has no semantics — a degree is a scalar, not a
-    //   comparable. Parens (`a vs (b vs c)`) slip past this check and are
-    //   caught by the evaluator via `EvalEnv.insideVersus`.
-    if (left.type === 'Versus') {
+    //   comparable. Unwrap `Grouped` so `(a vs b) vs c` rejects at parse
+    //   time like the bare form; paren-nested DC (`a vs (b vs c)`) is still
+    //   caught by the evaluator via `mergeContext`.
+    let leftChain: ASTNode = left;
+    while (leftChain.type === 'Grouped') {
+      leftChain = leftChain.expression;
+    }
+    if (leftChain.type === 'Versus') {
       throw new ParseError('Cannot chain versus operators', 'NESTED_VERSUS', token.position, token);
     }
 
@@ -635,6 +668,7 @@ export class Parser {
 
     const value = this.parseExpression(BP.DICE_LEFT);
     this.rejectSuccessCountTarget(value, token);
+    this.rejectVersusTarget(value, token);
 
     return { operator, value };
   }
