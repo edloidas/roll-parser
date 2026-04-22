@@ -81,6 +81,13 @@ roll-parser --help
   error (terminal by design), so `1d6>=5+2` and `10d10>=6f1+1` throw —
   parenthesize the threshold to keep everything inside the success-count:
   `1d6>=(5+2)`, `10d10>=6f(1+1)`.
+- **PF2e natural-20 upgrade only survives the compound explode.** On a `vs`
+  check, `1d20!! vs DC` preserves the natural-20 upgrade when the d20
+  explodes, but `1d20! vs DC` and `1d20!p vs DC` do not. Standard and
+  penetrating explodes leave two kept d20s in the pool, and the "exactly one
+  kept d20" rule makes natural-value detection return `undefined`. Use the
+  compound form when the nat-20 upgrade must be preserved through an
+  explode.
 
 ## License
 

@@ -64,8 +64,10 @@ The `Parser` class exposes two methods for Stage 2 modifier parsers:
 - `isComparePointAhead(): boolean` — peeks for comparison operator tokens
 - `parseComparePoint(): ComparePoint` — consumes comparison operator + value expression
 
-Comparison tokens have `BP = -1` (terminators), so they never interfere with the
-main Pratt loop. They are consumed exclusively by modifier parsers.
+Comparison tokens have `BP.COMPARE = 8`, placed below `BP.ADD`/`BP.MUL` so
+`XdY+N>T` parses as `(XdY+N)>T` and the success-count target guard can reject
+non-pool targets with a clear error (see #51). Inside modifier parsing the
+tokens are consumed via `parseComparePoint`, independently of the Pratt loop.
 
 ### Implementation Order
 
@@ -124,6 +126,16 @@ Covers standard PF2e patterns:
 - `1d20+10 vs 25` — one d20 ✓
 - `2d20kh1+5 vs 20` — advantage, one kept d20 ✓
 - `2d20kl1+5 vs 20` — disadvantage, one kept d20 ✓
+
+**Interaction with explode variants.** Only the compound form (`!!`) preserves
+a natural 20 on an exploded d20, because #52 records the pre-merge face as
+`initialResult` while the pool still contains one kept d20. Standard (`!`)
+and penetrating (`!p`) push the extra face into the pool as a second kept
+d20, so `extractNatural` falls into the "multiple kept d20s" branch and
+returns `undefined`. This is intentional — the "exactly one kept d20" rule
+above is the source of truth — but it means PF2e-style `1d20! vs DC` loses
+the nat-20 upgrade after an explode. Use `1d20!! vs DC` when the upgrade
+must be preserved.
 
 ### Negative Compare Values
 
@@ -396,7 +408,7 @@ negative values in strikethrough.
 
 ### 6. Success Counting (Dice Pools)
 
-**Syntax:** `10d10>=6`, `10d10>=6f1`, `10d10>5`, `5d6>=5+3`
+**Syntax:** `10d10>=6`, `10d10>=6f1`, `10d10>5`, `5d6>=(5+3)`
 
 **Lexer:** Comparison tokens + `FAIL` token (already implemented in Plan 0)
 
@@ -415,7 +427,7 @@ negative values in strikethrough.
 - After parsing threshold, check for `FAIL` token → if present, consume and parse
   fail value as `ComparePoint` via `parseComparePoint()` when a comparison operator
   follows, or as `{ operator: '=', value: … }` for the bare `fN` shorthand
-- `getLeftBp` for comparison tokens: `BP.MODIFIER` (35)
+- `getLeftBp` for comparison tokens: `BP.COMPARE` (8)
 - `FAIL` has `BP = -1` (consumed inside `parseSuccessCount`, never standalone)
 - Terminal constraint: if `target.type === 'SuccessCount'`, throw ParseError
 
@@ -439,7 +451,9 @@ negative values in strikethrough.
 **Edge cases:**
 - `10d10>=6f1` → WoD standard (successes at 6+, failures at 1)
 - `10d10>5` → strict greater than
-- `5d6>=5+3` → count successes, then add 3 to count
+- `5d6>=5+3` → ParseError (`INVALID_SUCCESS_COUNT_TARGET`): `SuccessCount`
+  is terminal, so outer arithmetic is rejected. Parenthesize the threshold
+  to keep the `+3` inside: `5d6>=(5+3)`.
 - `10d10kh5>=6` → keep highest 5, then count among those
 - `10d10>=6kh5` → ParseError (modifier after terminal SuccessCountNode)
 - `1d6>=7` → impossible threshold, zero successes
