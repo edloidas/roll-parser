@@ -1128,6 +1128,103 @@ describe('Parser', () => {
     });
   });
 
+  describe('success count rejected in meta-expression positions', () => {
+    // SuccessCount is terminal at every meta-expression parse site: modifier
+    // count, dice sides/count (infix + prefix), Fate/percent dice count,
+    // SuccessCount threshold value, bare `fN` value, and compare-point values
+    // (Explode / Reroll). Wrapping in parens used to bypass the #51 guards.
+
+    it('should reject SuccessCount as keep-modifier count: 4d6kh(3d6>=3)', () => {
+      expect(() => parse('4d6kh(3d6>=3)')).toThrow(ParseError);
+      try {
+        parse('4d6kh(3d6>=3)');
+      } catch (err) {
+        expect((err as ParseError).code).toBe('INVALID_SUCCESS_COUNT_TARGET');
+      }
+    });
+
+    it('should reject SuccessCount as prefix dice sides: d(1d6>=3)', () => {
+      expect(() => parse('d(1d6>=3)')).toThrow(ParseError);
+      try {
+        parse('d(1d6>=3)');
+      } catch (err) {
+        expect((err as ParseError).code).toBe('INVALID_SUCCESS_COUNT_TARGET');
+      }
+    });
+
+    it('should reject SuccessCount as infix dice sides: 4d(1d6>=3)', () => {
+      expect(() => parse('4d(1d6>=3)')).toThrow(ParseError);
+      try {
+        parse('4d(1d6>=3)');
+      } catch (err) {
+        expect((err as ParseError).code).toBe('INVALID_SUCCESS_COUNT_TARGET');
+      }
+    });
+
+    it('should reject SuccessCount as infix dice count: (1d6>=3)d6', () => {
+      expect(() => parse('(1d6>=3)d6')).toThrow(ParseError);
+      try {
+        parse('(1d6>=3)d6');
+      } catch (err) {
+        expect((err as ParseError).code).toBe('INVALID_SUCCESS_COUNT_TARGET');
+      }
+    });
+
+    it('should reject SuccessCount as percentile dice count: (1d6>=3)d%', () => {
+      expect(() => parse('(1d6>=3)d%')).toThrow(ParseError);
+      try {
+        parse('(1d6>=3)d%');
+      } catch (err) {
+        expect((err as ParseError).code).toBe('INVALID_SUCCESS_COUNT_TARGET');
+      }
+    });
+
+    it('should reject SuccessCount as Fate dice count: (1d6>=3)dF', () => {
+      expect(() => parse('(1d6>=3)dF')).toThrow(ParseError);
+      try {
+        parse('(1d6>=3)dF');
+      } catch (err) {
+        expect((err as ParseError).code).toBe('INVALID_SUCCESS_COUNT_TARGET');
+      }
+    });
+
+    it('should reject SuccessCount as threshold value: 5d10>=(1d6>=3)', () => {
+      expect(() => parse('5d10>=(1d6>=3)')).toThrow(ParseError);
+      try {
+        parse('5d10>=(1d6>=3)');
+      } catch (err) {
+        expect((err as ParseError).code).toBe('INVALID_SUCCESS_COUNT_TARGET');
+      }
+    });
+
+    it('should reject SuccessCount as bare fN value: 5d10>=6f(1d6>=3)', () => {
+      expect(() => parse('5d10>=6f(1d6>=3)')).toThrow(ParseError);
+      try {
+        parse('5d10>=6f(1d6>=3)');
+      } catch (err) {
+        expect((err as ParseError).code).toBe('INVALID_SUCCESS_COUNT_TARGET');
+      }
+    });
+
+    it('should reject SuccessCount as explode compare-point value: 1d6!>=(1d6>=3)', () => {
+      expect(() => parse('1d6!>=(1d6>=3)')).toThrow(ParseError);
+      try {
+        parse('1d6!>=(1d6>=3)');
+      } catch (err) {
+        expect((err as ParseError).code).toBe('INVALID_SUCCESS_COUNT_TARGET');
+      }
+    });
+
+    it('should reject SuccessCount as reroll compare-point value: 1d6r<=(1d6>=3)', () => {
+      expect(() => parse('1d6r<=(1d6>=3)')).toThrow(ParseError);
+      try {
+        parse('1d6r<=(1d6>=3)');
+      } catch (err) {
+        expect((err as ParseError).code).toBe('INVALID_SUCCESS_COUNT_TARGET');
+      }
+    });
+  });
+
   describe('postfix modifier target validation', () => {
     // Postfix pool modifiers (kh/kl/dh/dl, !/!!/!p, r/ro) require a dice-pool
     // target. Wrapping arithmetic silently drops user math — must parse-error.

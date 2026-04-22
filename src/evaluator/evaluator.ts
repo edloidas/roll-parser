@@ -92,8 +92,10 @@ export type EvalEnv = {
 
 /**
  * Per-branch mutable accumulator for tracking rolls and output during recursion.
+ *
+ * @internal exported for targeted `mergeMetaRolls` tests only; not a public API.
  */
-type EvalContext = {
+export type EvalContext = {
   rolls: DieResult[];
   expressionParts: string[];
   renderedParts: string[];
@@ -182,13 +184,21 @@ function renderDice(dice: DieResult[]): string {
  * inspectable. Tagging them `'dropped'` keeps totals correct via
  * `sumKeptDice`; `'meta'` lets renderers hide them and lets callers
  * distinguish them from ordinary pool dice.
+ *
+ * `'success'`/`'failure'` tags are stripped here as defense-in-depth against
+ * a SuccessCount leaking into a meta sub-expression (parser rejects all such
+ * wrappings; this strip ensures a future parse regression cannot leak tags
+ * into the top-level `successes`/`failures` scan).
  */
-function mergeMetaRolls(parent: EvalContext, source: EvalContext): void {
+/** @internal exported for targeted defense-in-depth tests only. */
+export function mergeMetaRolls(parent: EvalContext, source: EvalContext): void {
   for (const die of source.rolls) {
     parent.rolls.push({
       ...die,
       modifiers: [
-        ...die.modifiers.filter((m) => m !== 'kept' && m !== 'dropped'),
+        ...die.modifiers.filter(
+          (m) => m !== 'kept' && m !== 'dropped' && m !== 'success' && m !== 'failure',
+        ),
         'meta',
         'dropped',
       ],

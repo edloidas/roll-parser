@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Parser now rejects `SuccessCount` wrapped in meta-expression positions — modifier count, dice count/sides (infix and prefix), Fate/percentile dice count, SuccessCount threshold and bare `fN` value, and compare-point values used by Explode/Reroll. `mergeMetaRolls` also strips `success`/`failure` modifier tags on meta-forwarded dice as defense-in-depth ([#69](https://github.com/edloidas/roll-parser/issues/69))
+
 ## [3.0.0-alpha.0] - 2026-04-20
 
 First alpha of the v3 rewrite. Stage 1 (core engine) is complete; Stage 2 (dice mechanics) is largely in place.

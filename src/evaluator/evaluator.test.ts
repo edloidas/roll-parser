@@ -9,7 +9,8 @@ import { parse } from '../parser/parser';
 import { createMockRng } from '../rng/mock';
 import type { DieResult } from '../types';
 import { DegreeOfSuccess } from '../types';
-import { DEFAULT_MAX_DICE, evaluate, EvaluatorError } from './evaluator';
+import type { EvalContext } from './evaluator';
+import { DEFAULT_MAX_DICE, evaluate, EvaluatorError, mergeMetaRolls } from './evaluator';
 
 /**
  * Helper to safely get a die result at index, throwing if not present.
@@ -2273,6 +2274,33 @@ describe('evaluate', () => {
       const result = evaluate(ast, rng, { maxDice: 3 });
 
       expect(result.rolls).toHaveLength(3);
+    });
+
+    test('mergeMetaRolls strips success/failure modifiers (#69)', () => {
+      // Defense-in-depth: parser rejects SuccessCount in meta positions, but
+      // if a die ever arrives with `'success'`/`'failure'` tags inside a meta
+      // sub-context, mergeMetaRolls must drop those tags so they cannot reach
+      // the top-level successes/failures scan.
+      const source: EvalContext = {
+        rolls: [
+          { result: 6, sides: 10, modifiers: ['kept', 'success'], critical: false, fumble: false },
+          { result: 1, sides: 10, modifiers: ['kept', 'failure'], critical: false, fumble: false },
+        ],
+        expressionParts: [],
+        renderedParts: [],
+      };
+      const parent: EvalContext = { rolls: [], expressionParts: [], renderedParts: [] };
+
+      mergeMetaRolls(parent, source);
+
+      expect(parent.rolls).toHaveLength(2);
+      for (const die of parent.rolls) {
+        expect(die.modifiers).toContain('meta');
+        expect(die.modifiers).toContain('dropped');
+        expect(die.modifiers).not.toContain('success');
+        expect(die.modifiers).not.toContain('failure');
+        expect(die.modifiers).not.toContain('kept');
+      }
     });
   });
 });
