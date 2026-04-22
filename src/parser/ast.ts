@@ -250,46 +250,10 @@ export function isGrouped(node: ASTNode): node is GroupedNode {
 }
 
 /**
- * Returns `true` if the AST contains a `Dice` or `FateDice` node reachable
- * through structural composition (BinaryOp, UnaryOp, keep/drop, explode,
- * reroll, success-count wrappers). Meta-expressions — dice count/sides,
- * modifier counts, and ComparePoint values — are treated as leaves and
- * never recursed into.
- *
- * Used by the parser to reject success-counting targets that don't actually
- * roll any dice (e.g. `1>=3`, `(1+2)>=3`).
- */
-export function containsDice(node: ASTNode): boolean {
-  switch (node.type) {
-    case 'Dice':
-    case 'FateDice':
-      return true;
-    case 'Literal':
-      return false;
-    case 'BinaryOp':
-      return containsDice(node.left) || containsDice(node.right);
-    case 'UnaryOp':
-      return containsDice(node.operand);
-    case 'Modifier':
-    case 'Explode':
-    case 'Reroll':
-    case 'SuccessCount':
-      return containsDice(node.target);
-    case 'Versus':
-      return containsDice(node.roll) || containsDice(node.dc);
-    case 'FunctionCall':
-      return node.args.some(containsDice);
-    case 'Grouped':
-      return containsDice(node.expression);
-  }
-}
-
-/**
  * Returns `true` only when `node`'s direct result is a dice pool —
  * `Dice`, `FateDice`, or a chained pool modifier (`Modifier` / `Explode` /
- * `Reroll`). Unlike `containsDice`, this does NOT recurse through arithmetic
- * wrappers (`BinaryOp`, `UnaryOp`, `FunctionCall`), so `(1d6+5)` and
- * `floor(1d6/2)` are rejected.
+ * `Reroll`). Does NOT recurse through arithmetic wrappers (`BinaryOp`,
+ * `UnaryOp`, `FunctionCall`), so `(1d6+5)` and `floor(1d6/2)` are rejected.
  *
  * Used by the parser to reject postfix pool-modifier targets (kh/kl/dh/dl,
  * !/!!/!p, r/ro) that wrap a non-pool expression. Operating on the inner

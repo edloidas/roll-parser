@@ -1968,6 +1968,33 @@ describe('evaluate', () => {
       expect(result.degree).toBe(DegreeOfSuccess.Success);
       expect(getDie(result.rolls, 0).initialResult).toBeUndefined();
     });
+
+    test('Meta-d20 on count side: (1d20)d20!! vs 30 — meta d20 filtered from natural', () => {
+      // Draw order: meta count `(1d20)` → 1 (stamped 'dropped'), then outer
+      // `1d20!!` rolls [20, 20, 5] and compound-explodes to 45.
+      // `extractNatural` must skip the meta d20 and use the outer pool's 20.
+      const ast = parse('(1d20)d20!! vs 30');
+      const rng = createMockRng([1, 20, 20, 5]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(45);
+      expect(result.natural).toBe(20);
+      expect(result.degree).toBe(DegreeOfSuccess.CriticalSuccess);
+    });
+
+    test('Meta-d20 on sides: 1d(1d20) vs 15 — meta d20 filtered from natural', () => {
+      // Draw order: meta sides `(1d20)` → 20 (stamped 'dropped'), then outer
+      // `1d20` rolls 3. If `extractNatural` leaked the meta d20, two kept
+      // d20s would render natural undefined (ambiguous); correct behavior
+      // returns the outer result (3).
+      const ast = parse('1d(1d20) vs 15');
+      const rng = createMockRng([20, 3]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(3);
+      expect(result.natural).toBe(3);
+      expect(result.degree).toBe(DegreeOfSuccess.CriticalFailure);
+    });
   });
 
   describe('math functions', () => {
