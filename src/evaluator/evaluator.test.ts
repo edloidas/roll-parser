@@ -2330,4 +2330,143 @@ describe('evaluate', () => {
       }
     });
   });
+
+  describe('variables', () => {
+    test('resolves bare @name from context', () => {
+      const ast = parse('@str');
+      const result = evaluate(ast, createMockRng([]), { context: { str: 5 } });
+
+      expect(result.total).toBe(5);
+      expect(result.expression).toBe('5');
+      expect(result.rendered).toBe('@str[5] = 5');
+    });
+
+    test('resolves braced @{name with spaces} from context', () => {
+      const ast = parse('@{Strength Modifier}');
+      const result = evaluate(ast, createMockRng([]), {
+        context: { 'Strength Modifier': 3 },
+      });
+
+      expect(result.total).toBe(3);
+      expect(result.rendered).toBe('@{Strength Modifier}[3] = 3');
+    });
+
+    test('preserves case sensitivity (@StrMod ≠ @strmod)', () => {
+      const ast = parse('@StrMod');
+      const result = evaluate(ast, createMockRng([]), {
+        context: { StrMod: 4, strmod: 99 },
+      });
+
+      expect(result.total).toBe(4);
+    });
+
+    test('throws UNDEFINED_VARIABLE by default when key is missing', () => {
+      const ast = parse('@missing');
+
+      expect(() => evaluate(ast, createMockRng([]))).toThrow(EvaluatorError);
+      try {
+        evaluate(ast, createMockRng([]));
+      } catch (err) {
+        expect((err as EvaluatorError).code).toBe('UNDEFINED_VARIABLE');
+        expect((err as EvaluatorError).message).toBe('Undefined variable: missing');
+      }
+    });
+
+    test('returns 0 when key is missing and onMissingVariable is "zero"', () => {
+      const ast = parse('1d20+@missing');
+      const result = evaluate(ast, createMockRng([15]), { onMissingVariable: 'zero' });
+
+      expect(result.total).toBe(15);
+      expect(result.expression).toBe('1d20 + 0');
+      expect(result.rendered).toBe('1d20[15] + @missing[0] = 15');
+    });
+
+    test('integrates with arithmetic: 1d20+@str', () => {
+      const ast = parse('1d20+@str');
+      const result = evaluate(ast, createMockRng([10]), { context: { str: 3 } });
+
+      expect(result.total).toBe(13);
+      expect(result.expression).toBe('1d20 + 3');
+      expect(result.rendered).toBe('1d20[10] + @str[3] = 13');
+    });
+
+    test('resolves variable as dice count: @count d6', () => {
+      const ast = parse('@count d6');
+      const result = evaluate(ast, createMockRng([2, 4, 6]), { context: { count: 3 } });
+
+      expect(result.total).toBe(12);
+      expect(result.rolls).toHaveLength(3);
+      expect(result.expression).toBe('3d6');
+    });
+
+    test('resolves variable as dice sides: 1d@sides', () => {
+      const ast = parse('1d@sides');
+      const result = evaluate(ast, createMockRng([7]), { context: { sides: 8 } });
+
+      expect(result.total).toBe(7);
+      expect(getDie(result.rolls, 0).sides).toBe(8);
+    });
+
+    test('resolves variable as modifier count: 4d6kh@keep', () => {
+      const ast = parse('4d6kh@keep');
+      const result = evaluate(ast, createMockRng([2, 5, 3, 6]), { context: { keep: 2 } });
+
+      expect(result.total).toBe(11);
+    });
+
+    test('resolves variable as compare threshold: 2d6>=@dc', () => {
+      const ast = parse('2d6>=@dc');
+      const result = evaluate(ast, createMockRng([4, 6]), { context: { dc: 5 } });
+
+      expect(result.total).toBe(1);
+      expect(result.successes).toBe(1);
+    });
+
+    test('accepts decimal-valued variables', () => {
+      const ast = parse('@half + 1');
+      const result = evaluate(ast, createMockRng([]), { context: { half: 0.5 } });
+
+      expect(result.total).toBe(1.5);
+    });
+
+    test('accepts negative-valued variables (penalty modifier)', () => {
+      const ast = parse('1d20+@penalty');
+      const result = evaluate(ast, createMockRng([18]), { context: { penalty: -2 } });
+
+      expect(result.total).toBe(16);
+      expect(result.rendered).toBe('1d20[18] + @penalty[-2] = 16');
+    });
+
+    test('renders braced form when name needs braces', () => {
+      const ast = parse('@{damage bonus}');
+      const result = evaluate(ast, createMockRng([]), { context: { 'damage bonus': 7 } });
+
+      expect(result.rendered).toBe('@{damage bonus}[7] = 7');
+    });
+
+    test('renders bare form even if user wrote braces around bare-valid name', () => {
+      const ast = parse('@{strBonus}');
+      const result = evaluate(ast, createMockRng([]), { context: { strBonus: 2 } });
+
+      // Braces are stripped by the lexer; renderer re-derives bracedness from
+      // name shape, so this canonicalizes to the bare form.
+      expect(result.rendered).toBe('@strBonus[2] = 2');
+    });
+
+    test('throws on missing key when "throw" is explicit', () => {
+      const ast = parse('1d20+@missing');
+
+      expect(() =>
+        evaluate(ast, createMockRng([10]), { context: {}, onMissingVariable: 'throw' }),
+      ).toThrow(EvaluatorError);
+    });
+
+    test('integrates multiple variables in one expression', () => {
+      const ast = parse('@str+@dex+1d6');
+      const result = evaluate(ast, createMockRng([4]), { context: { str: 2, dex: 3 } });
+
+      expect(result.total).toBe(9);
+      expect(result.expression).toBe('2 + 3 + 1d6');
+    });
+  });
 });

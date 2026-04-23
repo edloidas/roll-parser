@@ -22,6 +22,7 @@ import type {
   RerollNode,
   SuccessCountNode,
   UnaryOpNode,
+  VariableNode,
   VersusNode,
 } from './ast';
 import { containsDicePool, containsFatePool, isSuccessCount } from './ast';
@@ -178,6 +179,9 @@ export class Parser {
 
       case TokenType.FUNCTION:
         return this.parseFunctionCall(token);
+
+      case TokenType.AT:
+        return this.parseVariable(token);
 
       case TokenType.EOF:
         throw new ParseError('Unexpected end of input', 'UNEXPECTED_END', token.position);
@@ -341,6 +345,10 @@ export class Parser {
     return { type: 'Grouped', expression };
   }
 
+  private parseVariable(token: Token): VariableNode {
+    return { type: 'Variable', name: token.value };
+  }
+
   private parseFunctionCall(token: Token): FunctionCallNode {
     // `FUNCTION` has BP = -1 so callers stop here; `COMMA` and `RPAREN` also
     // terminate inner `parseExpression(0)` calls, so argument boundaries are
@@ -470,7 +478,7 @@ export class Parser {
     // Default to 1 when no explicit count follows the modifier (e.g., 4d6kh → 4d6kh1)
     const nextToken = this.peek().type;
     const count: ASTNode =
-      nextToken === TokenType.NUMBER || nextToken === TokenType.LPAREN
+      nextToken === TokenType.NUMBER || nextToken === TokenType.LPAREN || nextToken === TokenType.AT
         ? this.parseExpression(BP.DICE_LEFT)
         : { type: 'Literal', value: 1 };
     this.rejectSuccessCountTarget(count, token);

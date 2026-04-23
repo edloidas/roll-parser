@@ -26,6 +26,7 @@ export type {
   RerollNode,
   SuccessCountNode,
   UnaryOpNode,
+  VariableNode,
   VersusNode,
 } from './parser/ast';
 export {
@@ -40,6 +41,7 @@ export {
   isReroll,
   isSuccessCount,
   isUnaryOp,
+  isVariable,
   isVersus,
 } from './parser/ast';
 

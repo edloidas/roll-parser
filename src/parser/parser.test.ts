@@ -15,6 +15,7 @@ import type {
   RerollNode,
   SuccessCountNode,
   UnaryOpNode,
+  VariableNode,
   VersusNode,
 } from './ast';
 
@@ -87,6 +88,10 @@ function functionCall(name: string, args: ASTNode[]): FunctionCallNode {
 
 function grouped(expression: ASTNode): GroupedNode {
   return { type: 'Grouped', expression };
+}
+
+function variable(name: string): VariableNode {
+  return { type: 'Variable', name };
 }
 
 describe('Parser', () => {
@@ -1751,6 +1756,59 @@ describe('Parser', () => {
       } catch (err) {
         expect((err as ParseError).code).toBe('EXPECTED_TOKEN');
       }
+    });
+  });
+
+  describe('variable references', () => {
+    it('should parse bare @name with case preserved', () => {
+      expect(parse('@StrMod')).toEqual(variable('StrMod'));
+    });
+
+    it('should parse braced @{name with spaces}', () => {
+      expect(parse('@{Strength Modifier}')).toEqual(variable('Strength Modifier'));
+    });
+
+    it('should treat @Foo and @foo as distinct variables', () => {
+      expect(parse('@Foo')).toEqual(variable('Foo'));
+      expect(parse('@foo')).toEqual(variable('foo'));
+    });
+
+    it('should parse variable in arithmetic: 1d20+@str', () => {
+      expect(parse('1d20+@str')).toEqual(
+        binary('+', dice(literal(1), literal(20)), variable('str')),
+      );
+    });
+
+    it('should parse variable in dice count: @count d6', () => {
+      expect(parse('@count d6')).toEqual(dice(variable('count'), literal(6)));
+    });
+
+    it('should parse variable in dice sides: 1d@sides', () => {
+      expect(parse('1d@sides')).toEqual(dice(literal(1), variable('sides')));
+    });
+
+    it('should parse variables on both sides: @count d@sides', () => {
+      expect(parse('@count d@sides')).toEqual(dice(variable('count'), variable('sides')));
+    });
+
+    it('should parse variable in modifier count: 4d6kh@keep', () => {
+      expect(parse('4d6kh@keep')).toEqual(
+        modifier('keep', 'highest', variable('keep'), dice(literal(4), literal(6))),
+      );
+    });
+
+    it('should parse variable as success-count threshold: 2d6>=@dc', () => {
+      expect(parse('2d6>=@dc')).toEqual(
+        successCount(dice(literal(2), literal(6)), cp('>=', variable('dc'))),
+      );
+    });
+
+    it('should parse braced variable inside grouped count: (@{base})d6', () => {
+      expect(parse('(@{base})d6')).toEqual(dice(grouped(variable('base')), literal(6)));
+    });
+
+    it('should parse variable as a leaf with no LED — @str+@dex', () => {
+      expect(parse('@str+@dex')).toEqual(binary('+', variable('str'), variable('dex')));
     });
   });
 });

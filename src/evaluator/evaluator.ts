@@ -18,6 +18,7 @@ import type {
   RerollNode,
   SuccessCountNode,
   UnaryOpNode,
+  VariableNode,
   VersusNode,
 } from '../parser/ast';
 import { isModifier } from '../parser/ast';
@@ -258,6 +259,9 @@ function evalNode(node: ASTNode, rng: RNG, ctx: EvalContext, env: EvalEnv): numb
     case 'Grouped':
       return evalGrouped(node, rng, ctx, env);
 
+    case 'Variable':
+      return evalVariable(node, ctx, env);
+
     default: {
       const exhaustive: never = node;
       throw new EvaluatorError(
@@ -272,6 +276,48 @@ function evalNode(node: ASTNode, rng: RNG, ctx: EvalContext, env: EvalEnv): numb
 function evalLiteral(value: number, ctx: EvalContext): number {
   ctx.expressionParts.push(String(value));
   ctx.renderedParts.push(String(value));
+  return value;
+}
+
+/**
+ * Re-derives whether a variable name needs braces in its rendered form.
+ *
+ * The lexer accepts `@name` (bare) or `@{name with spaces}` (braced) but
+ * strips the braces from the captured value. To round-trip through `rendered`
+ * we re-derive bracedness from the name shape — anything outside the bare
+ * identifier grammar implies the user wrote braces (or would need them).
+ */
+function variableNeedsBraces(name: string): boolean {
+  return !/^[A-Za-z_][A-Za-z0-9_]*$/.test(name);
+}
+
+/**
+ * Looks up a variable in `env.context` and resolves missing keys per
+ * `env.onMissingVariable`. The resolved scalar is the variable's value;
+ * `expression` shows the resolved number (mirrors how literals render),
+ * while `rendered` keeps the original `@name` (or `@{name}`) annotated with
+ * the resolved value in brackets so readers can attribute the number.
+ */
+function evalVariable(node: VariableNode, ctx: EvalContext, env: EvalEnv): number {
+  const present = Object.hasOwn(env.context, node.name);
+  if (!present) {
+    if (env.onMissingVariable === 'throw') {
+      throw new EvaluatorError(
+        `Undefined variable: ${node.name}`,
+        'UNDEFINED_VARIABLE',
+        'Variable',
+      );
+    }
+    const display = variableNeedsBraces(node.name) ? `@{${node.name}}` : `@${node.name}`;
+    ctx.expressionParts.push('0');
+    ctx.renderedParts.push(`${display}[0]`);
+    return 0;
+  }
+
+  const value = env.context[node.name] as number;
+  const display = variableNeedsBraces(node.name) ? `@{${node.name}}` : `@${node.name}`;
+  ctx.expressionParts.push(String(value));
+  ctx.renderedParts.push(`${display}[${value}]`);
   return value;
 }
 
