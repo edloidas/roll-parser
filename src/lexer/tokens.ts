@@ -127,11 +127,45 @@ export enum TokenType {
   VS = 29,
 
   //
+  // * Group boundaries
+  //
+
+  /** Left brace: '{' */
+  LBRACE = 30,
+  /** Right brace: '}' */
+  RBRACE = 31,
+
+  //
+  // * Variables
+  //
+
+  /** Variable reference prefix: '@' */
+  AT = 32,
+
+  //
+  // * Sort modifiers
+  //
+
+  /** Ascending sort: 's' or 'sa' */
+  SORT_ASC = 33,
+  /** Descending sort: 'sd' */
+  SORT_DESC = 34,
+
+  //
+  // * Crit thresholds
+  //
+
+  /** Critical success threshold: 'cs' */
+  CRIT_SUCCESS = 35,
+  /** Critical failure threshold: 'cf' */
+  CRIT_FAIL = 36,
+
+  //
   // * End of input
   //
 
   /** End of input marker */
-  EOF = 30,
+  EOF = 37,
 }
 
 /**
