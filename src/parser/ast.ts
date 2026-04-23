@@ -177,6 +177,21 @@ export type GroupNode = {
 };
 
 /**
+ * Sort modifier node (`s`, `sa`, `sd`).
+ *
+ * Cosmetically reorders the dice produced by `target` in ascending or
+ * descending order. Purely visual — does not affect `total`,
+ * `successes`/`failures`, or any die-level flag (`kept`/`dropped`/
+ * `critical`/`fumble`). Dropped dice retain their `dropped` flag and
+ * appear in sorted position alongside kept dice.
+ */
+export type SortNode = {
+  type: 'Sort';
+  order: 'ascending' | 'descending';
+  target: ASTNode;
+};
+
+/**
  * Union type of all AST nodes.
  */
 export type ASTNode =
@@ -193,7 +208,8 @@ export type ASTNode =
   | FunctionCallNode
   | GroupedNode
   | VariableNode
-  | GroupNode;
+  | GroupNode
+  | SortNode;
 
 /**
  * Type guard for LiteralNode.
@@ -294,6 +310,13 @@ export function isGroup(node: ASTNode): node is GroupNode {
 }
 
 /**
+ * Type guard for SortNode.
+ */
+export function isSort(node: ASTNode): node is SortNode {
+  return node.type === 'Sort';
+}
+
+/**
  * Returns `true` only when `node`'s direct result is a dice pool —
  * `Dice`, `FateDice`, or a chained pool modifier (`Modifier` / `Explode` /
  * `Reroll`). Does NOT recurse through arithmetic wrappers (`BinaryOp`,
@@ -311,6 +334,8 @@ export function containsDicePool(node: ASTNode): boolean {
     case 'Explode':
     case 'Reroll':
       return true;
+    case 'Sort':
+      return containsDicePool(node.target);
     case 'Grouped':
       return containsDicePool(node.expression);
     case 'Group':
@@ -328,11 +353,12 @@ export function containsDicePool(node: ASTNode): boolean {
 
 /**
  * Deeper variant of `containsDicePool` that recurses through arithmetic and
- * function wrappers. Used only from the `Group` case above — ordinary
- * parenthesized arithmetic (`(1d6+5)kh1`) must still reject, so the shallow
- * `containsDicePool` handles those directly.
+ * function wrappers. Used from the `Group` case above (ordinary parenthesized
+ * arithmetic `(1d6+5)kh1` must still reject, so the shallow `containsDicePool`
+ * handles those directly) and from the Sort parser guard (sort accepts
+ * `(1d6+2d8)s` per Stage 3 spec).
  */
-function deepContainsDicePool(node: ASTNode): boolean {
+export function deepContainsDicePool(node: ASTNode): boolean {
   switch (node.type) {
     case 'Dice':
     case 'FateDice':
@@ -345,6 +371,7 @@ function deepContainsDicePool(node: ASTNode): boolean {
     case 'Explode':
     case 'Reroll':
     case 'SuccessCount':
+    case 'Sort':
       return deepContainsDicePool(node.target);
     case 'Versus':
       return deepContainsDicePool(node.roll) || deepContainsDicePool(node.dc);
@@ -376,6 +403,7 @@ export function containsFatePool(node: ASTNode): boolean {
     case 'Modifier':
     case 'Explode':
     case 'Reroll':
+    case 'Sort':
       return containsFatePool(node.target);
     case 'Grouped':
       return containsFatePool(node.expression);

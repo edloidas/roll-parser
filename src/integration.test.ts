@@ -743,4 +743,35 @@ describe('roll() integration', () => {
       expect(r1.rolls).toEqual(r2.rolls);
     });
   });
+
+  describe('sort modifiers', () => {
+    test('4d6s sorts dice ascending and round-trips expression', () => {
+      const result = roll('4d6s', { rng: createMockRng([5, 2, 6, 3]) });
+
+      expect(result.total).toBe(16);
+      expect(result.rolls.map((d) => d.result)).toEqual([2, 3, 5, 6]);
+      expect(result.expression).toBe('4d6s');
+      expect(result.rendered).toBe('4d6s[2, 3, 5, 6] = 16');
+    });
+
+    test('4d6sd sorts dice descending', () => {
+      const result = roll('4d6sd', { rng: createMockRng([5, 2, 6, 3]) });
+
+      expect(result.total).toBe(16);
+      expect(result.rolls.map((d) => d.result)).toEqual([6, 5, 3, 2]);
+      expect(result.rendered).toBe('4d6sd[6, 5, 3, 2] = 16');
+    });
+
+    test('4d6dl1s renders dropped die inline in sorted position', () => {
+      const result = roll('4d6dl1s', { rng: createMockRng([5, 2, 6, 3]) });
+
+      expect(result.total).toBe(14);
+      expect(result.rolls.map((d) => d.result)).toEqual([2, 3, 5, 6]);
+      expect(result.rendered).toBe('4d6dl1s[~~2~~, 3, 5, 6] = 14');
+    });
+
+    test('rejects sort on a pure literal at parse time', () => {
+      expect(() => roll('5s', { rng: createMockRng([]) })).toThrow(ParseError);
+    });
+  });
 });

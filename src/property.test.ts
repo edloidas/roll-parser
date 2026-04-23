@@ -710,4 +710,101 @@ describe('property-based invariants', () => {
       );
     });
   });
+
+  describe('sort invariants', () => {
+    test('NdXs total equals NdX total for the same seeded roll', () => {
+      fc.assert(
+        fc.property(
+          fc.string({ minLength: 1, maxLength: 20 }),
+          fc.integer({ min: 1, max: 10 }),
+          fc.integer({ min: 2, max: 20 }),
+          (seed, count, sides) => {
+            const raw = roll(`${count}d${sides}`, { seed });
+            const sorted = roll(`${count}d${sides}s`, { seed });
+            return raw.total === sorted.total && raw.rolls.length === sorted.rolls.length;
+          },
+        ),
+        { numRuns: 200 },
+      );
+    });
+
+    test('NdXs produces a monotonically non-decreasing rolls sequence', () => {
+      fc.assert(
+        fc.property(
+          fc.string({ minLength: 1, maxLength: 20 }),
+          fc.integer({ min: 2, max: 12 }),
+          fc.integer({ min: 2, max: 20 }),
+          (seed, count, sides) => {
+            const result = roll(`${count}d${sides}s`, { seed });
+            for (let i = 1; i < result.rolls.length; i++) {
+              const prev = result.rolls[i - 1];
+              const curr = result.rolls[i];
+              if (prev == null || curr == null) return false;
+              if (prev.result > curr.result) return false;
+            }
+            return true;
+          },
+        ),
+        { numRuns: 200 },
+      );
+    });
+
+    test('NdXsd produces a monotonically non-increasing rolls sequence', () => {
+      fc.assert(
+        fc.property(
+          fc.string({ minLength: 1, maxLength: 20 }),
+          fc.integer({ min: 2, max: 12 }),
+          fc.integer({ min: 2, max: 20 }),
+          (seed, count, sides) => {
+            const result = roll(`${count}d${sides}sd`, { seed });
+            for (let i = 1; i < result.rolls.length; i++) {
+              const prev = result.rolls[i - 1];
+              const curr = result.rolls[i];
+              if (prev == null || curr == null) return false;
+              if (prev.result < curr.result) return false;
+            }
+            return true;
+          },
+        ),
+        { numRuns: 200 },
+      );
+    });
+
+    test('sort preserves successes/failures counts when chained after SuccessCount is not allowed — sanity check that sort does not emit them', () => {
+      fc.assert(
+        fc.property(
+          fc.string({ minLength: 1, maxLength: 20 }),
+          fc.integer({ min: 1, max: 8 }),
+          fc.integer({ min: 4, max: 20 }),
+          (seed, count, sides) => {
+            const result = roll(`${count}d${sides}s`, { seed });
+            return result.successes === undefined && result.failures === undefined;
+          },
+        ),
+        { numRuns: 100 },
+      );
+    });
+
+    test('sort preserves dropped count after keep/drop', () => {
+      fc.assert(
+        fc.property(
+          fc.string({ minLength: 1, maxLength: 20 }),
+          fc.integer({ min: 2, max: 8 }),
+          fc.integer({ min: 2, max: 20 }),
+          fc.integer({ min: 1, max: 3 }),
+          (seed, count, sides, drop) => {
+            const dropN = Math.min(drop, count - 1);
+            const base = roll(`${count}d${sides}dl${dropN}`, { seed });
+            const sorted = roll(`${count}d${sides}dl${dropN}s`, { seed });
+            const baseDropped = base.rolls.filter((d) => d.modifiers.includes('dropped')).length;
+            const sortedDropped = sorted.rolls.filter((d) =>
+              d.modifiers.includes('dropped'),
+            ).length;
+            return base.total === sorted.total && baseDropped === sortedDropped;
+          },
+        ),
+        { numRuns: 200 },
+      );
+    });
+  });
 });

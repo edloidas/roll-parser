@@ -2673,4 +2673,120 @@ describe('evaluate', () => {
       });
     });
   });
+
+  describe('sort modifier', () => {
+    test('ascending sort reorders rendered dice without affecting total', () => {
+      const ast = parse('4d6s');
+      const rng = createMockRng([5, 2, 6, 3]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(16);
+      expect(result.rolls.map((d) => d.result)).toEqual([2, 3, 5, 6]);
+      expect(result.expression).toBe('4d6s');
+      expect(result.rendered).toBe('4d6s[2, 3, 5, 6] = 16');
+    });
+
+    test('sa normalizes to s in expression output', () => {
+      const ast = parse('4d6sa');
+      const rng = createMockRng([5, 2, 6, 3]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(16);
+      expect(result.expression).toBe('4d6s');
+    });
+
+    test('descending sort reverses order', () => {
+      const ast = parse('4d6sd');
+      const rng = createMockRng([5, 2, 6, 3]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(16);
+      expect(result.rolls.map((d) => d.result)).toEqual([6, 5, 3, 2]);
+      expect(result.rendered).toBe('4d6sd[6, 5, 3, 2] = 16');
+    });
+
+    test('sort preserves dropped-die flag after keep/drop', () => {
+      // 4d6dl1: drop lowest (2). Kept: [5, 6, 3]. Total: 14.
+      // Sort ascending: [2 dropped, 3, 5, 6]. Total unchanged.
+      const ast = parse('4d6dl1s');
+      const rng = createMockRng([5, 2, 6, 3]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(14);
+      expect(result.rolls.map((d) => d.result)).toEqual([2, 3, 5, 6]);
+      expect(getDie(result.rolls, 0).modifiers).toContain('dropped');
+      expect(getDie(result.rolls, 1).modifiers).not.toContain('dropped');
+      expect(result.rendered).toBe('4d6dl1s[~~2~~, 3, 5, 6] = 14');
+    });
+
+    test('sort after explode reorders the expanded pool', () => {
+      // 4d6!: rolls [6, 2, 3, 5], explode the 6 → rolls 4. Pool: [6, 2, 3, 5, 4]. Total 20.
+      // Sort ascending: [2, 3, 4, 5, 6].
+      const ast = parse('4d6!s');
+      const rng = createMockRng([6, 2, 3, 5, 4]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(20);
+      expect(result.rolls.map((d) => d.result)).toEqual([2, 3, 4, 5, 6]);
+    });
+
+    test('sort is idempotent when chained in the same direction', () => {
+      const ast = parse('4d6s s');
+      const rng = createMockRng([4, 1, 6, 3]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(14);
+      expect(result.rolls.map((d) => d.result)).toEqual([1, 3, 4, 6]);
+    });
+
+    test('later sort in chain overrides the earlier direction', () => {
+      const ast = parse('4d6s sd');
+      const rng = createMockRng([4, 1, 6, 3]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(14);
+      expect(result.rolls.map((d) => d.result)).toEqual([6, 4, 3, 1]);
+    });
+
+    test('empty pool is a no-op', () => {
+      const ast = parse('0d6s');
+      const rng = createMockRng([]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(0);
+      expect(result.rolls).toEqual([]);
+      expect(result.rendered).toBe('0d6s[] = 0');
+    });
+
+    test('sort with Fate dice pool', () => {
+      // 4dF → [1, -1, 0, 1]. Sort descending: [1, 1, 0, -1]. Total: 1+(-1)+0+1 = 1.
+      const ast = parse('4dFsd');
+      const rng = createMockRng([1, -1, 0, 1]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(1);
+      expect(result.rolls.map((d) => d.result)).toEqual([1, 1, 0, -1]);
+    });
+
+    test('sort on arithmetic-wrapped pool mixes all dice flat', () => {
+      // (1d6+2d8)s: 1d6=4, 2d8=[5, 2]. Flat pool [4, 5, 2]. Sort asc: [2, 4, 5].
+      // Total is preserved: 4 + (5+2) = 11.
+      const ast = parse('(1d6+2d8)s');
+      const rng = createMockRng([4, 5, 2]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(11);
+      expect(result.rolls.map((d) => d.result)).toEqual([2, 4, 5]);
+    });
+
+    test('sort stability preserves insertion order for equal values', () => {
+      const ast = parse('4d6s');
+      const rng = createMockRng([3, 3, 1, 3]);
+      const result = evaluate(ast, rng);
+
+      expect(result.rolls.map((d) => d.result)).toEqual([1, 3, 3, 3]);
+      // All three 3s remain distinct DieResult objects; sort only reorders.
+      expect(result.rolls.filter((d) => d.result === 3)).toHaveLength(3);
+    });
+  });
 });
