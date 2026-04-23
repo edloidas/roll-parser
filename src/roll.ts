@@ -25,6 +25,10 @@ export type RollOptions = {
   maxExplodeIterations?: number;
   /** Maximum reroll iterations allowed per die (default: 1,000) */
   maxRerollIterations?: number;
+  /** Variable context for `@name` / `@{name}` references (default: empty) */
+  context?: Record<string, number>;
+  /** Behavior when a referenced variable is missing from context (default: 'throw') */
+  onMissingVariable?: 'throw' | 'zero';
 };
 
 /**
@@ -61,6 +65,10 @@ export function roll(notation: string, options: RollOptions = {}): RollResult {
   }
   if (options.maxRerollIterations != null) {
     evalOptions.maxRerollIterations = options.maxRerollIterations;
+  }
+  if (options.context != null) evalOptions.context = options.context;
+  if (options.onMissingVariable != null) {
+    evalOptions.onMissingVariable = options.onMissingVariable;
   }
   return evaluate(ast, rng, evalOptions);
 }

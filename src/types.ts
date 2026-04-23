@@ -123,4 +123,8 @@ export type EvaluateOptions = {
   maxExplodeIterations?: number;
   /** Maximum reroll iterations allowed per die (default: 1,000) */
   maxRerollIterations?: number;
+  /** Variable context for `@name` / `@{name}` references (default: empty) */
+  context?: Record<string, number>;
+  /** Behavior when a referenced variable is missing from context (default: 'throw') */
+  onMissingVariable?: 'throw' | 'zero';
 };

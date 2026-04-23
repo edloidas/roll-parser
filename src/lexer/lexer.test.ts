@@ -561,6 +561,157 @@ describe('Lexer', () => {
     });
   });
 
+  describe('Stage 3 tokens', () => {
+    describe('group braces', () => {
+      it('should tokenize { as LBRACE', () => {
+        const tokens = lex('{');
+
+        expect(tokens).toHaveLength(2);
+        expect(tokens[0]).toEqual({ type: TokenType.LBRACE, value: '{', position: 0 });
+        expect(tokens[1]?.type).toBe(TokenType.EOF);
+      });
+
+      it('should tokenize } as RBRACE', () => {
+        const tokens = lex('}');
+
+        expect(tokens).toHaveLength(2);
+        expect(tokens[0]).toEqual({ type: TokenType.RBRACE, value: '}', position: 0 });
+      });
+
+      it('should tokenize {1d20,2d6} with commas as separators', () => {
+        const tokens = lex('{1d20,2d6}');
+
+        expect(tokens).toHaveLength(10);
+        expect(tokens[0]).toEqual({ type: TokenType.LBRACE, value: '{', position: 0 });
+        expect(tokens[4]).toEqual({ type: TokenType.COMMA, value: ',', position: 5 });
+        expect(tokens[8]).toEqual({ type: TokenType.RBRACE, value: '}', position: 9 });
+      });
+    });
+
+    describe('sort modifiers', () => {
+      it('should tokenize s as SORT_ASC', () => {
+        const tokens = lex('s');
+
+        expect(tokens).toHaveLength(2);
+        expect(tokens[0]).toEqual({ type: TokenType.SORT_ASC, value: 's', position: 0 });
+      });
+
+      it('should tokenize sa as SORT_ASC', () => {
+        const tokens = lex('sa');
+
+        expect(tokens).toHaveLength(2);
+        expect(tokens[0]).toEqual({ type: TokenType.SORT_ASC, value: 'sa', position: 0 });
+      });
+
+      it('should tokenize sd as SORT_DESC', () => {
+        const tokens = lex('sd');
+
+        expect(tokens).toHaveLength(2);
+        expect(tokens[0]).toEqual({ type: TokenType.SORT_DESC, value: 'sd', position: 0 });
+      });
+
+      it('should be case-insensitive for sort modifiers', () => {
+        expect(lex('SA')[0]?.type).toBe(TokenType.SORT_ASC);
+        expect(lex('Sd')[0]?.type).toBe(TokenType.SORT_DESC);
+      });
+    });
+
+    describe('crit threshold modifiers', () => {
+      it('should tokenize cs as CRIT_SUCCESS', () => {
+        const tokens = lex('cs');
+
+        expect(tokens).toHaveLength(2);
+        expect(tokens[0]).toEqual({ type: TokenType.CRIT_SUCCESS, value: 'cs', position: 0 });
+      });
+
+      it('should tokenize cf as CRIT_FAIL', () => {
+        const tokens = lex('cf');
+
+        expect(tokens).toHaveLength(2);
+        expect(tokens[0]).toEqual({ type: TokenType.CRIT_FAIL, value: 'cf', position: 0 });
+      });
+
+      it('should be case-insensitive for crit modifiers', () => {
+        expect(lex('CS')[0]?.type).toBe(TokenType.CRIT_SUCCESS);
+        expect(lex('Cf')[0]?.type).toBe(TokenType.CRIT_FAIL);
+      });
+    });
+
+    describe('@ variable references', () => {
+      it('should tokenize bare @name and preserve case', () => {
+        const tokens = lex('@StrMod');
+
+        expect(tokens).toHaveLength(2);
+        expect(tokens[0]).toEqual({ type: TokenType.AT, value: 'StrMod', position: 0 });
+      });
+
+      it('should allow digits and underscores after the first char', () => {
+        const tokens = lex('@abilities_3');
+
+        expect(tokens).toHaveLength(2);
+        expect(tokens[0]).toEqual({ type: TokenType.AT, value: 'abilities_3', position: 0 });
+      });
+
+      it('should allow an underscore-leading name', () => {
+        const tokens = lex('@_hidden');
+
+        expect(tokens).toHaveLength(2);
+        expect(tokens[0]).toEqual({ type: TokenType.AT, value: '_hidden', position: 0 });
+      });
+
+      it('should tokenize @{name with spaces and hyphens} preserving case', () => {
+        const tokens = lex('@{Strength Modifier-1}');
+
+        expect(tokens).toHaveLength(2);
+        expect(tokens[0]).toEqual({
+          type: TokenType.AT,
+          value: 'Strength Modifier-1',
+          position: 0,
+        });
+      });
+
+      it('should stop scanning at non-identifier chars in the bare form', () => {
+        const tokens = lex('@foo+1');
+
+        expect(tokens).toHaveLength(4);
+        expect(tokens[0]).toEqual({ type: TokenType.AT, value: 'foo', position: 0 });
+        expect(tokens[1]).toEqual({ type: TokenType.PLUS, value: '+', position: 4 });
+        expect(tokens[2]).toEqual({ type: TokenType.NUMBER, value: '1', position: 5 });
+      });
+
+      it('should preserve case distinctly (@Foo vs @foo)', () => {
+        expect(lex('@Foo')[0]?.value).toBe('Foo');
+        expect(lex('@foo')[0]?.value).toBe('foo');
+      });
+
+      it('should throw LexerError for bare @ with no name', () => {
+        expect(() => lex('@')).toThrow(LexerError);
+      });
+
+      it('should throw LexerError for bare @ followed by a digit', () => {
+        expect(() => lex('@2')).toThrow(LexerError);
+      });
+
+      it('should throw LexerError for unterminated @{', () => {
+        expect(() => lex('@{foo')).toThrow(LexerError);
+      });
+
+      it('should throw LexerError when @{ contains a newline before }', () => {
+        expect(() => lex('@{foo\n}')).toThrow(LexerError);
+      });
+
+      it('should report position and character on @ errors', () => {
+        try {
+          lex('1d20+@');
+        } catch (e) {
+          expect(e).toBeInstanceOf(LexerError);
+          expect((e as LexerError).position).toBe(5);
+          expect((e as LexerError).character).toBe('@');
+        }
+      });
+    });
+  });
+
   describe('edge cases', () => {
     it('should tokenize 0d6 (zero count dice)', () => {
       const tokens = lex('0d6');
@@ -593,16 +744,16 @@ describe('Lexer', () => {
 
   describe('error handling', () => {
     it('should throw LexerError for invalid characters', () => {
-      expect(() => lex('2d20@')).toThrow(LexerError);
+      expect(() => lex('2d20#')).toThrow(LexerError);
     });
 
     it('should include position in error', () => {
       try {
-        lex('2d20@');
+        lex('2d20#');
       } catch (e) {
         expect(e).toBeInstanceOf(LexerError);
         expect((e as LexerError).position).toBe(4);
-        expect((e as LexerError).character).toBe('@');
+        expect((e as LexerError).character).toBe('#');
       }
     });
 

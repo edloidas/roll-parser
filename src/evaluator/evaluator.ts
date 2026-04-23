@@ -88,6 +88,17 @@ export type EvalEnv = {
    * left-chain check.
    */
   insideVersus: boolean;
+  /**
+   * User-supplied variable map for `@name` / `@{name}` references. Always
+   * defined — `evaluate()` defaults to an empty object so lookups can be
+   * branch-free on presence.
+   */
+  readonly context: Readonly<Record<string, number>>;
+  /**
+   * Behavior when a referenced variable is missing from `context`. Always
+   * defined — `evaluate()` defaults to `'throw'`.
+   */
+  readonly onMissingVariable: 'throw' | 'zero';
 };
 
 /**
@@ -876,6 +887,9 @@ export function evaluate(ast: ASTNode, rng: RNG, options: EvaluateOptions = {}):
       ? Math.floor(options.maxRerollIterations)
       : DEFAULT_MAX_REROLL_ITERATIONS;
 
+  const context = options.context ?? {};
+  const onMissingVariable = options.onMissingVariable ?? 'throw';
+
   const env: EvalEnv = {
     maxDice,
     maxExplodeIterations,
@@ -883,6 +897,8 @@ export function evaluate(ast: ASTNode, rng: RNG, options: EvaluateOptions = {}):
     totalDiceRolled: 0,
     hasSuccessCount: false,
     insideVersus: false,
+    context,
+    onMissingVariable,
   };
   const ctx: EvalContext = {
     rolls: [],

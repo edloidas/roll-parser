@@ -41,6 +41,11 @@ const IDENTIFIER_KEYWORDS: Record<string, TokenType> = {
   abs: TokenType.FUNCTION,
   max: TokenType.FUNCTION,
   min: TokenType.FUNCTION,
+  s: TokenType.SORT_ASC,
+  sa: TokenType.SORT_ASC,
+  sd: TokenType.SORT_DESC,
+  cs: TokenType.CRIT_SUCCESS,
+  cf: TokenType.CRIT_FAIL,
 };
 
 /**
@@ -95,6 +100,11 @@ export class Lexer {
       return this.scanIdentifier();
     }
 
+    // * Variable reference
+    if (char === '@') {
+      return this.scanAt();
+    }
+
     // * Operators and punctuation
     this.advance();
 
@@ -120,6 +130,10 @@ export class Lexer {
         return this.createTokenAt(TokenType.RPAREN, char, startPos);
       case ',':
         return this.createTokenAt(TokenType.COMMA, char, startPos);
+      case '{':
+        return this.createTokenAt(TokenType.LBRACE, char, startPos);
+      case '}':
+        return this.createTokenAt(TokenType.RBRACE, char, startPos);
       case '>':
         if (this.match('=')) {
           return this.createTokenAt(TokenType.GREATER_EQUAL, '>=', startPos);
@@ -218,6 +232,49 @@ export class Lexer {
     throw new LexerError('Unexpected identifier', 'UNEXPECTED_IDENTIFIER', startPos, lower);
   }
 
+  /**
+   * Scans a variable reference introduced by `@`.
+   *
+   * Two forms:
+   * - Bare: `@name` where `name` matches `[A-Za-z_][A-Za-z0-9_]*` (case preserved).
+   * - Braced: `@{name}` where `name` is any run of printable characters except
+   *   `}` and newline (permits spaces, hyphens, digits).
+   *
+   * Case is preserved — distinct from `scanIdentifier`, which lowercases the
+   * captured value. The emitted token's `value` is the variable name without
+   * the leading `@` or the surrounding braces.
+   */
+  private scanAt(): Token {
+    const startPos = this.pos;
+    this.advance(); // consume '@'
+
+    let name: string;
+    if (!this.isAtEnd() && this.peek() === '{') {
+      this.advance(); // consume '{'
+      const nameStart = this.pos;
+      while (!this.isAtEnd() && this.peek() !== '}' && this.peek() !== '\n') {
+        this.advance();
+      }
+      if (this.isAtEnd() || this.peek() !== '}') {
+        throw new LexerError('Unterminated @{...} variable', 'UNEXPECTED_CHARACTER', startPos, '@');
+      }
+      name = this.input.slice(nameStart, this.pos);
+      this.advance(); // consume '}'
+    } else {
+      const nameStart = this.pos;
+      if (this.isAtEnd() || !this.isIdentifierStart(this.peek())) {
+        throw new LexerError('Empty @ variable name', 'UNEXPECTED_CHARACTER', startPos, '@');
+      }
+      this.advance();
+      while (!this.isAtEnd() && this.isIdentifierPart(this.peek())) {
+        this.advance();
+      }
+      name = this.input.slice(nameStart, this.pos);
+    }
+
+    return this.createTokenAt(TokenType.AT, name, startPos);
+  }
+
   private peek(): string {
     return this.input[this.pos] ?? '';
   }
@@ -248,6 +305,14 @@ export class Lexer {
   private isAlpha(char: string): boolean {
     const c = char.toLowerCase();
     return c >= 'a' && c <= 'z';
+  }
+
+  private isIdentifierStart(char: string): boolean {
+    return this.isAlpha(char) || char === '_';
+  }
+
+  private isIdentifierPart(char: string): boolean {
+    return this.isAlpha(char) || this.isDigit(char) || char === '_';
   }
 
   private isWhitespace(char: string): boolean {
