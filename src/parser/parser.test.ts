@@ -10,6 +10,7 @@ import type {
   FateDiceNode,
   FunctionCallNode,
   GroupedNode,
+  GroupNode,
   LiteralNode,
   ModifierNode,
   RerollNode,
@@ -88,6 +89,10 @@ function functionCall(name: string, args: ASTNode[]): FunctionCallNode {
 
 function grouped(expression: ASTNode): GroupedNode {
   return { type: 'Grouped', expression };
+}
+
+function group(expressions: ASTNode[]): GroupNode {
+  return { type: 'Group', expressions };
 }
 
 function variable(name: string): VariableNode {
@@ -1809,6 +1814,219 @@ describe('Parser', () => {
 
     it('should parse variable as a leaf with no LED — @str+@dex', () => {
       expect(parse('@str+@dex')).toEqual(binary('+', variable('str'), variable('dex')));
+    });
+  });
+
+  describe('grouped rolls', () => {
+    describe('shape', () => {
+      it('should parse single-sub-roll group as Group with one expression', () => {
+        expect(parse('{4d6}')).toEqual(group([dice(literal(4), literal(6))]));
+      });
+
+      it('should parse literal group', () => {
+        expect(parse('{3, 5, 7}')).toEqual(group([literal(3), literal(5), literal(7)]));
+      });
+
+      it('should parse multi-sub-roll group with arithmetic sub-expressions', () => {
+        expect(parse('{4d6+2d8, 3d20+3, 5d10+1}')).toEqual(
+          group([
+            binary('+', dice(literal(4), literal(6)), dice(literal(2), literal(8))),
+            binary('+', dice(literal(3), literal(20)), literal(3)),
+            binary('+', dice(literal(5), literal(10)), literal(1)),
+          ]),
+        );
+      });
+
+      it('should parse single-expression flat-pool group', () => {
+        expect(parse('{4d10+5d6}')).toEqual(
+          group([binary('+', dice(literal(4), literal(10)), dice(literal(5), literal(6)))]),
+        );
+      });
+
+      it('should parse nested group', () => {
+        expect(parse('{1d6, {5}}')).toEqual(
+          group([dice(literal(1), literal(6)), group([literal(5)])]),
+        );
+      });
+
+      it('should parse doubly nested group with outer keep/drop', () => {
+        expect(parse('{{1d6, 2d8}kh1, 3d10}kl1')).toEqual(
+          modifier(
+            'keep',
+            'lowest',
+            literal(1),
+            group([
+              modifier(
+                'keep',
+                'highest',
+                literal(1),
+                group([dice(literal(1), literal(6)), dice(literal(2), literal(8))]),
+              ),
+              dice(literal(3), literal(10)),
+            ]),
+          ),
+        );
+      });
+    });
+
+    describe('keep/drop modifiers', () => {
+      it('should parse group + kh modifier', () => {
+        expect(parse('{1d6, 1d8}kh1')).toEqual(
+          modifier(
+            'keep',
+            'highest',
+            literal(1),
+            group([dice(literal(1), literal(6)), dice(literal(1), literal(8))]),
+          ),
+        );
+      });
+
+      it('should parse group + kl modifier', () => {
+        expect(parse('{1d20, 1d20}kl1')).toEqual(
+          modifier(
+            'keep',
+            'lowest',
+            literal(1),
+            group([dice(literal(1), literal(20)), dice(literal(1), literal(20))]),
+          ),
+        );
+      });
+
+      it('should parse flat-pool group + kh with implicit count', () => {
+        expect(parse('{4d10+5d6}kh2')).toEqual(
+          modifier(
+            'keep',
+            'highest',
+            literal(2),
+            group([binary('+', dice(literal(4), literal(10)), dice(literal(5), literal(6)))]),
+          ),
+        );
+      });
+
+      it('should accept literal-only multi-sub-roll group with keep/drop', () => {
+        expect(parse('{3, 5, 7}kh1')).toEqual(
+          modifier('keep', 'highest', literal(1), group([literal(3), literal(5), literal(7)])),
+        );
+      });
+
+      it('should reject keep/drop on a single-sub-roll group with no dice', () => {
+        expect(() => parse('{5}kh1')).toThrow(ParseError);
+      });
+    });
+
+    describe('group inside arithmetic and unary', () => {
+      it('should parse group on the right of +', () => {
+        expect(parse('5 + {1d6, 1d8}kh1')).toEqual(
+          binary(
+            '+',
+            literal(5),
+            modifier(
+              'keep',
+              'highest',
+              literal(1),
+              group([dice(literal(1), literal(6)), dice(literal(1), literal(8))]),
+            ),
+          ),
+        );
+      });
+
+      it('should parse group multiplied by a literal', () => {
+        expect(parse('2 * {1d6, 1d8}kh1')).toEqual(
+          binary(
+            '*',
+            literal(2),
+            modifier(
+              'keep',
+              'highest',
+              literal(1),
+              group([dice(literal(1), literal(6)), dice(literal(1), literal(8))]),
+            ),
+          ),
+        );
+      });
+
+      it('should parse unary minus before group', () => {
+        expect(parse('-{1d6, 2d8}kh1')).toEqual(
+          unary(
+            modifier(
+              'keep',
+              'highest',
+              literal(1),
+              group([dice(literal(1), literal(6)), dice(literal(2), literal(8))]),
+            ),
+          ),
+        );
+      });
+    });
+
+    describe('errors', () => {
+      it('should reject empty group', () => {
+        expect(() => parse('{}')).toThrow(ParseError);
+        try {
+          parse('{}');
+        } catch (e) {
+          expect((e as ParseError).code).toBe('UNEXPECTED_TOKEN');
+          expect((e as ParseError).message).toContain('Empty group');
+        }
+      });
+
+      it('should reject unterminated group with EOF', () => {
+        expect(() => parse('{1d6, 2d8')).toThrow(ParseError);
+        try {
+          parse('{1d6, 2d8');
+        } catch (e) {
+          expect((e as ParseError).code).toBe('EXPECTED_TOKEN');
+          expect((e as ParseError).message).toContain('Unterminated group');
+        }
+      });
+
+      it('should reject unterminated group with stray token', () => {
+        expect(() => parse('{1d6 +}')).toThrow(ParseError);
+      });
+
+      it('should reject stray closing brace at top level', () => {
+        expect(() => parse('1d6}')).toThrow(ParseError);
+      });
+
+      it('should reject stray opening brace after an expression', () => {
+        expect(() => parse('1d6{1d8}')).toThrow(ParseError);
+      });
+
+      it('should reject explode on a group: {4d6}!', () => {
+        expect(() => parse('{4d6}!')).toThrow(ParseError);
+        try {
+          parse('{4d6}!');
+        } catch (e) {
+          expect((e as ParseError).code).toBe('INVALID_EXPLODE_TARGET');
+          expect((e as ParseError).message).toContain('Cannot explode a group');
+        }
+      });
+
+      it('should reject explode on a parenthesized group: ({4d6})!', () => {
+        expect(() => parse('({4d6})!')).toThrow(ParseError);
+      });
+
+      it('should reject compound explode on a group', () => {
+        expect(() => parse('{4d6}!!')).toThrow(ParseError);
+      });
+
+      it('should reject penetrating explode on a group', () => {
+        expect(() => parse('{4d6}!p')).toThrow(ParseError);
+      });
+
+      it('should reject reroll on a group: {4d6}r<2', () => {
+        expect(() => parse('{4d6}r<2')).toThrow(ParseError);
+        try {
+          parse('{4d6}r<2');
+        } catch (e) {
+          expect((e as ParseError).code).toBe('INVALID_REROLL_TARGET');
+          expect((e as ParseError).message).toContain('Cannot reroll a group');
+        }
+      });
+
+      it('should reject reroll-once on a group', () => {
+        expect(() => parse('{4d6}ro<2')).toThrow(ParseError);
+      });
     });
   });
 });

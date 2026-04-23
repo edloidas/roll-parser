@@ -2469,4 +2469,208 @@ describe('evaluate', () => {
       expect(result.expression).toBe('2 + 3 + 1d6');
     });
   });
+
+  describe('grouped rolls', () => {
+    describe('without modifier', () => {
+      test('single-sub-roll group is a pass-through: {4d6}', () => {
+        const ast = parse('{4d6}');
+        const rng = createMockRng([1, 2, 3, 4]);
+        const result = evaluate(ast, rng);
+
+        expect(result.total).toBe(10);
+        expect(result.rolls).toHaveLength(4);
+        expect(result.expression).toBe('{4d6}');
+        expect(result.rendered).toBe('{4d6[1, 2, 3, 4]} = 10');
+      });
+
+      test('multi-sub-roll group sums subtotals: {1d6, 1d8}', () => {
+        const ast = parse('{1d6, 1d8}');
+        const rng = createMockRng([3, 5]);
+        const result = evaluate(ast, rng);
+
+        expect(result.total).toBe(8);
+        expect(result.rolls).toHaveLength(2);
+        expect(result.expression).toBe('{1d6, 1d8}');
+        expect(result.rendered).toBe('{1d6[3], 1d8[5]} = 8');
+      });
+
+      test('literal-only group sums: {3, 5, 7}', () => {
+        const ast = parse('{3, 5, 7}');
+        const result = evaluate(ast, createMockRng([]));
+
+        expect(result.total).toBe(15);
+        expect(result.rolls).toHaveLength(0);
+        expect(result.expression).toBe('{3, 5, 7}');
+      });
+
+      test('nested group: {1d6, {5}}', () => {
+        const ast = parse('{1d6, {5}}');
+        const rng = createMockRng([4]);
+        const result = evaluate(ast, rng);
+
+        expect(result.total).toBe(9);
+        expect(result.rolls).toHaveLength(1);
+        expect(getDie(result.rolls, 0).result).toBe(4);
+      });
+
+      test('sub-roll with versus propagates degree', () => {
+        const ast = parse('{1d20+5 vs 15}');
+        const rng = createMockRng([10]);
+        const result = evaluate(ast, rng);
+
+        expect(result.total).toBe(15);
+        expect(result.degree).toBe(DegreeOfSuccess.Success);
+      });
+    });
+
+    describe('flat-pool mode (single sub-roll with keep/drop)', () => {
+      test('{4d10+5d6}kh2 keeps 2 highest across combined 9-die pool', () => {
+        const ast = parse('{4d10+5d6}kh2');
+        // 4 d10 draws: [10, 9, 8, 7], 5 d6 draws: [6, 5, 4, 3, 2]
+        // Combined sorted: 10, 9, 8, 7, 6, 5, 4, 3, 2 — kh2 keeps [10, 9]
+        const rng = createMockRng([10, 9, 8, 7, 6, 5, 4, 3, 2]);
+        const result = evaluate(ast, rng);
+
+        expect(result.total).toBe(19);
+        expect(result.rolls).toHaveLength(9);
+        const kept = result.rolls.filter((d) => !d.modifiers.includes('dropped'));
+        expect(kept.map((d) => d.result).sort((a, b) => b - a)).toEqual([10, 9]);
+      });
+
+      test('{4d6}kh2 passes through to ordinary keep-highest', () => {
+        const ast = parse('{4d6}kh2');
+        const rng = createMockRng([1, 2, 3, 4]);
+        const result = evaluate(ast, rng);
+
+        expect(result.total).toBe(7);
+        const kept = result.rolls.filter((d) => !d.modifiers.includes('dropped'));
+        expect(kept).toHaveLength(2);
+      });
+    });
+
+    describe('sub-roll mode (multi sub-roll with keep/drop)', () => {
+      test('{4d6+2d8, 3d20+3, 5d10+1}kh1 keeps highest subtotal', () => {
+        const ast = parse('{4d6+2d8, 3d20+3, 5d10+1}kh1');
+        // Sub 1: 4d6 = [1,1,1,1]=4, 2d8 = [1,1]=2 → 6
+        // Sub 2: 3d20 = [5,5,5]=15 → 15+3=18
+        // Sub 3: 5d10 = [1,1,1,1,1]=5 → 5+1=6
+        // Subtotals: [6, 18, 6] — kh1 picks 18
+        const rng = createMockRng([1, 1, 1, 1, 1, 1, 5, 5, 5, 1, 1, 1, 1, 1]);
+        const result = evaluate(ast, rng);
+
+        expect(result.total).toBe(18);
+        expect(result.rolls).toHaveLength(14);
+      });
+
+      test('dropped sub-roll flags all inner dice dropped', () => {
+        const ast = parse('{1d6, 1d8}kh1');
+        // Subtotals: [2, 7] — kh1 keeps sub 2 (1d8=7), drops sub 1 (1d6=2)
+        const rng = createMockRng([2, 7]);
+        const result = evaluate(ast, rng);
+
+        expect(result.total).toBe(7);
+        expect(result.rolls).toHaveLength(2);
+        const d6 = result.rolls.find((d) => d.sides === 6);
+        const d8 = result.rolls.find((d) => d.sides === 8);
+        expect(d6?.modifiers).toContain('dropped');
+        expect(d8?.modifiers).not.toContain('dropped');
+      });
+
+      test('literal-only multi-sub-roll: {3, 5, 7}kh1 returns 7', () => {
+        const ast = parse('{3, 5, 7}kh1');
+        const result = evaluate(ast, createMockRng([]));
+
+        expect(result.total).toBe(7);
+        expect(result.rolls).toHaveLength(0);
+      });
+
+      test('kl1 keeps lowest subtotal', () => {
+        const ast = parse('{1d6, 1d8}kl1');
+        // Subtotals: [5, 2] — kl1 keeps sub 2 (1d8=2)
+        const rng = createMockRng([5, 2]);
+        const result = evaluate(ast, rng);
+
+        expect(result.total).toBe(2);
+      });
+
+      test('dh1 drops highest subtotal', () => {
+        const ast = parse('{1d6, 1d8, 1d10}dh1');
+        // Subtotals: [2, 5, 8] — dh1 drops 8, keeps [2, 5] = 7
+        const rng = createMockRng([2, 5, 8]);
+        const result = evaluate(ast, rng);
+
+        expect(result.total).toBe(7);
+      });
+
+      test('dl1 drops lowest subtotal', () => {
+        const ast = parse('{1d6, 1d8, 1d10}dl1');
+        // Subtotals: [2, 5, 8] — dl1 drops 2, keeps [5, 8] = 13
+        const rng = createMockRng([2, 5, 8]);
+        const result = evaluate(ast, rng);
+
+        expect(result.total).toBe(13);
+      });
+
+      test('rendered form shows strikethrough for dropped sub-rolls', () => {
+        const ast = parse('{1d6, 1d8}kh1');
+        const rng = createMockRng([2, 7]);
+        const result = evaluate(ast, rng);
+
+        expect(result.rendered).toBe('{~~1d6[2]~~, 1d8[7]} = 7');
+        expect(result.expression).toBe('{1d6, 1d8}kh1');
+      });
+
+      test('RNG draw order is left-to-right across sub-expressions', () => {
+        const ast = parse('{1d6, 2d8}kh1');
+        // Expected draws: 1d6 first, then 2d8 left-to-right.
+        // Subtotals: [3, 5+6]=[3, 11] — kh1 picks sub 2
+        const rng = createMockRng([3, 5, 6]);
+        const result = evaluate(ast, rng);
+
+        expect(result.total).toBe(11);
+        const d8s = result.rolls.filter((d) => d.sides === 8);
+        expect(d8s.map((d) => d.result)).toEqual([5, 6]);
+      });
+    });
+
+    describe('group inside arithmetic', () => {
+      test('2 * {1d6, 1d8}kh1', () => {
+        const ast = parse('2 * {1d6, 1d8}kh1');
+        const rng = createMockRng([4, 3]);
+        const result = evaluate(ast, rng);
+
+        // Subtotals: [4, 3] — kh1 picks 4. 2 * 4 = 8.
+        expect(result.total).toBe(8);
+      });
+
+      test('{1d6, 1d8}kh1 + 5', () => {
+        const ast = parse('{1d6, 1d8}kh1 + 5');
+        const rng = createMockRng([4, 3]);
+        const result = evaluate(ast, rng);
+
+        expect(result.total).toBe(9);
+      });
+
+      test('-{1d6, 2d8}kh1 negates the kept subtotal', () => {
+        const ast = parse('-{1d6, 2d8}kh1');
+        const rng = createMockRng([3, 4, 5]);
+        const result = evaluate(ast, rng);
+
+        // Subtotals: [3, 9]. kh1 picks 9. Negate: -9.
+        expect(result.total).toBe(-9);
+      });
+    });
+
+    describe('nested keep/drop', () => {
+      test('{{1d6, 2d8}kh1, 3d10}kl1 — two levels of keep/drop', () => {
+        const ast = parse('{{1d6, 2d8}kh1, 3d10}kl1');
+        // Inner group: subtotals [1d6=2, 2d8=5+6=11] — kh1 picks 11.
+        // Outer group: subtotals [11, 3d10=1+2+3=6] — kl1 picks 6.
+        const rng = createMockRng([2, 5, 6, 1, 2, 3]);
+        const result = evaluate(ast, rng);
+
+        expect(result.total).toBe(6);
+      });
+    });
+  });
 });

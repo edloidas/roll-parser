@@ -14,6 +14,7 @@ import type {
   FateDiceNode,
   FunctionCallNode,
   GroupedNode,
+  GroupNode,
   ModifierNode,
   RerollNode,
   SuccessCountNode,
@@ -259,6 +260,9 @@ function evalNode(node: ASTNode, rng: RNG, ctx: EvalContext, env: EvalEnv): numb
     case 'Grouped':
       return evalGrouped(node, rng, ctx, env);
 
+    case 'Group':
+      return evalGroup(node, rng, ctx, env);
+
     case 'Variable':
       return evalVariable(node, ctx, env);
 
@@ -502,6 +506,36 @@ function evalGrouped(node: GroupedNode, rng: RNG, ctx: EvalContext, env: EvalEnv
   return value;
 }
 
+/**
+ * Evaluates a grouped roll `{expr1, expr2, ...}`.
+ *
+ * Each sub-expression is evaluated in an isolated context, then its rolls
+ * and `versusMetadata` propagate up via `mergeContext`. Sub-roll subtotals
+ * sum to the group's total. When the group is the base target of a
+ * keep/drop modifier with `expressions.length >= 2`, `evalModifier`
+ * intercepts first and never calls this function — dual semantics
+ * (flat-pool vs sub-roll) are decided there.
+ */
+function evalGroup(node: GroupNode, rng: RNG, ctx: EvalContext, env: EvalEnv): number {
+  const subExprs: string[] = [];
+  const subRendered: string[] = [];
+  let total = 0;
+
+  for (const expr of node.expressions) {
+    const subCtx: EvalContext = { rolls: [], expressionParts: [], renderedParts: [] };
+    const subtotal = evalNode(expr, rng, subCtx, env);
+    mergeContext(ctx, subCtx);
+    subExprs.push(subCtx.expressionParts.join(''));
+    subRendered.push(subCtx.renderedParts.join(''));
+    total += subtotal;
+  }
+
+  ctx.expressionParts.push(`{${subExprs.join(', ')}}`);
+  ctx.renderedParts.push(`{${subRendered.join(', ')}}`);
+
+  return total;
+}
+
 function evalFunctionCall(
   node: FunctionCallNode,
   rng: RNG,
@@ -732,6 +766,14 @@ function evalReroll(node: RerollNode, rng: RNG, ctx: EvalContext, env: EvalEnv):
 function evalModifier(node: ModifierNode, rng: RNG, ctx: EvalContext, env: EvalEnv): number {
   const { specs, baseTarget } = flattenModifierChain(node, rng, ctx, env);
 
+  // Multi-sub-roll group: keep/drop operates on sub-roll subtotals as if
+  // each subtotal were a compound die. Single-sub-roll groups fall through
+  // to the flat-pool path below — `evalGroup` evaluates the inner expression
+  // into `targetCtx.rolls`, and `mergeDropSets` selects individual dice.
+  if (baseTarget.type === 'Group' && baseTarget.expressions.length >= 2) {
+    return evalGroupModifier(baseTarget, specs, rng, ctx, env);
+  }
+
   const targetCtx: EvalContext = { rolls: [], expressionParts: [], renderedParts: [] };
   evalNode(baseTarget, rng, targetCtx, env);
 
@@ -746,6 +788,107 @@ function evalModifier(node: ModifierNode, rng: RNG, ctx: EvalContext, env: EvalE
 
   ctx.expressionParts.push(`${targetExpr}${modifierCodes}`);
   ctx.renderedParts.push(`${targetExpr}${renderDice(mergedDice)}`);
+
+  return total;
+}
+
+/**
+ * Evaluates a keep/drop modifier chain whose base target is a multi
+ * sub-roll group. Each sub-roll is evaluated in isolation so its subtotal
+ * and dice are captured separately. Synthetic dice — one per sub-roll,
+ * `result = subtotal` — feed `mergeDropSets` to pick kept/dropped indices.
+ * Dropped sub-rolls' inner dice are re-flagged `'dropped'` so `sumKeptDice`
+ * on the propagated rolls still agrees with the group total, and the
+ * rendered form wraps them in strikethrough `~~...~~`.
+ */
+function evalGroupModifier(
+  group: GroupNode,
+  specs: ModifierSpec[],
+  rng: RNG,
+  ctx: EvalContext,
+  env: EvalEnv,
+): number {
+  type SubRoll = {
+    subtotal: number;
+    rolls: DieResult[];
+    expr: string;
+    rendered: string;
+    versusMetadata: EvalContext['versusMetadata'];
+  };
+
+  const subRolls: SubRoll[] = group.expressions.map((expr) => {
+    const subCtx: EvalContext = { rolls: [], expressionParts: [], renderedParts: [] };
+    const subtotal = evalNode(expr, rng, subCtx, env);
+    return {
+      subtotal,
+      rolls: subCtx.rolls,
+      expr: subCtx.expressionParts.join(''),
+      rendered: subCtx.renderedParts.join(''),
+      versusMetadata: subCtx.versusMetadata,
+    };
+  });
+
+  // ? Synthetic dice carry `sides = 0` as a sentinel — they're never
+  //   surfaced in `ctx.rolls`, only used as input to `mergeDropSets`. Any
+  //   `critical`/`fumble` flags would be meaningless for a subtotal.
+  const syntheticDice: DieResult[] = subRolls.map((sub) => ({
+    sides: 0,
+    result: sub.subtotal,
+    modifiers: [],
+    critical: false,
+    fumble: false,
+  }));
+
+  const mergedSynthetic = mergeDropSets(syntheticDice, specs);
+
+  const outerRendered: string[] = [];
+  let total = 0;
+
+  for (let i = 0; i < subRolls.length; i++) {
+    const sub = subRolls[i] as SubRoll;
+    const synth = mergedSynthetic[i] as DieResult;
+    const isDropped = synth.modifiers.includes('dropped');
+
+    if (isDropped) {
+      // Flag every inner die dropped so propagated rolls match the total.
+      // Keep existing `'kept'` stripped — the sub-roll didn't contribute,
+      // so its die-level kept annotation no longer applies.
+      const droppedRolls: DieResult[] = sub.rolls.map((d) => ({
+        ...d,
+        modifiers: [...d.modifiers.filter((m) => m !== 'kept' && m !== 'dropped'), 'dropped'],
+      }));
+      ctx.rolls.push(...droppedRolls);
+      outerRendered.push(`~~${sub.rendered}~~`);
+    } else {
+      ctx.rolls.push(...sub.rolls);
+      outerRendered.push(sub.rendered);
+      total += sub.subtotal;
+    }
+
+    // Propagate Versus metadata from kept OR dropped sub-rolls — dropping
+    // a sub-roll doesn't make its degree result disappear; two versus
+    // results in the same group still collide via the same guard used by
+    // `mergeContext`.
+    if (sub.versusMetadata) {
+      if (ctx.versusMetadata) {
+        throw new EvaluatorError(
+          'Multiple versus operators in the same expression',
+          'NESTED_VERSUS',
+          'Versus',
+        );
+      }
+      ctx.versusMetadata = sub.versusMetadata;
+    }
+  }
+
+  const subExprStrs = subRolls.map((s) => s.expr);
+  const modifierCodes = specs.map((s) => `${s.code}${s.count}`).join('');
+
+  ctx.expressionParts.push(`{${subExprStrs.join(', ')}}${modifierCodes}`);
+  // ? Mirror `evalModifier`'s flat-pool rendering: modifier codes live in
+  //   `expressionParts` only — the per-sub strikethrough already signals
+  //   which sub-rolls were kept vs dropped.
+  ctx.renderedParts.push(`{${outerRendered.join(', ')}}`);
 
   return total;
 }

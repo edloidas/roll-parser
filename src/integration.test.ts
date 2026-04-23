@@ -688,4 +688,59 @@ describe('roll() integration', () => {
       );
     });
   });
+
+  describe('grouped rolls', () => {
+    test('advantage-style: {1d20+5, 1d20+5}kh1 picks highest total', () => {
+      // Sub 1: 1d20=8 → 13, Sub 2: 1d20=17 → 22. kh1 picks 22.
+      const result = roll('{1d20+5, 1d20+5}kh1', { rng: createMockRng([8, 17]) });
+
+      expect(result.total).toBe(22);
+      expect(result.notation).toBe('{1d20+5, 1d20+5}kh1');
+    });
+
+    test('flat-pool: {4d6+2d8}kh3 keeps 3 highest across combined pool', () => {
+      // 4d6: [6, 6, 6, 1], 2d8: [8, 1]. Combined [6, 6, 6, 1, 8, 1]. kh3 → 8+6+6 = 20
+      const result = roll('{4d6+2d8}kh3', { rng: createMockRng([6, 6, 6, 1, 8, 1]) });
+
+      expect(result.total).toBe(20);
+    });
+
+    test('literal group: {3, 5, 7}kh1 returns 7', () => {
+      const result = roll('{3, 5, 7}kh1', { rng: createMockRng([]) });
+
+      expect(result.total).toBe(7);
+    });
+
+    test('group arithmetic combine: 2 * {1d6, 1d8}kh1', () => {
+      const result = roll('2 * {1d6, 1d8}kh1', { rng: createMockRng([4, 3]) });
+
+      expect(result.total).toBe(8);
+    });
+
+    test('nested: {1d6, {5}} passes inner literal through', () => {
+      const result = roll('{1d6, {5}}', { rng: createMockRng([4]) });
+
+      expect(result.total).toBe(9);
+    });
+
+    test('rejects empty group at parse time', () => {
+      expect(() => roll('{}', { rng: createMockRng([]) })).toThrow(ParseError);
+    });
+
+    test('rejects explode on group at parse time', () => {
+      expect(() => roll('{4d6}!', { rng: createMockRng([]) })).toThrow(ParseError);
+    });
+
+    test('rejects reroll on group at parse time', () => {
+      expect(() => roll('{4d6}r<2', { rng: createMockRng([]) })).toThrow(ParseError);
+    });
+
+    test('works with seeded RNG for reproducibility', () => {
+      const r1 = roll('{1d20+5, 1d20+5}kh1', { seed: 'test-seed' });
+      const r2 = roll('{1d20+5, 1d20+5}kh1', { seed: 'test-seed' });
+
+      expect(r1.total).toBe(r2.total);
+      expect(r1.rolls).toEqual(r2.rolls);
+    });
+  });
 });

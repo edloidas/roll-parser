@@ -17,6 +17,7 @@ import type {
   FateDiceNode,
   FunctionCallNode,
   GroupedNode,
+  GroupNode,
   LiteralNode,
   ModifierNode,
   RerollNode,
@@ -176,6 +177,9 @@ export class Parser {
 
       case TokenType.LPAREN:
         return this.parseGrouped();
+
+      case TokenType.LBRACE:
+        return this.parseGroup(token);
 
       case TokenType.FUNCTION:
         return this.parseFunctionCall(token);
@@ -345,6 +349,34 @@ export class Parser {
     return { type: 'Grouped', expression };
   }
 
+  private parseGroup(startToken: Token): GroupNode {
+    // ? `LBRACE`/`RBRACE`/`COMMA` all have `getLeftBp === -1`, so inner
+    //   `parseExpression(0)` calls terminate at the first `,` or `}` without
+    //   competing with modifier/arithmetic BPs.
+    if (this.peek().type === TokenType.RBRACE) {
+      throw new ParseError('Empty group', 'UNEXPECTED_TOKEN', startToken.position, startToken);
+    }
+
+    const expressions: ASTNode[] = [this.parseExpression(0)];
+    while (this.peek().type === TokenType.COMMA) {
+      this.advance();
+      expressions.push(this.parseExpression(0));
+    }
+
+    if (this.peek().type !== TokenType.RBRACE) {
+      const unterminated = this.peek();
+      throw new ParseError(
+        `Unterminated group: expected '}' or ','`,
+        'EXPECTED_TOKEN',
+        unterminated.position,
+        unterminated,
+      );
+    }
+    this.advance();
+
+    return { type: 'Group', expressions };
+  }
+
   private parseVariable(token: Token): VariableNode {
     return { type: 'Variable', name: token.value };
   }
@@ -433,6 +465,27 @@ export class Parser {
     }
   }
 
+  /**
+   * Rejects `GroupNode` (or a parens-wrapped group) as the target of `token`.
+   * Explode and reroll wrap bare dice only — a group is fundamentally a
+   * container of sub-expressions, so applying these modifiers has no defined
+   * semantics. Parens are unwrapped so `({1d6})!` rejects the same as `{1d6}!`.
+   */
+  private rejectGroupTarget(
+    target: ASTNode,
+    token: Token,
+    action: string,
+    code: RollParserErrorCode,
+  ): void {
+    let node = target;
+    while (node.type === 'Grouped') {
+      node = node.expression;
+    }
+    if (node.type === 'Group') {
+      throw new ParseError(`Cannot ${action} a group`, code, token.position, token);
+    }
+  }
+
   private rejectVersusTarget(target: ASTNode, token: Token): void {
     // ? Versus produces a PF2e degree outcome — a terminal scalar, not a
     //   valid input to dice count/sides/thresholds. Symmetric with
@@ -496,6 +549,11 @@ export class Parser {
   private parseExplode(target: ASTNode, token: Token): ExplodeNode {
     this.rejectSuccessCountTarget(target, token);
 
+    // Groups have no explode semantics — reject outright. Must come before
+    // `containsDicePool`, which recurses into `Group` and would otherwise
+    // let `{4d6}!` slip through.
+    this.rejectGroupTarget(target, token, 'explode', 'INVALID_EXPLODE_TARGET');
+
     // Explode needs a dice pool to explode on. Wrapping arithmetic (e.g.
     // `(1d6+5)!`, `floor(1d6/2)!`) would silently drop user math.
     if (!containsDicePool(target)) {
@@ -546,6 +604,10 @@ export class Parser {
 
   private parseReroll(target: ASTNode, token: Token): RerollNode {
     this.rejectSuccessCountTarget(target, token);
+
+    // Groups have no reroll semantics — reject outright. Must come before
+    // `containsDicePool`, which recurses into `Group`.
+    this.rejectGroupTarget(target, token, 'reroll', 'INVALID_REROLL_TARGET');
 
     // Reroll needs a dice pool to inspect. Wrapping arithmetic (e.g.
     // `(1d6+5)r<3`, `floor(1d6/2)ro<3`) would silently drop user math.
@@ -773,6 +835,11 @@ export class Parser {
       // Punctuation and keywords that terminate expressions
       case TokenType.COMMA:
       case TokenType.FUNCTION:
+      // Group boundaries: `}` closes the current group (consumed inside
+      // `parseGroup`), and a stray `{` after a complete expression is an
+      // error. Both terminate the outer Pratt loop at -1.
+      case TokenType.LBRACE:
+      case TokenType.RBRACE:
         return -1;
       default:
         return 0;
