@@ -149,6 +149,20 @@ export type GroupedNode = {
 };
 
 /**
+ * Variable reference node (`@name` or `@{name with spaces}`).
+ *
+ * Resolves to a numeric value from the evaluator's `context` map at
+ * evaluation time. Names are case-sensitive (`@StrMod` ≠ `@strmod`) — the
+ * lexer preserves case in the `AT` token's `value`, distinct from other
+ * identifier tokens which lowercase. Leaf node — no LED, never wraps a
+ * sub-expression.
+ */
+export type VariableNode = {
+  type: 'Variable';
+  name: string;
+};
+
+/**
  * Union type of all AST nodes.
  */
 export type ASTNode =
@@ -163,7 +177,8 @@ export type ASTNode =
   | SuccessCountNode
   | VersusNode
   | FunctionCallNode
-  | GroupedNode;
+  | GroupedNode
+  | VariableNode;
 
 /**
  * Type guard for LiteralNode.
@@ -247,6 +262,13 @@ export function isFunctionCall(node: ASTNode): node is FunctionCallNode {
  */
 export function isGrouped(node: ASTNode): node is GroupedNode {
   return node.type === 'Grouped';
+}
+
+/**
+ * Type guard for VariableNode.
+ */
+export function isVariable(node: ASTNode): node is VariableNode {
+  return node.type === 'Variable';
 }
 
 /**

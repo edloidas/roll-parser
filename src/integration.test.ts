@@ -636,4 +636,56 @@ describe('roll() integration', () => {
       expect(() => roll('max(1d6)', { rng: createMockRng([3]) })).toThrow(ParseError);
     });
   });
+
+  describe('variable injection', () => {
+    test('resolves @str in arithmetic', () => {
+      const result = roll('1d20+@str', {
+        rng: createMockRng([10]),
+        context: { str: 5 },
+      });
+
+      expect(result.total).toBe(15);
+      expect(result.notation).toBe('1d20+@str');
+      expect(result.expression).toBe('1d20 + 5');
+    });
+
+    test('resolves @{Strength Modifier} braced form', () => {
+      const result = roll('1d20+@{Strength Modifier}', {
+        rng: createMockRng([8]),
+        context: { 'Strength Modifier': 3 },
+      });
+
+      expect(result.total).toBe(11);
+      expect(result.notation).toBe('1d20+@{Strength Modifier}');
+    });
+
+    test('resolves variable as dice count and sides', () => {
+      const result = roll('@count d@sides', {
+        rng: createMockRng([2, 5, 4, 6]),
+        context: { count: 4, sides: 6 },
+      });
+
+      expect(result.total).toBe(17);
+      expect(result.rolls).toHaveLength(4);
+    });
+
+    test('throws on missing variable by default', () => {
+      expect(() => roll('1d20+@missing', { rng: createMockRng([10]) })).toThrow(EvaluatorError);
+    });
+
+    test('returns 0 for missing variable when onMissingVariable is "zero"', () => {
+      const result = roll('1d20+@missing', {
+        rng: createMockRng([10]),
+        onMissingVariable: 'zero',
+      });
+
+      expect(result.total).toBe(10);
+    });
+
+    test('case-sensitive lookup (@StrMod ≠ @strmod)', () => {
+      expect(() => roll('@StrMod', { rng: createMockRng([]), context: { strmod: 5 } })).toThrow(
+        EvaluatorError,
+      );
+    });
+  });
 });
