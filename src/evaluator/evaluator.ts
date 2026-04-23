@@ -17,6 +17,7 @@ import type {
   GroupNode,
   ModifierNode,
   RerollNode,
+  SortNode,
   SuccessCountNode,
   UnaryOpNode,
   VariableNode,
@@ -46,6 +47,7 @@ import {
   applyRerollOnce,
   DEFAULT_MAX_REROLL_ITERATIONS,
 } from './modifiers/reroll';
+import { sortDice } from './modifiers/sort';
 import { countSuccesses } from './modifiers/success-count';
 
 /**
@@ -262,6 +264,9 @@ function evalNode(node: ASTNode, rng: RNG, ctx: EvalContext, env: EvalEnv): numb
 
     case 'Group':
       return evalGroup(node, rng, ctx, env);
+
+    case 'Sort':
+      return evalSort(node, rng, ctx, env);
 
     case 'Variable':
       return evalVariable(node, ctx, env);
@@ -761,6 +766,45 @@ function evalReroll(node: RerollNode, rng: RNG, ctx: EvalContext, env: EvalEnv):
   ctx.renderedParts.push(`${targetExpr}${code}${renderDice(pool)}`);
 
   return sumKeptDice(pool);
+}
+
+/**
+ * Evaluates a sort modifier. Purely visual — sorts the dice produced by
+ * `node.target` in ascending or descending order of `result` without
+ * changing the total or any die-level flag. Dropped dice participate in
+ * the sort alongside kept dice, preserving their `'dropped'` marker.
+ *
+ * Rendering mirrors `evalExplode` / `evalModifier`: emits
+ * `<targetExpr><code>[<sortedDice>]`, replacing any inline dice brackets
+ * the target itself rendered. Multi-sub-roll groups (`{4d6, 3d6}s`) fall
+ * through to this flat-pool path — hierarchical per-sub-roll sorting is
+ * deferred (see Stage 3 spec §3 "Group interaction").
+ */
+function evalSort(node: SortNode, rng: RNG, ctx: EvalContext, env: EvalEnv): number {
+  const targetCtx: EvalContext = { rolls: [], expressionParts: [], renderedParts: [] };
+  const total = evalNode(node.target, rng, targetCtx, env);
+
+  const sortedRolls = sortDice(targetCtx.rolls, node.order);
+
+  ctx.rolls.push(...sortedRolls);
+  if (targetCtx.versusMetadata) {
+    if (ctx.versusMetadata) {
+      throw new EvaluatorError(
+        'Multiple versus operators in the same expression',
+        'NESTED_VERSUS',
+        'Versus',
+      );
+    }
+    ctx.versusMetadata = targetCtx.versusMetadata;
+  }
+
+  const code = node.order === 'ascending' ? 's' : 'sd';
+  const targetExpr = targetCtx.expressionParts.join('');
+
+  ctx.expressionParts.push(`${targetExpr}${code}`);
+  ctx.renderedParts.push(`${targetExpr}${code}${renderDice(sortedRolls)}`);
+
+  return total;
 }
 
 function evalModifier(node: ModifierNode, rng: RNG, ctx: EvalContext, env: EvalEnv): number {

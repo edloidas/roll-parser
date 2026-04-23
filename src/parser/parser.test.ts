@@ -14,6 +14,7 @@ import type {
   LiteralNode,
   ModifierNode,
   RerollNode,
+  SortNode,
   SuccessCountNode,
   UnaryOpNode,
   VariableNode,
@@ -97,6 +98,10 @@ function group(expressions: ASTNode[]): GroupNode {
 
 function variable(name: string): VariableNode {
   return { type: 'Variable', name };
+}
+
+function sort(order: SortNode['order'], target: ASTNode): SortNode {
+  return { type: 'Sort', order, target };
 }
 
 describe('Parser', () => {
@@ -2026,6 +2031,117 @@ describe('Parser', () => {
 
       it('should reject reroll-once on a group', () => {
         expect(() => parse('{4d6}ro<2')).toThrow(ParseError);
+      });
+    });
+  });
+
+  describe('sort modifiers', () => {
+    describe('shape', () => {
+      it('should parse s as ascending sort', () => {
+        expect(parse('4d6s')).toEqual(sort('ascending', dice(literal(4), literal(6))));
+      });
+
+      it('should parse sa as ascending sort', () => {
+        expect(parse('4d6sa')).toEqual(sort('ascending', dice(literal(4), literal(6))));
+      });
+
+      it('should parse sd as descending sort', () => {
+        expect(parse('4d6sd')).toEqual(sort('descending', dice(literal(4), literal(6))));
+      });
+
+      it('should chain sort over keep/drop', () => {
+        expect(parse('4d6dl1s')).toEqual(
+          sort('ascending', modifier('drop', 'lowest', literal(1), dice(literal(4), literal(6)))),
+        );
+      });
+
+      it('should chain keep/drop over sort (modifier outer)', () => {
+        // ? `sdl` as one identifier maxes-munches to an unknown keyword in
+        //   the lexer; whitespace separates the two modifiers cleanly.
+        expect(parse('4d6s dl1')).toEqual(
+          modifier('drop', 'lowest', literal(1), sort('ascending', dice(literal(4), literal(6)))),
+        );
+      });
+
+      it('should chain sort over explode', () => {
+        expect(parse('4d6!s')).toEqual(
+          sort('ascending', explode('standard', dice(literal(4), literal(6)))),
+        );
+      });
+
+      it('should allow double sort (idempotent chain)', () => {
+        // ? Maximal-munch lexing treats `ss` / `ssd` as a single identifier,
+        //   so chained sorts need whitespace between the keywords.
+        expect(parse('4d6s s')).toEqual(
+          sort('ascending', sort('ascending', dice(literal(4), literal(6)))),
+        );
+      });
+
+      it('should allow mixed-direction chain', () => {
+        expect(parse('4d6s sd')).toEqual(
+          sort('descending', sort('ascending', dice(literal(4), literal(6)))),
+        );
+      });
+
+      it('should accept arithmetic-wrapped pool via parens', () => {
+        expect(parse('(1d6+2d8)s')).toEqual(
+          sort(
+            'ascending',
+            grouped(binary('+', dice(literal(1), literal(6)), dice(literal(2), literal(8)))),
+          ),
+        );
+      });
+
+      it('should accept Fate dice pool', () => {
+        expect(parse('4dFsd')).toEqual(sort('descending', fateDice(literal(4))));
+      });
+
+      it('should accept single-sub-roll group', () => {
+        expect(parse('{4d6}s')).toEqual(sort('ascending', group([dice(literal(4), literal(6))])));
+      });
+
+      it('should accept multi-sub-roll group', () => {
+        expect(parse('{4d6, 3d6}sd')).toEqual(
+          sort('descending', group([dice(literal(4), literal(6)), dice(literal(3), literal(6))])),
+        );
+      });
+    });
+
+    describe('errors', () => {
+      it('should reject sort on a pure literal', () => {
+        expect(() => parse('5s')).toThrow(ParseError);
+        try {
+          parse('5s');
+        } catch (e) {
+          expect((e as ParseError).code).toBe('INVALID_SORT_TARGET');
+          expect((e as ParseError).message).toContain('dice pool');
+        }
+      });
+
+      it('should reject sort on pure arithmetic', () => {
+        expect(() => parse('(1+2)sd')).toThrow(ParseError);
+      });
+
+      it('should reject sort on SuccessCount target', () => {
+        expect(() => parse('4d6>=4s')).toThrow(ParseError);
+        try {
+          parse('4d6>=4s');
+        } catch (e) {
+          expect((e as ParseError).code).toBe('INVALID_SUCCESS_COUNT_TARGET');
+        }
+      });
+
+      it('should reject sort on Versus target (via parens)', () => {
+        expect(() => parse('(1d20 vs 15)s')).toThrow(ParseError);
+        try {
+          parse('(1d20 vs 15)s');
+        } catch (e) {
+          expect((e as ParseError).code).toBe('NESTED_VERSUS');
+        }
+      });
+
+      it('should reject sort on a function call over literals', () => {
+        expect(() => parse('floor(5)s')).toThrow(ParseError);
       });
     });
   });

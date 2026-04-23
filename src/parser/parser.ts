@@ -21,12 +21,13 @@ import type {
   LiteralNode,
   ModifierNode,
   RerollNode,
+  SortNode,
   SuccessCountNode,
   UnaryOpNode,
   VariableNode,
   VersusNode,
 } from './ast';
-import { containsDicePool, containsFatePool, isSuccessCount } from './ast';
+import { containsDicePool, containsFatePool, deepContainsDicePool, isSuccessCount } from './ast';
 
 /**
  * Error thrown when the parser encounters invalid syntax.
@@ -237,6 +238,10 @@ export class Parser {
       case TokenType.REROLL:
       case TokenType.REROLL_ONCE:
         return this.parseReroll(left, token);
+
+      case TokenType.SORT_ASC:
+      case TokenType.SORT_DESC:
+        return this.parseSort(left, token);
 
       case TokenType.GREATER:
       case TokenType.GREATER_EQUAL:
@@ -636,6 +641,31 @@ export class Parser {
     return { type: 'Reroll', once, condition, target };
   }
 
+  private parseSort(target: ASTNode, token: Token): SortNode {
+    this.rejectSuccessCountTarget(target, token);
+    this.rejectVersusTarget(target, token);
+
+    // Sort is purely visual but still needs a dice pool to reorder —
+    // `5s`, `(1+2)s`, or `floor(5)s` have no dice to touch. Uses the deep
+    // guard so arithmetic-wrapped pools like `(1d6+2d8)s` are accepted per
+    // Stage 3 spec, while pure literals/arithmetic reject.
+    if (!deepContainsDicePool(target)) {
+      throw new ParseError(
+        `Sort modifier requires a dice pool target`,
+        'INVALID_SORT_TARGET',
+        token.position,
+        token,
+      );
+    }
+
+    const order: SortNode['order'] = token.type === TokenType.SORT_ASC ? 'ascending' : 'descending';
+
+    // ? Chained sorts (`4d6ss`, `4d6sasd`) are allowed — sort is idempotent
+    //   when repeated in the same direction; a later `sd` after `s` just
+    //   overrides the order since both pass over the same pool.
+    return { type: 'Sort', order, target };
+  }
+
   private parseSuccessCount(target: ASTNode, token: Token): SuccessCountNode {
     // Success counting is terminal: chaining (`>=5>=3`) has no semantics.
     this.rejectSuccessCountTarget(target, token);
@@ -817,6 +847,8 @@ export class Parser {
       case TokenType.EXPLODE_PENETRATING:
       case TokenType.REROLL:
       case TokenType.REROLL_ONCE:
+      case TokenType.SORT_ASC:
+      case TokenType.SORT_DESC:
         return BP.MODIFIER;
       // Comparison operators act as LED-dispatched success-count modifiers
       // at the Pratt level. Sit below ADD/MUL so arithmetic on a dice pool
