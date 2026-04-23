@@ -163,6 +163,20 @@ export type VariableNode = {
 };
 
 /**
+ * Grouped-roll node (`{expr}`, `{expr1, expr2, ...}`).
+ *
+ * Distinct from `GroupedNode` (parenthesized wrapper) — a `GroupNode`
+ * collects one or more sub-expressions whose evaluation semantics change
+ * with the sub-roll count. `expressions.length === 1` is a passthrough
+ * (flat-pool when wrapped by keep/drop); `expressions.length >= 2` treats
+ * each sub-roll's subtotal as a compound die for keep/drop selection.
+ */
+export type GroupNode = {
+  type: 'Group';
+  expressions: ASTNode[];
+};
+
+/**
  * Union type of all AST nodes.
  */
 export type ASTNode =
@@ -178,7 +192,8 @@ export type ASTNode =
   | VersusNode
   | FunctionCallNode
   | GroupedNode
-  | VariableNode;
+  | VariableNode
+  | GroupNode;
 
 /**
  * Type guard for LiteralNode.
@@ -272,6 +287,13 @@ export function isVariable(node: ASTNode): node is VariableNode {
 }
 
 /**
+ * Type guard for GroupNode.
+ */
+export function isGroup(node: ASTNode): node is GroupNode {
+  return node.type === 'Group';
+}
+
+/**
  * Returns `true` only when `node`'s direct result is a dice pool —
  * `Dice`, `FateDice`, or a chained pool modifier (`Modifier` / `Explode` /
  * `Reroll`). Does NOT recurse through arithmetic wrappers (`BinaryOp`,
@@ -291,6 +313,47 @@ export function containsDicePool(node: ASTNode): boolean {
       return true;
     case 'Grouped':
       return containsDicePool(node.expression);
+    case 'Group':
+      // ? Multi-sub-roll groups (`{a, b, c}kh1`) always accept: keep/drop
+      //   operates on subtotals, which are "compound dice" by definition —
+      //   even a literal-only `{3, 5, 7}kh1` is valid. Single-sub-roll
+      //   groups are the user's explicit opt-in to flat-pool semantics, so
+      //   we deep-walk through arithmetic that a raw `(1d6+5)kh1` would
+      //   reject. This is the `{}` escape hatch per Stage 3 spec.
+      return node.expressions.length >= 2 || node.expressions.some(deepContainsDicePool);
+    default:
+      return false;
+  }
+}
+
+/**
+ * Deeper variant of `containsDicePool` that recurses through arithmetic and
+ * function wrappers. Used only from the `Group` case above — ordinary
+ * parenthesized arithmetic (`(1d6+5)kh1`) must still reject, so the shallow
+ * `containsDicePool` handles those directly.
+ */
+function deepContainsDicePool(node: ASTNode): boolean {
+  switch (node.type) {
+    case 'Dice':
+    case 'FateDice':
+      return true;
+    case 'BinaryOp':
+      return deepContainsDicePool(node.left) || deepContainsDicePool(node.right);
+    case 'UnaryOp':
+      return deepContainsDicePool(node.operand);
+    case 'Modifier':
+    case 'Explode':
+    case 'Reroll':
+    case 'SuccessCount':
+      return deepContainsDicePool(node.target);
+    case 'Versus':
+      return deepContainsDicePool(node.roll) || deepContainsDicePool(node.dc);
+    case 'FunctionCall':
+      return node.args.some(deepContainsDicePool);
+    case 'Grouped':
+      return deepContainsDicePool(node.expression);
+    case 'Group':
+      return node.expressions.length >= 2 || node.expressions.some(deepContainsDicePool);
     default:
       return false;
   }
@@ -316,6 +379,8 @@ export function containsFatePool(node: ASTNode): boolean {
       return containsFatePool(node.target);
     case 'Grouped':
       return containsFatePool(node.expression);
+    case 'Group':
+      return node.expressions.some(containsFatePool);
     default:
       return false;
   }
