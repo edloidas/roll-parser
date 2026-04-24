@@ -807,4 +807,87 @@ describe('property-based invariants', () => {
       );
     });
   });
+
+  describe('crit threshold invariants', () => {
+    test('cs threshold does not change total or rolls vs. base roll', () => {
+      fc.assert(
+        fc.property(
+          fc.string({ minLength: 1, maxLength: 20 }),
+          fc.integer({ min: 1, max: 8 }),
+          fc.integer({ min: 4, max: 20 }),
+          fc.integer({ min: 2, max: 19 }),
+          (seed, count, sides, threshold) => {
+            const base = roll(`${count}d${sides}`, { seed });
+            const flagged = roll(`${count}d${sides}cs>=${threshold}`, { seed });
+            if (base.total !== flagged.total) return false;
+            if (base.rolls.length !== flagged.rolls.length) return false;
+            for (let i = 0; i < base.rolls.length; i++) {
+              const b = base.rolls[i];
+              const f = flagged.rolls[i];
+              if (b?.result !== f?.result) return false;
+            }
+            return true;
+          },
+        ),
+        { numRuns: 200 },
+      );
+    });
+
+    test('cs>=T marks every die with result >= T as critical', () => {
+      fc.assert(
+        fc.property(
+          fc.string({ minLength: 1, maxLength: 20 }),
+          fc.integer({ min: 2, max: 10 }),
+          fc.integer({ min: 4, max: 20 }),
+          fc.integer({ min: 2, max: 19 }),
+          (seed, count, sides, threshold) => {
+            const result = roll(`${count}d${sides}cs>=${threshold}`, { seed });
+            for (const die of result.rolls) {
+              const expected = die.result >= threshold;
+              if (die.critical !== expected) return false;
+              if (die.fumble !== false) return false;
+            }
+            return true;
+          },
+        ),
+        { numRuns: 200 },
+      );
+    });
+
+    test('cf<=T marks every die with result <= T as fumble', () => {
+      fc.assert(
+        fc.property(
+          fc.string({ minLength: 1, maxLength: 20 }),
+          fc.integer({ min: 2, max: 10 }),
+          fc.integer({ min: 4, max: 20 }),
+          fc.integer({ min: 1, max: 5 }),
+          (seed, count, sides, threshold) => {
+            const result = roll(`${count}d${sides}cf<=${threshold}`, { seed });
+            for (const die of result.rolls) {
+              const expected = die.result <= threshold;
+              if (die.fumble !== expected) return false;
+              if (die.critical !== false) return false;
+            }
+            return true;
+          },
+        ),
+        { numRuns: 200 },
+      );
+    });
+
+    test('crit threshold does not emit successes/failures', () => {
+      fc.assert(
+        fc.property(
+          fc.string({ minLength: 1, maxLength: 20 }),
+          fc.integer({ min: 1, max: 8 }),
+          fc.integer({ min: 4, max: 20 }),
+          (seed, count, sides) => {
+            const result = roll(`${count}d${sides}cs`, { seed });
+            return result.successes === undefined && result.failures === undefined;
+          },
+        ),
+        { numRuns: 100 },
+      );
+    });
+  });
 });

@@ -2789,4 +2789,245 @@ describe('evaluate', () => {
       expect(result.rolls.filter((d) => d.result === 3)).toHaveLength(3);
     });
   });
+
+  describe('crit threshold modifier', () => {
+    test('default cs flags the natural max face as critical', () => {
+      const ast = parse('1d20cs');
+      const rng = createMockRng([20]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(20);
+      expect(getDie(result.rolls, 0).critical).toBe(true);
+      expect(getDie(result.rolls, 0).fumble).toBe(false);
+      expect(result.expression).toBe('1d20cs');
+      expect(result.rendered).toBe('1d20cs[20] = 20');
+    });
+
+    test('default cf flags a 1 as fumble', () => {
+      const ast = parse('1d20cf');
+      const rng = createMockRng([1]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(1);
+      expect(getDie(result.rolls, 0).critical).toBe(false);
+      expect(getDie(result.rolls, 0).fumble).toBe(true);
+    });
+
+    test('cs>=19 flags 19 and 20 as critical', () => {
+      const ast = parse('4d20cs>=19');
+      const rng = createMockRng([20, 19, 15, 1]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(55);
+      expect(result.rolls.map((d) => d.critical)).toEqual([true, true, false, false]);
+      // Replace semantics — cf side empty, so no fumble on the `1`.
+      expect(result.rolls.map((d) => d.fumble)).toEqual([false, false, false, false]);
+      expect(result.expression).toBe('4d20cs>=19');
+    });
+
+    test('cs>19 strict inequality flags only 20', () => {
+      const ast = parse('4d20cs>19');
+      const rng = createMockRng([20, 19, 15, 1]);
+      const result = evaluate(ast, rng);
+
+      expect(result.rolls.map((d) => d.critical)).toEqual([true, false, false, false]);
+    });
+
+    test('cf<3 flags 1 and 2 as fumble and clears default critical', () => {
+      const ast = parse('4d20cf<3');
+      const rng = createMockRng([20, 1, 2, 15]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(38);
+      // Replace semantics — no success thresholds, so the natural 20 is not
+      // critical anymore.
+      expect(result.rolls.map((d) => d.critical)).toEqual([false, false, false, false]);
+      expect(result.rolls.map((d) => d.fumble)).toEqual([false, true, true, false]);
+    });
+
+    test('cs=20cs=1 unions two success thresholds (flags both 20 and 1)', () => {
+      const ast = parse('4d20cs=20cs=1');
+      const rng = createMockRng([20, 1, 10, 15]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(46);
+      expect(result.rolls.map((d) => d.critical)).toEqual([true, true, false, false]);
+      expect(result.expression).toBe('4d20cs=20cs=1');
+    });
+
+    test('combined cs>=19cf<3 sets both flags correctly', () => {
+      const ast = parse('4d20cs>=19cf<3');
+      const rng = createMockRng([20, 1, 10, 19]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(50);
+      expect(result.rolls.map((d) => d.critical)).toEqual([true, false, false, true]);
+      expect(result.rolls.map((d) => d.fumble)).toEqual([false, true, false, false]);
+      expect(result.expression).toBe('4d20cs>=19cf<3');
+    });
+
+    test('order-independent — cf<3cs>=19 produces the same flags as cs>=19cf<3', () => {
+      const rng1 = createMockRng([20, 1, 10, 19]);
+      const r1 = evaluate(parse('4d20cs>=19cf<3'), rng1);
+      const rng2 = createMockRng([20, 1, 10, 19]);
+      const r2 = evaluate(parse('4d20cf<3cs>=19'), rng2);
+
+      expect(r1.rolls.map((d) => d.critical)).toEqual(r2.rolls.map((d) => d.critical));
+      expect(r1.rolls.map((d) => d.fumble)).toEqual(r2.rolls.map((d) => d.fumble));
+    });
+
+    test('cs<1 never matches on d20 — all critical cleared', () => {
+      const ast = parse('4d20cs<1');
+      const rng = createMockRng([20, 1, 10, 19]);
+      const result = evaluate(ast, rng);
+
+      expect(result.rolls.every((d) => d.critical === false)).toBe(true);
+    });
+
+    test('total is unchanged vs. the same seeded roll without cs', () => {
+      const rng1 = createMockRng([7, 12, 20, 4]);
+      const r1 = evaluate(parse('4d20'), rng1);
+      const rng2 = createMockRng([7, 12, 20, 4]);
+      const r2 = evaluate(parse('4d20cs>18cf<3'), rng2);
+
+      expect(r1.total).toBe(r2.total);
+      expect(r1.rolls.map((d) => d.result)).toEqual(r2.rolls.map((d) => d.result));
+    });
+
+    test('cs on 4d6 flags each die > 4 as critical (d6 has no natural crit)', () => {
+      const ast = parse('4d6cs>4');
+      const rng = createMockRng([6, 5, 3, 1]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(15);
+      expect(result.rolls.map((d) => d.critical)).toEqual([true, true, false, false]);
+    });
+
+    test('dropped dice keep their custom crit flag', () => {
+      const ast = parse('4d20dl1cs>17');
+      const rng = createMockRng([20, 18, 5, 19]);
+      const result = evaluate(ast, rng);
+
+      // Drop lowest (5). Kept: [20, 18, 19]. Total: 57.
+      expect(result.total).toBe(57);
+      const dropped = result.rolls.find((d) => d.modifiers.includes('dropped'));
+      expect(dropped?.result).toBe(5);
+      expect(dropped?.critical).toBe(false);
+      // All kept dice satisfy cs>17, so they're flagged.
+      const kept = result.rolls.filter((d) => !d.modifiers.includes('dropped'));
+      expect(kept.map((d) => d.critical)).toEqual([true, true, true]);
+    });
+
+    test('cs flags entire expanded explode pool; explosion trigger uses raw face', () => {
+      // 1d6!: rolls [6, 4], explode 6 → rolls another [4]. Pool [6, 4]? Let
+      // me trace: standard-explode re-rolls 6, gets 4, appends. Pool: [6, 4].
+      // Actually mock [6, 4] → rng.nextInt: first draw 6 (pool die), second
+      // draw 4 (explosion). Pool: [6, 4]. Total 10.
+      const ast = parse('1d6!cs>3');
+      const rng = createMockRng([6, 4]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(10);
+      // Both dice have result > 3, so both flagged critical.
+      expect(result.rolls.every((d) => d.critical === true)).toBe(true);
+    });
+
+    test('cs with custom threshold does not suppress explode on natural max', () => {
+      // 1d6!cs<1 — no explosion trigger change; the 6 still explodes even
+      // though cs<1 never matches (all critical cleared).
+      const ast = parse('1d6!cs<1');
+      const rng = createMockRng([6, 4]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(10);
+      expect(result.rolls.every((d) => d.critical === false)).toBe(true);
+    });
+
+    test('cs after sort — flags applied on sorted pool', () => {
+      const ast = parse('4d6s cs>4');
+      const rng = createMockRng([5, 2, 6, 3]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(16);
+      // Sorted: [2, 3, 5, 6]. cs>4 flags 5 and 6.
+      expect(result.rolls.map((d) => d.result)).toEqual([2, 3, 5, 6]);
+      expect(result.rolls.map((d) => d.critical)).toEqual([false, false, true, true]);
+    });
+
+    test('empty pool is a no-op', () => {
+      const ast = parse('0d6cs>3');
+      const rng = createMockRng([]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(0);
+      expect(result.rolls).toEqual([]);
+      expect(result.rendered).toBe('0d6cs>3[] = 0');
+    });
+
+    test('renders expression with default-sentinel codes', () => {
+      // ? `cscf` lexed as one unknown identifier; whitespace separates the
+      //   two bare modifiers.
+      const ast = parse('1d20cs cf');
+      const rng = createMockRng([10]);
+      const result = evaluate(ast, rng);
+
+      expect(result.expression).toBe('1d20cscf');
+      expect(result.rendered).toBe('1d20cscf[10] = 10');
+    });
+
+    test('renders expression with mixed defaults and compare points', () => {
+      // Bare `cs` + `cf<3` + `cs=10`. Rendered order: all success thresholds
+      // first, then all fail thresholds — so "cscs=10cf<3".
+      const ast = parse('1d20cs cf<3cs=10');
+      const rng = createMockRng([10]);
+      const result = evaluate(ast, rng);
+
+      expect(result.expression).toBe('1d20cscs=10cf<3');
+    });
+
+    test('computed threshold via parens evaluates correctly', () => {
+      const ast = parse('4d20cs>=(17+2)');
+      const rng = createMockRng([20, 19, 18, 5]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(62);
+      // >= 19 flags 20 and 19.
+      expect(result.rolls.map((d) => d.critical)).toEqual([true, true, false, false]);
+    });
+
+    test('cs on Fate dice overrides the always-false defaults', () => {
+      // 4dF: [1, -1, 0, 1]. cs>0 flags both 1s as critical.
+      const ast = parse('4dFcs>0');
+      const rng = createMockRng([1, -1, 0, 1]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(1);
+      expect(result.rolls.map((d) => d.critical)).toEqual([true, false, false, true]);
+      expect(result.rolls.map((d) => d.fumble)).toEqual([false, false, false, false]);
+    });
+
+    test('SuccessCount wrapping CritThreshold leaves success tags independent of crit flags', () => {
+      // 10d10cs>8>=6 — crit flagged for result > 8; success for >= 6.
+      const ast = parse('10d10cs>8>=6');
+      const rng = createMockRng([10, 9, 8, 7, 6, 5, 4, 3, 2, 1]);
+      const result = evaluate(ast, rng);
+
+      // Successes (>= 6): 10, 9, 8, 7, 6 → 5 successes.
+      expect(result.successes).toBe(5);
+      // Critical (> 8): 10, 9 → 2 critical dice.
+      expect(result.rolls.filter((d) => d.critical).length).toBe(2);
+      // Total is the success count (5) since SuccessCount transforms the pool.
+      expect(result.total).toBe(5);
+    });
+
+    test('chained cs via parens collapses threshold into one node', () => {
+      const ast = parse('(1d20cs>19)cs=1');
+      const rng = createMockRng([1]);
+      const result = evaluate(ast, rng);
+
+      // Both thresholds apply: >19 false for 1, =1 true for 1 → critical.
+      expect(getDie(result.rolls, 0).critical).toBe(true);
+      expect(result.expression).toBe('1d20cs>19cs=1');
+    });
+  });
 });

@@ -192,6 +192,32 @@ export type SortNode = {
 };
 
 /**
+ * Sentinel for bare `cs` / `cf` without a ComparePoint. Resolved to
+ * `result === sides` (for critical) or `result === 1` (for fumble) at
+ * evaluation time, using each die's own `sides`.
+ */
+export type CritThreshold = ComparePoint | 'default';
+
+/**
+ * Critical threshold modifier node (`cs`, `cf`).
+ *
+ * Overrides the default `critical`/`fumble` flag logic for the dice
+ * produced by `target`. Bare `cs`/`cf` uses the `'default'` sentinel
+ * (max face / 1). Custom thresholds accept any ComparePoint. Chaining
+ * collapses into a single node — `1d20cs=20cs=1cf>18` has two success
+ * and one fail threshold. Display-only: does not change `total`,
+ * explosion triggers, or success counting. An empty `failThresholds`
+ * forces `fumble: false` on every die (replace, not merge) — same
+ * for `successThresholds` and `critical`.
+ */
+export type CritThresholdNode = {
+  type: 'CritThreshold';
+  successThresholds: CritThreshold[];
+  failThresholds: CritThreshold[];
+  target: ASTNode;
+};
+
+/**
  * Union type of all AST nodes.
  */
 export type ASTNode =
@@ -209,7 +235,8 @@ export type ASTNode =
   | GroupedNode
   | VariableNode
   | GroupNode
-  | SortNode;
+  | SortNode
+  | CritThresholdNode;
 
 /**
  * Type guard for LiteralNode.
@@ -317,6 +344,13 @@ export function isSort(node: ASTNode): node is SortNode {
 }
 
 /**
+ * Type guard for CritThresholdNode.
+ */
+export function isCritThreshold(node: ASTNode): node is CritThresholdNode {
+  return node.type === 'CritThreshold';
+}
+
+/**
  * Returns `true` only when `node`'s direct result is a dice pool —
  * `Dice`, `FateDice`, or a chained pool modifier (`Modifier` / `Explode` /
  * `Reroll`). Does NOT recurse through arithmetic wrappers (`BinaryOp`,
@@ -335,6 +369,7 @@ export function containsDicePool(node: ASTNode): boolean {
     case 'Reroll':
       return true;
     case 'Sort':
+    case 'CritThreshold':
       return containsDicePool(node.target);
     case 'Grouped':
       return containsDicePool(node.expression);
@@ -372,6 +407,7 @@ export function deepContainsDicePool(node: ASTNode): boolean {
     case 'Reroll':
     case 'SuccessCount':
     case 'Sort':
+    case 'CritThreshold':
       return deepContainsDicePool(node.target);
     case 'Versus':
       return deepContainsDicePool(node.roll) || deepContainsDicePool(node.dc);
@@ -404,6 +440,7 @@ export function containsFatePool(node: ASTNode): boolean {
     case 'Explode':
     case 'Reroll':
     case 'Sort':
+    case 'CritThreshold':
       return containsFatePool(node.target);
     case 'Grouped':
       return containsFatePool(node.expression);

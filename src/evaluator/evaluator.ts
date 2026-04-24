@@ -9,6 +9,8 @@ import { RollParserError } from '../errors';
 import type {
   ASTNode,
   BinaryOpNode,
+  CritThreshold,
+  CritThresholdNode,
   DiceNode,
   ExplodeNode,
   FateDiceNode,
@@ -27,6 +29,7 @@ import { isModifier } from '../parser/ast';
 import type { RNG } from '../rng/types';
 import type { ComparePoint, DieResult, EvaluateOptions, RollResult } from '../types';
 import { DegreeOfSuccess } from '../types';
+import { applyCritThresholds, type ResolvedCritThreshold } from './modifiers/crit-threshold';
 import {
   applyCompoundExplode,
   applyPenetratingExplode,
@@ -267,6 +270,9 @@ function evalNode(node: ASTNode, rng: RNG, ctx: EvalContext, env: EvalEnv): numb
 
     case 'Sort':
       return evalSort(node, rng, ctx, env);
+
+    case 'CritThreshold':
+      return evalCritThreshold(node, rng, ctx, env);
 
     case 'Variable':
       return evalVariable(node, ctx, env);
@@ -805,6 +811,78 @@ function evalSort(node: SortNode, rng: RNG, ctx: EvalContext, env: EvalEnv): num
   ctx.renderedParts.push(`${targetExpr}${code}${renderDice(sortedRolls)}`);
 
   return total;
+}
+
+/**
+ * Evaluates a critical/fumble threshold modifier. Pure post-processing:
+ * evaluates the target in an isolated context, resolves each threshold's
+ * ComparePoint value (including meta-expressions, which consume RNG draws
+ * AFTER the target pool), then overrides `critical`/`fumble` flags on the
+ * produced dice in place.
+ *
+ * Replace semantics: an empty `failThresholds` array forces
+ * `fumble: false` on every die — same for `successThresholds`. Bare
+ * `cs`/`cf` uses the `'default'` sentinel resolved per-die to
+ * `result === sides` or `result === 1`.
+ *
+ * Renders `<targetExpr><codes>[<dice>]`, mirroring `evalSort`/`evalExplode`.
+ */
+function evalCritThreshold(
+  node: CritThresholdNode,
+  rng: RNG,
+  ctx: EvalContext,
+  env: EvalEnv,
+): number {
+  const targetCtx: EvalContext = { rolls: [], expressionParts: [], renderedParts: [] };
+  const total = evalNode(node.target, rng, targetCtx, env);
+
+  const successResolved = node.successThresholds.map((t) => resolveCritThreshold(t, rng, ctx, env));
+  const failResolved = node.failThresholds.map((t) => resolveCritThreshold(t, rng, ctx, env));
+
+  applyCritThresholds(targetCtx.rolls, successResolved, failResolved);
+
+  ctx.rolls.push(...targetCtx.rolls);
+  if (targetCtx.versusMetadata) {
+    if (ctx.versusMetadata) {
+      throw new EvaluatorError(
+        'Multiple versus operators in the same expression',
+        'NESTED_VERSUS',
+        'Versus',
+      );
+    }
+    ctx.versusMetadata = targetCtx.versusMetadata;
+  }
+
+  const targetExpr = targetCtx.expressionParts.join('');
+  const codes = [
+    ...successResolved.map((t) => (t === 'default' ? 'cs' : `cs${t.operator}${t.value}`)),
+    ...failResolved.map((t) => (t === 'default' ? 'cf' : `cf${t.operator}${t.value}`)),
+  ].join('');
+
+  ctx.expressionParts.push(`${targetExpr}${codes}`);
+  ctx.renderedParts.push(`${targetExpr}${codes}${renderDice(targetCtx.rolls)}`);
+
+  return total;
+}
+
+function resolveCritThreshold(
+  threshold: CritThreshold,
+  rng: RNG,
+  ctx: EvalContext,
+  env: EvalEnv,
+): ResolvedCritThreshold {
+  if (threshold === 'default') return 'default';
+  const thresholdCtx: EvalContext = { rolls: [], expressionParts: [], renderedParts: [] };
+  const resolved = evalNode(threshold.value, rng, thresholdCtx, env);
+  mergeMetaRolls(ctx, thresholdCtx);
+  if (!Number.isFinite(resolved)) {
+    throw new EvaluatorError(
+      `Invalid crit threshold: ${resolved}`,
+      'INVALID_THRESHOLD',
+      'CritThreshold',
+    );
+  }
+  return { operator: threshold.operator, value: resolved };
 }
 
 function evalModifier(node: ModifierNode, rng: RNG, ctx: EvalContext, env: EvalEnv): number {

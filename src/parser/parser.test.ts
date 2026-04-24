@@ -5,6 +5,8 @@ import type { ComparePoint } from '../types';
 import type {
   ASTNode,
   BinaryOpNode,
+  CritThreshold,
+  CritThresholdNode,
   DiceNode,
   ExplodeNode,
   FateDiceNode,
@@ -102,6 +104,14 @@ function variable(name: string): VariableNode {
 
 function sort(order: SortNode['order'], target: ASTNode): SortNode {
   return { type: 'Sort', order, target };
+}
+
+function critThreshold(
+  successThresholds: CritThreshold[],
+  failThresholds: CritThreshold[],
+  target: ASTNode,
+): CritThresholdNode {
+  return { type: 'CritThreshold', successThresholds, failThresholds, target };
 }
 
 describe('Parser', () => {
@@ -2142,6 +2152,225 @@ describe('Parser', () => {
 
       it('should reject sort on a function call over literals', () => {
         expect(() => parse('floor(5)s')).toThrow(ParseError);
+      });
+    });
+  });
+
+  describe('crit threshold modifiers', () => {
+    describe('shape', () => {
+      it('should parse bare cs as default success threshold', () => {
+        expect(parse('1d20cs')).toEqual(
+          critThreshold(['default'], [], dice(literal(1), literal(20))),
+        );
+      });
+
+      it('should parse bare cf as default fail threshold', () => {
+        expect(parse('1d20cf')).toEqual(
+          critThreshold([], ['default'], dice(literal(1), literal(20))),
+        );
+      });
+
+      it('should parse cs with a compare point', () => {
+        expect(parse('1d20cs>19')).toEqual(
+          critThreshold([cp('>', literal(19))], [], dice(literal(1), literal(20))),
+        );
+      });
+
+      it('should parse cf with a compare point', () => {
+        expect(parse('1d20cf<3')).toEqual(
+          critThreshold([], [cp('<', literal(3))], dice(literal(1), literal(20))),
+        );
+      });
+
+      it('should chain multiple cs thresholds into a single node', () => {
+        expect(parse('1d20cs=20cs=1')).toEqual(
+          critThreshold(
+            [cp('=', literal(20)), cp('=', literal(1))],
+            [],
+            dice(literal(1), literal(20)),
+          ),
+        );
+      });
+
+      it('should chain multiple cf thresholds into a single node', () => {
+        expect(parse('1d20cf=1cf=2')).toEqual(
+          critThreshold(
+            [],
+            [cp('=', literal(1)), cp('=', literal(2))],
+            dice(literal(1), literal(20)),
+          ),
+        );
+      });
+
+      it('should combine cs and cf into the same node', () => {
+        expect(parse('1d20cs>19cf<3')).toEqual(
+          critThreshold(
+            [cp('>', literal(19))],
+            [cp('<', literal(3))],
+            dice(literal(1), literal(20)),
+          ),
+        );
+      });
+
+      it('should be order-independent — cf first then cs', () => {
+        expect(parse('1d20cf<3cs>19')).toEqual(
+          critThreshold(
+            [cp('>', literal(19))],
+            [cp('<', literal(3))],
+            dice(literal(1), literal(20)),
+          ),
+        );
+      });
+
+      it('should parse mixed chain with defaults and compare points', () => {
+        expect(parse('1d20cs=20cs=1cf>18')).toEqual(
+          critThreshold(
+            [cp('=', literal(20)), cp('=', literal(1))],
+            [cp('>', literal(18))],
+            dice(literal(1), literal(20)),
+          ),
+        );
+      });
+
+      it('should chain cs over keep/drop', () => {
+        expect(parse('4d20dl1cs>17')).toEqual(
+          critThreshold(
+            [cp('>', literal(17))],
+            [],
+            modifier('drop', 'lowest', literal(1), dice(literal(4), literal(20))),
+          ),
+        );
+      });
+
+      it('should chain cs over explode', () => {
+        expect(parse('1d20!cs>19')).toEqual(
+          critThreshold(
+            [cp('>', literal(19))],
+            [],
+            explode('standard', dice(literal(1), literal(20))),
+          ),
+        );
+      });
+
+      it('should chain cs over sort', () => {
+        // ? `4d6scs` maxes-munches to an unknown `scs` identifier in the
+        //   lexer — whitespace separates the two keywords cleanly, same
+        //   as the `4d6s dl1` pattern used by sort tests.
+        expect(parse('4d6s cs>4')).toEqual(
+          critThreshold([cp('>', literal(4))], [], sort('ascending', dice(literal(4), literal(6)))),
+        );
+      });
+
+      it('should chain sort over cs (sort outer)', () => {
+        // ? `cs` and `s` cannot be lexed together as one identifier — the
+        //   intervening `>value` breaks maximal munch. No whitespace needed.
+        expect(parse('4d6cs>4 s')).toEqual(
+          sort('ascending', critThreshold([cp('>', literal(4))], [], dice(literal(4), literal(6)))),
+        );
+      });
+
+      it('should collapse chain through parens', () => {
+        // ? `(1d20cs>19)cs=1` must collapse into one CritThresholdNode, not
+        //   double-wrap through the Grouped node.
+        expect(parse('(1d20cs>19)cs=1')).toEqual(
+          critThreshold(
+            [cp('>', literal(19)), cp('=', literal(1))],
+            [],
+            dice(literal(1), literal(20)),
+          ),
+        );
+      });
+
+      it('should accept Fate dice pool', () => {
+        expect(parse('4dFcs>0')).toEqual(
+          critThreshold([cp('>', literal(0))], [], fateDice(literal(4))),
+        );
+      });
+
+      it('should allow SuccessCount to wrap CritThreshold', () => {
+        // CritThreshold contains a dice pool — SuccessCount's pool check passes.
+        expect(parse('10d10cs>8>=6')).toEqual(
+          successCount(
+            critThreshold([cp('>', literal(8))], [], dice(literal(10), literal(10))),
+            cp('>=', literal(6)),
+          ),
+        );
+      });
+    });
+
+    describe('errors', () => {
+      it('should reject cs on a pure literal', () => {
+        expect(() => parse('5cs')).toThrow(ParseError);
+        try {
+          parse('5cs');
+        } catch (e) {
+          expect((e as ParseError).code).toBe('INVALID_CRIT_THRESHOLD_TARGET');
+          expect((e as ParseError).message).toContain('dice pool');
+        }
+      });
+
+      it('should reject cs on pure arithmetic', () => {
+        expect(() => parse('(1+2)cs>1')).toThrow(ParseError);
+      });
+
+      it('should reject cs on arithmetic-wrapped pool', () => {
+        // ? Mirrors explode/reroll — cs/cf is "bare dice only". `(1d6+2d8)` is
+        //   an arithmetic wrapper, not a dice pool in the shallow sense.
+        expect(() => parse('(1d6+2d8)cs>5')).toThrow(ParseError);
+        try {
+          parse('(1d6+2d8)cs>5');
+        } catch (e) {
+          expect((e as ParseError).code).toBe('INVALID_CRIT_THRESHOLD_TARGET');
+        }
+      });
+
+      it('should reject cs on a single-sub-roll group', () => {
+        expect(() => parse('{1d6}cs>5')).toThrow(ParseError);
+        try {
+          parse('{1d6}cs>5');
+        } catch (e) {
+          expect((e as ParseError).code).toBe('INVALID_CRIT_THRESHOLD_TARGET');
+          expect((e as ParseError).message).toContain('group');
+        }
+      });
+
+      it('should reject cs on a multi-sub-roll group', () => {
+        expect(() => parse('{1d6, 2d8}cs>5')).toThrow(ParseError);
+      });
+
+      it('should reject cs on parens-wrapped group', () => {
+        expect(() => parse('({1d6})cs>5')).toThrow(ParseError);
+        try {
+          parse('({1d6})cs>5');
+        } catch (e) {
+          expect((e as ParseError).code).toBe('INVALID_CRIT_THRESHOLD_TARGET');
+        }
+      });
+
+      it('should reject cf on a group', () => {
+        expect(() => parse('{1d6}cf<2')).toThrow(ParseError);
+      });
+
+      it('should reject cs on SuccessCount target', () => {
+        expect(() => parse('4d6>=4cs>5')).toThrow(ParseError);
+        try {
+          parse('4d6>=4cs>5');
+        } catch (e) {
+          expect((e as ParseError).code).toBe('INVALID_SUCCESS_COUNT_TARGET');
+        }
+      });
+
+      it('should reject cs on Versus target (via parens)', () => {
+        expect(() => parse('(1d20 vs 15)cs>18')).toThrow(ParseError);
+        try {
+          parse('(1d20 vs 15)cs>18');
+        } catch (e) {
+          expect((e as ParseError).code).toBe('NESTED_VERSUS');
+        }
+      });
+
+      it('should reject cs on a function call over literals', () => {
+        expect(() => parse('floor(5)cs>3')).toThrow(ParseError);
       });
     });
   });
