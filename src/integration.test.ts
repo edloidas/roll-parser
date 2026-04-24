@@ -774,4 +774,38 @@ describe('roll() integration', () => {
       expect(() => roll('5s', { rng: createMockRng([]) })).toThrow(ParseError);
     });
   });
+
+  describe('crit threshold modifiers', () => {
+    test('4d20cs>=19 flags 19 and 20 as critical via roll()', () => {
+      const result = roll('4d20cs>=19', { rng: createMockRng([20, 19, 15, 1]) });
+
+      expect(result.total).toBe(55);
+      expect(result.rolls.map((d) => d.critical)).toEqual([true, true, false, false]);
+      expect(result.expression).toBe('4d20cs>=19');
+      expect(result.rendered).toBe('4d20cs>=19[20, 19, 15, 1] = 55');
+    });
+
+    test('4d20cf<3 flags 1 and 2 as fumble via roll()', () => {
+      const result = roll('4d20cf<3', { rng: createMockRng([20, 1, 2, 15]) });
+
+      expect(result.total).toBe(38);
+      expect(result.rolls.map((d) => d.fumble)).toEqual([false, true, true, false]);
+    });
+
+    test('combined cs>=19cf<3 round-trips through notation', () => {
+      const result = roll('4d20cs>=19cf<3', { rng: createMockRng([20, 1, 10, 19]) });
+
+      expect(result.rolls.map((d) => d.critical)).toEqual([true, false, false, true]);
+      expect(result.rolls.map((d) => d.fumble)).toEqual([false, true, false, false]);
+      expect(result.expression).toBe('4d20cs>=19cf<3');
+    });
+
+    test('rejects cs on a pure literal at parse time', () => {
+      expect(() => roll('5cs', { rng: createMockRng([]) })).toThrow(ParseError);
+    });
+
+    test('rejects cs on a group at parse time', () => {
+      expect(() => roll('{1d6}cs>5', { rng: createMockRng([]) })).toThrow(ParseError);
+    });
+  });
 });

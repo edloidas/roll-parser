@@ -12,6 +12,8 @@ import type { CompareOp, ComparePoint } from '../types';
 import type {
   ASTNode,
   BinaryOpNode,
+  CritThreshold,
+  CritThresholdNode,
   DiceNode,
   ExplodeNode,
   FateDiceNode,
@@ -27,7 +29,13 @@ import type {
   VariableNode,
   VersusNode,
 } from './ast';
-import { containsDicePool, containsFatePool, deepContainsDicePool, isSuccessCount } from './ast';
+import {
+  containsDicePool,
+  containsFatePool,
+  deepContainsDicePool,
+  isCritThreshold,
+  isSuccessCount,
+} from './ast';
 
 /**
  * Error thrown when the parser encounters invalid syntax.
@@ -242,6 +250,10 @@ export class Parser {
       case TokenType.SORT_ASC:
       case TokenType.SORT_DESC:
         return this.parseSort(left, token);
+
+      case TokenType.CRIT_SUCCESS:
+      case TokenType.CRIT_FAIL:
+        return this.parseCritThreshold(left, token);
 
       case TokenType.GREATER:
       case TokenType.GREATER_EQUAL:
@@ -666,6 +678,63 @@ export class Parser {
     return { type: 'Sort', order, target };
   }
 
+  private parseCritThreshold(target: ASTNode, token: Token): CritThresholdNode {
+    this.rejectSuccessCountTarget(target, token);
+    this.rejectVersusTarget(target, token);
+
+    // Groups have no crit-threshold semantics per Stage 3 spec — a group is a
+    // container of sub-expressions, not a dice pool. Must run before
+    // `containsDicePool`, which recurses into `Group`.
+    this.rejectGroupTarget(
+      target,
+      token,
+      'apply crit threshold to',
+      'INVALID_CRIT_THRESHOLD_TARGET',
+    );
+
+    // Shallow dice-pool check (bare dice only) — rejects `(1d6+2d8)cs>5`,
+    // `5cs`, `(1+2)cs`, `floor(5)cs`. Matches explode/reroll behavior.
+    // Note: if `target` already is a `CritThresholdNode`, `containsDicePool`
+    // recurses into its `target`, so chained `cs`/`cf` naturally pass.
+    if (!containsDicePool(target)) {
+      throw new ParseError(
+        `Crit threshold modifier requires a dice pool target`,
+        'INVALID_CRIT_THRESHOLD_TARGET',
+        token.position,
+        token,
+      );
+    }
+
+    const threshold: CritThreshold = this.isComparePointAhead()
+      ? this.parseComparePoint()
+      : 'default';
+
+    // ? Unwrap parens so `(1d20cs>19)cs=1` chains into the inner node. Without
+    //   unwrapping, the outer `cs` would create a second CritThresholdNode
+    //   wrapping the Grouped — the collapse-into-single-node design decision
+    //   from STAGE3.md §"CritThreshold Collects Multiple Thresholds" would
+    //   be subtly broken for any user who parenthesizes the chain.
+    let chainTarget: ASTNode = target;
+    while (chainTarget.type === 'Grouped') {
+      chainTarget = chainTarget.expression;
+    }
+    if (isCritThreshold(chainTarget)) {
+      if (token.type === TokenType.CRIT_SUCCESS) {
+        chainTarget.successThresholds.push(threshold);
+      } else {
+        chainTarget.failThresholds.push(threshold);
+      }
+      return chainTarget;
+    }
+
+    return {
+      type: 'CritThreshold',
+      successThresholds: token.type === TokenType.CRIT_SUCCESS ? [threshold] : [],
+      failThresholds: token.type === TokenType.CRIT_FAIL ? [threshold] : [],
+      target,
+    };
+  }
+
   private parseSuccessCount(target: ASTNode, token: Token): SuccessCountNode {
     // Success counting is terminal: chaining (`>=5>=3`) has no semantics.
     this.rejectSuccessCountTarget(target, token);
@@ -849,6 +918,8 @@ export class Parser {
       case TokenType.REROLL_ONCE:
       case TokenType.SORT_ASC:
       case TokenType.SORT_DESC:
+      case TokenType.CRIT_SUCCESS:
+      case TokenType.CRIT_FAIL:
         return BP.MODIFIER;
       // Comparison operators act as LED-dispatched success-count modifiers
       // at the Pratt level. Sit below ADD/MUL so arithmetic on a dice pool
