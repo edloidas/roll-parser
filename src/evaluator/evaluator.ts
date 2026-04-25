@@ -424,26 +424,38 @@ function evalFateDice(node: FateDiceNode, rng: RNG, ctx: EvalContext, env: EvalE
 }
 
 /**
+ * Propagates `versusMetadata` onto a parent so `degree`/`natural` survive
+ * wrappers like `floor(...)`, `(vs) + 0`, or `-(vs)`. Throws `NESTED_VERSUS`
+ * if the parent already carries metadata — two versus results cannot occupy
+ * the same `RollResult`. No-op when `metadata` is `undefined`.
+ *
+ * Use this directly when the caller has already pushed (or transformed) `rolls`
+ * itself — e.g. `evalSort`, `evalCritThreshold`, `evalGroupModifier`. For the
+ * default case where the child's raw rolls flow up unchanged, use
+ * `mergeContext` instead.
+ */
+function propagateMetadata(parent: EvalContext, metadata: EvalContext['versusMetadata']): void {
+  if (!metadata) return;
+  if (parent.versusMetadata) {
+    throw new EvaluatorError(
+      'Multiple versus operators in the same expression',
+      'NESTED_VERSUS',
+      'Versus',
+    );
+  }
+  parent.versusMetadata = metadata;
+}
+
+/**
  * Merges a child sub-context back into its parent. Copies `rolls` and
- * propagates `versusMetadata` so `degree`/`natural` survive wrappers like
- * `floor(...)`, `(vs) + 0`, or `-(vs)`. Throws `NESTED_VERSUS` if both sides
- * carry metadata — two versus results cannot occupy the same `RollResult`.
+ * delegates `versusMetadata` propagation to `propagateMetadata`.
  *
  * Does not merge `expressionParts` / `renderedParts` — each wrapper formats
  * those with its own operator/function syntax.
  */
 function mergeContext(parent: EvalContext, child: EvalContext): void {
   parent.rolls.push(...child.rolls);
-  if (child.versusMetadata) {
-    if (parent.versusMetadata) {
-      throw new EvaluatorError(
-        'Multiple versus operators in the same expression',
-        'NESTED_VERSUS',
-        'Versus',
-      );
-    }
-    parent.versusMetadata = child.versusMetadata;
-  }
+  propagateMetadata(parent, child.versusMetadata);
 }
 
 function evalBinaryOp(node: BinaryOpNode, rng: RNG, ctx: EvalContext, env: EvalEnv): number {
@@ -793,16 +805,7 @@ function evalSort(node: SortNode, rng: RNG, ctx: EvalContext, env: EvalEnv): num
   const sortedRolls = sortDice(targetCtx.rolls, node.order);
 
   ctx.rolls.push(...sortedRolls);
-  if (targetCtx.versusMetadata) {
-    if (ctx.versusMetadata) {
-      throw new EvaluatorError(
-        'Multiple versus operators in the same expression',
-        'NESTED_VERSUS',
-        'Versus',
-      );
-    }
-    ctx.versusMetadata = targetCtx.versusMetadata;
-  }
+  propagateMetadata(ctx, targetCtx.versusMetadata);
 
   const code = node.order === 'ascending' ? 's' : 'sd';
   const targetExpr = targetCtx.expressionParts.join('');
@@ -842,16 +845,7 @@ function evalCritThreshold(
   applyCritThresholds(targetCtx.rolls, successResolved, failResolved);
 
   ctx.rolls.push(...targetCtx.rolls);
-  if (targetCtx.versusMetadata) {
-    if (ctx.versusMetadata) {
-      throw new EvaluatorError(
-        'Multiple versus operators in the same expression',
-        'NESTED_VERSUS',
-        'Versus',
-      );
-    }
-    ctx.versusMetadata = targetCtx.versusMetadata;
-  }
+  propagateMetadata(ctx, targetCtx.versusMetadata);
 
   const targetExpr = targetCtx.expressionParts.join('');
   const codes = [
@@ -991,16 +985,7 @@ function evalGroupModifier(
     // a sub-roll doesn't make its degree result disappear; two versus
     // results in the same group still collide via the same guard used by
     // `mergeContext`.
-    if (sub.versusMetadata) {
-      if (ctx.versusMetadata) {
-        throw new EvaluatorError(
-          'Multiple versus operators in the same expression',
-          'NESTED_VERSUS',
-          'Versus',
-        );
-      }
-      ctx.versusMetadata = sub.versusMetadata;
-    }
+    propagateMetadata(ctx, sub.versusMetadata);
   }
 
   const subExprStrs = subRolls.map((s) => s.expr);
