@@ -706,6 +706,20 @@ export class Parser {
       );
     }
 
+    // Bare `cs`/`cf` resolve to a per-die default that assumes max-side / 1
+    // semantics — incompatible with Fate dice (`{-1, 0, +1}`), where the bare
+    // fumble check would flip the best face (`+1`) into a fumble. Custom
+    // thresholds with explicit ComparePoints remain accepted. Mirrors the
+    // Fate-explosion rejection above.
+    if (!this.isComparePointAhead() && containsFatePool(target)) {
+      throw new ParseError(
+        `Bare cs/cf cannot apply to Fate dice`,
+        'INVALID_CRIT_THRESHOLD_TARGET',
+        token.position,
+        token,
+      );
+    }
+
     const threshold: CritThreshold = this.isComparePointAhead()
       ? this.parseComparePoint()
       : 'default';

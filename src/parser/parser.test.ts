@@ -2316,6 +2316,12 @@ describe('Parser', () => {
         );
       });
 
+      it('should accept Fate dice with custom fail threshold', () => {
+        expect(parse('4dFcf=-1')).toEqual(
+          critThreshold([], [cp('=', unary(literal(1)))], fateDice(literal(4))),
+        );
+      });
+
       it('should allow SuccessCount to wrap CritThreshold', () => {
         // CritThreshold contains a dice pool — SuccessCount's pool check passes.
         expect(parse('10d10cs>8>=6')).toEqual(
@@ -2419,6 +2425,43 @@ describe('Parser', () => {
 
       it('should reject cs on a function call over literals', () => {
         expect(() => parse('floor(5)cs>3')).toThrow(ParseError);
+      });
+
+      it('should reject bare cs on Fate dice pool', () => {
+        // Fate results are `{-1, 0, +1}`; the default crit sentinel assumes
+        // max-side semantics that don't apply. Custom thresholds remain valid.
+        expect(() => parse('4dFcs')).toThrow(ParseError);
+        try {
+          parse('4dFcs');
+        } catch (e) {
+          expect((e as ParseError).code).toBe('INVALID_CRIT_THRESHOLD_TARGET');
+          expect((e as ParseError).message).toContain('Fate');
+        }
+      });
+
+      it('should reject bare cf on Fate dice pool', () => {
+        // Without this guard, the default fumble check (`result === 1`) flips
+        // a `+1` Fate face into a fumble — a semantic inversion.
+        expect(() => parse('4dFcf')).toThrow(ParseError);
+        try {
+          parse('4dFcf');
+        } catch (e) {
+          expect((e as ParseError).code).toBe('INVALID_CRIT_THRESHOLD_TARGET');
+          expect((e as ParseError).message).toContain('Fate');
+        }
+      });
+
+      it('should reject bare cf chained after custom cs on Fate pool', () => {
+        // ? `containsFatePool` recurses through `CritThreshold`, so the bare
+        //   `cf` is caught even when the target is already a wrapping crit
+        //   threshold node from a custom success threshold.
+        expect(() => parse('4dFcs>0cf')).toThrow(ParseError);
+        try {
+          parse('4dFcs>0cf');
+        } catch (e) {
+          expect((e as ParseError).code).toBe('INVALID_CRIT_THRESHOLD_TARGET');
+          expect((e as ParseError).message).toContain('Fate');
+        }
       });
     });
   });
