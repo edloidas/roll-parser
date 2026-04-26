@@ -491,17 +491,25 @@ export class Parser {
    * semantics. Walks `Grouped`/`Modifier`/`Sort`/`CritThreshold` so wrappers
    * cannot smuggle a group past the check (`{1d6}kh1cs>5`, `({1d6})!`,
    * `{1d6}scs>5` all reject the same as `{1d6}!`/`{1d6}cs>5`).
+   *
+   * `singleSubRollPasses` opts the caller into the Stage 3 single-sub-roll
+   * passthrough rule (STAGE3.md "Group Semantics: Single vs Multi Sub-Roll"):
+   * a `Group` with one expression is the user's explicit flat-pool escape
+   * hatch and is equivalent to its unwrapped form. Currently only
+   * `parseCritThreshold` opts in — explode/reroll keep the strict reject so
+   * existing notation contracts don't shift.
    */
   private rejectGroupTarget(
     target: ASTNode,
     token: Token,
     action: string,
     code: RollParserErrorCode,
+    singleSubRollPasses = false,
   ): void {
     const node = unwrapTransparent(target, ['Grouped', 'Modifier', 'Sort', 'CritThreshold']);
-    if (node.type === 'Group') {
-      throw new ParseError(`Cannot ${action} a group`, code, token.position, token);
-    }
+    if (node.type !== 'Group') return;
+    if (singleSubRollPasses && node.expressions.length === 1) return;
+    throw new ParseError(`Cannot ${action} a group`, code, token.position, token);
   }
 
   private rejectVersusTarget(target: ASTNode, token: Token): void {
@@ -683,14 +691,18 @@ export class Parser {
     this.rejectSuccessCountTarget(target, token);
     this.rejectVersusTarget(target, token);
 
-    // Groups have no crit-threshold semantics per Stage 3 spec — a group is a
-    // container of sub-expressions, not a dice pool. Must run before
+    // Multi-sub-roll groups have no crit-threshold semantics per Stage 3 spec
+    // — a group there is a container of sub-roll subtotals, not a dice pool,
+    // and applying cs/cf would override `critical`/`fumble` on dropped
+    // sub-roll dice. Single-sub-roll groups pass through under the documented
+    // flat-pool rule (`{1d20}kh1cs>18` ≡ `(1d20)kh1cs>18`). Must run before
     // `containsDicePool`, which recurses into `Group`.
     this.rejectGroupTarget(
       target,
       token,
       'apply crit threshold to',
       'INVALID_CRIT_THRESHOLD_TARGET',
+      true,
     );
 
     // Shallow dice-pool check (bare dice only) — rejects `(1d6+2d8)cs>5`,

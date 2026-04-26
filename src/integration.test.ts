@@ -804,8 +804,8 @@ describe('roll() integration', () => {
       expect(() => roll('5cs', { rng: createMockRng([]) })).toThrow(ParseError);
     });
 
-    test('rejects cs on a group at parse time', () => {
-      expect(() => roll('{1d6}cs>5', { rng: createMockRng([]) })).toThrow(ParseError);
+    test('rejects cs on a multi-sub-roll group at parse time', () => {
+      expect(() => roll('{1d6, 2d8}cs>5', { rng: createMockRng([]) })).toThrow(ParseError);
     });
   });
 });

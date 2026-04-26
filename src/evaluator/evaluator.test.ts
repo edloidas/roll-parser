@@ -3075,5 +3075,19 @@ describe('evaluate', () => {
       expect(getDie(result.rolls, 0).critical).toBe(true);
       expect(result.expression).toBe('1d20cs>19cs=1');
     });
+
+    test('single-sub-roll group passthrough — {1d20}kh1cs>18 matches 1d20kh1cs>18', () => {
+      // Stage 3 single-sub-roll passthrough: `{1d20}` is the documented
+      // flat-pool escape hatch and must produce the same total and per-die
+      // critical flags as the unwrapped form under the same RNG sequence.
+      const seq = [20, 17, 5, 1];
+      const grouped = evaluate(parse('{1d20}kh1cs>18'), createMockRng([...seq]));
+      const flat = evaluate(parse('1d20kh1cs>18'), createMockRng([...seq]));
+
+      expect(grouped.total).toBe(flat.total);
+      expect(grouped.rolls.map((d) => d.result)).toEqual(flat.rolls.map((d) => d.result));
+      expect(grouped.rolls.map((d) => d.critical)).toEqual(flat.rolls.map((d) => d.critical));
+      expect(grouped.rolls.map((d) => d.fumble)).toEqual(flat.rolls.map((d) => d.fumble));
+    });
   });
 });
