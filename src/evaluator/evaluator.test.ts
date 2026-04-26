@@ -2468,6 +2468,52 @@ describe('evaluate', () => {
       expect(result.total).toBe(9);
       expect(result.expression).toBe('2 + 3 + 1d6');
     });
+
+    test('throws INVALID_VARIABLE_VALUE when context value is a string', () => {
+      const ast = parse('1d20+@str');
+      const context = { str: 'high' as unknown as number };
+
+      expect(() => evaluate(ast, createMockRng([5]), { context })).toThrow(EvaluatorError);
+      try {
+        evaluate(ast, createMockRng([5]), { context });
+      } catch (err) {
+        expect((err as EvaluatorError).code).toBe('INVALID_VARIABLE_VALUE');
+        expect((err as EvaluatorError).message).toBe('Invalid variable value: str = high');
+      }
+    });
+
+    test('throws INVALID_VARIABLE_VALUE when context value is NaN', () => {
+      const ast = parse('1d20+@str');
+
+      expect(() => evaluate(ast, createMockRng([5]), { context: { str: Number.NaN } })).toThrow(
+        EvaluatorError,
+      );
+      try {
+        evaluate(ast, createMockRng([5]), { context: { str: Number.NaN } });
+      } catch (err) {
+        expect((err as EvaluatorError).code).toBe('INVALID_VARIABLE_VALUE');
+      }
+    });
+
+    test('throws INVALID_VARIABLE_VALUE when context value is Infinity', () => {
+      const ast = parse('1d20+@str');
+
+      expect(() =>
+        evaluate(ast, createMockRng([5]), { context: { str: Number.POSITIVE_INFINITY } }),
+      ).toThrow(EvaluatorError);
+      try {
+        evaluate(ast, createMockRng([5]), { context: { str: Number.POSITIVE_INFINITY } });
+      } catch (err) {
+        expect((err as EvaluatorError).code).toBe('INVALID_VARIABLE_VALUE');
+      }
+    });
+
+    test('finite numeric value passes through unchanged', () => {
+      const ast = parse('1d20+@str');
+      const result = evaluate(ast, createMockRng([5]), { context: { str: 3 } });
+
+      expect(result.total).toBe(8);
+    });
   });
 
   describe('grouped rolls', () => {

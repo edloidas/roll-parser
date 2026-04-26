@@ -330,6 +330,13 @@ function evalVariable(node: VariableNode, ctx: EvalContext, env: EvalEnv): numbe
   }
 
   const value = env.context[node.name] as number;
+  if (!Number.isFinite(value)) {
+    throw new EvaluatorError(
+      `Invalid variable value: ${node.name} = ${value}`,
+      'INVALID_VARIABLE_VALUE',
+      'Variable',
+    );
+  }
   const display = variableNeedsBraces(node.name) ? `@{${node.name}}` : `@${node.name}`;
   ctx.expressionParts.push(String(value));
   ctx.renderedParts.push(`${display}[${value}]`);
