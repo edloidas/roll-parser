@@ -12,6 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Parser now rejects `SuccessCount` wrapped in meta-expression positions — modifier count, dice count/sides (infix and prefix), Fate/percentile dice count, SuccessCount threshold and bare `fN` value, and compare-point values used by Explode/Reroll. `mergeMetaRolls` also strips `success`/`failure` modifier tags on meta-forwarded dice as defense-in-depth ([#69](https://github.com/edloidas/roll-parser/issues/69))
 - Parser now rejects `Versus` wrapped in the same meta-expression positions so a PF2e `vs` outcome cannot be silently dropped by `mergeMetaRolls`, and the `parseVersus` chain guard unwraps `Grouped` so `(1d20 vs 15) vs 10` throws `NESTED_VERSUS` at parse time instead of at eval ([#70](https://github.com/edloidas/roll-parser/issues/70))
 
+### Notes
+
+These are intentional behaviours documented for the first time, not changes — semantics are unchanged.
+
+- `cs`/`cf` use replace semantics on `critical`/`fumble`: supplying only `cf<3` clears default crit on a natural 20. Chain `cs` first (`1d20cscf<3`) to keep the default crit alongside a custom fumble ([#96](https://github.com/edloidas/roll-parser/issues/96))
+- Sort flattens additive pools: `(2d6+1d8)s` renders as one combined sorted list rather than per-pool brackets. Same applies to wrapped pools like `floor(4d6)s`. Totals are preserved ([#96](https://github.com/edloidas/roll-parser/issues/96))
+- Outer parens drop from `result.expression` when chained `cs`/`cf` thresholds collapse: `(1d20cs>19)cs=1` renders as `1d20cs>19cs=1`. Re-parses to the same AST; only the textual form differs ([#96](https://github.com/edloidas/roll-parser/issues/96))
+
 ## [3.0.0-alpha.0] - 2026-04-20
 
 First alpha of the v3 rewrite. Stage 1 (core engine) is complete; Stage 2 (dice mechanics) is largely in place.

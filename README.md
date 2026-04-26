@@ -102,6 +102,23 @@ roll-parser --help
   The round-trip property test does not exercise meta-expressions, so the
   gap is invisible to CI. Do not rely on `result.expression` as a faithful
   re-parseable form when your notation contains meta-expressions.
+- **`cs`/`cf` use replace semantics on `critical`/`fumble`.** Supplying only
+  `cf<3` clears every die's `critical` to `false` — including a natural 20
+  on `1d20cf<3` — because the empty `successThresholds` array overrides the
+  default crit. Chain `cs` first to preserve the default crit alongside a
+  custom fumble: `1d20cscf<3`.
+- **Sort flattens additive pools and drops per-pool brackets.** `(2d6+1d8)s`
+  renders the combined pool as one sorted list — `(2d6 + 1d8)s[3, 4, 5]` —
+  rather than the per-pool form `2d6[3, 4] + 1d8[5]` that bare `2d6+1d8`
+  produces. The same flattening applies inside wrapped pools like
+  `floor(4d6)s`. Totals are preserved; only the rendered breakdown loses
+  pool boundaries.
+- **Outer parens drop from `result.expression` after threshold collapse.**
+  `(1d20cs>19)cs=1` evaluates with `result.expression = '1d20cs>19cs=1'`
+  because chained `cs` thresholds collapse into a single `CritThresholdNode`
+  with merged thresholds. The notation re-parses to the same AST, so
+  behaviour is harmless — but tools diffing the original notation against
+  `expression` will see a spurious change.
 
 ## License
 
