@@ -35,6 +35,7 @@ import {
   deepContainsDicePool,
   isCritThreshold,
   isSuccessCount,
+  unwrapTransparent,
 } from './ast';
 
 /**
@@ -468,10 +469,11 @@ export class Parser {
   }
 
   private rejectSuccessCountTarget(target: ASTNode, token: Token): void {
-    let node = target;
-    while (node.type === 'Grouped') {
-      node = node.expression;
-    }
+    // ? Narrow unwrap: only `Grouped`. A `SuccessCount` cannot live inside
+    //   `Modifier`/`Sort`/`CritThreshold` because each of those parsers calls
+    //   this same reject on their target before constructing the wrapper —
+    //   so widening the set here would never match.
+    const node = unwrapTransparent(target, ['Grouped']);
     if (isSuccessCount(node)) {
       throw new ParseError(
         `Cannot apply modifier after success counting`,
@@ -483,10 +485,12 @@ export class Parser {
   }
 
   /**
-   * Rejects `GroupNode` (or a parens-wrapped group) as the target of `token`.
-   * Explode and reroll wrap bare dice only — a group is fundamentally a
-   * container of sub-expressions, so applying these modifiers has no defined
-   * semantics. Parens are unwrapped so `({1d6})!` rejects the same as `{1d6}!`.
+   * Rejects `GroupNode` (or a wrapper-cloaked group) as the target of `token`.
+   * Explode, reroll, and crit-threshold wrap bare dice pools only — a group
+   * is a container of sub-expressions, so these modifiers have no defined
+   * semantics. Walks `Grouped`/`Modifier`/`Sort`/`CritThreshold` so wrappers
+   * cannot smuggle a group past the check (`{1d6}kh1cs>5`, `({1d6})!`,
+   * `{1d6}scs>5` all reject the same as `{1d6}!`/`{1d6}cs>5`).
    */
   private rejectGroupTarget(
     target: ASTNode,
@@ -494,10 +498,7 @@ export class Parser {
     action: string,
     code: RollParserErrorCode,
   ): void {
-    let node = target;
-    while (node.type === 'Grouped') {
-      node = node.expression;
-    }
+    const node = unwrapTransparent(target, ['Grouped', 'Modifier', 'Sort', 'CritThreshold']);
     if (node.type === 'Group') {
       throw new ParseError(`Cannot ${action} a group`, code, token.position, token);
     }
@@ -509,10 +510,10 @@ export class Parser {
     //   `rejectSuccessCountTarget`; wrappers like `floor(vs)+0` still
     //   propagate `versusMetadata` via `mergeContext`, so this only blocks
     //   `mergeMetaRolls` sites where metadata would silently vanish.
-    let node = target;
-    while (node.type === 'Grouped') {
-      node = node.expression;
-    }
+    // ? Narrow unwrap: only `Grouped`. `Modifier`/`Sort`/`CritThreshold`
+    //   cannot wrap a `Versus` because `containsDicePool` does not recurse
+    //   into `Versus`, so each of those parsers rejects the wrap upstream.
+    const node = unwrapTransparent(target, ['Grouped']);
     if (node.type === 'Versus') {
       throw new ParseError(
         `Versus cannot be used as a meta-expression`,
