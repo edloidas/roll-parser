@@ -2042,6 +2042,35 @@ describe('Parser', () => {
       it('should reject reroll-once on a group', () => {
         expect(() => parse('{4d6}ro<2')).toThrow(ParseError);
       });
+
+      it('should reject explode on a modifier-wrapped group: {4d6}kh1!', () => {
+        expect(() => parse('{4d6}kh1!')).toThrow(ParseError);
+        try {
+          parse('{4d6}kh1!');
+        } catch (e) {
+          expect((e as ParseError).code).toBe('INVALID_EXPLODE_TARGET');
+          expect((e as ParseError).message).toContain('Cannot explode a group');
+        }
+      });
+
+      it('should reject reroll on a modifier-wrapped group: {4d6}kh1r<2', () => {
+        expect(() => parse('{4d6}kh1r<2')).toThrow(ParseError);
+        try {
+          parse('{4d6}kh1r<2');
+        } catch (e) {
+          expect((e as ParseError).code).toBe('INVALID_REROLL_TARGET');
+          expect((e as ParseError).message).toContain('Cannot reroll a group');
+        }
+      });
+
+      it('should reject explode on a sort-wrapped group: {4d6}s!', () => {
+        expect(() => parse('{4d6}s!')).toThrow(ParseError);
+        try {
+          parse('{4d6}s!');
+        } catch (e) {
+          expect((e as ParseError).code).toBe('INVALID_EXPLODE_TARGET');
+        }
+      });
     });
   });
 
@@ -2349,6 +2378,25 @@ describe('Parser', () => {
 
       it('should reject cf on a group', () => {
         expect(() => parse('{1d6}cf<2')).toThrow(ParseError);
+      });
+
+      it('should reject cs on a modifier-wrapped group: {1d6}kh1cs>5', () => {
+        expect(() => parse('{1d6}kh1cs>5')).toThrow(ParseError);
+        try {
+          parse('{1d6}kh1cs>5');
+        } catch (e) {
+          expect((e as ParseError).code).toBe('INVALID_CRIT_THRESHOLD_TARGET');
+          expect((e as ParseError).message).toContain('group');
+        }
+      });
+
+      it('should reject cf on a modifier-wrapped group: {1d6}kh1cf<2', () => {
+        expect(() => parse('{1d6}kh1cf<2')).toThrow(ParseError);
+        try {
+          parse('{1d6}kh1cf<2');
+        } catch (e) {
+          expect((e as ParseError).code).toBe('INVALID_CRIT_THRESHOLD_TARGET');
+        }
       });
 
       it('should reject cs on SuccessCount target', () => {

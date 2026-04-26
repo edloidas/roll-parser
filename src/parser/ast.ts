@@ -351,6 +351,56 @@ export function isCritThreshold(node: ASTNode): node is CritThresholdNode {
 }
 
 /**
+ * Wrapper kinds that `unwrapTransparent` can peel.
+ *
+ * "Transparent" is relative to the question being asked. `Modifier`/`Sort`/
+ * `CritThreshold` are transparent for "what is the underlying operand?" when
+ * deciding whether to reject a `Group` target — they preserve `containsDicePool`'s
+ * answer for whatever they wrap. They are NOT transparent for "is this a
+ * `SuccessCount`?" or "is this a `Versus`?", because the parsers that build
+ * those wrappers already reject `SuccessCount`/`Versus` operands upstream.
+ */
+export type TransparentWrapperKind = 'Grouped' | 'Modifier' | 'Sort' | 'CritThreshold';
+
+/**
+ * Walks `node` while its `.type` is in `kinds`, returning the first descendant
+ * that is not one of the listed wrappers. Each caller picks the subset that
+ * matches its rejection semantics — see `TransparentWrapperKind` for guidance.
+ *
+ * Used by parser reject helpers to look past wrappers when deciding whether
+ * an operand violates a rule (e.g., `Group` cannot be the target of `cs`/`cf`,
+ * even when wrapped in `Modifier` like `{1d6}kh1cs>5`).
+ */
+export function unwrapTransparent(
+  node: ASTNode,
+  kinds: readonly TransparentWrapperKind[],
+): ASTNode {
+  let current = node;
+  while (true) {
+    switch (current.type) {
+      case 'Grouped':
+        if (!kinds.includes('Grouped')) return current;
+        current = current.expression;
+        break;
+      case 'Modifier':
+        if (!kinds.includes('Modifier')) return current;
+        current = current.target;
+        break;
+      case 'Sort':
+        if (!kinds.includes('Sort')) return current;
+        current = current.target;
+        break;
+      case 'CritThreshold':
+        if (!kinds.includes('CritThreshold')) return current;
+        current = current.target;
+        break;
+      default:
+        return current;
+    }
+  }
+}
+
+/**
  * Returns `true` only when `node`'s direct result is a dice pool —
  * `Dice`, `FateDice`, or a chained pool modifier (`Modifier` / `Explode` /
  * `Reroll`). Does NOT recurse through arithmetic wrappers (`BinaryOp`,
