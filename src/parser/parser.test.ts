@@ -2331,6 +2331,47 @@ describe('Parser', () => {
           ),
         );
       });
+
+      // Single-sub-roll groups are the documented flat-pool escape hatch
+      // (STAGE3.md "Group Semantics: Single vs Multi Sub-Roll") and pass
+      // through to cs/cf as if they were the unwrapped form.
+      it('should accept cs on a single-sub-roll group: {1d6}cs>5', () => {
+        expect(parse('{1d6}cs>5')).toEqual(
+          critThreshold([cp('>', literal(5))], [], group([dice(literal(1), literal(6))])),
+        );
+      });
+
+      it('should accept cf on a single-sub-roll group: {1d6}cf<2', () => {
+        expect(parse('{1d6}cf<2')).toEqual(
+          critThreshold([], [cp('<', literal(2))], group([dice(literal(1), literal(6))])),
+        );
+      });
+
+      it('should accept cs on a parens-wrapped single-sub-roll group: ({1d6})cs>5', () => {
+        expect(parse('({1d6})cs>5')).toEqual(
+          critThreshold([cp('>', literal(5))], [], grouped(group([dice(literal(1), literal(6))]))),
+        );
+      });
+
+      it('should accept cs on a modifier-wrapped single-sub-roll group: {1d20}kh1cs>18', () => {
+        expect(parse('{1d20}kh1cs>18')).toEqual(
+          critThreshold(
+            [cp('>', literal(18))],
+            [],
+            modifier('keep', 'highest', literal(1), group([dice(literal(1), literal(20))])),
+          ),
+        );
+      });
+
+      it('should accept cf on a modifier-wrapped single-sub-roll group: {1d6}kh1cf<2', () => {
+        expect(parse('{1d6}kh1cf<2')).toEqual(
+          critThreshold(
+            [],
+            [cp('<', literal(2))],
+            modifier('keep', 'highest', literal(1), group([dice(literal(1), literal(6))])),
+          ),
+        );
+      });
     });
 
     describe('errors', () => {
@@ -2359,47 +2400,57 @@ describe('Parser', () => {
         }
       });
 
-      it('should reject cs on a single-sub-roll group', () => {
-        expect(() => parse('{1d6}cs>5')).toThrow(ParseError);
-        try {
-          parse('{1d6}cs>5');
-        } catch (e) {
-          expect((e as ParseError).code).toBe('INVALID_CRIT_THRESHOLD_TARGET');
-          expect((e as ParseError).message).toContain('group');
-        }
-      });
-
       it('should reject cs on a multi-sub-roll group', () => {
         expect(() => parse('{1d6, 2d8}cs>5')).toThrow(ParseError);
-      });
-
-      it('should reject cs on parens-wrapped group', () => {
-        expect(() => parse('({1d6})cs>5')).toThrow(ParseError);
         try {
-          parse('({1d6})cs>5');
-        } catch (e) {
-          expect((e as ParseError).code).toBe('INVALID_CRIT_THRESHOLD_TARGET');
-        }
-      });
-
-      it('should reject cf on a group', () => {
-        expect(() => parse('{1d6}cf<2')).toThrow(ParseError);
-      });
-
-      it('should reject cs on a modifier-wrapped group: {1d6}kh1cs>5', () => {
-        expect(() => parse('{1d6}kh1cs>5')).toThrow(ParseError);
-        try {
-          parse('{1d6}kh1cs>5');
+          parse('{1d6, 2d8}cs>5');
         } catch (e) {
           expect((e as ParseError).code).toBe('INVALID_CRIT_THRESHOLD_TARGET');
           expect((e as ParseError).message).toContain('group');
         }
       });
 
-      it('should reject cf on a modifier-wrapped group: {1d6}kh1cf<2', () => {
-        expect(() => parse('{1d6}kh1cf<2')).toThrow(ParseError);
+      it('should reject cf on a multi-sub-roll group', () => {
+        expect(() => parse('{1d6, 2d8}cf<2')).toThrow(ParseError);
+      });
+
+      it('should reject cs on a parens-wrapped multi-sub-roll group', () => {
+        expect(() => parse('({1d6, 2d8})cs>5')).toThrow(ParseError);
         try {
-          parse('{1d6}kh1cf<2');
+          parse('({1d6, 2d8})cs>5');
+        } catch (e) {
+          expect((e as ParseError).code).toBe('INVALID_CRIT_THRESHOLD_TARGET');
+        }
+      });
+
+      it('should reject cs on a modifier-wrapped multi-sub-roll group: {1d20, 1d20}kh1cs>18', () => {
+        // Without the unwrap-through-Modifier check, the evaluator overrides
+        // critical/fumble on dropped sub-roll dice from each branch.
+        expect(() => parse('{1d20, 1d20}kh1cs>18')).toThrow(ParseError);
+        try {
+          parse('{1d20, 1d20}kh1cs>18');
+        } catch (e) {
+          expect((e as ParseError).code).toBe('INVALID_CRIT_THRESHOLD_TARGET');
+          expect((e as ParseError).message).toContain('group');
+        }
+      });
+
+      it('should reject cf on a modifier-wrapped multi-sub-roll group: {1d20, 1d20}kh1cf<3', () => {
+        expect(() => parse('{1d20, 1d20}kh1cf<3')).toThrow(ParseError);
+        try {
+          parse('{1d20, 1d20}kh1cf<3');
+        } catch (e) {
+          expect((e as ParseError).code).toBe('INVALID_CRIT_THRESHOLD_TARGET');
+        }
+      });
+
+      it('should reject cs on a parens-wrapped modifier-wrapped multi-sub-roll group', () => {
+        // ? Acceptance criterion 5 from #97 — Grouped wrapper around the
+        //   Modifier(Group([...])) chain still resolves to a Group via the
+        //   shared unwrap.
+        expect(() => parse('({1d20, 1d20}kh1)cs>18')).toThrow(ParseError);
+        try {
+          parse('({1d20, 1d20}kh1)cs>18');
         } catch (e) {
           expect((e as ParseError).code).toBe('INVALID_CRIT_THRESHOLD_TARGET');
         }
