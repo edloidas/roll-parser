@@ -2677,6 +2677,44 @@ describe('evaluate', () => {
         const d8s = result.rolls.filter((d) => d.sides === 8);
         expect(d8s.map((d) => d.result)).toEqual([5, 6]);
       });
+
+      test('dropped versus sub-roll does not propagate degree', () => {
+        // Subtotals: [5, 18] — kh1 keeps sub 1 (1d20=18), drops sub 0 (1d20 vs 15).
+        // The dropped vs sub-roll's degree must NOT surface on the result.
+        const ast = parse('{1d20 vs 15, 1d20}kh1');
+        const rng = createMockRng([5, 18]);
+        const result = evaluate(ast, rng);
+
+        expect(result.total).toBe(18);
+        expect(result.degree).toBeUndefined();
+      });
+
+      test('kept versus sub-roll propagates degree', () => {
+        // Subtotals: [18, 5] — kh1 keeps sub 0 (1d20 vs 15, d20=18), drops sub 1.
+        // 18 >= 15 (Success); not >= 25, so no Critical upgrade.
+        const ast = parse('{1d20 vs 15, 1d20}kh1');
+        const rng = createMockRng([18, 5]);
+        const result = evaluate(ast, rng);
+
+        expect(result.total).toBe(18);
+        expect(result.degree).toBe(DegreeOfSuccess.Success);
+      });
+
+      test('two kept versus sub-rolls still throw NESTED_VERSUS', () => {
+        // kh2 on a 3-sub group keeps subs 0 and 1 (subtotals 18, 6 — sub 2 d4=4
+        // dropped). Both kept subs carry versus metadata, so propagation must
+        // collide via the NESTED_VERSUS guard.
+        const ast = parse('{1d20 vs 15, 1d6 vs 10, 1d4}kh2');
+        const rng = createMockRng([18, 6, 4]);
+
+        try {
+          evaluate(ast, rng);
+          throw new Error('expected evaluate to throw');
+        } catch (err) {
+          expect(err).toBeInstanceOf(EvaluatorError);
+          expect((err as EvaluatorError).code).toBe('NESTED_VERSUS');
+        }
+      });
     });
 
     describe('group inside arithmetic', () => {

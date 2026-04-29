@@ -988,11 +988,13 @@ function evalGroupModifier(
       total += sub.subtotal;
     }
 
-    // Propagate Versus metadata from kept OR dropped sub-rolls — dropping
-    // a sub-roll doesn't make its degree result disappear; two versus
-    // results in the same group still collide via the same guard used by
-    // `mergeContext`.
-    propagateMetadata(ctx, sub.versusMetadata);
+    // Propagate Versus metadata only from kept sub-rolls — `RollResult.degree`
+    // must reflect dice that contributed to `RollResult.total`. Two kept
+    // versus sub-rolls still collide here via the `NESTED_VERSUS` guard
+    // inside `propagateMetadata`.
+    if (!isDropped) {
+      propagateMetadata(ctx, sub.versusMetadata);
+    }
   }
 
   const subExprStrs = subRolls.map((s) => s.expr);
