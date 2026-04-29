@@ -3079,15 +3079,45 @@ describe('evaluate', () => {
     test('single-sub-roll group passthrough — {1d20}kh1cs>18 matches 1d20kh1cs>18', () => {
       // Stage 3 single-sub-roll passthrough: `{1d20}` is the documented
       // flat-pool escape hatch and must produce the same total and per-die
-      // critical flags as the unwrapped form under the same RNG sequence.
-      const seq = [20, 17, 5, 1];
-      const grouped = evaluate(parse('{1d20}kh1cs>18'), createMockRng([...seq]));
-      const flat = evaluate(parse('1d20kh1cs>18'), createMockRng([...seq]));
+      // critical/fumble flags as the unwrapped form under the same RNG.
+      const grouped = evaluate(parse('{1d20}kh1cs>18'), createMockRng([20]));
+      const flat = evaluate(parse('1d20kh1cs>18'), createMockRng([20]));
 
       expect(grouped.total).toBe(flat.total);
-      expect(grouped.rolls.map((d) => d.result)).toEqual(flat.rolls.map((d) => d.result));
-      expect(grouped.rolls.map((d) => d.critical)).toEqual(flat.rolls.map((d) => d.critical));
-      expect(grouped.rolls.map((d) => d.fumble)).toEqual(flat.rolls.map((d) => d.fumble));
+      expect(grouped.rolls).toEqual(flat.rolls);
+      // ! The notation MUST round-trip — braces survive in `expression`,
+      //   so the user's input is preserved verbatim. A future renderer
+      //   refactor that strips braces would silently regress this.
+      expect(grouped.expression).toBe('{1d20}kh1cs>18');
+      expect(flat.expression).toBe('1d20kh1cs>18');
+    });
+
+    test('{1d6}cs>5 evaluates with cs flag on the inner d6', () => {
+      const result = evaluate(parse('{1d6}cs>5'), createMockRng([6]));
+      expect(result.total).toBe(6);
+      expect(result.rolls.map((d) => d.critical)).toEqual([true]);
+      expect(result.expression).toBe('{1d6}cs>5');
+    });
+
+    test('({1d6})cs>5 — parens-wrapped single-sub group preserves both layers in expression', () => {
+      const result = evaluate(parse('({1d6})cs>5'), createMockRng([3]));
+      expect(result.total).toBe(3);
+      expect(result.rolls.map((d) => d.critical)).toEqual([false]);
+      expect(result.expression).toBe('({1d6})cs>5');
+    });
+
+    test('{1d6}cf<2 evaluates with cf flag on the inner d6', () => {
+      const result = evaluate(parse('{1d6}cf<2'), createMockRng([1]));
+      expect(result.total).toBe(1);
+      expect(result.rolls.map((d) => d.fumble)).toEqual([true]);
+      expect(result.expression).toBe('{1d6}cf<2');
+    });
+
+    test('{1d6}kh1cf<2 evaluates with cf flag through the single-sub Modifier', () => {
+      const result = evaluate(parse('{1d6}kh1cf<2'), createMockRng([1]));
+      expect(result.total).toBe(1);
+      expect(result.rolls.map((d) => d.fumble)).toEqual([true]);
+      expect(result.expression).toBe('{1d6}kh1cf<2');
     });
   });
 });

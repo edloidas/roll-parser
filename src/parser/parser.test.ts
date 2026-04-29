@@ -1345,6 +1345,64 @@ describe('Parser', () => {
         expect((err as ParseError).code).toBe('NESTED_VERSUS');
       }
     });
+
+    // #109 — single-sub-roll Group passthrough makes Versus reachable past
+    // the shallow rejectVersusTarget check. Each meta-expression site needs
+    // a `{...}`-form rejection to mirror the existing parens-form coverage.
+    it('should reject Versus inside parens-wrapped single-sub group as keep-modifier count: 4d6kh({1d20 vs 10})', () => {
+      // ? `kh{...}` is not valid syntax — `kh` requires parens, not braces.
+      //   `kh({...})` is the actual bypass route: parens around a single-sub
+      //   Group around Versus. The new deep-walk catches it.
+      expect(() => parse('4d6kh({1d20 vs 10})')).toThrow(ParseError);
+      try {
+        parse('4d6kh({1d20 vs 10})');
+      } catch (err) {
+        expect((err as ParseError).code).toBe('NESTED_VERSUS');
+      }
+    });
+
+    it('should reject Versus inside single-sub group as success-count threshold: 5d10>={1d20 vs 10}', () => {
+      expect(() => parse('5d10>={1d20 vs 10}')).toThrow(ParseError);
+      try {
+        parse('5d10>={1d20 vs 10}');
+      } catch (err) {
+        expect((err as ParseError).code).toBe('NESTED_VERSUS');
+      }
+    });
+
+    it('should reject Versus inside single-sub group as kh target: {1d20 vs 15}kh1', () => {
+      // ! Pre-existing inconsistency closed: parseModifier did not call
+      //   rejectVersusTarget. The Group passthrough made it reachable past
+      //   `containsDicePool` (deep walk recurses into Versus.roll/dc), so the
+      //   reject was the only thing standing between user input and a
+      //   silently-dropped `degree`/`natural`.
+      expect(() => parse('{1d20 vs 15}kh1')).toThrow(ParseError);
+      try {
+        parse('{1d20 vs 15}kh1');
+      } catch (err) {
+        expect((err as ParseError).code).toBe('NESTED_VERSUS');
+      }
+    });
+
+    it('should reject Versus buried in unary inside single-sub group as kh target: {-(1d20 vs 15)}kh1', () => {
+      expect(() => parse('{-(1d20 vs 15)}kh1')).toThrow(ParseError);
+    });
+
+    it('should reject Versus inside single-sub group as sort target: {1d20 vs 15}s', () => {
+      expect(() => parse('{1d20 vs 15}s')).toThrow(ParseError);
+      try {
+        parse('{1d20 vs 15}s');
+      } catch (err) {
+        expect((err as ParseError).code).toBe('NESTED_VERSUS');
+      }
+    });
+
+    it('should accept Versus inside single-sub group as arithmetic operand: {1d20 vs 15}+5', () => {
+      // ? BinaryOp uses `mergeContext`, which propagates `versusMetadata`.
+      //   Not a meta-expression site — explicitly distinguished from the
+      //   modifier/sort/cs cases above.
+      expect(() => parse('{1d20 vs 15}+5')).not.toThrow();
+    });
   });
 
   describe('postfix modifier target validation', () => {
@@ -2456,6 +2514,39 @@ describe('Parser', () => {
         }
       });
 
+      // #109 — single-sub-roll passthrough must not smuggle a buried
+      // multi-sub Group through a wrapper `unwrapTransparent` doesn't peel.
+      it('should reject cs on nested multi-sub-roll group: {{1d20, 1d20}kh1}cs>18', () => {
+        expect(() => parse('{{1d20, 1d20}kh1}cs>18')).toThrow(ParseError);
+        try {
+          parse('{{1d20, 1d20}kh1}cs>18');
+        } catch (e) {
+          expect((e as ParseError).code).toBe('INVALID_CRIT_THRESHOLD_TARGET');
+          expect((e as ParseError).message).toContain('group');
+        }
+      });
+
+      it('should reject cs on multi-sub group buried in arithmetic: {{1d6, 2d8}+0}cs>5', () => {
+        expect(() => parse('{{1d6, 2d8}+0}cs>5')).toThrow(ParseError);
+        try {
+          parse('{{1d6, 2d8}+0}cs>5');
+        } catch (e) {
+          expect((e as ParseError).code).toBe('INVALID_CRIT_THRESHOLD_TARGET');
+        }
+      });
+
+      it('should reject cs on multi-sub group buried in unary: {-{1d6, 2d8}}cs>5', () => {
+        expect(() => parse('{-{1d6, 2d8}}cs>5')).toThrow(ParseError);
+      });
+
+      it('should reject cs on multi-sub group buried in function call: {abs({1d6, 2d8})}cs>5', () => {
+        expect(() => parse('{abs({1d6, 2d8})}cs>5')).toThrow(ParseError);
+      });
+
+      it('should reject cs on multi-sub group buried in nested function/arithmetic: {floor({1d6, 2d8}/1)}cs>5', () => {
+        expect(() => parse('{floor({1d6, 2d8}/1)}cs>5')).toThrow(ParseError);
+      });
+
       it('should reject cs on SuccessCount target', () => {
         expect(() => parse('4d6>=4cs>5')).toThrow(ParseError);
         try {
@@ -2513,6 +2604,51 @@ describe('Parser', () => {
           expect((e as ParseError).code).toBe('INVALID_CRIT_THRESHOLD_TARGET');
           expect((e as ParseError).message).toContain('Fate');
         }
+      });
+
+      // #109 — single-sub-roll Group passthrough makes Fate reachable past
+      // the shallow `containsFatePool` check; `deepContainsFatePool` recurses
+      // through arithmetic, so the bare-Fate guard still fires.
+      it('should reject bare cf on Fate inside arithmetic group: {4dF+1d6}cf', () => {
+        expect(() => parse('{4dF+1d6}cf')).toThrow(ParseError);
+        try {
+          parse('{4dF+1d6}cf');
+        } catch (e) {
+          expect((e as ParseError).code).toBe('INVALID_CRIT_THRESHOLD_TARGET');
+          expect((e as ParseError).message).toContain('Fate');
+        }
+      });
+
+      it('should reject bare cs on Fate inside parens-wrapped arithmetic group: ({4dF+1d6})cs', () => {
+        expect(() => parse('({4dF+1d6})cs')).toThrow(ParseError);
+      });
+
+      it('should reject bare cf on Fate inside function-call group: {abs(4dF)}cf', () => {
+        expect(() => parse('{abs(4dF)}cf')).toThrow(ParseError);
+      });
+
+      // #109 — single-sub-roll Group passthrough also smuggles Versus past
+      // `rejectVersusTarget`'s shallow check at the cs/cf consumer site.
+      it('should reject cs on Versus inside single-sub group: {1d20 vs 15}cs>18', () => {
+        expect(() => parse('{1d20 vs 15}cs>18')).toThrow(ParseError);
+        try {
+          parse('{1d20 vs 15}cs>18');
+        } catch (e) {
+          expect((e as ParseError).code).toBe('NESTED_VERSUS');
+        }
+      });
+
+      it('should reject cs on Versus buried in arithmetic inside Group: {1+(1d20 vs 15)}cs>18', () => {
+        expect(() => parse('{1+(1d20 vs 15)}cs>18')).toThrow(ParseError);
+        try {
+          parse('{1+(1d20 vs 15)}cs>18');
+        } catch (e) {
+          expect((e as ParseError).code).toBe('NESTED_VERSUS');
+        }
+      });
+
+      it('should reject cs on Versus buried in function call inside Group: {abs(1d20 vs 15)}cs>18', () => {
+        expect(() => parse('{abs(1d20 vs 15)}cs>18')).toThrow(ParseError);
       });
     });
   });

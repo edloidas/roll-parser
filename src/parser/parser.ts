@@ -32,6 +32,8 @@ import type {
 import {
   containsDicePool,
   containsFatePool,
+  containsMultiSubGroup,
+  containsVersus,
   deepContainsDicePool,
   isCritThreshold,
   isSuccessCount,
@@ -508,7 +510,18 @@ export class Parser {
   ): void {
     const node = unwrapTransparent(target, ['Grouped', 'Modifier', 'Sort', 'CritThreshold']);
     if (node.type !== 'Group') return;
-    if (singleSubRollPasses && node.expressions.length === 1) return;
+    if (singleSubRollPasses && node.expressions.length === 1) {
+      // ! Deep-walk the inner sub-expression — `unwrapTransparent` only peels
+      //   `Grouped`/`Modifier`/`Sort`/`CritThreshold`, so a multi-sub Group
+      //   buried under arithmetic (`{{1d6,2d8}+0}cs>5`), function calls
+      //   (`{abs({1d6,2d8})}cs>5`), or unary ops would otherwise revive the
+      //   exact dropped-die-flag bug from #97.
+      const inner = node.expressions[0];
+      if (inner != null && containsMultiSubGroup(inner)) {
+        throw new ParseError(`Cannot ${action} a group`, code, token.position, token);
+      }
+      return;
+    }
     throw new ParseError(`Cannot ${action} a group`, code, token.position, token);
   }
 
@@ -530,10 +543,34 @@ export class Parser {
         token,
       );
     }
+    // ! Single-sub-roll `Group` passthrough is the new sibling route —
+    //   `containsDicePool` recurses into Group's single sub-expression via
+    //   `deepContainsDicePool`, which traverses Versus's `roll`/`dc`. Deep
+    //   walk for any descendant Versus so `{1d20 vs 15}cs>18`,
+    //   `{1+(1d20 vs 15)}cs>18`, and `4d6>={abs(1d20 vs 15)}` reject too.
+    if (node.type === 'Group' && node.expressions.length === 1) {
+      const inner = node.expressions[0];
+      if (inner != null && containsVersus(inner)) {
+        throw new ParseError(
+          `Versus cannot be used as a meta-expression`,
+          'NESTED_VERSUS',
+          token.position,
+          token,
+        );
+      }
+    }
   }
 
   private parseModifier(target: ASTNode, token: Token): ModifierNode {
     this.rejectSuccessCountTarget(target, token);
+    // ! Mirror `parseSort`/`parseCritThreshold` — keep/drop applied to a
+    //   Versus target silently drops `degree`/`natural` metadata. Pre-existing
+    //   for `(1d20 vs 15)kh1` (caught upstream by `containsDicePool` with a
+    //   different error code), but the single-sub-roll Group passthrough makes
+    //   `{1d20 vs 15}kh1` reachable past `containsDicePool` (Group's deep
+    //   walk recurses into Versus's roll/dc), so the explicit reject is the
+    //   only thing that closes the metadata-drop hole.
+    this.rejectVersusTarget(target, token);
 
     // Keep/drop modifiers need a dice pool to select from. Wrapping arithmetic
     // (e.g. `(1d6+5)kh1`, `4d6+2kh3`) would silently drop user math.
