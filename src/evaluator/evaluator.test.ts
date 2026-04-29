@@ -3079,6 +3079,73 @@ describe('evaluate', () => {
       expect(result.rolls.map((d) => d.critical)).toEqual([true, true, false, false]);
     });
 
+    test('RNG-consuming cs threshold draws pool first, then meta — 4d20cs>=(1d2+17)', () => {
+      // Pins the documented draw order: `evalCritThreshold` evaluates the
+      // 4d20 pool before resolving the threshold meta-expression. RNG order:
+      // pool dice [20, 19, 18, 5] → 1d2 threshold die [2]. Threshold = 19.
+      const ast = parse('4d20cs>=(1d2+17)');
+      const rng = createMockRng([20, 19, 18, 5, 2]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(62);
+
+      // Meta die pushed before pool in result.rolls — same shape as the
+      // SuccessCount meta-threshold test above.
+      const meta = getDie(result.rolls, 0);
+      expect(meta.sides).toBe(2);
+      expect(meta.result).toBe(2);
+      expect(meta.modifiers).toContain('meta');
+      expect(meta.modifiers).toContain('dropped');
+
+      const pool = result.rolls.slice(1);
+      expect(pool).toHaveLength(4);
+      expect(pool.map((d) => d.result)).toEqual([20, 19, 18, 5]);
+      expect(pool.every((d) => d.sides === 20)).toBe(true);
+      expect(pool.map((d) => d.critical)).toEqual([true, true, false, false]);
+    });
+
+    test('RNG-consuming cs threshold sanity variant — 4d20cs>=(1d4)', () => {
+      // Distinct sequence to avoid coincidence with the test above.
+      // RNG order: pool [15, 12, 10, 4] → 1d4 threshold [3]. Threshold = 3.
+      const ast = parse('4d20cs>=(1d4)');
+      const rng = createMockRng([15, 12, 10, 4, 3]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(41);
+
+      const meta = getDie(result.rolls, 0);
+      expect(meta.sides).toBe(4);
+      expect(meta.result).toBe(3);
+      expect(meta.modifiers).toContain('meta');
+      expect(meta.modifiers).toContain('dropped');
+
+      const pool = result.rolls.slice(1);
+      expect(pool.map((d) => d.result)).toEqual([15, 12, 10, 4]);
+      // >= 3 flags all four.
+      expect(pool.map((d) => d.critical)).toEqual([true, true, true, true]);
+    });
+
+    test('RNG-consuming cf threshold draws pool first, then meta — 4d20cf<=(1d3)', () => {
+      // Mirrors the cs draw-order pin for cf. RNG order: pool [20, 2, 1, 15]
+      // → 1d3 threshold [2]. Threshold = 2.
+      const ast = parse('4d20cf<=(1d3)');
+      const rng = createMockRng([20, 2, 1, 15, 2]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(38);
+
+      const meta = getDie(result.rolls, 0);
+      expect(meta.sides).toBe(3);
+      expect(meta.result).toBe(2);
+      expect(meta.modifiers).toContain('meta');
+      expect(meta.modifiers).toContain('dropped');
+
+      const pool = result.rolls.slice(1);
+      expect(pool.map((d) => d.result)).toEqual([20, 2, 1, 15]);
+      // <= 2 flags 2 and 1 as fumble.
+      expect(pool.map((d) => d.fumble)).toEqual([false, true, true, false]);
+    });
+
     test('cs on Fate dice overrides the always-false defaults', () => {
       // 4dF: [1, -1, 0, 1]. cs>0 flags both 1s as critical.
       const ast = parse('4dFcs>0');
