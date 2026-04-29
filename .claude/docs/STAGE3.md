@@ -432,7 +432,12 @@ subtotals.
 - `{4d6+2d8, 3d20+3, 5d10+1}kh1` → keep highest subtotal
 - `{4d10+5d6}kh2` → flat pool, keep 2 highest individual dice
 - `{4d6}!` → ParseError (`Cannot explode a group`)
-- `{1d6}cs>5` → ParseError (`Cannot apply crit threshold to a group`)
+- `{1d6}cs>5` → accepted (single-sub-roll passthrough; equivalent to `1d6cs>5`)
+- `{1d6, 2d8}cs>5` → ParseError (`Cannot apply crit threshold to a group`)
+- `{{1d6, 2d8}+0}cs>5` → ParseError (passthrough deep-walks for buried multi-sub Group)
+- `{4dF+1d6}cf` → ParseError (passthrough deep-walks for buried Fate; bare `cf` would flip `+1` faces to fumble)
+- `{1d20 vs 15}cs>18` → ParseError (`Versus cannot be used as a meta-expression`; passthrough deep-walks for buried Versus at metadata-dropping consumer sites)
+- `{1d20 vs 15}+5` → accepted (BinaryOp uses `mergeContext`, propagates `degree`/`natural`)
 - Unterminated: `{1d6, 2d8` → ParseError (`Unterminated group`)
 - Nested: `{{1d6, 2d8}kh1, 3d10}kl1` → valid, two levels of keep/drop
 - Group containing only literals: `{3, 5, 7}kh1` → returns 7 (subtotals `[3, 5, 7]`)

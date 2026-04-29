@@ -481,6 +481,11 @@ export function deepContainsDicePool(node: ASTNode): boolean {
  * Used by the parser to reject `!`, `!!`, `!p` applied to Fate pools
  * (`4dF!`, `(4dF)kh2!`, etc.). Fate explosion semantics are undefined, so
  * parse-time rejection is preferred over a silent evaluator no-op.
+ *
+ * Inside a `Group`, recursion uses `deepContainsFatePool` to mirror
+ * `containsDicePool`'s deep walk through the same case — otherwise
+ * `{4dF+1d6}cf` slips past the bare-Fate guard and the default fumble
+ * check (`result === 1`) flips `+1` faces into fumbles.
  */
 export function containsFatePool(node: ASTNode): boolean {
   switch (node.type) {
@@ -495,7 +500,115 @@ export function containsFatePool(node: ASTNode): boolean {
     case 'Grouped':
       return containsFatePool(node.expression);
     case 'Group':
-      return node.expressions.some(containsFatePool);
+      return node.expressions.some(deepContainsFatePool);
+    default:
+      return false;
+  }
+}
+
+/**
+ * Deeper variant of `containsFatePool` that recurses through arithmetic and
+ * function wrappers. Mirrors `deepContainsDicePool`. Used from
+ * `containsFatePool`'s `Group` case so single-sub-roll groups containing
+ * arithmetic-wrapped Fate (`{4dF+1d6}cf`) still trip the bare-Fate guard.
+ *
+ * Outside a `Group`, ordinary parenthesized arithmetic (`(4dF+1d6)cf`) is
+ * already rejected upstream by shallow `containsDicePool`, so this helper
+ * intentionally stays Group-internal.
+ */
+export function deepContainsFatePool(node: ASTNode): boolean {
+  switch (node.type) {
+    case 'FateDice':
+      return true;
+    case 'BinaryOp':
+      return deepContainsFatePool(node.left) || deepContainsFatePool(node.right);
+    case 'UnaryOp':
+      return deepContainsFatePool(node.operand);
+    case 'Modifier':
+    case 'Explode':
+    case 'Reroll':
+    case 'SuccessCount':
+    case 'Sort':
+    case 'CritThreshold':
+      return deepContainsFatePool(node.target);
+    case 'Versus':
+      return deepContainsFatePool(node.roll) || deepContainsFatePool(node.dc);
+    case 'FunctionCall':
+      return node.args.some(deepContainsFatePool);
+    case 'Grouped':
+      return deepContainsFatePool(node.expression);
+    case 'Group':
+      return node.expressions.some(deepContainsFatePool);
+    default:
+      return false;
+  }
+}
+
+/**
+ * Deep-walks a node to find any descendant `Group` with two or more
+ * sub-expressions. Used by `rejectGroupTarget`'s single-sub-roll
+ * passthrough so a multi-sub Group buried under arithmetic
+ * (`{{1d6,2d8}+0}cs>5`), function calls (`{abs({1d6,2d8})}cs>5`), or any
+ * other non-transparent wrapper still rejects with the same error code.
+ *
+ * Without this walk, the unwrap inside `rejectGroupTarget` only peels
+ * `Grouped`/`Modifier`/`Sort`/`CritThreshold` — a multi-sub Group cloaked
+ * in a `BinaryOp`/`UnaryOp`/`FunctionCall` revives issue #97.
+ */
+export function containsMultiSubGroup(node: ASTNode): boolean {
+  switch (node.type) {
+    case 'Group':
+      return node.expressions.length >= 2 || node.expressions.some(containsMultiSubGroup);
+    case 'BinaryOp':
+      return containsMultiSubGroup(node.left) || containsMultiSubGroup(node.right);
+    case 'UnaryOp':
+      return containsMultiSubGroup(node.operand);
+    case 'Modifier':
+    case 'Explode':
+    case 'Reroll':
+    case 'SuccessCount':
+    case 'Sort':
+    case 'CritThreshold':
+      return containsMultiSubGroup(node.target);
+    case 'Versus':
+      return containsMultiSubGroup(node.roll) || containsMultiSubGroup(node.dc);
+    case 'FunctionCall':
+      return node.args.some(containsMultiSubGroup);
+    case 'Grouped':
+      return containsMultiSubGroup(node.expression);
+    default:
+      return false;
+  }
+}
+
+/**
+ * Deep-walks a node to find any descendant `Versus`. Used by
+ * `rejectVersusTarget`'s single-sub-roll Group passthrough so a buried
+ * Versus (`{1+(1d20 vs 15)}cs>18`, `{abs(1d20 vs 15)}cs>18`,
+ * `{-(1d20 vs 15)}kh1`) still rejects with `NESTED_VERSUS` instead of
+ * silently dropping `versusMetadata` at the modifier consumer site.
+ */
+export function containsVersus(node: ASTNode): boolean {
+  switch (node.type) {
+    case 'Versus':
+      return true;
+    case 'BinaryOp':
+      return containsVersus(node.left) || containsVersus(node.right);
+    case 'UnaryOp':
+      return containsVersus(node.operand);
+    case 'Modifier':
+    case 'Explode':
+    case 'Reroll':
+    case 'SuccessCount':
+    case 'Sort':
+    case 'CritThreshold':
+      return containsVersus(node.target);
+    case 'FunctionCall':
+      return node.args.some(containsVersus);
+    case 'Grouped':
+      return containsVersus(node.expression);
+    case 'Group':
+      return node.expressions.some(containsVersus);
     default:
       return false;
   }
