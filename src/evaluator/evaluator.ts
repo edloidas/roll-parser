@@ -801,9 +801,9 @@ function evalReroll(node: RerollNode, rng: RNG, ctx: EvalContext, env: EvalEnv):
  *
  * Rendering mirrors `evalExplode` / `evalModifier`: emits
  * `<targetExpr><code>[<sortedDice>]`, replacing any inline dice brackets
- * the target itself rendered. Multi-sub-roll groups (`{4d6, 3d6}s`) fall
- * through to this flat-pool path — hierarchical per-sub-roll sorting is
- * deferred (see Stage 3 spec §3 "Group interaction").
+ * the target itself rendered. Multi-sub-roll Group targets (`{4d6, 3d6}s`)
+ * are rejected at parse time with `INVALID_SORT_TARGET` until hierarchical
+ * per-sub-roll sorting (Stage 3 spec §3 "Group interaction") is implemented.
  */
 function evalSort(node: SortNode, rng: RNG, ctx: EvalContext, env: EvalEnv): number {
   const targetCtx: EvalContext = { rolls: [], expressionParts: [], renderedParts: [] };

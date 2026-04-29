@@ -2196,12 +2196,6 @@ describe('Parser', () => {
       it('should accept single-sub-roll group', () => {
         expect(parse('{4d6}s')).toEqual(sort('ascending', group([dice(literal(4), literal(6))])));
       });
-
-      it('should accept multi-sub-roll group', () => {
-        expect(parse('{4d6, 3d6}sd')).toEqual(
-          sort('descending', group([dice(literal(4), literal(6)), dice(literal(3), literal(6))])),
-        );
-      });
     });
 
     describe('errors', () => {
@@ -2217,6 +2211,25 @@ describe('Parser', () => {
 
       it('should reject sort on pure arithmetic', () => {
         expect(() => parse('(1+2)sd')).toThrow(ParseError);
+      });
+
+      it('should reject sort on a multi-sub-roll group', () => {
+        expect(() => parse('{1d6, 2d8}s')).toThrow(ParseError);
+        try {
+          parse('{1d6, 2d8}s');
+        } catch (e) {
+          expect((e as ParseError).code).toBe('INVALID_SORT_TARGET');
+          expect((e as ParseError).message).toContain('not yet support');
+        }
+      });
+
+      it('should reject sort on a parens-wrapped multi-sub-roll group', () => {
+        expect(() => parse('({1d6, 2d8})s')).toThrow(ParseError);
+        try {
+          parse('({1d6, 2d8})s');
+        } catch (e) {
+          expect((e as ParseError).code).toBe('INVALID_SORT_TARGET');
+        }
       });
 
       it('should reject sort on SuccessCount target', () => {

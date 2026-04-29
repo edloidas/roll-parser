@@ -716,6 +716,23 @@ export class Parser {
       );
     }
 
+    // ! Multi-sub-roll groups (`{a, b}s`, `({a, b})s`) need hierarchical
+    //   sort per Stage 3 spec §3 (sort dice within each sub-roll, then sort
+    //   sub-rolls by total) — `evalSort` only flat-sorts, so accepting the
+    //   syntax would silently ship non-spec behaviour. Reject at parse time
+    //   until the deferred Stage 4 implementation lands. Single-sub Groups
+    //   keep passing through (the unwrap returns a `Group` with one
+    //   expression, which is the user's flat-pool escape hatch).
+    const base = unwrapTransparent(target, ['Grouped', 'Modifier', 'Sort', 'CritThreshold']);
+    if (base.type === 'Group' && base.expressions.length >= 2) {
+      throw new ParseError(
+        `Sort modifier does not yet support multi-sub-roll groups`,
+        'INVALID_SORT_TARGET',
+        token.position,
+        token,
+      );
+    }
+
     const order: SortNode['order'] = token.type === TokenType.SORT_ASC ? 'ascending' : 'descending';
 
     // ? Chained sorts (`4d6ss`, `4d6sasd`) are allowed — sort is idempotent
