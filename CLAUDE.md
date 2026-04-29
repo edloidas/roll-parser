@@ -16,6 +16,14 @@ bun validate    # Full check before commit: typecheck + lint + format:check + bu
 - Target: ES2022, TypeScript only
 - Library + CLI dual output (ESM + CJS compiled JS)
 
+## Ad-hoc scripts
+
+For one-off verification or sanity checks, create the file with the `Write` tool,
+then run it with `bun run <file>` and delete it with `rm <file>`. Do NOT use shell
+heredocs (`cat > file << 'EOF' ... EOF`) — braces, quotes, or `$` inside a heredoc
+trigger Claude Code's expansion-obfuscation guard and force an approval prompt.
+Prefer promoting recurring checks to a real `*.test.ts` file instead of a temp script.
+
 ## Git & GitHub
 
 Conventional Commits: `<type>: <description> #<issue>`
