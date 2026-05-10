@@ -76,33 +76,33 @@ describe('SeededRNG', () => {
       }
     });
 
-    it('should handle floating-point seeds (truncates to integer)', () => {
-      const rng1 = new SeededRNG(42.999);
-      const rng2 = new SeededRNG(42.999);
+    it('should handle floating-point seeds (truncates via uint32 coercion)', () => {
+      // `42.999 >>> 0 === 42`, so SeededRNG(42.999) must match SeededRNG(42).
+      const fractional = new SeededRNG(42.999);
+      const truncated = new SeededRNG(42);
 
-      // Should produce consistent results
       for (let i = 0; i < 10; i++) {
-        expect(rng1.nextInt(1, 100)).toBe(rng2.nextInt(1, 100));
+        expect(fractional.nextInt(1, 100)).toBe(truncated.nextInt(1, 100));
       }
     });
 
     it('should handle NaN seed (treated as 0)', () => {
-      const rng1 = new SeededRNG(Number.NaN);
-      const rng2 = new SeededRNG(Number.NaN);
+      // `NaN >>> 0 === 0`, so SeededRNG(NaN) must match SeededRNG(0).
+      const nanSeed = new SeededRNG(Number.NaN);
+      const zeroSeed = new SeededRNG(0);
 
-      // NaN >>> 0 === 0, so both should behave like seed 0
       for (let i = 0; i < 10; i++) {
-        expect(rng1.nextInt(1, 100)).toBe(rng2.nextInt(1, 100));
+        expect(nanSeed.nextInt(1, 100)).toBe(zeroSeed.nextInt(1, 100));
       }
     });
 
-    it('should handle Infinity seed', () => {
-      const rng1 = new SeededRNG(Number.POSITIVE_INFINITY);
-      const rng2 = new SeededRNG(Number.POSITIVE_INFINITY);
+    it('should handle Infinity seed (treated as 0)', () => {
+      // `Infinity >>> 0 === 0`, so SeededRNG(Infinity) must match SeededRNG(0).
+      const infSeed = new SeededRNG(Number.POSITIVE_INFINITY);
+      const zeroSeed = new SeededRNG(0);
 
-      // Infinity >>> 0 === 0
       for (let i = 0; i < 10; i++) {
-        expect(rng1.nextInt(1, 100)).toBe(rng2.nextInt(1, 100));
+        expect(infSeed.nextInt(1, 100)).toBe(zeroSeed.nextInt(1, 100));
       }
     });
 
@@ -172,21 +172,27 @@ describe('SeededRNG', () => {
       }
     });
 
-    it('should handle min === max', () => {
+    it('should handle min === max without consuming RNG state', () => {
       const rng = new SeededRNG(42);
+      const reference = new SeededRNG(42);
 
       for (let i = 0; i < 100; i++) {
         expect(rng.nextInt(5, 5)).toBe(5);
       }
+
+      // Trivial-range early-return must not advance state — the next
+      // non-trivial draw must match a fresh RNG with the same seed.
+      expect(rng.nextInt(1, 6)).toBe(reference.nextInt(1, 6));
     });
 
     it('should handle inverted bounds (swap min/max)', () => {
-      const rng = new SeededRNG(42);
+      // nextInt(10, 1) must produce the same sequence as nextInt(1, 10) on the
+      // same seed — bounds normalization, not just clamping to range.
+      const inverted = new SeededRNG(42);
+      const normal = new SeededRNG(42);
 
       for (let i = 0; i < 100; i++) {
-        const value = rng.nextInt(10, 1);
-        expect(value).toBeGreaterThanOrEqual(1);
-        expect(value).toBeLessThanOrEqual(10);
+        expect(inverted.nextInt(10, 1)).toBe(normal.nextInt(1, 10));
       }
     });
 
@@ -516,7 +522,7 @@ describe('MockRNG', () => {
 
       try {
         rng.nextInt(1, 6);
-        expect(true).toBe(false); // Should not reach here
+        expect.unreachable('expected MockRNGExhaustedError');
       } catch (e) {
         expect(e).toBeInstanceOf(MockRNGExhaustedError);
         expect((e as MockRNGExhaustedError).consumed).toBe(3);
@@ -535,7 +541,7 @@ describe('MockRNG', () => {
 
       try {
         rng.nextInt(1, 6);
-        expect(true).toBe(false);
+        expect.unreachable('expected MockRNGExhaustedError');
       } catch (e) {
         expect((e as MockRNGExhaustedError).consumed).toBe(0);
       }
