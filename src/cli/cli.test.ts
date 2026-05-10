@@ -49,11 +49,11 @@ describe('CLI integration', () => {
   });
 
   test('--verbose shows rendered breakdown', async () => {
+    // Deterministic with --seed test: rolls [3, 6, 3, 3], kh3 keeps {6, 3, 3} = 12,
+    // dropped die is rendered as `(3)`.
     const { stdout, exitCode } = await runCli(['4d6kh3', '--verbose', '--seed', 'test']);
     expect(exitCode).toBe(0);
-    expect(stdout).toContain('4d6');
-    expect(stdout).toContain('[');
-    expect(stdout).toContain('=');
+    expect(stdout.trim()).toBe('4d6[3, 6, 3, (3)] = 12');
   });
 
   test('verbose mode shows dropped dice in parentheses', async () => {

@@ -873,17 +873,18 @@ describe('evaluate', () => {
       expect(result.rolls).toHaveLength(0);
     });
 
-    test('invalid maxDice falls back to default', () => {
-      const ast = parse('3d6');
-      const vals = [1, 2, 3];
+    test('invalid maxDice falls back to DEFAULT_MAX_DICE', () => {
+      // Roll DEFAULT_MAX_DICE+1 dice with invalid maxDice values and assert the
+      // resulting error message references DEFAULT_MAX_DICE — proves the
+      // fallback used the documented default and not Infinity (would not throw)
+      // or some other value (different limit in the message).
+      const overCount = DEFAULT_MAX_DICE + 1;
+      const ast = parse(`${overCount}d6`);
+      const expectedMsg = `Total dice count ${overCount} exceeds limit of ${DEFAULT_MAX_DICE}`;
 
-      // NaN, negative, Infinity, zero — all fall back to DEFAULT_MAX_DICE
-      expect(() => evaluate(ast, createMockRng(vals), { maxDice: Number.NaN })).not.toThrow();
-      expect(() => evaluate(ast, createMockRng(vals), { maxDice: -1 })).not.toThrow();
-      expect(() =>
-        evaluate(ast, createMockRng(vals), { maxDice: Number.POSITIVE_INFINITY }),
-      ).not.toThrow();
-      expect(() => evaluate(ast, createMockRng(vals), { maxDice: 0 })).not.toThrow();
+      for (const maxDice of [Number.NaN, -1, Number.POSITIVE_INFINITY, 0]) {
+        expect(() => evaluate(ast, createMockRng([]), { maxDice })).toThrow(expectedMsg);
+      }
     });
 
     test('float maxDice is floored', () => {
@@ -1892,7 +1893,8 @@ describe('evaluate', () => {
       const rng = createMockRng([12]);
       const result = evaluate(ast, rng);
 
-      expect(result.degree).toBeDefined();
+      // 1d20+5=17 vs DC=20 → 17 < 20 and 17 > dc-10=10 → Failure.
+      expect(result.degree).toBe(DegreeOfSuccess.Failure);
       expect(result.natural).toBe(12);
     });
 
