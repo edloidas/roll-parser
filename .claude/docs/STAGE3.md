@@ -643,73 +643,198 @@ use the custom rules.
 
 **Syntax:** No notation change. Enriches `RollResult`.
 
-**New type:**
+**New types:**
 ```typescript
+/** Per-spec keep/drop entry inside a flattened modifier chain. */
+type ModifierSpec = {
+  kind: 'keep' | 'drop';
+  selector: 'highest' | 'lowest';
+  count: number;  // resolved at eval time
+};
+
 type RollPart =
-  | { type: 'literal'; value: number }
-  | { type: 'variable'; name: string; value: number }
-  | { type: 'dice'; sides: number; rolls: DieResult[]; total: number }
+  | { type: 'literal'; value: number; total: number }
+  | { type: 'variable'; name: string; value: number; total: number }
+  | { type: 'dice'; count: number; sides: number; rolls: DieResult[]; total: number }
   | { type: 'fateDice'; count: number; rolls: DieResult[]; total: number }
+  | { type: 'grouped'; inner: RollPart; total: number }
   | { type: 'binaryOp'; operator: '+'|'-'|'*'|'/'|'%'|'**'; left: RollPart; right: RollPart; total: number }
   | { type: 'unaryOp'; operator: '-'; operand: RollPart; total: number }
-  | { type: 'modifier'; modifier: string; target: RollPart; total: number }
-  | { type: 'explode'; variant: 'standard'|'compound'|'penetrating'; target: RollPart; total: number }
-  | { type: 'reroll'; once: boolean; target: RollPart; total: number }
-  | { type: 'successCount'; target: RollPart; successes: number; failures: number; total: number }
+  | { type: 'modifier'; specs: ModifierSpec[]; target: RollPart; total: number }
+  | { type: 'explode'; variant: 'standard'|'compound'|'penetrating'; threshold?: ComparePoint; target: RollPart; total: number }
+  | { type: 'reroll'; once: boolean; condition: ComparePoint; target: RollPart; total: number }
+  | { type: 'successCount'; threshold: ComparePoint; failThreshold?: ComparePoint; target: RollPart; successes: number; failures: number; total: number }
   | { type: 'versus'; roll: RollPart; dc: RollPart; degree: DegreeOfSuccess; total: number }
   | { type: 'functionCall'; name: string; args: RollPart[]; total: number }
   | { type: 'group'; parts: RollPart[]; keptIndices?: number[]; total: number }
   | { type: 'sort'; order: 'ascending'|'descending'; target: RollPart; total: number }
-  | { type: 'critThreshold'; target: RollPart; total: number };
+  | { type: 'critThreshold'; successThresholds: CritThreshold[]; failThresholds: CritThreshold[]; target: RollPart; total: number };
+
+/** Convenience alias for consumers writing exhaustive switches. */
+type RollPartType = RollPart['type'];
 ```
 
-Discriminant is lowercase to distinguish from `ASTNode.type` (which is PascalCase).
-This prevents accidental confusion between parse-tree and evaluation-tree at the
-type level.
+The union has 16 arms — one per `ASTNode` variant. The mapping is 1:1: every
+`ASTNode` produces exactly one `RollPart`, including `Grouped` (parenthesized
+wrappers) which produce a `grouped` part to preserve user-typed structure for
+notation-sensitive consumers.
+
+Discriminants are lowercase camelCase to distinguish from `ASTNode.type`
+(PascalCase). This prevents accidental confusion between parse-tree and
+evaluation-tree at the type level.
+
+**Invariants:**
+
+- **Top-level total**: `result.parts.total === result.total`. Always. Recursive
+  consistency is desirable but not contractual — see snapshot tests.
+- **`successCount.total = successes - failures`**. Always, regardless of empty
+  pool or wrapping arithmetic. (`5d6>=5 * 2`: inner `successCount.total = S-F`,
+  outer `binaryOp.total = (S-F) * 2`.)
+- **`literal.total === value`** and **`variable.total === value`** (the resolved
+  numeric value). Redundant but consistent across the union.
+- **`DieResult` reference sharing**: each part's `rolls[]` array shares
+  `DieResult` references with `result.rolls[]`. Both reflect post-evaluation
+  state — modifications from explode (compound `result` accumulation,
+  penetrating `result = raw - 1`), reroll (`['rerolled', 'dropped']` flags),
+  and keep/drop (`'dropped'` flag) are visible in both. No deep-clone.
 
 **RollResult extension:**
 ```typescript
 type RollResult = {
   // ...existing fields...
-  /** Structured breakdown of the evaluated expression, mirroring the AST. */
+  /** Structured breakdown of the evaluated expression, mirroring the AST 1:1. */
   parts: RollPart;
 };
 ```
 
-**Evaluator:**
+`parts` is non-optional and always built. This is a deliberate API decision —
+no opt-in flag, no feature-detection surface, single source of truth for
+"what does the expression tree look like." If perf evidence later demonstrates
+a regression for high-throughput consumers (Monte Carlo simulators, server-side
+batch evaluators), Stage 4 may add an `EvaluateOptions.includeParts` opt-out.
+Until then, simplicity wins.
 
-Each `evalNode` branch returns both the numeric total AND a `RollPart`. The
-cleanest approach: a single `evalNodeDetailed(node, env, ctx): { total: number;
-part: RollPart }` function replaces `evalNode`. The existing `total`-only
-consumers read `.total`.
+**Evaluator refactor:**
 
-Alternative: maintain a parallel stack in `EvalContext.partsStack` and push/pop
-around each evaluation. Simpler to retrofit but easier to get wrong under
-recursion.
+`evalNode(node, rng, ctx, env): number` becomes
+`evalNodeDetailed(node, rng, ctx, env): { total: number; part: RollPart }`.
+Every AST branch returns both the numeric total AND its `RollPart` in a single
+pass. TypeScript exhaustiveness ensures no branch is forgotten.
 
-**Recommendation:** refactor `evalNode` to return `{ total, part }` in the
-foundation PR for this feature. Existing tests verify `total` unchanged.
+The alternative parallel-`partsStack` approach in `EvalContext` was considered
+and rejected: while the codebase already trusts mutation-based accumulation
+(`rolls`, `expressionParts`, `renderedParts`, `versusMetadata`), the typed
+return-value approach gets compiler-enforced "every branch produces a part" for
+free. The stack approach requires hand-proven invariants on every future change.
+
+**Per-branch construction notes:**
+
+- **`evalDice`**: count-meta and sides-meta sub-expressions still draw RNG
+  per `rng.md`, but their part-trees are NOT surfaced (see "Out of Scope"
+  below). The `dice` part's `count` and `sides` are the resolved numbers.
+- **`evalModifier`**: invokes `flattenModifierChain` and produces a single
+  `modifier` part with the full `ModifierSpec[]` array. Per-spec intermediate
+  totals do not exist (modifiers compose as a union of drop sets, not a
+  pipeline) — the chain is flat by design.
+- **`evalGroupModifier`** (multi-sub-roll Group under outer Modifier): writes
+  `keptIndices` onto the inner `group` part it constructs. The outer evaluator
+  owns the inner part — accept the small model leak; semantically `keptIndices`
+  belongs to the group structure, not the modifier.
+- **`evalGroup`** (bare or single-sub passthrough): omits `keptIndices` entirely
+  (the optional `?`). No selection happened.
+- **`evalVersus`**: computes `degree` locally via `extractNatural` +
+  `calculateDegree` to populate the `versus` part. Continues to set
+  `ctx.versusMetadata` for top-level `RollResult.degree`. Both must agree.
+- **`evalSuccessCount`**: tracks per-node `successes` / `failures` locally
+  during the branch (cannot defer to top-level `ctx.rolls` walk — that would
+  break the single-pass model). The existing top-level scan in `evaluate()`
+  remains as the source of `RollResult.successes` / `RollResult.failures`;
+  by design these must equal `successCount.successes` / `successCount.failures`
+  for any expression that has a `SuccessCount` node (parser guarantees at most
+  one per expression).
+- **`evalCritThreshold`**: surfaces the full `successThresholds` /
+  `failThresholds` arrays from the AST node. Empty arrays mean "force
+  critical/fumble false on every die" per existing semantics.
+
+**Group `keptIndices` semantics:**
+
+- 0-based.
+- Indexes into `parts[]` in the order the user wrote the sub-expressions.
+- Pre-sort: sort modifiers operate inside individual sub-rolls, not on the
+  sub-roll list. `keptIndices` references sub-roll positions, not dice within.
+- Set only when an outer keep/drop modifier wraps the group. Bare `Group`
+  parts omit it.
+- Dropped sub-rolls remain in `parts[]` with their own complete RollPart —
+  including `versus.degree` if applicable. Consumers filter by `keptIndices`
+  to find what contributed to `result.degree` / `result.total`.
 
 **Edge cases:**
-- Expression with no dice: `1+2` → `parts: { type: 'binaryOp', left: {literal,1}, right: {literal,2}, total: 3 }`
-- Single die: `1d20` → `parts: { type: 'dice', sides: 20, rolls: [...], total: ... }`
-- Nested modifiers: `4d6kh3` → `parts: { type: 'modifier', modifier: 'kh3',
-  target: { type: 'dice', ... }, total: ... }`
-- Variables resolve to their value: `@str` → `{ type: 'variable', name: 'str', value: 3 }`
-- Functions show args: `floor(1d6/2)` → `{ type: 'functionCall', name: 'floor',
-  args: [{type: 'binaryOp', ...}], total: ... }`
-- Groups show all sub-roll parts plus kept indices: `{1d6, 1d8}kh1` →
-  outer modifier wrapping `{ type: 'group', parts: [...], keptIndices: [1], total: ... }`
+
+- Expression with no dice: `1+2` → `{ type: 'binaryOp', operator: '+',
+  left: { type: 'literal', value: 1, total: 1 },
+  right: { type: 'literal', value: 2, total: 2 }, total: 3 }`.
+- Parenthesized: `(1+2)*3` → `{ type: 'binaryOp', operator: '*',
+  left: { type: 'grouped', inner: { type: 'binaryOp', ...total: 3 }, total: 3 },
+  right: { type: 'literal', value: 3, total: 3 }, total: 9 }`.
+- Single die: `1d20` → `{ type: 'dice', count: 1, sides: 20, rolls: [...], total }`.
+- Nested modifiers: `4d6kh3` → `{ type: 'modifier', specs: [{kind:'keep',selector:'highest',count:3}],
+  target: { type: 'dice', count: 4, sides: 6, ... }, total }`.
+- Modifier chain: `4d6kh3kl1` → `{ type: 'modifier', specs: [{kind:'keep',selector:'highest',count:3},
+  {kind:'drop',selector:'lowest',count:1}], target: { type: 'dice', ... }, total }`.
+- Variables: `@str` (resolves to 3) → `{ type: 'variable', name: 'str', value: 3, total: 3 }`.
+- Functions: `floor(1d6/2)` → `{ type: 'functionCall', name: 'floor',
+  args: [{ type: 'binaryOp', ... }], total }`.
+- Groups under keep/drop: `{1d6, 1d8}kh1` → outer modifier wrapping
+  `{ type: 'group', parts: [...], keptIndices: [1], total }`.
+- Bare group: `{1d6, 1d8}` → `{ type: 'group', parts: [...], total }`
+  (no `keptIndices`).
+- Reroll with condition: `4d6r<3` → `{ type: 'reroll', once: false,
+  condition: { operator: '<', value: 3 }, target: { type: 'dice', ... }, total }`.
+- Crit threshold chain: `1d20cs=20cs=1cf>18` → `{ type: 'critThreshold',
+  successThresholds: [{operator:'=',value:20},{operator:'=',value:1}],
+  failThresholds: [{operator:'>',value:18}], target: { type: 'dice', ... }, total }`.
+
+**Out of scope for v1:**
+
+- **Meta-expression sub-trees**: `4d6kh(1d2)`, `(1+1)d(3*2)`, `4d6!>(1d2)`,
+  `4d6cs>(1d2)`, `10d10>=(1d2)` all use sub-expressions that draw RNG and
+  produce dice flagged `'meta'`+`'dropped'` in the flat `result.rolls[]`.
+  These are NOT surfaced as nested RollParts — the schema would balloon, and
+  the AST 1:1 mapping breaks (AST stores meta as `ASTNode`, not as a
+  separate child slot on each variant). Consumers needing meta breakdown
+  inspect `result.rolls` (filter by `modifiers.includes('meta')`) or re-parse
+  the meta substring from `result.notation`. Stage 4 candidate.
 
 **Tests must cover:**
-- Parts tree structure for each AST node type
-- Total consistency: `result.parts.total === result.total`
-- Variable resolution captured in parts
-- Group kept-indices accurate
-- Round-trip: JSON.stringify → JSON.parse produces equivalent structure
-- No circular references in the tree
-- Property test: arbitrary valid notation produces a parts tree whose `total`
-  matches `result.total`
+
+- **Per-variant structural assertions** (one test per RollPart variant):
+  shape, discriminator, total, structural children. Asserts `count`/`sides`
+  on `dice`, `condition` on `reroll`, `threshold` on `explode`/`successCount`,
+  `successThresholds`/`failThresholds` on `critThreshold`, `specs[]` on
+  `modifier`.
+- **Top-level invariant**: `result.parts.total === result.total` across a
+  representative compound set (`1d20+5`, `(1d6+2)*3`, `4d6kh3`, `4d6kh3kl1`,
+  `{1d6,1d8}kh1`, `floor(1d10/2)`, `1d20+@str`, `1d20 vs 15`, `1d20cs>18`,
+  `5d6>=5`, `5d6>=5*2`, `4d6r<3!`).
+- **Cross-field consistency**: `result.successes === parts…successCount.successes`
+  and `result.failures === parts…successCount.failures` (when present);
+  `result.degree === parts…versus.degree` (when present and at root).
+- **Variable resolution**: defined and `onMissingVariable: 'zero'` cases
+  both produce `{ value: <number>, total: <number> }`.
+- **Group `keptIndices`**: accurate after `kh`/`kl`/`dh`/`dl`; absent on
+  bare groups.
+- **Reference sharing**: `result.parts.<dice-part>.rolls[i]` is the same
+  object reference as the corresponding entry in `result.rolls[]`.
+- **Snapshot tests** (~10 representative notations using deterministic
+  `createMockRng`): `expect(result.parts).toMatchInlineSnapshot(...)`.
+  Catches structural drift the property test cannot.
+- **Property test** (`fast-check`, numRuns: 200+): for arbitrary valid
+  notation, root `parts.total === result.total`. Pinned to root only —
+  recursive consistency is covered by snapshots.
+- **JSON safety**: `JSON.parse(JSON.stringify(result.parts))` deep-equals
+  `result.parts`. No `undefined` field values that drop on serialization.
+  Cycles cause `stringify` to throw — that's a test failure naturally;
+  no separate cycle test needed.
 
 ---
 
