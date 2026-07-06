@@ -58,11 +58,20 @@ import { countSuccesses } from './modifiers/success-count.js';
  */
 export class EvaluatorError extends RollParserError {
   readonly nodeType: string | undefined;
+  /**
+   * Source span of the tightest AST node that was being evaluated when the
+   * error was thrown — stamped by `evalNode` on the way up, so the innermost
+   * node wins. `undefined` when the AST was built without parser spans.
+   */
+  start: number | undefined;
+  end: number | undefined;
 
   constructor(message: string, code: RollParserErrorCode, nodeType?: string) {
     super(message, code);
     this.name = 'EvaluatorError';
     this.nodeType = nodeType ?? undefined;
+    this.start = undefined;
+    this.end = undefined;
   }
 }
 
@@ -228,8 +237,24 @@ export function mergeMetaRolls(parent: EvalContext, source: EvalContext): void {
 
 /**
  * Evaluates an AST node, returning value and updating context.
+ *
+ * Errors bubbling up get the source span of the tightest node that was being
+ * evaluated — the innermost `evalNode` frame stamps first, outer frames leave
+ * an already-stamped error untouched.
  */
 function evalNode(node: ASTNode, rng: RNG, ctx: EvalContext, env: EvalEnv): number {
+  try {
+    return evalNodeInner(node, rng, ctx, env);
+  } catch (error) {
+    if (error instanceof EvaluatorError && error.start === undefined && node.start !== undefined) {
+      error.start = node.start;
+      error.end = node.end;
+    }
+    throw error;
+  }
+}
+
+function evalNodeInner(node: ASTNode, rng: RNG, ctx: EvalContext, env: EvalEnv): number {
   switch (node.type) {
     case 'Literal':
       return evalLiteral(node.value, ctx);

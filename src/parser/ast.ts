@@ -7,9 +7,22 @@
 import type { ComparePoint } from '../types.js';
 
 /**
+ * Source span carried by every AST node.
+ *
+ * `start` is inclusive, `end` exclusive, both in UTF-16 code units into the
+ * original notation string. The parser sets both on every node it produces;
+ * they are typed optional so hand-constructed ASTs (tests, programmatic
+ * consumers) remain valid without positions.
+ */
+export type NodeSpan = {
+  start?: number;
+  end?: number;
+};
+
+/**
  * Numeric literal node.
  */
-export type LiteralNode = {
+export type LiteralNode = NodeSpan & {
   type: 'Literal';
   value: number;
 };
@@ -18,7 +31,7 @@ export type LiteralNode = {
  * Dice roll node.
  * Count and sides can be expressions to support computed dice like (1+1)d(3*2).
  */
-export type DiceNode = {
+export type DiceNode = NodeSpan & {
   type: 'Dice';
   count: ASTNode;
   sides: ASTNode;
@@ -28,7 +41,7 @@ export type DiceNode = {
  * Fate/Fudge dice node (`dF`).
  * Each die produces a result in {-1, 0, +1}. No configurable sides.
  */
-export type FateDiceNode = {
+export type FateDiceNode = NodeSpan & {
   type: 'FateDice';
   count: ASTNode;
 };
@@ -36,7 +49,7 @@ export type FateDiceNode = {
 /**
  * Binary operation node.
  */
-export type BinaryOpNode = {
+export type BinaryOpNode = NodeSpan & {
   type: 'BinaryOp';
   operator: '+' | '-' | '*' | '/' | '%' | '**';
   left: ASTNode;
@@ -46,7 +59,7 @@ export type BinaryOpNode = {
 /**
  * Unary operation node.
  */
-export type UnaryOpNode = {
+export type UnaryOpNode = NodeSpan & {
   type: 'UnaryOp';
   operator: '-';
   operand: ASTNode;
@@ -56,7 +69,7 @@ export type UnaryOpNode = {
  * Keep/drop modifier node.
  * Wraps a dice expression with keep highest/lowest or drop highest/lowest.
  */
-export type ModifierNode = {
+export type ModifierNode = NodeSpan & {
   type: 'Modifier';
   modifier: 'keep' | 'drop';
   selector: 'highest' | 'lowest';
@@ -69,7 +82,7 @@ export type ModifierNode = {
  * Wraps a dice expression with a standard, compounding, or penetrating
  * explosion. An absent `threshold` means "explode on the die's maximum face".
  */
-export type ExplodeNode = {
+export type ExplodeNode = NodeSpan & {
   type: 'Explode';
   variant: 'standard' | 'compound' | 'penetrating';
   threshold?: ComparePoint;
@@ -82,7 +95,7 @@ export type ExplodeNode = {
  * keeps the second result regardless of match; `once: false` for `r`
  * re-rolls recursively until the condition no longer matches.
  */
-export type RerollNode = {
+export type RerollNode = NodeSpan & {
   type: 'Reroll';
   once: boolean;
   condition: ComparePoint;
@@ -98,7 +111,7 @@ export type RerollNode = {
  * operator, unary operator, versus operand, or function argument. The
  * `failThreshold` accepts any `CompareOp`; bare `fN` defaults to `operator: '='`.
  */
-export type SuccessCountNode = {
+export type SuccessCountNode = NodeSpan & {
   type: 'SuccessCount';
   target: ASTNode;
   threshold: ComparePoint;
@@ -115,7 +128,7 @@ export type SuccessCountNode = {
  * rejected at parse time; nesting via parens (`a vs (b vs c)`) is rejected
  * at evaluation time.
  */
-export type VersusNode = {
+export type VersusNode = NodeSpan & {
   type: 'Versus';
   roll: ASTNode;
   dc: ASTNode;
@@ -129,7 +142,7 @@ export type VersusNode = {
  * parse time against a static table; by the time the evaluator sees a
  * `FunctionCallNode`, `args.length` is guaranteed to match the function.
  */
-export type FunctionCallNode = {
+export type FunctionCallNode = NodeSpan & {
   type: 'FunctionCall';
   name: string;
   args: ASTNode[];
@@ -143,7 +156,7 @@ export type FunctionCallNode = {
  * `parse` without losing precedence information. Semantically transparent:
  * evaluation returns the inner expression's value unchanged.
  */
-export type GroupedNode = {
+export type GroupedNode = NodeSpan & {
   type: 'Grouped';
   expression: ASTNode;
 };
@@ -157,7 +170,7 @@ export type GroupedNode = {
  * identifier tokens which lowercase. Leaf node — no LED, never wraps a
  * sub-expression.
  */
-export type VariableNode = {
+export type VariableNode = NodeSpan & {
   type: 'Variable';
   name: string;
 };
@@ -171,7 +184,7 @@ export type VariableNode = {
  * (flat-pool when wrapped by keep/drop); `expressions.length >= 2` treats
  * each sub-roll's subtotal as a compound die for keep/drop selection.
  */
-export type GroupNode = {
+export type GroupNode = NodeSpan & {
   type: 'Group';
   expressions: ASTNode[];
 };
@@ -185,7 +198,7 @@ export type GroupNode = {
  * `critical`/`fumble`). Dropped dice retain their `dropped` flag and
  * appear in sorted position alongside kept dice.
  */
-export type SortNode = {
+export type SortNode = NodeSpan & {
   type: 'Sort';
   order: 'ascending' | 'descending';
   target: ASTNode;
@@ -206,11 +219,11 @@ export type CritThreshold = ComparePoint | 'default';
  * (max face / 1). Custom thresholds accept any ComparePoint. Chaining
  * collapses into a single node — `1d20cs=20cs=1cf>18` has two success
  * and one fail threshold. Display-only: does not change `total`,
- * explosion triggers, or success counting. An empty `failThresholds`
- * forces `fumble: false` on every die (replace, not merge) — same
- * for `successThresholds` and `critical`.
+ * explosion triggers, or success counting. `cs` and `cf` are independent
+ * overrides — a side with no explicit thresholds keeps the default rule
+ * (the evaluator substitutes the `'default'` sentinel at apply time).
  */
-export type CritThresholdNode = {
+export type CritThresholdNode = NodeSpan & {
   type: 'CritThreshold';
   successThresholds: CritThreshold[];
   failThresholds: CritThreshold[];

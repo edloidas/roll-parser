@@ -5,6 +5,7 @@
  */
 
 import { describe, expect, test } from 'bun:test';
+import type { ASTNode } from '../parser/ast.js';
 import { parse } from '../parser/parser.js';
 import { createMockRng } from '../rng/mock.js';
 import type { DieResult } from '../types.js';
@@ -662,6 +663,34 @@ describe('evaluate', () => {
 
       expect(getDie(result.rolls, 0).fumble).toBe(true);
       expect(getDie(result.rolls, 0).critical).toBe(false);
+    });
+
+    test('evaluator errors carry the span of the failing sub-expression', () => {
+      // `1d0` sits at offsets 4..7 inside `2d6+1d0+3` — the innermost node
+      // that failed, not the whole expression.
+      try {
+        evaluate(parse('2d6+1d0+3'), createMockRng([1, 1]));
+        throw new Error('expected EvaluatorError');
+      } catch (error) {
+        expect(error).toBeInstanceOf(EvaluatorError);
+        expect((error as EvaluatorError).start).toBe(4);
+        expect((error as EvaluatorError).end).toBe(7);
+      }
+    });
+
+    test('evaluator errors on hand-built ASTs have undefined spans', () => {
+      const ast: ASTNode = {
+        type: 'Dice',
+        count: { type: 'Literal', value: 1 },
+        sides: { type: 'Literal', value: 0 },
+      };
+      try {
+        evaluate(ast, createMockRng([]));
+        throw new Error('expected EvaluatorError');
+      } catch (error) {
+        expect(error).toBeInstanceOf(EvaluatorError);
+        expect((error as EvaluatorError).start).toBeUndefined();
+      }
     });
 
     test('1d1 is neither critical nor fumble', () => {

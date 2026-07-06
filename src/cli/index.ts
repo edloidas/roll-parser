@@ -30,11 +30,13 @@ Examples:
 
 /**
  * Prints the notation with a caret under the error position for errors that
- * carry one (LexerError, ParseError). Skipped for multi-line notations and
- * out-of-range positions to keep the caret honest.
+ * carry one (LexerError/ParseError `position`, EvaluatorError `start`).
+ * Skipped for multi-line notations and out-of-range positions to keep the
+ * caret honest.
  */
 function writeErrorContext(notation: string, error: Error): void {
-  const position = 'position' in error ? error.position : undefined;
+  const position =
+    'position' in error ? error.position : 'start' in error ? error.start : undefined;
   if (typeof position !== 'number' || !Number.isInteger(position)) return;
   if (notation.includes('\n') || position < 0 || position > notation.length) return;
 

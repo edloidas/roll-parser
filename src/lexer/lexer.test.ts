@@ -8,45 +8,45 @@ describe('Lexer', () => {
       const tokens = lex('2d20+5');
 
       expect(tokens).toHaveLength(6);
-      expect(tokens[0]).toEqual({ type: TokenType.NUMBER, value: '2', position: 0 });
-      expect(tokens[1]).toEqual({ type: TokenType.DICE, value: 'd', position: 1 });
-      expect(tokens[2]).toEqual({ type: TokenType.NUMBER, value: '20', position: 2 });
-      expect(tokens[3]).toEqual({ type: TokenType.PLUS, value: '+', position: 4 });
-      expect(tokens[4]).toEqual({ type: TokenType.NUMBER, value: '5', position: 5 });
-      expect(tokens[5]).toEqual({ type: TokenType.EOF, value: '', position: 6 });
+      expect(tokens[0]).toMatchObject({ type: TokenType.NUMBER, value: '2', position: 0 });
+      expect(tokens[1]).toMatchObject({ type: TokenType.DICE, value: 'd', position: 1 });
+      expect(tokens[2]).toMatchObject({ type: TokenType.NUMBER, value: '20', position: 2 });
+      expect(tokens[3]).toMatchObject({ type: TokenType.PLUS, value: '+', position: 4 });
+      expect(tokens[4]).toMatchObject({ type: TokenType.NUMBER, value: '5', position: 5 });
+      expect(tokens[5]).toMatchObject({ type: TokenType.EOF, value: '', position: 6 });
     });
 
     it('should handle case insensitivity for dice operator', () => {
       const tokens = lex('D20');
 
       expect(tokens).toHaveLength(3);
-      expect(tokens[0]).toEqual({ type: TokenType.DICE, value: 'd', position: 0 });
-      expect(tokens[1]).toEqual({ type: TokenType.NUMBER, value: '20', position: 1 });
-      expect(tokens[2]).toEqual({ type: TokenType.EOF, value: '', position: 3 });
+      expect(tokens[0]).toMatchObject({ type: TokenType.DICE, value: 'd', position: 0 });
+      expect(tokens[1]).toMatchObject({ type: TokenType.NUMBER, value: '20', position: 1 });
+      expect(tokens[2]).toMatchObject({ type: TokenType.EOF, value: '', position: 3 });
     });
 
     it('should handle whitespace between tokens', () => {
       const tokens = lex('2 d 20');
 
       expect(tokens).toHaveLength(4);
-      expect(tokens[0]).toEqual({ type: TokenType.NUMBER, value: '2', position: 0 });
-      expect(tokens[1]).toEqual({ type: TokenType.DICE, value: 'd', position: 2 });
-      expect(tokens[2]).toEqual({ type: TokenType.NUMBER, value: '20', position: 4 });
-      expect(tokens[3]).toEqual({ type: TokenType.EOF, value: '', position: 6 });
+      expect(tokens[0]).toMatchObject({ type: TokenType.NUMBER, value: '2', position: 0 });
+      expect(tokens[1]).toMatchObject({ type: TokenType.DICE, value: 'd', position: 2 });
+      expect(tokens[2]).toMatchObject({ type: TokenType.NUMBER, value: '20', position: 4 });
+      expect(tokens[3]).toMatchObject({ type: TokenType.EOF, value: '', position: 6 });
     });
 
     it('should return only EOF for empty string', () => {
       const tokens = lex('');
 
       expect(tokens).toHaveLength(1);
-      expect(tokens[0]).toEqual({ type: TokenType.EOF, value: '', position: 0 });
+      expect(tokens[0]).toMatchObject({ type: TokenType.EOF, value: '', position: 0 });
     });
 
     it('should return only EOF for whitespace-only string', () => {
       const tokens = lex('   \t\n  ');
 
       expect(tokens).toHaveLength(1);
-      expect(tokens[0]).toEqual({ type: TokenType.EOF, value: '', position: 7 });
+      expect(tokens[0]).toMatchObject({ type: TokenType.EOF, value: '', position: 7 });
     });
   });
 
@@ -54,13 +54,13 @@ describe('Lexer', () => {
     it('should tokenize integer numbers', () => {
       const tokens = lex('42');
 
-      expect(tokens[0]).toEqual({ type: TokenType.NUMBER, value: '42', position: 0 });
+      expect(tokens[0]).toMatchObject({ type: TokenType.NUMBER, value: '42', position: 0 });
     });
 
     it('should tokenize decimal numbers', () => {
       const tokens = lex('1.5');
 
-      expect(tokens[0]).toEqual({ type: TokenType.NUMBER, value: '1.5', position: 0 });
+      expect(tokens[0]).toMatchObject({ type: TokenType.NUMBER, value: '1.5', position: 0 });
     });
 
     it('should throw for trailing dot not followed by digit', () => {
@@ -71,8 +71,8 @@ describe('Lexer', () => {
     it('should tokenize multi-digit numbers', () => {
       const tokens = lex('100d20');
 
-      expect(tokens[0]).toEqual({ type: TokenType.NUMBER, value: '100', position: 0 });
-      expect(tokens[2]).toEqual({ type: TokenType.NUMBER, value: '20', position: 4 });
+      expect(tokens[0]).toMatchObject({ type: TokenType.NUMBER, value: '100', position: 0 });
+      expect(tokens[2]).toMatchObject({ type: TokenType.NUMBER, value: '20', position: 4 });
     });
   });
 
@@ -92,29 +92,29 @@ describe('Lexer', () => {
       const tokens = lex('2**3');
 
       expect(tokens).toHaveLength(4);
-      expect(tokens[0]).toEqual({ type: TokenType.NUMBER, value: '2', position: 0 });
-      expect(tokens[1]).toEqual({ type: TokenType.POWER, value: '**', position: 1 });
-      expect(tokens[2]).toEqual({ type: TokenType.NUMBER, value: '3', position: 3 });
+      expect(tokens[0]).toMatchObject({ type: TokenType.NUMBER, value: '2', position: 0 });
+      expect(tokens[1]).toMatchObject({ type: TokenType.POWER, value: '**', position: 1 });
+      expect(tokens[2]).toMatchObject({ type: TokenType.NUMBER, value: '3', position: 3 });
     });
 
     it('should tokenize ^ as power operator', () => {
       const tokens = lex('2^3');
 
       expect(tokens).toHaveLength(4);
-      expect(tokens[0]).toEqual({ type: TokenType.NUMBER, value: '2', position: 0 });
-      expect(tokens[1]).toEqual({ type: TokenType.POWER, value: '^', position: 1 });
-      expect(tokens[2]).toEqual({ type: TokenType.NUMBER, value: '3', position: 2 });
+      expect(tokens[0]).toMatchObject({ type: TokenType.NUMBER, value: '2', position: 0 });
+      expect(tokens[1]).toMatchObject({ type: TokenType.POWER, value: '^', position: 1 });
+      expect(tokens[2]).toMatchObject({ type: TokenType.NUMBER, value: '3', position: 2 });
     });
 
     it('should tokenize parentheses', () => {
       const tokens = lex('(1+2)');
 
       expect(tokens).toHaveLength(6);
-      expect(tokens[0]).toEqual({ type: TokenType.LPAREN, value: '(', position: 0 });
-      expect(tokens[1]).toEqual({ type: TokenType.NUMBER, value: '1', position: 1 });
-      expect(tokens[2]).toEqual({ type: TokenType.PLUS, value: '+', position: 2 });
-      expect(tokens[3]).toEqual({ type: TokenType.NUMBER, value: '2', position: 3 });
-      expect(tokens[4]).toEqual({ type: TokenType.RPAREN, value: ')', position: 4 });
+      expect(tokens[0]).toMatchObject({ type: TokenType.LPAREN, value: '(', position: 0 });
+      expect(tokens[1]).toMatchObject({ type: TokenType.NUMBER, value: '1', position: 1 });
+      expect(tokens[2]).toMatchObject({ type: TokenType.PLUS, value: '+', position: 2 });
+      expect(tokens[3]).toMatchObject({ type: TokenType.NUMBER, value: '2', position: 3 });
+      expect(tokens[4]).toMatchObject({ type: TokenType.RPAREN, value: ')', position: 4 });
     });
   });
 
@@ -123,36 +123,36 @@ describe('Lexer', () => {
       const tokens = lex('kh');
 
       expect(tokens).toHaveLength(2);
-      expect(tokens[0]).toEqual({ type: TokenType.KEEP_HIGH, value: 'kh', position: 0 });
+      expect(tokens[0]).toMatchObject({ type: TokenType.KEEP_HIGH, value: 'kh', position: 0 });
     });
 
     it('should tokenize kl as KEEP_LOW', () => {
       const tokens = lex('kl');
 
       expect(tokens).toHaveLength(2);
-      expect(tokens[0]).toEqual({ type: TokenType.KEEP_LOW, value: 'kl', position: 0 });
+      expect(tokens[0]).toMatchObject({ type: TokenType.KEEP_LOW, value: 'kl', position: 0 });
     });
 
     it('should tokenize k alone as KEEP_HIGH (shorthand)', () => {
       const tokens = lex('k3');
 
       expect(tokens).toHaveLength(3);
-      expect(tokens[0]).toEqual({ type: TokenType.KEEP_HIGH, value: 'k', position: 0 });
-      expect(tokens[1]).toEqual({ type: TokenType.NUMBER, value: '3', position: 1 });
+      expect(tokens[0]).toMatchObject({ type: TokenType.KEEP_HIGH, value: 'k', position: 0 });
+      expect(tokens[1]).toMatchObject({ type: TokenType.NUMBER, value: '3', position: 1 });
     });
 
     it('should tokenize dh as DROP_HIGH (maximal munch)', () => {
       const tokens = lex('dh');
 
       expect(tokens).toHaveLength(2);
-      expect(tokens[0]).toEqual({ type: TokenType.DROP_HIGH, value: 'dh', position: 0 });
+      expect(tokens[0]).toMatchObject({ type: TokenType.DROP_HIGH, value: 'dh', position: 0 });
     });
 
     it('should tokenize dl as DROP_LOW', () => {
       const tokens = lex('dl');
 
       expect(tokens).toHaveLength(2);
-      expect(tokens[0]).toEqual({ type: TokenType.DROP_LOW, value: 'dl', position: 0 });
+      expect(tokens[0]).toMatchObject({ type: TokenType.DROP_LOW, value: 'dl', position: 0 });
     });
 
     it('should handle case insensitivity for modifiers', () => {
@@ -166,22 +166,22 @@ describe('Lexer', () => {
       const tokens = lex('4d6kh3');
 
       expect(tokens).toHaveLength(6);
-      expect(tokens[0]).toEqual({ type: TokenType.NUMBER, value: '4', position: 0 });
-      expect(tokens[1]).toEqual({ type: TokenType.DICE, value: 'd', position: 1 });
-      expect(tokens[2]).toEqual({ type: TokenType.NUMBER, value: '6', position: 2 });
-      expect(tokens[3]).toEqual({ type: TokenType.KEEP_HIGH, value: 'kh', position: 3 });
-      expect(tokens[4]).toEqual({ type: TokenType.NUMBER, value: '3', position: 5 });
+      expect(tokens[0]).toMatchObject({ type: TokenType.NUMBER, value: '4', position: 0 });
+      expect(tokens[1]).toMatchObject({ type: TokenType.DICE, value: 'd', position: 1 });
+      expect(tokens[2]).toMatchObject({ type: TokenType.NUMBER, value: '6', position: 2 });
+      expect(tokens[3]).toMatchObject({ type: TokenType.KEEP_HIGH, value: 'kh', position: 3 });
+      expect(tokens[4]).toMatchObject({ type: TokenType.NUMBER, value: '3', position: 5 });
     });
 
     it('should tokenize 4d6dl1 correctly', () => {
       const tokens = lex('4d6dl1');
 
       expect(tokens).toHaveLength(6);
-      expect(tokens[0]).toEqual({ type: TokenType.NUMBER, value: '4', position: 0 });
-      expect(tokens[1]).toEqual({ type: TokenType.DICE, value: 'd', position: 1 });
-      expect(tokens[2]).toEqual({ type: TokenType.NUMBER, value: '6', position: 2 });
-      expect(tokens[3]).toEqual({ type: TokenType.DROP_LOW, value: 'dl', position: 3 });
-      expect(tokens[4]).toEqual({ type: TokenType.NUMBER, value: '1', position: 5 });
+      expect(tokens[0]).toMatchObject({ type: TokenType.NUMBER, value: '4', position: 0 });
+      expect(tokens[1]).toMatchObject({ type: TokenType.DICE, value: 'd', position: 1 });
+      expect(tokens[2]).toMatchObject({ type: TokenType.NUMBER, value: '6', position: 2 });
+      expect(tokens[3]).toMatchObject({ type: TokenType.DROP_LOW, value: 'dl', position: 3 });
+      expect(tokens[4]).toMatchObject({ type: TokenType.NUMBER, value: '1', position: 5 });
     });
   });
 
@@ -190,22 +190,22 @@ describe('Lexer', () => {
       const tokens = lex('d6');
 
       expect(tokens).toHaveLength(3);
-      expect(tokens[0]).toEqual({ type: TokenType.DICE, value: 'd', position: 0 });
-      expect(tokens[1]).toEqual({ type: TokenType.NUMBER, value: '6', position: 1 });
+      expect(tokens[0]).toMatchObject({ type: TokenType.DICE, value: 'd', position: 0 });
+      expect(tokens[1]).toMatchObject({ type: TokenType.NUMBER, value: '6', position: 1 });
     });
 
     it('should distinguish dh as DROP_HIGH not DICE', () => {
       const tokens = lex('dh');
 
       expect(tokens).toHaveLength(2);
-      expect(tokens[0]).toEqual({ type: TokenType.DROP_HIGH, value: 'dh', position: 0 });
+      expect(tokens[0]).toMatchObject({ type: TokenType.DROP_HIGH, value: 'dh', position: 0 });
     });
 
     it('should distinguish dl as DROP_LOW not DICE', () => {
       const tokens = lex('dl');
 
       expect(tokens).toHaveLength(2);
-      expect(tokens[0]).toEqual({ type: TokenType.DROP_LOW, value: 'dl', position: 0 });
+      expect(tokens[0]).toMatchObject({ type: TokenType.DROP_LOW, value: 'dl', position: 0 });
     });
   });
 
@@ -247,48 +247,48 @@ describe('Lexer', () => {
       const tokens = lex('>5');
 
       expect(tokens).toHaveLength(3);
-      expect(tokens[0]).toEqual({ type: TokenType.GREATER, value: '>', position: 0 });
-      expect(tokens[1]).toEqual({ type: TokenType.NUMBER, value: '5', position: 1 });
+      expect(tokens[0]).toMatchObject({ type: TokenType.GREATER, value: '>', position: 0 });
+      expect(tokens[1]).toMatchObject({ type: TokenType.NUMBER, value: '5', position: 1 });
     });
 
     it('should tokenize >= as GREATER_EQUAL (maximal munch)', () => {
       const tokens = lex('>=6');
 
       expect(tokens).toHaveLength(3);
-      expect(tokens[0]).toEqual({ type: TokenType.GREATER_EQUAL, value: '>=', position: 0 });
-      expect(tokens[1]).toEqual({ type: TokenType.NUMBER, value: '6', position: 2 });
+      expect(tokens[0]).toMatchObject({ type: TokenType.GREATER_EQUAL, value: '>=', position: 0 });
+      expect(tokens[1]).toMatchObject({ type: TokenType.NUMBER, value: '6', position: 2 });
     });
 
     it('should tokenize < as LESS', () => {
       const tokens = lex('<2');
 
       expect(tokens).toHaveLength(3);
-      expect(tokens[0]).toEqual({ type: TokenType.LESS, value: '<', position: 0 });
-      expect(tokens[1]).toEqual({ type: TokenType.NUMBER, value: '2', position: 1 });
+      expect(tokens[0]).toMatchObject({ type: TokenType.LESS, value: '<', position: 0 });
+      expect(tokens[1]).toMatchObject({ type: TokenType.NUMBER, value: '2', position: 1 });
     });
 
     it('should tokenize <= as LESS_EQUAL (maximal munch)', () => {
       const tokens = lex('<=3');
 
       expect(tokens).toHaveLength(3);
-      expect(tokens[0]).toEqual({ type: TokenType.LESS_EQUAL, value: '<=', position: 0 });
-      expect(tokens[1]).toEqual({ type: TokenType.NUMBER, value: '3', position: 2 });
+      expect(tokens[0]).toMatchObject({ type: TokenType.LESS_EQUAL, value: '<=', position: 0 });
+      expect(tokens[1]).toMatchObject({ type: TokenType.NUMBER, value: '3', position: 2 });
     });
 
     it('should tokenize = as EQUAL', () => {
       const tokens = lex('=1');
 
       expect(tokens).toHaveLength(3);
-      expect(tokens[0]).toEqual({ type: TokenType.EQUAL, value: '=', position: 0 });
-      expect(tokens[1]).toEqual({ type: TokenType.NUMBER, value: '1', position: 1 });
+      expect(tokens[0]).toMatchObject({ type: TokenType.EQUAL, value: '=', position: 0 });
+      expect(tokens[1]).toMatchObject({ type: TokenType.NUMBER, value: '1', position: 1 });
     });
 
     it('should not conflate > = (with space) as >=', () => {
       const tokens = lex('> =');
 
       expect(tokens).toHaveLength(3);
-      expect(tokens[0]).toEqual({ type: TokenType.GREATER, value: '>', position: 0 });
-      expect(tokens[1]).toEqual({ type: TokenType.EQUAL, value: '=', position: 2 });
+      expect(tokens[0]).toMatchObject({ type: TokenType.GREATER, value: '>', position: 0 });
+      expect(tokens[1]).toMatchObject({ type: TokenType.EQUAL, value: '=', position: 2 });
     });
   });
 
@@ -297,28 +297,40 @@ describe('Lexer', () => {
       const tokens = lex('!');
 
       expect(tokens).toHaveLength(2);
-      expect(tokens[0]).toEqual({ type: TokenType.EXPLODE, value: '!', position: 0 });
+      expect(tokens[0]).toMatchObject({ type: TokenType.EXPLODE, value: '!', position: 0 });
     });
 
     it('should tokenize !! as EXPLODE_COMPOUND (maximal munch)', () => {
       const tokens = lex('!!');
 
       expect(tokens).toHaveLength(2);
-      expect(tokens[0]).toEqual({ type: TokenType.EXPLODE_COMPOUND, value: '!!', position: 0 });
+      expect(tokens[0]).toMatchObject({
+        type: TokenType.EXPLODE_COMPOUND,
+        value: '!!',
+        position: 0,
+      });
     });
 
     it('should tokenize !p as EXPLODE_PENETRATING', () => {
       const tokens = lex('!p');
 
       expect(tokens).toHaveLength(2);
-      expect(tokens[0]).toEqual({ type: TokenType.EXPLODE_PENETRATING, value: '!p', position: 0 });
+      expect(tokens[0]).toMatchObject({
+        type: TokenType.EXPLODE_PENETRATING,
+        value: '!p',
+        position: 0,
+      });
     });
 
     it('should be case-insensitive for !P', () => {
       const tokens = lex('!P');
 
       expect(tokens).toHaveLength(2);
-      expect(tokens[0]).toEqual({ type: TokenType.EXPLODE_PENETRATING, value: '!p', position: 0 });
+      expect(tokens[0]).toMatchObject({
+        type: TokenType.EXPLODE_PENETRATING,
+        value: '!p',
+        position: 0,
+      });
     });
 
     it('should tokenize 1d6! as dice + explode', () => {
@@ -337,7 +349,7 @@ describe('Lexer', () => {
       expect(tokens).toHaveLength(7);
       expect(tokens[3]?.type).toBe(TokenType.EXPLODE);
       expect(tokens[4]?.type).toBe(TokenType.GREATER);
-      expect(tokens[5]).toEqual({ type: TokenType.NUMBER, value: '5', position: 5 });
+      expect(tokens[5]).toMatchObject({ type: TokenType.NUMBER, value: '5', position: 5 });
     });
   });
 
@@ -346,14 +358,14 @@ describe('Lexer', () => {
       const tokens = lex('r');
 
       expect(tokens).toHaveLength(2);
-      expect(tokens[0]).toEqual({ type: TokenType.REROLL, value: 'r', position: 0 });
+      expect(tokens[0]).toMatchObject({ type: TokenType.REROLL, value: 'r', position: 0 });
     });
 
     it('should tokenize ro as REROLL_ONCE (maximal munch)', () => {
       const tokens = lex('ro');
 
       expect(tokens).toHaveLength(2);
-      expect(tokens[0]).toEqual({ type: TokenType.REROLL_ONCE, value: 'ro', position: 0 });
+      expect(tokens[0]).toMatchObject({ type: TokenType.REROLL_ONCE, value: 'ro', position: 0 });
     });
 
     it('should tokenize r<2 as REROLL + LESS + NUMBER', () => {
@@ -362,7 +374,7 @@ describe('Lexer', () => {
       expect(tokens).toHaveLength(4);
       expect(tokens[0]?.type).toBe(TokenType.REROLL);
       expect(tokens[1]?.type).toBe(TokenType.LESS);
-      expect(tokens[2]).toEqual({ type: TokenType.NUMBER, value: '2', position: 2 });
+      expect(tokens[2]).toMatchObject({ type: TokenType.NUMBER, value: '2', position: 2 });
     });
 
     it('should tokenize ro>=3 as REROLL_ONCE + GREATER_EQUAL + NUMBER', () => {
@@ -371,7 +383,7 @@ describe('Lexer', () => {
       expect(tokens).toHaveLength(4);
       expect(tokens[0]?.type).toBe(TokenType.REROLL_ONCE);
       expect(tokens[1]?.type).toBe(TokenType.GREATER_EQUAL);
-      expect(tokens[2]).toEqual({ type: TokenType.NUMBER, value: '3', position: 4 });
+      expect(tokens[2]).toMatchObject({ type: TokenType.NUMBER, value: '3', position: 4 });
     });
   });
 
@@ -380,15 +392,15 @@ describe('Lexer', () => {
       const tokens = lex('d%');
 
       expect(tokens).toHaveLength(2);
-      expect(tokens[0]).toEqual({ type: TokenType.DICE_PERCENT, value: 'd%', position: 0 });
+      expect(tokens[0]).toMatchObject({ type: TokenType.DICE_PERCENT, value: 'd%', position: 0 });
     });
 
     it('should tokenize 2d% as NUMBER + DICE_PERCENT', () => {
       const tokens = lex('2d%');
 
       expect(tokens).toHaveLength(3);
-      expect(tokens[0]).toEqual({ type: TokenType.NUMBER, value: '2', position: 0 });
-      expect(tokens[1]).toEqual({ type: TokenType.DICE_PERCENT, value: 'd%', position: 1 });
+      expect(tokens[0]).toMatchObject({ type: TokenType.NUMBER, value: '2', position: 0 });
+      expect(tokens[1]).toMatchObject({ type: TokenType.DICE_PERCENT, value: 'd%', position: 1 });
     });
 
     it('should not confuse standalone % with d%', () => {
@@ -406,22 +418,22 @@ describe('Lexer', () => {
       const tokens = lex('dF');
 
       expect(tokens).toHaveLength(2);
-      expect(tokens[0]).toEqual({ type: TokenType.DICE_FATE, value: 'df', position: 0 });
+      expect(tokens[0]).toMatchObject({ type: TokenType.DICE_FATE, value: 'df', position: 0 });
     });
 
     it('should be case-insensitive for df', () => {
       const tokens = lex('df');
 
       expect(tokens).toHaveLength(2);
-      expect(tokens[0]).toEqual({ type: TokenType.DICE_FATE, value: 'df', position: 0 });
+      expect(tokens[0]).toMatchObject({ type: TokenType.DICE_FATE, value: 'df', position: 0 });
     });
 
     it('should tokenize 4dF as NUMBER + DICE_FATE', () => {
       const tokens = lex('4dF');
 
       expect(tokens).toHaveLength(3);
-      expect(tokens[0]).toEqual({ type: TokenType.NUMBER, value: '4', position: 0 });
-      expect(tokens[1]).toEqual({ type: TokenType.DICE_FATE, value: 'df', position: 1 });
+      expect(tokens[0]).toMatchObject({ type: TokenType.NUMBER, value: '4', position: 0 });
+      expect(tokens[1]).toMatchObject({ type: TokenType.DICE_FATE, value: 'df', position: 1 });
     });
 
     it('should not confuse dF with dh/dl', () => {
@@ -434,10 +446,10 @@ describe('Lexer', () => {
       const tokens = lex('4dFkh2');
 
       expect(tokens).toHaveLength(5);
-      expect(tokens[0]).toEqual({ type: TokenType.NUMBER, value: '4', position: 0 });
-      expect(tokens[1]).toEqual({ type: TokenType.DICE_FATE, value: 'df', position: 1 });
-      expect(tokens[2]).toEqual({ type: TokenType.KEEP_HIGH, value: 'kh', position: 3 });
-      expect(tokens[3]).toEqual({ type: TokenType.NUMBER, value: '2', position: 5 });
+      expect(tokens[0]).toMatchObject({ type: TokenType.NUMBER, value: '4', position: 0 });
+      expect(tokens[1]).toMatchObject({ type: TokenType.DICE_FATE, value: 'df', position: 1 });
+      expect(tokens[2]).toMatchObject({ type: TokenType.KEEP_HIGH, value: 'kh', position: 3 });
+      expect(tokens[3]).toMatchObject({ type: TokenType.NUMBER, value: '2', position: 5 });
     });
 
     it('should tokenize 4dFdl1 without greedy identifier merge', () => {
@@ -454,8 +466,8 @@ describe('Lexer', () => {
       const tokens = lex('dFdF');
 
       expect(tokens).toHaveLength(3);
-      expect(tokens[0]).toEqual({ type: TokenType.DICE_FATE, value: 'df', position: 0 });
-      expect(tokens[1]).toEqual({ type: TokenType.DICE_FATE, value: 'df', position: 2 });
+      expect(tokens[0]).toMatchObject({ type: TokenType.DICE_FATE, value: 'df', position: 0 });
+      expect(tokens[1]).toMatchObject({ type: TokenType.DICE_FATE, value: 'df', position: 2 });
     });
 
     it('should tokenize dF+5 with trailing arithmetic', () => {
@@ -483,8 +495,8 @@ describe('Lexer', () => {
       const tokens = lex('f1');
 
       expect(tokens).toHaveLength(3);
-      expect(tokens[0]).toEqual({ type: TokenType.FAIL, value: 'f', position: 0 });
-      expect(tokens[1]).toEqual({ type: TokenType.NUMBER, value: '1', position: 1 });
+      expect(tokens[0]).toMatchObject({ type: TokenType.FAIL, value: 'f', position: 0 });
+      expect(tokens[1]).toMatchObject({ type: TokenType.NUMBER, value: '1', position: 1 });
     });
   });
 
@@ -493,7 +505,7 @@ describe('Lexer', () => {
       const tokens = lex('floor');
 
       expect(tokens).toHaveLength(2);
-      expect(tokens[0]).toEqual({ type: TokenType.FUNCTION, value: 'floor', position: 0 });
+      expect(tokens[0]).toMatchObject({ type: TokenType.FUNCTION, value: 'floor', position: 0 });
     });
 
     it('should tokenize all math functions', () => {
@@ -534,7 +546,7 @@ describe('Lexer', () => {
 
       expect(tokens).toHaveLength(4);
       expect(tokens[0]?.type).toBe(TokenType.NUMBER);
-      expect(tokens[1]).toEqual({ type: TokenType.COMMA, value: ',', position: 1 });
+      expect(tokens[1]).toMatchObject({ type: TokenType.COMMA, value: ',', position: 1 });
       expect(tokens[2]?.type).toBe(TokenType.NUMBER);
     });
   });
@@ -544,7 +556,7 @@ describe('Lexer', () => {
       const tokens = lex('vs');
 
       expect(tokens).toHaveLength(2);
-      expect(tokens[0]).toEqual({ type: TokenType.VS, value: 'vs', position: 0 });
+      expect(tokens[0]).toMatchObject({ type: TokenType.VS, value: 'vs', position: 0 });
     });
 
     it('should be case-insensitive for VS', () => {
@@ -556,8 +568,8 @@ describe('Lexer', () => {
       const tokens = lex('1d20+10 vs 25');
 
       expect(tokens).toHaveLength(8);
-      expect(tokens[5]).toEqual({ type: TokenType.VS, value: 'vs', position: 8 });
-      expect(tokens[6]).toEqual({ type: TokenType.NUMBER, value: '25', position: 11 });
+      expect(tokens[5]).toMatchObject({ type: TokenType.VS, value: 'vs', position: 8 });
+      expect(tokens[6]).toMatchObject({ type: TokenType.NUMBER, value: '25', position: 11 });
     });
   });
 
@@ -567,7 +579,7 @@ describe('Lexer', () => {
         const tokens = lex('{');
 
         expect(tokens).toHaveLength(2);
-        expect(tokens[0]).toEqual({ type: TokenType.LBRACE, value: '{', position: 0 });
+        expect(tokens[0]).toMatchObject({ type: TokenType.LBRACE, value: '{', position: 0 });
         expect(tokens[1]?.type).toBe(TokenType.EOF);
       });
 
@@ -575,16 +587,16 @@ describe('Lexer', () => {
         const tokens = lex('}');
 
         expect(tokens).toHaveLength(2);
-        expect(tokens[0]).toEqual({ type: TokenType.RBRACE, value: '}', position: 0 });
+        expect(tokens[0]).toMatchObject({ type: TokenType.RBRACE, value: '}', position: 0 });
       });
 
       it('should tokenize {1d20,2d6} with commas as separators', () => {
         const tokens = lex('{1d20,2d6}');
 
         expect(tokens).toHaveLength(10);
-        expect(tokens[0]).toEqual({ type: TokenType.LBRACE, value: '{', position: 0 });
-        expect(tokens[4]).toEqual({ type: TokenType.COMMA, value: ',', position: 5 });
-        expect(tokens[8]).toEqual({ type: TokenType.RBRACE, value: '}', position: 9 });
+        expect(tokens[0]).toMatchObject({ type: TokenType.LBRACE, value: '{', position: 0 });
+        expect(tokens[4]).toMatchObject({ type: TokenType.COMMA, value: ',', position: 5 });
+        expect(tokens[8]).toMatchObject({ type: TokenType.RBRACE, value: '}', position: 9 });
       });
     });
 
@@ -593,21 +605,21 @@ describe('Lexer', () => {
         const tokens = lex('s');
 
         expect(tokens).toHaveLength(2);
-        expect(tokens[0]).toEqual({ type: TokenType.SORT_ASC, value: 's', position: 0 });
+        expect(tokens[0]).toMatchObject({ type: TokenType.SORT_ASC, value: 's', position: 0 });
       });
 
       it('should tokenize sa as SORT_ASC', () => {
         const tokens = lex('sa');
 
         expect(tokens).toHaveLength(2);
-        expect(tokens[0]).toEqual({ type: TokenType.SORT_ASC, value: 'sa', position: 0 });
+        expect(tokens[0]).toMatchObject({ type: TokenType.SORT_ASC, value: 'sa', position: 0 });
       });
 
       it('should tokenize sd as SORT_DESC', () => {
         const tokens = lex('sd');
 
         expect(tokens).toHaveLength(2);
-        expect(tokens[0]).toEqual({ type: TokenType.SORT_DESC, value: 'sd', position: 0 });
+        expect(tokens[0]).toMatchObject({ type: TokenType.SORT_DESC, value: 'sd', position: 0 });
       });
 
       it('should be case-insensitive for sort modifiers', () => {
@@ -621,14 +633,14 @@ describe('Lexer', () => {
         const tokens = lex('cs');
 
         expect(tokens).toHaveLength(2);
-        expect(tokens[0]).toEqual({ type: TokenType.CRIT_SUCCESS, value: 'cs', position: 0 });
+        expect(tokens[0]).toMatchObject({ type: TokenType.CRIT_SUCCESS, value: 'cs', position: 0 });
       });
 
       it('should tokenize cf as CRIT_FAIL', () => {
         const tokens = lex('cf');
 
         expect(tokens).toHaveLength(2);
-        expect(tokens[0]).toEqual({ type: TokenType.CRIT_FAIL, value: 'cf', position: 0 });
+        expect(tokens[0]).toMatchObject({ type: TokenType.CRIT_FAIL, value: 'cf', position: 0 });
       });
 
       it('should be case-insensitive for crit modifiers', () => {
@@ -642,21 +654,21 @@ describe('Lexer', () => {
         const tokens = lex('@StrMod');
 
         expect(tokens).toHaveLength(2);
-        expect(tokens[0]).toEqual({ type: TokenType.AT, value: 'StrMod', position: 0 });
+        expect(tokens[0]).toMatchObject({ type: TokenType.AT, value: 'StrMod', position: 0 });
       });
 
       it('should allow digits and underscores after the first char', () => {
         const tokens = lex('@abilities_3');
 
         expect(tokens).toHaveLength(2);
-        expect(tokens[0]).toEqual({ type: TokenType.AT, value: 'abilities_3', position: 0 });
+        expect(tokens[0]).toMatchObject({ type: TokenType.AT, value: 'abilities_3', position: 0 });
       });
 
       it('should allow an underscore-leading name', () => {
         const tokens = lex('@_hidden');
 
         expect(tokens).toHaveLength(2);
-        expect(tokens[0]).toEqual({ type: TokenType.AT, value: '_hidden', position: 0 });
+        expect(tokens[0]).toMatchObject({ type: TokenType.AT, value: '_hidden', position: 0 });
       });
 
       it('should tokenize @{name with spaces and hyphens} preserving case', () => {
@@ -667,6 +679,9 @@ describe('Lexer', () => {
           type: TokenType.AT,
           value: 'Strength Modifier-1',
           position: 0,
+          // Braced form consumes `@{...}` — end covers the braces, not just
+          // the captured name.
+          end: 22,
         });
       });
 
@@ -674,9 +689,9 @@ describe('Lexer', () => {
         const tokens = lex('@foo+1');
 
         expect(tokens).toHaveLength(4);
-        expect(tokens[0]).toEqual({ type: TokenType.AT, value: 'foo', position: 0 });
-        expect(tokens[1]).toEqual({ type: TokenType.PLUS, value: '+', position: 4 });
-        expect(tokens[2]).toEqual({ type: TokenType.NUMBER, value: '1', position: 5 });
+        expect(tokens[0]).toMatchObject({ type: TokenType.AT, value: 'foo', position: 0 });
+        expect(tokens[1]).toMatchObject({ type: TokenType.PLUS, value: '+', position: 4 });
+        expect(tokens[2]).toMatchObject({ type: TokenType.NUMBER, value: '1', position: 5 });
       });
 
       it('should preserve case distinctly (@Foo vs @foo)', () => {
@@ -717,18 +732,18 @@ describe('Lexer', () => {
       const tokens = lex('0d6');
 
       expect(tokens).toHaveLength(4);
-      expect(tokens[0]).toEqual({ type: TokenType.NUMBER, value: '0', position: 0 });
-      expect(tokens[1]).toEqual({ type: TokenType.DICE, value: 'd', position: 1 });
-      expect(tokens[2]).toEqual({ type: TokenType.NUMBER, value: '6', position: 2 });
+      expect(tokens[0]).toMatchObject({ type: TokenType.NUMBER, value: '0', position: 0 });
+      expect(tokens[1]).toMatchObject({ type: TokenType.DICE, value: 'd', position: 1 });
+      expect(tokens[2]).toMatchObject({ type: TokenType.NUMBER, value: '6', position: 2 });
     });
 
     it('should tokenize 1d1 (single-sided die)', () => {
       const tokens = lex('1d1');
 
       expect(tokens).toHaveLength(4);
-      expect(tokens[0]).toEqual({ type: TokenType.NUMBER, value: '1', position: 0 });
-      expect(tokens[1]).toEqual({ type: TokenType.DICE, value: 'd', position: 1 });
-      expect(tokens[2]).toEqual({ type: TokenType.NUMBER, value: '1', position: 2 });
+      expect(tokens[0]).toMatchObject({ type: TokenType.NUMBER, value: '1', position: 0 });
+      expect(tokens[1]).toMatchObject({ type: TokenType.DICE, value: 'd', position: 1 });
+      expect(tokens[2]).toMatchObject({ type: TokenType.NUMBER, value: '1', position: 2 });
     });
 
     it('should throw for trailing dot (1.)', () => {
@@ -738,7 +753,44 @@ describe('Lexer', () => {
     it('should handle leading zeros in numbers', () => {
       const tokens = lex('007d20');
 
-      expect(tokens[0]).toEqual({ type: TokenType.NUMBER, value: '007', position: 0 });
+      expect(tokens[0]).toMatchObject({ type: TokenType.NUMBER, value: '007', position: 0 });
+    });
+  });
+
+  describe('token end offsets', () => {
+    it('sets end to the exclusive offset after each token', () => {
+      const tokens = lex('12d20kh3');
+
+      expect(tokens[0]).toEqual({ type: TokenType.NUMBER, value: '12', position: 0, end: 2 });
+      expect(tokens[1]).toEqual({ type: TokenType.DICE, value: 'd', position: 2, end: 3 });
+      expect(tokens[2]).toEqual({ type: TokenType.NUMBER, value: '20', position: 3, end: 5 });
+      expect(tokens[3]).toEqual({ type: TokenType.KEEP_HIGH, value: 'kh', position: 5, end: 7 });
+      expect(tokens[4]).toEqual({ type: TokenType.NUMBER, value: '3', position: 7, end: 8 });
+      expect(tokens[5]).toEqual({ type: TokenType.EOF, value: '', position: 8, end: 8 });
+    });
+
+    it('covers consumed input where value differs from source', () => {
+      // dF normalizes to 'df'; @{..} strips braces from value — end must
+      // still cover the consumed source characters.
+      expect(lex('4DF')[1]).toEqual({
+        type: TokenType.DICE_FATE,
+        value: 'df',
+        position: 1,
+        end: 3,
+      });
+      expect(lex('@{a b}')[0]).toEqual({ type: TokenType.AT, value: 'a b', position: 0, end: 6 });
+      expect(lex('d%')[0]).toEqual({
+        type: TokenType.DICE_PERCENT,
+        value: 'd%',
+        position: 0,
+        end: 2,
+      });
+      expect(lex('1d6!p')[3]).toEqual({
+        type: TokenType.EXPLODE_PENETRATING,
+        value: '!p',
+        position: 3,
+        end: 5,
+      });
     });
   });
 

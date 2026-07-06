@@ -345,12 +345,14 @@ export class Lexer {
     return char === ' ' || char === '\t' || char === '\n' || char === '\r';
   }
 
+  // ? Both factories run after the token's characters were consumed, so
+  //   `this.pos` is the exclusive end offset.
   private createToken(type: TokenType, value: string): Token {
-    return { type, value, position: this.pos };
+    return { type, value, position: this.pos, end: this.pos };
   }
 
   private createTokenAt(type: TokenType, value: string, position: number): Token {
-    return { type, value, position };
+    return { type, value, position, end: this.pos };
   }
 }
 

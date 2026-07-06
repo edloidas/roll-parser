@@ -176,6 +176,12 @@ export type Token = {
   type: TokenType;
   /** The raw string value from input (lowercased for identifiers) */
   value: string;
-  /** Zero-based position in the input string */
+  /** Zero-based start offset in the input string (UTF-16 code units) */
   position: number;
+  /**
+   * Zero-based end offset (exclusive). Not always `position + value.length` —
+   * braced variables (`@{name}` stores only `name`) and case-normalized
+   * identifiers consume more input than their `value` retains.
+   */
+  end: number;
 };

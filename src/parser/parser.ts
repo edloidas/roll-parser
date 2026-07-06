@@ -215,13 +215,13 @@ export class Parser {
         return this.parsePrefixDice(token);
 
       case TokenType.DICE_PERCENT:
-        return this.parsePrefixDicePercent();
+        return this.parsePrefixDicePercent(token);
 
       case TokenType.DICE_FATE:
-        return this.parsePrefixFateDice();
+        return this.parsePrefixFateDice(token);
 
       case TokenType.LPAREN:
-        return this.parseGrouped();
+        return this.parseGrouped(token);
 
       case TokenType.LBRACE:
         return this.parseGroup(token);
@@ -313,10 +313,20 @@ export class Parser {
 
   // * Node parsers
 
+  /**
+   * Zero-width span for synthetic nodes (implicit counts, `d%` sides) that
+   * have no source text of their own — anchored at the governing token.
+   */
+  private static syntheticLiteral(value: number, token: Token): LiteralNode {
+    return { type: 'Literal', value, start: token.position, end: token.position };
+  }
+
   private parseLiteral(token: Token): LiteralNode {
     return {
       type: 'Literal',
       value: Number.parseFloat(token.value),
+      start: token.position,
+      end: token.end,
     };
   }
 
@@ -327,6 +337,8 @@ export class Parser {
       type: 'UnaryOp',
       operator: '-',
       operand,
+      start: token.position,
+      end: operand.end ?? token.end,
     };
   }
 
@@ -337,8 +349,10 @@ export class Parser {
     this.rejectVersusTarget(sides, token);
     return {
       type: 'Dice',
-      count: { type: 'Literal', value: 1 },
+      count: Parser.syntheticLiteral(1, token),
       sides,
+      start: token.position,
+      end: sides.end ?? token.end,
     };
   }
 
@@ -354,15 +368,19 @@ export class Parser {
       type: 'Dice',
       count: left,
       sides,
+      start: left.start ?? token.position,
+      end: sides.end ?? token.end,
     };
   }
 
-  private parsePrefixDicePercent(): DiceNode {
+  private parsePrefixDicePercent(token: Token): DiceNode {
     // d% → Dice(1, 100)
     return {
       type: 'Dice',
-      count: { type: 'Literal', value: 1 },
-      sides: { type: 'Literal', value: 100 },
+      count: Parser.syntheticLiteral(1, token),
+      sides: Parser.syntheticLiteral(100, token),
+      start: token.position,
+      end: token.end,
     };
   }
 
@@ -374,15 +392,19 @@ export class Parser {
     return {
       type: 'Dice',
       count: left,
-      sides: { type: 'Literal', value: 100 },
+      sides: Parser.syntheticLiteral(100, token),
+      start: left.start ?? token.position,
+      end: token.end,
     };
   }
 
-  private parsePrefixFateDice(): FateDiceNode {
+  private parsePrefixFateDice(token: Token): FateDiceNode {
     // dF → FateDice(1)
     return {
       type: 'FateDice',
-      count: { type: 'Literal', value: 1 },
+      count: Parser.syntheticLiteral(1, token),
+      start: token.position,
+      end: token.end,
     };
   }
 
@@ -396,13 +418,15 @@ export class Parser {
     return {
       type: 'FateDice',
       count: left,
+      start: left.start ?? token.position,
+      end: token.end,
     };
   }
 
-  private parseGrouped(): GroupedNode {
+  private parseGrouped(token: Token): GroupedNode {
     const expression = this.parseExpression(0);
-    this.expect(TokenType.RPAREN);
-    return { type: 'Grouped', expression };
+    const close = this.expect(TokenType.RPAREN);
+    return { type: 'Grouped', expression, start: token.position, end: close.end };
   }
 
   private parseGroup(startToken: Token): GroupNode {
@@ -428,13 +452,13 @@ export class Parser {
         unterminated,
       );
     }
-    this.advance();
+    const close = this.advance();
 
-    return { type: 'Group', expressions };
+    return { type: 'Group', expressions, start: startToken.position, end: close.end };
   }
 
   private parseVariable(token: Token): VariableNode {
-    return { type: 'Variable', name: token.value };
+    return { type: 'Variable', name: token.value, start: token.position, end: token.end };
   }
 
   private parseFunctionCall(token: Token): FunctionCallNode {
@@ -456,7 +480,7 @@ export class Parser {
       }
     }
 
-    this.expect(TokenType.RPAREN);
+    const close = this.expect(TokenType.RPAREN);
 
     const arity = FUNCTION_ARITY[token.value];
     if (arity === undefined) {
@@ -486,7 +510,13 @@ export class Parser {
       );
     }
 
-    return { type: 'FunctionCall', name: token.value, args };
+    return {
+      type: 'FunctionCall',
+      name: token.value,
+      args,
+      start: token.position,
+      end: close.end,
+    };
   }
 
   private parseBinaryOp(left: ASTNode, token: Token): BinaryOpNode {
@@ -503,6 +533,8 @@ export class Parser {
       operator,
       left,
       right,
+      start: left.start ?? token.position,
+      end: right.end ?? token.end,
     };
   }
 
@@ -657,10 +689,13 @@ export class Parser {
 
     // Default to 1 when no explicit count follows the modifier (e.g., 4d6kh → 4d6kh1)
     const nextToken = this.peek().type;
-    const count: ASTNode =
-      nextToken === TokenType.NUMBER || nextToken === TokenType.LPAREN || nextToken === TokenType.AT
-        ? this.parseExpression(BP.DICE_LEFT)
-        : { type: 'Literal', value: 1 };
+    const hasExplicitCount =
+      nextToken === TokenType.NUMBER ||
+      nextToken === TokenType.LPAREN ||
+      nextToken === TokenType.AT;
+    const count: ASTNode = hasExplicitCount
+      ? this.parseExpression(BP.DICE_LEFT)
+      : Parser.syntheticLiteral(1, token);
     this.rejectSuccessCountTarget(count, token);
     this.rejectVersusTarget(count, token);
 
@@ -670,6 +705,8 @@ export class Parser {
       selector,
       count,
       target,
+      start: target.start ?? token.position,
+      end: hasExplicitCount ? (count.end ?? token.end) : token.end,
     };
   }
 
@@ -722,9 +759,16 @@ export class Parser {
           ? 'compound'
           : 'penetrating';
 
-    const node: ExplodeNode = { type: 'Explode', variant, target };
+    const node: ExplodeNode = {
+      type: 'Explode',
+      variant,
+      target,
+      start: target.start ?? token.position,
+      end: token.end,
+    };
     if (this.isComparePointAhead()) {
       node.threshold = this.parseComparePoint();
+      node.end = node.threshold.value.end ?? token.end;
     }
     return node;
   }
@@ -760,7 +804,14 @@ export class Parser {
     const once = token.type === TokenType.REROLL_ONCE;
     const condition = this.parseComparePoint();
 
-    return { type: 'Reroll', once, condition, target };
+    return {
+      type: 'Reroll',
+      once,
+      condition,
+      target,
+      start: target.start ?? token.position,
+      end: condition.value.end ?? token.end,
+    };
   }
 
   private parseSort(target: ASTNode, token: Token): SortNode {
@@ -802,7 +853,13 @@ export class Parser {
     // ? Chained sorts (`4d6ss`, `4d6sasd`) are allowed — sort is idempotent
     //   when repeated in the same direction; a later `sd` after `s` just
     //   overrides the order since both pass over the same pool.
-    return { type: 'Sort', order, target };
+    return {
+      type: 'Sort',
+      order,
+      target,
+      start: target.start ?? token.position,
+      end: token.end,
+    };
   }
 
   private parseCritThreshold(target: ASTNode, token: Token): CritThresholdNode {
@@ -853,6 +910,7 @@ export class Parser {
     const threshold: CritThreshold = this.isComparePointAhead()
       ? this.parseComparePoint()
       : 'default';
+    const end = threshold === 'default' ? token.end : (threshold.value.end ?? token.end);
 
     // ? Unwrap parens so `(1d20cs>19)cs=1` chains into the inner node. Without
     //   unwrapping, the outer `cs` would create a second CritThresholdNode
@@ -869,6 +927,7 @@ export class Parser {
       } else {
         chainTarget.failThresholds.push(threshold);
       }
+      chainTarget.end = end;
       return chainTarget;
     }
 
@@ -877,6 +936,8 @@ export class Parser {
       successThresholds: token.type === TokenType.CRIT_SUCCESS ? [threshold] : [],
       failThresholds: token.type === TokenType.CRIT_FAIL ? [threshold] : [],
       target,
+      start: target.start ?? token.position,
+      end,
     };
   }
 
@@ -905,6 +966,8 @@ export class Parser {
       type: 'SuccessCount',
       target,
       threshold: { operator, value },
+      start: target.start ?? token.position,
+      end: value.end ?? token.end,
     };
 
     if (this.peek().type === TokenType.FAIL) {
@@ -918,6 +981,7 @@ export class Parser {
         this.rejectVersusTarget(failValue, token);
         node.failThreshold = { operator: '=', value: failValue };
       }
+      node.end = node.failThreshold.value.end ?? node.end ?? token.end;
     }
 
     return node;
@@ -941,7 +1005,13 @@ export class Parser {
     const dc = this.parseExpression(BP.VS_RIGHT);
     this.rejectSuccessCountTarget(dc, token);
 
-    return { type: 'Versus', roll: left, dc };
+    return {
+      type: 'Versus',
+      roll: left,
+      dc,
+      start: left.start ?? token.position,
+      end: dc.end ?? token.end,
+    };
   }
 
   // * Compare point utilities
@@ -1115,7 +1185,9 @@ export class Parser {
   }
 
   private peek(): Token {
-    return this.tokens[this.pos] ?? { type: TokenType.EOF, value: '', position: this.pos };
+    return (
+      this.tokens[this.pos] ?? { type: TokenType.EOF, value: '', position: this.pos, end: this.pos }
+    );
   }
 
   private advance(): Token {
