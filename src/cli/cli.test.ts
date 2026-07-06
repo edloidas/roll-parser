@@ -75,6 +75,13 @@ describe('CLI integration', () => {
     expect(stderr).toContain('Error:');
   });
 
+  test('positioned errors print the notation with a caret', async () => {
+    const { stderr, exitCode } = await runCli(['2d6+&']);
+    expect(exitCode).toBe(1);
+    expect(stderr).toContain('2d6+&');
+    expect(stderr).toContain('    ^');
+  });
+
   test('no arguments exits with code 2', async () => {
     const { stderr, exitCode } = await runCli([]);
     expect(exitCode).toBe(2);

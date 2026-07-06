@@ -348,9 +348,13 @@ describe('roll() integration', () => {
   });
 
   describe('edge case behaviors', () => {
-    test('very large power produces Infinity', () => {
+    test('very large power throws NON_FINITE_RESULT', () => {
       // 2^1024 overflows IEEE 754 double (~1.8e308 max)
-      expect(roll('2**1024').total).toBe(Number.POSITIVE_INFINITY);
+      expect(() => roll('2**1024')).toThrow('Result is not a finite number');
+    });
+
+    test('NaN result throws NON_FINITE_RESULT', () => {
+      expect(() => roll('2**1024 - 2**1024')).toThrow('Result is not a finite number');
     });
 
     test('unary minus on grouped expression', () => {

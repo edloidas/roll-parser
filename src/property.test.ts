@@ -845,7 +845,8 @@ describe('property-based invariants', () => {
             for (const die of result.rolls) {
               const expected = die.result >= threshold;
               if (die.critical !== expected) return false;
-              if (die.fumble !== false) return false;
+              // cs does not touch the fumble side — default rule stays.
+              if (die.fumble !== (die.result === 1)) return false;
             }
             return true;
           },
@@ -866,7 +867,8 @@ describe('property-based invariants', () => {
             for (const die of result.rolls) {
               const expected = die.result <= threshold;
               if (die.fumble !== expected) return false;
-              if (die.critical !== false) return false;
+              // cf does not touch the critical side — default rule stays.
+              if (die.critical !== (die.result === die.sides)) return false;
             }
             return true;
           },

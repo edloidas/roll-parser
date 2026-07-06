@@ -50,7 +50,7 @@ function rollReplacement(sides: number, rng: RNG, env: EvalEnv): DieResult {
     result,
     modifiers: [],
     critical: result === sides && sides > 1,
-    fumble: result === 1,
+    fumble: result === 1 && sides > 1,
   };
 }
 

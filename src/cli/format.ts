@@ -30,16 +30,20 @@ export function formatResult(result: RollResult, verbose: boolean): string {
  * Converts markdown-style dice markers to terminal-friendly forms.
  *
  * The evaluator uses markdown syntax in the rendered field:
- *   `~~value~~` — dropped dice
+ *   `~~value~~` — dropped dice or dropped group sub-rolls
  *   `**value**` — dice counted as success
  *   `__value__` — dice counted as failure
  *
  * For plain terminals these become `(value)`, `[value]`, and `{value}` so
  * the per-die classification stays visible without any markup dependency.
+ * Dropped spans can wrap a whole sub-roll (e.g. `~~1d8[2]~~` from
+ * `{1d8, 1d10}kh1`), so the strikethrough pattern accepts any tilde-free
+ * content, not just a single number. The evaluator never nests `~~`
+ * (see `stripInnerMarkers`), so the tilde-free span match is safe.
  */
 function formatRendered(rendered: string): string {
   return rendered
-    .replace(/~~(-?\d+)~~/g, '($1)')
     .replace(/\*\*(-?\d+)\*\*/g, '[$1]')
-    .replace(/__(-?\d+)__/g, '{$1}');
+    .replace(/__(-?\d+)__/g, '{$1}')
+    .replace(/~~([^~]+)~~/g, '($1)');
 }

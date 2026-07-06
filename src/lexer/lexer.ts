@@ -49,6 +49,22 @@ const IDENTIFIER_KEYWORDS: Record<string, TokenType> = {
 };
 
 /**
+ * Builds a hint for identifiers that start with a known keyword. Maximal
+ * munch merges adjacent modifiers when the first has no count — `4d6khs`
+ * lexes as one identifier `khs` instead of `kh` + `s`. Point the user at the
+ * explicit-count (or whitespace) split.
+ */
+function buildIdentifierHint(identifier: string): string {
+  for (let length = identifier.length - 1; length >= 1; length--) {
+    const prefix = identifier.slice(0, length);
+    if (IDENTIFIER_KEYWORDS[prefix] == null) continue;
+    const rest = identifier.slice(length);
+    return ` (did you mean '${prefix}' followed by '${rest}'? separate modifiers with a count or space, e.g. '${prefix}1${rest}')`;
+  }
+  return '';
+}
+
+/**
  * Lexer for dice notation.
  *
  * Produces a stream of tokens from an input string using character-by-character
@@ -155,8 +171,13 @@ export class Lexer {
           return this.createTokenAt(TokenType.EXPLODE_PENETRATING, '!p', startPos);
         }
         return this.createTokenAt(TokenType.EXPLODE, char, startPos);
-      default:
-        throw new LexerError('Unexpected character', 'UNEXPECTED_CHARACTER', startPos, char);
+      default: {
+        // Surrogate pairs (emoji, astral symbols) span two code units —
+        // report the full code point instead of a lone surrogate ('�').
+        const codePoint = this.input.codePointAt(startPos);
+        const display = codePoint == null ? char : String.fromCodePoint(codePoint);
+        throw new LexerError('Unexpected character', 'UNEXPECTED_CHARACTER', startPos, display);
+      }
     }
   }
 
@@ -229,7 +250,12 @@ export class Lexer {
       return this.createTokenAt(tokenType, lower, startPos);
     }
 
-    throw new LexerError('Unexpected identifier', 'UNEXPECTED_IDENTIFIER', startPos, lower);
+    throw new LexerError(
+      `Unexpected identifier${buildIdentifierHint(lower)}`,
+      'UNEXPECTED_IDENTIFIER',
+      startPos,
+      lower,
+    );
   }
 
   /**

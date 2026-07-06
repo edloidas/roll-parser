@@ -95,6 +95,24 @@ const BP = {
 } as const;
 
 /**
+ * Maximum expression nesting depth. Far beyond any human-authored notation —
+ * exists so adversarial input like 20,000 nested parens throws a typed
+ * `ParseError` instead of an uncaught `RangeError` stack overflow (which
+ * would also break the `isRollParserError` contract). Bounding parse depth
+ * also bounds AST depth, protecting the recursive AST walkers and evaluator.
+ */
+const MAX_PARSE_DEPTH = 128;
+
+/** Human-readable symbols for tokens named in `expect()` error messages. */
+const TOKEN_DISPLAY: Partial<Record<TokenType, string>> = {
+  [TokenType.LPAREN]: `'('`,
+  [TokenType.RPAREN]: `')'`,
+  [TokenType.LBRACE]: `'{'`,
+  [TokenType.RBRACE]: `'}'`,
+  [TokenType.COMMA]: `','`,
+};
+
+/**
  * Arity table for math functions. `min` and `max` are inclusive.
  * `POSITIVE_INFINITY` means unbounded (variadic).
  */
@@ -116,6 +134,7 @@ const FUNCTION_ARITY: Record<string, { min: number; max: number }> = {
 export class Parser {
   private readonly tokens: Token[];
   private pos = 0;
+  private depth = 0;
 
   constructor(tokens: Token[]) {
     this.tokens = tokens;
@@ -149,19 +168,33 @@ export class Parser {
    * Parse an expression with minimum binding power.
    */
   private parseExpression(minBp: number): ASTNode {
-    let left = this.parseNud();
-
-    while (this.hasTokens()) {
-      const token = this.peek();
-      const leftBp = this.getLeftBp(token);
-
-      if (leftBp < minBp) break;
-
-      this.advance();
-      left = this.parseLed(left, token);
+    this.depth += 1;
+    if (this.depth > MAX_PARSE_DEPTH) {
+      throw new ParseError(
+        `Expression nesting exceeds the maximum depth of ${MAX_PARSE_DEPTH}`,
+        'MAX_DEPTH_EXCEEDED',
+        this.peek().position,
+        this.peek(),
+      );
     }
 
-    return left;
+    try {
+      let left = this.parseNud();
+
+      while (this.hasTokens()) {
+        const token = this.peek();
+        const leftBp = this.getLeftBp(token);
+
+        if (leftBp < minBp) break;
+
+        this.advance();
+        left = this.parseLed(left, token);
+      }
+
+      return left;
+    } finally {
+      this.depth -= 1;
+    }
   }
 
   /**
@@ -313,6 +346,7 @@ export class Parser {
     // 4d6 → Dice(4, 6)
     this.rejectSuccessCountTarget(left, token);
     this.rejectVersusTarget(left, token);
+    this.rejectBareDiceChain(left, token);
     const sides = this.parseExpression(BP.DICE_RIGHT);
     this.rejectSuccessCountTarget(sides, token);
     this.rejectVersusTarget(sides, token);
@@ -336,6 +370,7 @@ export class Parser {
     // 2d% → Dice(2, 100)
     this.rejectSuccessCountTarget(left, token);
     this.rejectVersusTarget(left, token);
+    this.rejectBareDiceChain(left, token);
     return {
       type: 'Dice',
       count: left,
@@ -357,6 +392,7 @@ export class Parser {
     // without BP competition against a right-operand.
     this.rejectSuccessCountTarget(left, token);
     this.rejectVersusTarget(left, token);
+    this.rejectBareDiceChain(left, token);
     return {
       type: 'FateDice',
       count: left,
@@ -468,6 +504,34 @@ export class Parser {
       left,
       right,
     };
+  }
+
+  /**
+   * Rejects a dice token whose count operand is itself a bare (unparenthesized)
+   * dice expression. `4d6d1` would otherwise silently parse as `(4d6)d1` —
+   * roll 4d6, then use the result as a count of d1 dice — which is almost
+   * never intended: every major dice dialect reads `4d6d1` as "drop lowest 1".
+   * Both meanings stay reachable through explicit forms: `4d6dl1` to drop,
+   * `(4d6)d1` for nested dice.
+   */
+  private rejectBareDiceChain(left: ASTNode, token: Token): void {
+    switch (left.type) {
+      case 'Dice':
+      case 'FateDice':
+      case 'Explode':
+      case 'Reroll':
+      case 'Modifier':
+      case 'Sort':
+      case 'CritThreshold':
+        throw new ParseError(
+          `Ambiguous dice chain: use 'dl'/'dh' to drop dice (4d6dl1) or parentheses for nested dice ((4d6)d1)`,
+          'AMBIGUOUS_DICE_CHAIN',
+          token.position,
+          token,
+        );
+      default:
+        return;
+    }
   }
 
   private rejectSuccessCountTarget(target: ASTNode, token: Token): void {
@@ -1063,9 +1127,10 @@ export class Parser {
   private expect(type: TokenType): Token {
     const token = this.peek();
     if (token.type !== type) {
-      const expected = TokenType[type];
+      const expected = TOKEN_DISPLAY[type] ?? TokenType[type];
+      const got = token.type === TokenType.EOF ? 'end of input' : `'${token.value}'`;
       throw new ParseError(
-        `Expected ${expected} but got '${token.value}'`,
+        `Expected ${expected} but got ${got}`,
         'EXPECTED_TOKEN',
         token.position,
         token,

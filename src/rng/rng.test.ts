@@ -196,6 +196,40 @@ describe('SeededRNG', () => {
       }
     });
 
+    it('should cover ranges wider than 2^32', () => {
+      // A single uint32 draw caps out below 2^32 — the wide path must reach
+      // the upper part of the range. P(all 1,000 draws < 2^32) ≈ (1/256)^1000.
+      const rng = new SeededRNG(42);
+      const max = 2 ** 40;
+      let sawAbove32Bits = false;
+
+      for (let i = 0; i < 1000; i++) {
+        const value = rng.nextInt(1, max);
+        expect(value).toBeGreaterThanOrEqual(1);
+        expect(value).toBeLessThanOrEqual(max);
+        expect(Number.isInteger(value)).toBe(true);
+        if (value > 0x100000000) sawAbove32Bits = true;
+      }
+
+      expect(sawAbove32Bits).toBe(true);
+    });
+
+    it('should support the full safe-integer range', () => {
+      const rng = new SeededRNG(42);
+
+      for (let i = 0; i < 100; i++) {
+        const value = rng.nextInt(1, Number.MAX_SAFE_INTEGER);
+        expect(value).toBeGreaterThanOrEqual(1);
+        expect(value).toBeLessThanOrEqual(Number.MAX_SAFE_INTEGER);
+        expect(Number.isInteger(value)).toBe(true);
+      }
+    });
+
+    it('should throw RangeError for ranges beyond 2^53', () => {
+      const rng = new SeededRNG(42);
+      expect(() => rng.nextInt(-(2 ** 53), 2 ** 53)).toThrow(RangeError);
+    });
+
     it('should hit both min and max values (d6)', () => {
       const rng = new SeededRNG(42);
       const min = 1;

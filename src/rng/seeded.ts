@@ -114,6 +114,12 @@ export class SeededRNG implements RNG {
       return lo;
     }
 
+    // Ranges wider than 2^32 need two draws — a single uint32 can never
+    // produce the upper part of the range and would silently truncate it.
+    if (range > 0x100000000) {
+      return lo + this.nextBoundedWide(range);
+    }
+
     // Rejection sampling for unbiased distribution
     // Avoids modulo bias by rejecting values that would cause uneven distribution
     const threshold = (0x100000000 - range) % range;
@@ -123,5 +129,29 @@ export class SeededRNG implements RNG {
     } while (value < threshold);
 
     return lo + (value % range);
+  }
+
+  /**
+   * Unbiased sampling in `[0, range)` for ranges above 2^32, built from two
+   * uint32 draws combined into a 53-bit integer (the largest width JS numbers
+   * represent exactly). Ranges beyond 2^53 cannot be sampled without bias —
+   * throw instead of silently degrading.
+   */
+  private nextBoundedWide(range: number): number {
+    const MAX_53 = 2 ** 53;
+    if (range > MAX_53) {
+      throw new RangeError(`nextInt range ${range} exceeds 2^53 and cannot be sampled exactly`);
+    }
+
+    // Largest multiple of `range` below 2^53 — values at or above it are
+    // rejected to avoid modulo bias.
+    const limit = Math.floor(MAX_53 / range) * range;
+    let value: number;
+    do {
+      // 32 high bits shifted up by 21 + top 21 bits of a second draw = 53 bits.
+      value = this.nextUint32() * 0x200000 + (this.nextUint32() >>> 11);
+    } while (value >= limit);
+
+    return value % range;
   }
 }

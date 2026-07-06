@@ -770,6 +770,37 @@ describe('Lexer', () => {
         expect((e as LexerError).message).toContain('abc');
       }
     });
+
+    it('should report full code points for astral characters', () => {
+      try {
+        lex('🎲d6');
+      } catch (e) {
+        expect(e).toBeInstanceOf(LexerError);
+        expect((e as LexerError).character).toBe('🎲');
+        expect((e as LexerError).message).toContain('🎲');
+      }
+      expect(() => lex('🎲d6')).toThrow(LexerError);
+    });
+
+    it('should hint at modifier splits for merged identifiers', () => {
+      // `4d6khs` — maximal munch merges `kh` + `s` into one identifier.
+      try {
+        lex('4d6khs');
+      } catch (e) {
+        expect(e).toBeInstanceOf(LexerError);
+        expect((e as LexerError).message).toContain(`did you mean 'kh' followed by 's'`);
+        expect((e as LexerError).message).toContain('kh1s');
+      }
+      expect(() => lex('4d6khs')).toThrow(LexerError);
+    });
+
+    it('should not hint for identifiers with no keyword prefix', () => {
+      try {
+        lex('xyz');
+      } catch (e) {
+        expect((e as LexerError).message).not.toContain('did you mean');
+      }
+    });
   });
 
   describe('Lexer class', () => {

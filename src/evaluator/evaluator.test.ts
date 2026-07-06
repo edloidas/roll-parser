@@ -664,13 +664,14 @@ describe('evaluate', () => {
       expect(getDie(result.rolls, 0).critical).toBe(false);
     });
 
-    test('1d1 is fumble but not critical', () => {
+    test('1d1 is neither critical nor fumble', () => {
+      // A d1 always rolls 1 — neither an exceptional max nor min.
       const ast = parse('1d1');
       const rng = createMockRng([1]);
       const result = evaluate(ast, rng);
 
       expect(getDie(result.rolls, 0).critical).toBe(false);
-      expect(getDie(result.rolls, 0).fumble).toBe(true);
+      expect(getDie(result.rolls, 0).fumble).toBe(false);
     });
 
     test('normal roll has no critical or fumble', () => {
@@ -1997,6 +1998,48 @@ describe('evaluate', () => {
       expect(result.natural).toBe(3);
       expect(result.degree).toBe(DegreeOfSuccess.CriticalFailure);
     });
+
+    test('Standard explode nat-20: 1d20! vs 35 rolls=[20,5] → natural=20, upgrade CriticalFailure→Failure', () => {
+      // The explosion continuation die is not a primary d20 — the natural
+      // comes from the original die, matching the compound (`!!`) behavior.
+      const ast = parse('1d20! vs 35');
+      const rng = createMockRng([20, 5]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(25);
+      expect(result.natural).toBe(20);
+      expect(result.degree).toBe(DegreeOfSuccess.Failure);
+    });
+
+    test('Standard explode chain: 1d20! vs 60 rolls=[20,20,5] → natural=20 through both continuations', () => {
+      const ast = parse('1d20! vs 60');
+      const rng = createMockRng([20, 20, 5]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(45);
+      expect(result.natural).toBe(20);
+      expect(result.degree).toBe(DegreeOfSuccess.Failure);
+    });
+
+    test('Penetrating explode nat-20: 1d20!p vs 35 rolls=[20,5] → natural=20, upgrade CriticalFailure→Failure', () => {
+      const ast = parse('1d20!p vs 35');
+      const rng = createMockRng([20, 5]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(24);
+      expect(result.natural).toBe(20);
+      expect(result.degree).toBe(DegreeOfSuccess.Failure);
+    });
+
+    test('Exploded pool plus separate d20 stays ambiguous: 1d20!+1d20 vs 50 → natural undefined', () => {
+      const ast = parse('1d20!+1d20 vs 50');
+      const rng = createMockRng([20, 5, 10]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(35);
+      expect(result.natural).toBeUndefined();
+      expect(result.degree).toBe(DegreeOfSuccess.CriticalFailure);
+    });
   });
 
   describe('math functions', () => {
@@ -2624,6 +2667,38 @@ describe('evaluate', () => {
         expect(d8?.modifiers).not.toContain('dropped');
       });
 
+      test('dropped sub-roll success tags are stripped from successes count', () => {
+        const ast = parse('{2d6>=4, 2d6>=4}kh1');
+        // Sub 1: [5, 5] → 2 successes, subtotal 2. Sub 2: [4, 1] → 1 success,
+        // subtotal 1. kh1 keeps sub 1 — the dropped sub-roll's success must
+        // not leak into RollResult.successes.
+        const rng = createMockRng([5, 5, 4, 1]);
+        const result = evaluate(ast, rng);
+
+        expect(result.total).toBe(2);
+        expect(result.successes).toBe(2);
+        expect(result.failures).toBe(0);
+      });
+
+      test('dropped sub-roll failure tags are stripped from failures count', () => {
+        const ast = parse('{2d6>=4f<=2, 2d6>=4f<=2}kh1');
+        // Sub 1: [5, 5] → 2 successes. Sub 2: [1, 1] → 2 failures, dropped.
+        const rng = createMockRng([5, 5, 1, 1]);
+        const result = evaluate(ast, rng);
+
+        expect(result.successes).toBe(2);
+        expect(result.failures).toBe(0);
+      });
+
+      test('dropped sub-roll rendering strips success/failure markers', () => {
+        const ast = parse('{2d6>=4, 2d6>=4}kh1');
+        const rng = createMockRng([5, 5, 4, 1]);
+        const result = evaluate(ast, rng);
+
+        // No bold/underline markers inside the dropped strikethrough span.
+        expect(result.rendered).toBe('{2d6>=4[**5**, **5**], ~~2d6>=4[4, 1]~~} = 2');
+      });
+
       test('literal-only multi-sub-roll: {3, 5, 7}kh1 returns 7', () => {
         const ast = parse('{3, 5, 7}kh1');
         const result = evaluate(ast, createMockRng([]));
@@ -2906,8 +2981,8 @@ describe('evaluate', () => {
 
       expect(result.total).toBe(55);
       expect(result.rolls.map((d) => d.critical)).toEqual([true, true, false, false]);
-      // Replace semantics — cf side empty, so no fumble on the `1`.
-      expect(result.rolls.map((d) => d.fumble)).toEqual([false, false, false, false]);
+      // Independent overrides — cf side untouched, default fumble on the `1`.
+      expect(result.rolls.map((d) => d.fumble)).toEqual([false, false, false, true]);
       expect(result.expression).toBe('4d20cs>=19');
     });
 
@@ -2919,15 +2994,15 @@ describe('evaluate', () => {
       expect(result.rolls.map((d) => d.critical)).toEqual([true, false, false, false]);
     });
 
-    test('cf<3 flags 1 and 2 as fumble and clears default critical', () => {
+    test('cf<3 flags 1 and 2 as fumble and keeps default critical', () => {
       const ast = parse('4d20cf<3');
       const rng = createMockRng([20, 1, 2, 15]);
       const result = evaluate(ast, rng);
 
       expect(result.total).toBe(38);
-      // Replace semantics — no success thresholds, so the natural 20 is not
-      // critical anymore.
-      expect(result.rolls.map((d) => d.critical)).toEqual([false, false, false, false]);
+      // Independent overrides — cs side untouched, so the natural 20 keeps
+      // its default critical.
+      expect(result.rolls.map((d) => d.critical)).toEqual([true, false, false, false]);
       expect(result.rolls.map((d) => d.fumble)).toEqual([false, true, true, false]);
     });
 
