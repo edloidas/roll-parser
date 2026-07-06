@@ -131,6 +131,10 @@ export function applyStandardExplode(
  * Compound explode: pool length stays the same. Each original die's `result`
  * accumulates every explosion roll, and gains the `'exploded'` modifier once
  * it actually exploded at least once.
+ *
+ * Mutates exploded dice in place — the same `DieResult` objects are shared
+ * between `RollResult.rolls` and the `RollPart` tree, and both must reflect
+ * post-explosion state.
  */
 export function applyCompoundExplode(
   pool: DieResult[],
@@ -138,8 +142,8 @@ export function applyCompoundExplode(
   rng: RNG,
   env: EvalEnv,
 ): DieResult[] {
-  return pool.map((original) => {
-    if (!canExplode(original)) return original;
+  for (const original of pool) {
+    if (!canExplode(original)) continue;
 
     const sides = original.sides;
     let accumulated = original.result;
@@ -158,22 +162,18 @@ export function applyCompoundExplode(
       iterations += 1;
     }
 
-    if (!exploded) return original;
+    if (!exploded) continue;
 
-    return {
-      sides,
-      result: accumulated,
-      initialResult: original.result,
-      modifiers: original.modifiers.includes('exploded')
-        ? original.modifiers
-        : [...original.modifiers, 'exploded'],
-      // ? `critical` and `fumble` refer to the original triggering roll, but
-      //   after compounding the `result` is a sum. Mark critical if the
-      //   original roll was max; fumble stays as-is (can't accumulate down).
-      critical: original.critical,
-      fumble: original.fumble,
-    };
-  });
+    // ? `critical` and `fumble` keep referring to the original triggering
+    //   roll — after compounding the `result` is a sum.
+    original.initialResult = original.result;
+    original.result = accumulated;
+    if (!original.modifiers.includes('exploded')) {
+      original.modifiers = [...original.modifiers, 'exploded'];
+    }
+  }
+
+  return pool;
 }
 
 /**

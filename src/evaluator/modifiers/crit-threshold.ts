@@ -17,14 +17,12 @@
  * @module evaluator/modifiers/crit-threshold
  */
 
-import type { CompareOp, DieResult } from '../../types.js';
+import type { DieResult, ResolvedCritThreshold } from '../../types.js';
 import { matchesCondition } from './compare.js';
 
-/**
- * Resolved crit threshold — either `'default'` (meaning the evaluator
- * resolves per-die at apply time) or a concrete operator+value pair.
- */
-export type ResolvedCritThreshold = { operator: CompareOp; value: number } | 'default';
+// ? Re-exported for existing importers — the definition moved to types.ts so
+//   the public RollPart union can reference it without a circular import.
+export type { ResolvedCritThreshold } from '../../types.js';
 
 /**
  * Applies success/fail threshold arrays to a dice pool, overriding each

@@ -70,6 +70,11 @@ export type {
   DieModifier,
   DieResult,
   EvaluateOptions,
+  ModifierSpec,
+  ResolvedComparePoint,
+  ResolvedCritThreshold,
+  RollPart,
+  RollPartType,
   RollResult,
 } from './types.js';
 export { DegreeOfSuccess } from './types.js';

@@ -23,6 +23,21 @@ export type ComparePoint = {
 };
 
 /**
+ * A ComparePoint whose value has been evaluated to a number. Used in
+ * `RollPart` where meta-expressions are already resolved.
+ */
+export type ResolvedComparePoint = {
+  operator: CompareOp;
+  value: number;
+};
+
+/**
+ * A resolved crit threshold — `'default'` means the per-die default rule
+ * (`result === sides` for critical, `result === 1` for fumble).
+ */
+export type ResolvedCritThreshold = ResolvedComparePoint | 'default';
+
+/**
  * Modifier flags applied to individual die results.
  */
 export type DieModifier =
@@ -74,6 +89,96 @@ export type DieResult = {
 };
 
 /**
+ * Per-spec keep/drop entry inside a flattened modifier chain. Counts are
+ * resolved at evaluation time (meta-expressions like `kh(1d2)` become the
+ * rolled number).
+ */
+export type ModifierSpec = {
+  kind: 'keep' | 'drop';
+  selector: 'highest' | 'lowest';
+  count: number;
+};
+
+/**
+ * Fields shared by every RollPart variant. `start`/`end` mirror the source
+ * span of the AST node the part was evaluated from — present whenever the
+ * AST came from `parse()`, absent on hand-built ASTs.
+ */
+type RollPartBase = {
+  /** Sub-total this part contributed to its parent. */
+  total: number;
+  start?: number;
+  end?: number;
+};
+
+/**
+ * Structured breakdown of an evaluated expression, mirroring the AST 1:1 —
+ * every ASTNode produces exactly one RollPart. Discriminants are lowercase
+ * camelCase to distinguish evaluation-tree types from `ASTNode.type`
+ * (PascalCase) at a glance.
+ *
+ * Invariants:
+ * - `RollResult.parts.total === RollResult.total`.
+ * - `successCount.total === successes - failures`.
+ * - `literal.total === value` and `variable.total === value`.
+ * - Each part's `rolls[]` shares `DieResult` references with
+ *   `RollResult.rolls[]`; both reflect post-evaluation state (explode
+ *   accumulation, reroll flags, keep/drop flags). No deep clone.
+ *
+ * Meta-expression sub-trees (`4d6kh(1d2)`, `(1+1)d6` counts/sides, computed
+ * thresholds) are not surfaced as nested parts — their resolved numbers
+ * appear in the owning part, and their dice are inspectable in
+ * `RollResult.rolls` via the `'meta'` modifier tag.
+ */
+export type RollPart =
+  | (RollPartBase & { type: 'literal'; value: number })
+  | (RollPartBase & { type: 'variable'; name: string; value: number })
+  | (RollPartBase & { type: 'dice'; count: number; sides: number; rolls: DieResult[] })
+  | (RollPartBase & { type: 'fateDice'; count: number; rolls: DieResult[] })
+  | (RollPartBase & { type: 'grouped'; inner: RollPart })
+  | (RollPartBase & {
+      type: 'binaryOp';
+      operator: '+' | '-' | '*' | '/' | '%' | '**';
+      left: RollPart;
+      right: RollPart;
+    })
+  | (RollPartBase & { type: 'unaryOp'; operator: '-'; operand: RollPart })
+  | (RollPartBase & { type: 'modifier'; specs: ModifierSpec[]; target: RollPart })
+  | (RollPartBase & {
+      type: 'explode';
+      variant: 'standard' | 'compound' | 'penetrating';
+      threshold?: ResolvedComparePoint;
+      target: RollPart;
+    })
+  | (RollPartBase & {
+      type: 'reroll';
+      once: boolean;
+      condition: ResolvedComparePoint;
+      target: RollPart;
+    })
+  | (RollPartBase & {
+      type: 'successCount';
+      threshold: ResolvedComparePoint;
+      failThreshold?: ResolvedComparePoint;
+      target: RollPart;
+      successes: number;
+      failures: number;
+    })
+  | (RollPartBase & { type: 'versus'; roll: RollPart; dc: RollPart; degree: DegreeOfSuccess })
+  | (RollPartBase & { type: 'functionCall'; name: string; args: RollPart[] })
+  | (RollPartBase & { type: 'group'; parts: RollPart[]; keptIndices?: number[] })
+  | (RollPartBase & { type: 'sort'; order: 'ascending' | 'descending'; target: RollPart })
+  | (RollPartBase & {
+      type: 'critThreshold';
+      successThresholds: ResolvedCritThreshold[];
+      failThresholds: ResolvedCritThreshold[];
+      target: RollPart;
+    });
+
+/** Convenience alias for consumers writing exhaustive switches. */
+export type RollPartType = RollPart['type'];
+
+/**
  * Complete roll result with all metadata.
  */
 export type RollResult = {
@@ -87,6 +192,8 @@ export type RollResult = {
   rendered: string;
   /** All individual die results */
   rolls: DieResult[];
+  /** Structured breakdown of the evaluated expression, mirroring the AST 1:1. */
+  parts: RollPart;
   /**
    * Number of dice tagged as success across the whole expression. Present
    * only when a success-counting modifier was used. Independent of `total` —
