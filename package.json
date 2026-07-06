@@ -51,7 +51,7 @@
     "access": "public"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p site/tsconfig.json",
     "lint": "biome lint .",
     "lint:fix": "biome lint --write .",
     "format": "biome format --write .",
@@ -68,6 +68,8 @@
     "build:types": "tsc --emitDeclarationOnly -p tsconfig.build.json",
     "check:package": "attw --pack . --profile esm-only && publint",
     "bench": "bun run bench/roll.bench.ts",
+    "site:build": "bun scripts/build-site.ts",
+    "site:dev": "bun ./site/index.html",
     "test": "bun test",
     "test:node": "node -e \"import('./dist/index.js').then(m => { const r = m.roll('1d6'); if (!(r.total >= 1 && r.total <= 6)) throw new Error('ESM smoke failed: total=' + r.total); console.log('Node.js ESM smoke: ok'); })\" && node -e \"const m = require('./dist/index.js'); const r = m.roll('1d6'); if (!(r.total >= 1 && r.total <= 6)) throw new Error('require(esm) smoke failed: total=' + r.total); console.log('Node.js require(esm) smoke: ok');\"",
     "test:watch": "bun test --watch",

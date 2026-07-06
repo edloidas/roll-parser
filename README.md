@@ -11,6 +11,10 @@ TypeScript-first, Bun-optimized, Pratt parser architecture.
   <a href="https://nodejs.org/"><img src="https://img.shields.io/badge/Node.js-22%2B-339933.svg" alt="Node.js"></a>
 </p>
 
+<p align="center">
+  <a href="https://edloidas.github.io/roll-parser/"><strong>Try it online →</strong></a>
+</p>
+
 ## Status
 
 > **v3 Alpha** — Stages 1–3 (core engine, system compatibility, advanced

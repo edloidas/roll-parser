@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>roll-parser — interactive dice notation playground</title>
+    <meta
+      name="description"
+      content="Interactive playground for roll-parser: type dice notation and watch it roll. Shareable, seeded, reproducible."
+    />
+    <link rel="icon" type="image/svg+xml" href="./public/favicon.svg" />
+    <link rel="stylesheet" href="./src/style.css" />
+  </head>
+  <body>
+    <!-- Shared rainbow gradient — referenced by id from every die SVG and the logo. -->
+    <svg class="defs" aria-hidden="true" width="0" height="0" focusable="false">
+      <defs>
+        <linearGradient id="rp-rainbow" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#ff4d6d" />
+          <stop offset="20%" stop-color="#ff9e3d" />
+          <stop offset="40%" stop-color="#ffe14d" />
+          <stop offset="60%" stop-color="#4dff9e" />
+          <stop offset="80%" stop-color="#4dc4ff" />
+          <stop offset="100%" stop-color="#b06dff" />
+        </linearGradient>
+      </defs>
+    </svg>
+
+    <div class="app" id="app">
+      <main class="main">
+        <a class="logo" href="https://github.com/edloidas/roll-parser" aria-label="roll-parser on GitHub">
+          <svg class="logo-die" viewBox="0 0 100 100" aria-hidden="true">
+            <!-- d20: pointy-top hexagon outline with central triangle facets -->
+            <polygon
+              class="logo-stroke"
+              points="50,4 89.8,27 89.8,73 50,96 10.2,73 10.2,27"
+            />
+            <polygon class="logo-stroke" points="50,26 72,64 28,64" />
+            <path
+              class="logo-stroke"
+              d="M50,4 L50,26 M89.8,27 L72,64 M89.8,73 L72,64 M50,96 L50,64 M10.2,73 L28,64 M10.2,27 L28,64 M28,64 L50,64 M72,64 L50,64"
+            />
+            <text class="logo-num" x="50" y="20" text-anchor="middle">20</text>
+          </svg>
+          <span class="wordmark">roll-parser</span>
+        </a>
+
+        <div class="tray" id="tray" aria-hidden="true"></div>
+
+        <div class="input-zone">
+          <div class="input-row">
+            <label class="visually-hidden" for="notation">Dice notation</label>
+            <input
+              id="notation"
+              class="notation-input"
+              type="text"
+              inputmode="text"
+              autocomplete="off"
+              autocapitalize="off"
+              autocorrect="off"
+              spellcheck="false"
+              enterkeyhint="go"
+              placeholder="Try 4d6kh3, 1d20+7 vs 15, 8d6!…"
+            />
+            <button id="reroll" class="icon-btn" type="button" title="Reroll (Enter)" aria-label="Reroll">
+              <span class="icon-glyph" aria-hidden="true">⟳</span>
+            </button>
+            <button id="copy" class="icon-btn" type="button" title="Copy shareable link" aria-label="Copy link">
+              <span class="icon-glyph" aria-hidden="true">🔗</span>
+              <span class="copied-flag" id="copied" aria-hidden="true">copied</span>
+            </button>
+          </div>
+
+          <div class="error-slot" id="error" role="alert" aria-live="assertive"></div>
+
+          <div class="chips" id="chips">
+            <button class="chip" type="button" data-notation="4d6kh3">4d6kh3</button>
+            <button class="chip" type="button" data-notation="2d20kl1+5">2d20kl1+5</button>
+            <button class="chip" type="button" data-notation="8d6!">8d6!</button>
+            <button class="chip" type="button" data-notation="10d10&gt;=6f1">10d10&gt;=6f1</button>
+            <button class="chip" type="button" data-notation="1d20+7 vs 15">1d20+7 vs 15</button>
+            <button class="chip" type="button" data-notation="4dF">4dF</button>
+            <button class="chip" type="button" data-notation="{1d8, 1d10}kh1">{1d8, 1d10}kh1</button>
+          </div>
+        </div>
+
+        <section class="result-panel" id="result" aria-live="polite" aria-label="Roll result"></section>
+      </main>
+
+      <footer class="footer">
+        <a href="https://github.com/edloidas/roll-parser">GitHub</a>
+        <span class="dot">·</span>
+        <a href="https://www.npmjs.com/package/roll-parser">npm</a>
+        <span class="dot">·</span>
+        <span class="version" id="version"></span>
+      </footer>
+    </div>
+
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>
