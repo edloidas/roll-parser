@@ -4,25 +4,26 @@
   "description": "High-performance dice notation parser for tabletop RPGs. TypeScript-first, Bun-optimized.",
   "type": "module",
   "main": "./dist/index.js",
-  "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
-  "bin": { "roll-parser": "./dist/cli.js" },
+  "bin": {
+    "roll-parser": "./dist/cli.js"
+  },
   "sideEffects": false,
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.mjs",
-      "require": "./dist/index.js"
+      "default": "./dist/index.js"
     },
     "./testing": {
       "types": "./dist/testing.d.ts",
-      "import": "./dist/testing.mjs",
-      "require": "./dist/testing.js"
-    }
+      "default": "./dist/testing.js"
+    },
+    "./package.json": "./package.json"
   },
   "files": [
     "dist",
     "src",
+    "CHANGELOG.md",
     "!src/**/*.test.ts"
   ],
   "keywords": [
@@ -60,26 +61,29 @@
     "check:version": "bun scripts/check-version.ts",
     "check:changelog": "bun scripts/check-changelog.ts",
     "clean": "rm -rf dist coverage",
-    "build": "bun run clean && bun run build:esm && bun run build:cjs && bun run build:esm:testing && bun run build:cjs:testing && bun run build:cli && bun run build:types",
-    "build:esm": "bun build src/index.ts --outfile dist/index.mjs --target bun",
-    "build:cjs": "bun build src/index.ts --outfile dist/index.js --target node",
-    "build:esm:testing": "bun build src/testing.ts --outfile dist/testing.mjs --target bun",
-    "build:cjs:testing": "bun build src/testing.ts --outfile dist/testing.js --target node",
-    "build:cli": "bun build src/cli/index.ts --outfile dist/cli.js --target node",
+    "build": "bun run clean && bun run build:lib && bun run build:testing && bun run build:cli && bun run build:types",
+    "build:lib": "bun build src/index.ts --outdir dist --target node --sourcemap=linked",
+    "build:testing": "bun build src/testing.ts --outdir dist --target node --sourcemap=linked",
+    "build:cli": "bun build src/cli/index.ts --outdir dist --entry-naming 'cli.[ext]' --target node --sourcemap=linked",
     "build:types": "tsc --emitDeclarationOnly -p tsconfig.build.json",
+    "check:package": "attw --pack . --profile esm-only && publint",
+    "bench": "bun run bench/roll.bench.ts",
     "test": "bun test",
-    "test:node": "node -e \"import('./dist/index.mjs').then(m => { const r = m.roll('1d6'); if (!(r.total >= 1 && r.total <= 6)) throw new Error('ESM smoke failed: total=' + r.total); console.log('Node.js ESM smoke: ok'); })\" && node -e \"const m = require('./dist/index.js'); const r = m.roll('1d6'); if (!(r.total >= 1 && r.total <= 6)) throw new Error('CJS smoke failed: total=' + r.total); console.log('Node.js CJS smoke: ok');\"",
+    "test:node": "node -e \"import('./dist/index.js').then(m => { const r = m.roll('1d6'); if (!(r.total >= 1 && r.total <= 6)) throw new Error('ESM smoke failed: total=' + r.total); console.log('Node.js ESM smoke: ok'); })\" && node -e \"const m = require('./dist/index.js'); const r = m.roll('1d6'); if (!(r.total >= 1 && r.total <= 6)) throw new Error('require(esm) smoke failed: total=' + r.total); console.log('Node.js require(esm) smoke: ok');\"",
     "test:watch": "bun test --watch",
-    "test:ci": "bun test --bail",
-    "validate": "bun run check && bun run build && bun test:ci",
+    "test:ci": "bun test --bail --coverage",
+    "validate": "bun run check && bun run build && bun run check:package && bun test:ci",
     "coverage": "bun test --coverage",
-    "release:dry": "bun run check:version && bun run check:changelog && bun run check && bun run build && bun test",
+    "release:dry": "bun run check:version && bun run check:changelog && bun run check && bun run build && bun run check:package && bun test",
     "prepublishOnly": "bun run release:dry"
   },
   "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.4",
     "@biomejs/biome": "^2.4.9",
     "@types/bun": "^1.3.0",
     "fast-check": "^4.6.0",
+    "mitata": "^1.0.34",
+    "publint": "^0.3.21",
     "typescript": "^6.0.2"
   },
   "engines": {

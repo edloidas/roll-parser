@@ -4,7 +4,7 @@
  * @module evaluator/modifiers/keep-drop
  */
 
-import type { DieResult } from '../../types';
+import type { DieResult } from '../../types.js';
 
 /**
  * Marks all eligible dice as `'kept'`. Dice that already carry `'dropped'`

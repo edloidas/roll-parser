@@ -4,11 +4,11 @@
  * @module evaluator
  */
 
-export { DEFAULT_MAX_DICE, evaluate, EvaluatorError } from './evaluator';
+export { DEFAULT_MAX_DICE, evaluate, EvaluatorError } from './evaluator.js';
 export {
   applyDropHighest,
   applyDropLowest,
   applyKeepHighest,
   applyKeepLowest,
   sumKeptDice,
-} from './modifiers/keep-drop';
+} from './modifiers/keep-drop.js';

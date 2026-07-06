@@ -4,7 +4,7 @@
  * @module types
  */
 
-import type { ASTNode } from './parser/ast';
+import type { ASTNode } from './parser/ast.js';
 
 /**
  * Comparison operator for compare points.

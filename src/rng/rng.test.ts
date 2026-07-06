@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
-import { createMockRng, MockRNGExhaustedError } from './mock';
-import { SeededRNG } from './seeded';
+import { createMockRng, MockRNGExhaustedError } from './mock.js';
+import { SeededRNG } from './seeded.js';
 
 // Note: Property-based tests with fast-check are available when the package is installed.
 // Run `bun install` to enable them.

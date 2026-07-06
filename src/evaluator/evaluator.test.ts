@@ -5,12 +5,12 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import { parse } from '../parser/parser';
-import { createMockRng } from '../rng/mock';
-import type { DieResult } from '../types';
-import { DegreeOfSuccess } from '../types';
-import type { EvalContext } from './evaluator';
-import { DEFAULT_MAX_DICE, evaluate, EvaluatorError, mergeMetaRolls } from './evaluator';
+import { parse } from '../parser/parser.js';
+import { createMockRng } from '../rng/mock.js';
+import type { DieResult } from '../types.js';
+import { DegreeOfSuccess } from '../types.js';
+import type { EvalContext } from './evaluator.js';
+import { DEFAULT_MAX_DICE, evaluate, EvaluatorError, mergeMetaRolls } from './evaluator.js';
 
 /**
  * Helper to safely get a die result at index, throwing if not present.

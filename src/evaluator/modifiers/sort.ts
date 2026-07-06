@@ -10,7 +10,7 @@
  * @module evaluator/modifiers/sort
  */
 
-import type { DieResult } from '../../types';
+import type { DieResult } from '../../types.js';
 
 /**
  * Returns a sorted copy of `dice` in the given order, preserving every die's

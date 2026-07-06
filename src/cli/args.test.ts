@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { parseArgs } from './args';
+import { parseArgs } from './args.js';
 
 describe('parseArgs', () => {
   describe('notation parsing', () => {

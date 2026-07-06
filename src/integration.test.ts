@@ -5,11 +5,11 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import { EvaluatorError } from './evaluator/evaluator';
-import { ParseError } from './parser/parser';
-import { createMockRng } from './rng/mock';
-import { roll } from './roll';
-import { DegreeOfSuccess } from './types';
+import { EvaluatorError } from './evaluator/evaluator.js';
+import { ParseError } from './parser/parser.js';
+import { createMockRng } from './rng/mock.js';
+import { roll } from './roll.js';
+import { DegreeOfSuccess } from './types.js';
 
 describe('roll() integration', () => {
   describe('full pipeline', () => {
@@ -355,6 +355,28 @@ describe('roll() integration', () => {
 
     test('NaN result throws NON_FINITE_RESULT', () => {
       expect(() => roll('2**1024 - 2**1024')).toThrow('Result is not a finite number');
+    });
+
+    test('reroll replacement rolls count against maxDice', () => {
+      // Pool of 2 fills the limit; the first replacement roll must exceed it.
+      expect(() => roll('2d6r<6', { maxDice: 2, rng: createMockRng([1, 1, 1]) })).toThrow(
+        'exceeds limit',
+      );
+    });
+
+    test('reroll skips dice dropped by a prior modifier', () => {
+      // kh2 keeps [5, 4], drops [1, 2] — reroll must not touch dropped dice.
+      const once = roll('4d6kh2ro<3', { rng: createMockRng([5, 4, 1, 2]) });
+      expect(once.total).toBe(9);
+
+      const recursive = roll('4d6kh2r<3', { rng: createMockRng([5, 4, 1, 2]) });
+      expect(recursive.total).toBe(9);
+    });
+
+    test('compound explode respects maxExplodeIterations', () => {
+      expect(() =>
+        roll('1d6!!', { maxExplodeIterations: 2, rng: createMockRng([6, 6, 6]) }),
+      ).toThrow('Explode iteration limit');
     });
 
     test('unary minus on grouped expression', () => {

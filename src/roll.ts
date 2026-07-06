@@ -4,12 +4,12 @@
  * @module roll
  */
 
-import type { RNG } from './rng/types';
-import type { EvaluateOptions, RollResult } from './types';
-import { evaluate } from './evaluator/evaluator';
-import { lex } from './lexer/lexer';
-import { Parser } from './parser/parser';
-import { SeededRNG } from './rng/seeded';
+import type { RNG } from './rng/types.js';
+import type { EvaluateOptions, RollResult } from './types.js';
+import { evaluate } from './evaluator/evaluator.js';
+import { lex } from './lexer/lexer.js';
+import { Parser } from './parser/parser.js';
+import { SeededRNG } from './rng/seeded.js';
 
 /**
  * Options for the roll function.

@@ -14,7 +14,9 @@ bun validate    # Full check before commit: typecheck + lint + format:check + bu
 
 - Runtime: Bun — never use npm, yarn, or pnpm
 - Target: ES2022, TypeScript only
-- Library + CLI dual output (ESM + CJS compiled JS)
+- Library + CLI, ESM-only compiled JS (Node ≥22 consumes via `import` or `require(esm)`)
+- Relative imports in `src/` carry explicit `.js` extensions — required for nodenext-safe `.d.ts` output (verified by `bun run check:package`)
+- Do not pass `--sourcemap` with `--outfile` to `bun build` — Bun 1.3.x silently writes nothing; use `--outdir` (+ `--entry-naming` for the CLI)
 
 ## Ad-hoc scripts
 

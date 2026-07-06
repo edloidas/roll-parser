@@ -10,7 +10,7 @@
 import {
   MockRNGExhaustedError as _MockRNGExhaustedError,
   createMockRng as _createMockRng,
-} from './rng/mock';
+} from './rng/mock.js';
 
 export const createMockRng = _createMockRng;
 export const MockRNGExhaustedError = _MockRNGExhaustedError;

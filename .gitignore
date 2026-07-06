@@ -15,6 +15,9 @@ settings.local.json
 # Build files
 dist/
 build/
+# TS-only source tree — compiled JS in src/ is always a stray build artifact
+src/**/*.js
+src/**/*.js.map
 
 # Development files
 api/

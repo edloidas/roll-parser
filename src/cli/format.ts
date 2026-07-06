@@ -6,7 +6,7 @@
  * @module cli/format
  */
 
-import type { RollResult } from '../types';
+import type { RollResult } from '../types.js';
 
 /**
  * Formats a roll result for terminal display.
