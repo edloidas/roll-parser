@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
-import { createMockRng } from '../rng/mock';
-import { roll } from '../roll';
-import { formatResult } from './format';
+import { createMockRng } from '../rng/mock.js';
+import { roll } from '../roll.js';
+import { formatResult } from './format.js';
 
 describe('formatResult', () => {
   describe('normal mode', () => {

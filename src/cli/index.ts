@@ -6,11 +6,11 @@
  * @module cli/index
  */
 
-import { isRollParserError } from '../errors';
-import { VERSION } from '../index';
-import { roll } from '../roll';
-import { parseArgs } from './args';
-import { formatResult } from './format';
+import { isRollParserError } from '../errors.js';
+import { VERSION } from '../index.js';
+import { roll } from '../roll.js';
+import { parseArgs } from './args.js';
+import { formatResult } from './format.js';
 
 const HELP_TEXT = `roll-parser v${VERSION}
 

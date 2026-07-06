@@ -4,7 +4,7 @@
  * @module rng/mock
  */
 
-import type { RNG } from './types';
+import type { RNG } from './types.js';
 
 /**
  * Error thrown when MockRNG exhausts its predefined values.

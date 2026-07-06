@@ -15,8 +15,8 @@
  * @module evaluator/modifiers/success-count
  */
 
-import type { CompareOp, DieResult } from '../../types';
-import { matchesCondition } from './compare';
+import type { CompareOp, DieResult } from '../../types.js';
+import { matchesCondition } from './compare.js';
 
 export type ResolvedThreshold = {
   operator: CompareOp;

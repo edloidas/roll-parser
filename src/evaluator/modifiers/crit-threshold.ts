@@ -17,8 +17,8 @@
  * @module evaluator/modifiers/crit-threshold
  */
 
-import type { CompareOp, DieResult } from '../../types';
-import { matchesCondition } from './compare';
+import type { CompareOp, DieResult } from '../../types.js';
+import { matchesCondition } from './compare.js';
 
 /**
  * Resolved crit threshold — either `'default'` (meaning the evaluator

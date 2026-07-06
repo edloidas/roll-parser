@@ -4,5 +4,5 @@
  * @module rng
  */
 
-export type { RNG } from './types';
-export { SeededRNG } from './seeded';
+export type { RNG } from './types.js';
+export { SeededRNG } from './seeded.js';

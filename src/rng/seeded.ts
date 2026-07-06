@@ -4,7 +4,7 @@
  * @module rng/seeded
  */
 
-import type { RNG } from './types';
+import type { RNG } from './types.js';
 
 /**
  * Seedable pseudo-random number generator using xorshift128.

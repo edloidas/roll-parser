@@ -4,7 +4,7 @@
  * @module parser/ast
  */
 
-import type { ComparePoint } from '../types';
+import type { ComparePoint } from '../types.js';
 
 /**
  * Numeric literal node.

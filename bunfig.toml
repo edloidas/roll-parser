@@ -4,5 +4,10 @@ minimumReleaseAge = 259200
 minimumReleaseAgeExcludes = ["@biomejs/biome", "@types/bun", "typescript"]
 
 [test]
-coverage = false
-coverageSkipSourceFiles = true
+coverageSkipTestFiles = true
+
+# Enforced only when coverage runs (`bun test --coverage`, `test:ci`) — plain
+# `bun test` stays fast. Targets from .claude/rules/testing.md.
+[test.coverageThreshold]
+lines = 0.95
+functions = 1.0

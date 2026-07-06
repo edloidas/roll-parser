@@ -4,11 +4,11 @@
  * @module parser/parser
  */
 
-import type { RollParserErrorCode } from '../errors';
-import { RollParserError } from '../errors';
-import { lex } from '../lexer/lexer';
-import { type Token, TokenType } from '../lexer/tokens';
-import type { CompareOp, ComparePoint } from '../types';
+import type { RollParserErrorCode } from '../errors.js';
+import { RollParserError } from '../errors.js';
+import { lex } from '../lexer/lexer.js';
+import { type Token, TokenType } from '../lexer/tokens.js';
+import type { CompareOp, ComparePoint } from '../types.js';
 import type {
   ASTNode,
   BinaryOpNode,
@@ -28,7 +28,7 @@ import type {
   UnaryOpNode,
   VariableNode,
   VersusNode,
-} from './ast';
+} from './ast.js';
 import {
   containsDicePool,
   containsFatePool,
@@ -38,7 +38,7 @@ import {
   isCritThreshold,
   isSuccessCount,
   unwrapTransparent,
-} from './ast';
+} from './ast.js';
 
 /**
  * Error thrown when the parser encounters invalid syntax.

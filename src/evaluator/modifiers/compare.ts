@@ -8,7 +8,7 @@
  * @module evaluator/modifiers/compare
  */
 
-import type { CompareOp } from '../../types';
+import type { CompareOp } from '../../types.js';
 
 /**
  * Compares a die result against a fixed comparison threshold.

@@ -4,9 +4,9 @@
  * @module lexer/lexer
  */
 
-import type { RollParserErrorCode } from '../errors';
-import { RollParserError } from '../errors';
-import { type Token, TokenType } from './tokens';
+import type { RollParserErrorCode } from '../errors.js';
+import { RollParserError } from '../errors.js';
+import { type Token, TokenType } from './tokens.js';
 
 /**
  * Error thrown when the lexer encounters an invalid character.

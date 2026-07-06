@@ -9,10 +9,10 @@
  * @module evaluator/modifiers/reroll
  */
 
-import type { RNG } from '../../rng/types';
-import type { CompareOp, DieResult } from '../../types';
-import { EvaluatorError, type EvalEnv } from '../evaluator';
-import { matchesCondition } from './compare';
+import type { RNG } from '../../rng/types.js';
+import type { CompareOp, DieResult } from '../../types.js';
+import { EvaluatorError, type EvalEnv } from '../evaluator.js';
+import { matchesCondition } from './compare.js';
 
 /** Default maximum reroll iterations per die. */
 export const DEFAULT_MAX_REROLL_ITERATIONS = 1_000;

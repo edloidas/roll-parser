@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
-import { Lexer, LexerError, lex } from './lexer';
-import { TokenType } from './tokens';
+import { Lexer, LexerError, lex } from './lexer.js';
+import { TokenType } from './tokens.js';
 
 describe('Lexer', () => {
   describe('basic tokens', () => {

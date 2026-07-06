@@ -4,8 +4,8 @@
  * @module evaluator/evaluator
  */
 
-import type { RollParserErrorCode } from '../errors';
-import { RollParserError } from '../errors';
+import type { RollParserErrorCode } from '../errors.js';
+import { RollParserError } from '../errors.js';
 import type {
   ASTNode,
   BinaryOpNode,
@@ -24,19 +24,19 @@ import type {
   UnaryOpNode,
   VariableNode,
   VersusNode,
-} from '../parser/ast';
-import { isModifier } from '../parser/ast';
-import type { RNG } from '../rng/types';
-import type { ComparePoint, DieResult, EvaluateOptions, RollResult } from '../types';
-import { DegreeOfSuccess } from '../types';
-import { applyCritThresholds, type ResolvedCritThreshold } from './modifiers/crit-threshold';
+} from '../parser/ast.js';
+import { isModifier } from '../parser/ast.js';
+import type { RNG } from '../rng/types.js';
+import type { ComparePoint, DieResult, EvaluateOptions, RollResult } from '../types.js';
+import { DegreeOfSuccess } from '../types.js';
+import { applyCritThresholds, type ResolvedCritThreshold } from './modifiers/crit-threshold.js';
 import {
   applyCompoundExplode,
   applyPenetratingExplode,
   applyStandardExplode,
   buildShouldExplode,
   DEFAULT_MAX_EXPLODE_ITERATIONS,
-} from './modifiers/explode';
+} from './modifiers/explode.js';
 import {
   applyDropHighest,
   applyDropLowest,
@@ -44,14 +44,14 @@ import {
   applyKeepLowest,
   markAllKept,
   sumKeptDice,
-} from './modifiers/keep-drop';
+} from './modifiers/keep-drop.js';
 import {
   applyRecursiveReroll,
   applyRerollOnce,
   DEFAULT_MAX_REROLL_ITERATIONS,
-} from './modifiers/reroll';
-import { sortDice } from './modifiers/sort';
-import { countSuccesses } from './modifiers/success-count';
+} from './modifiers/reroll.js';
+import { sortDice } from './modifiers/sort.js';
+import { countSuccesses } from './modifiers/success-count.js';
 
 /**
  * Error thrown during AST evaluation.

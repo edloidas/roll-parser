@@ -8,10 +8,10 @@
  * @module evaluator/modifiers/explode
  */
 
-import type { RNG } from '../../rng/types';
-import type { CompareOp } from '../../types';
-import type { DieResult } from '../../types';
-import { EvaluatorError, type EvalEnv } from '../evaluator';
+import type { RNG } from '../../rng/types.js';
+import type { CompareOp } from '../../types.js';
+import type { DieResult } from '../../types.js';
+import { EvaluatorError, type EvalEnv } from '../evaluator.js';
 
 /** Default maximum explosion iterations per die. */
 export const DEFAULT_MAX_EXPLODE_ITERATIONS = 1_000;

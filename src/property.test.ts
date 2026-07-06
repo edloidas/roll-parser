@@ -6,7 +6,7 @@
 
 import { describe, test } from 'bun:test';
 import fc from 'fast-check';
-import { roll } from './roll';
+import { roll } from './roll.js';
 
 describe('property-based invariants', () => {
   describe('dice roll bounds', () => {

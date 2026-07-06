@@ -5,14 +5,14 @@
  */
 
 // * Error hierarchy
-export { RollParserError, isRollParserError } from './errors';
-export type { RollParserErrorCode } from './errors';
+export { RollParserError, isRollParserError } from './errors.js';
+export type { RollParserErrorCode } from './errors.js';
 
 // * Lexer exports
-export { LexerError } from './lexer/lexer';
+export { LexerError } from './lexer/lexer.js';
 
 // * Parser exports
-export { parse, ParseError } from './parser/parser';
+export { parse, ParseError } from './parser/parser.js';
 export type {
   ASTNode,
   BinaryOpNode,
@@ -28,7 +28,7 @@ export type {
   UnaryOpNode,
   VariableNode,
   VersusNode,
-} from './parser/ast';
+} from './parser/ast.js';
 export {
   isBinaryOp,
   isDice,
@@ -43,11 +43,11 @@ export {
   isUnaryOp,
   isVariable,
   isVersus,
-} from './parser/ast';
+} from './parser/ast.js';
 
 // * RNG exports
-export type { RNG } from './rng/types';
-export { SeededRNG } from './rng/seeded';
+export type { RNG } from './rng/types.js';
+export { SeededRNG } from './rng/seeded.js';
 
 // * Evaluator exports
 export {
@@ -56,7 +56,7 @@ export {
   DEFAULT_MAX_REROLL_ITERATIONS,
   evaluate,
   EvaluatorError,
-} from './evaluator/evaluator';
+} from './evaluator/evaluator.js';
 export type {
   CompareOp,
   ComparePoint,
@@ -64,13 +64,15 @@ export type {
   DieResult,
   EvaluateOptions,
   RollResult,
-} from './types';
-export { DegreeOfSuccess } from './types';
+} from './types.js';
+export { DegreeOfSuccess } from './types.js';
 
 // * Public API
-export { roll } from './roll';
-export type { RollOptions } from './roll';
+export { roll } from './roll.js';
+export type { RollOptions } from './roll.js';
 
-import pkg from '../package.json';
+// ? Named import — Bun's bundler tree-shakes the JSON module down to the
+//   single used property, so the full manifest is not embedded in dist.
+import { version } from '../package.json';
 
-export const VERSION: string = pkg.version;
+export const VERSION: string = version;
