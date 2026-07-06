@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Rich structured `RollResult.parts` output — a 16-variant discriminated union mirroring the AST 1:1, always built during evaluation. Each part carries its sub-total, resolved thresholds/specs (`ModifierSpec`, `ResolvedComparePoint`, `ResolvedCritThreshold`), source span, and (for dice parts) the same `DieResult` objects as `RollResult.rolls`. Group parts under keep/drop carry `keptIndices`; versus parts carry `degree`; successCount parts carry `successes`/`failures` with `total === successes - failures`. JSON-serializable with `parts.total === result.total` guaranteed ([#84](https://github.com/edloidas/roll-parser/issues/84))
+- Source spans: lexer tokens carry an exclusive `end` offset, and every parser-produced AST node carries `start`/`end` offsets (`NodeSpan`) into the notation. `EvaluatorError` is stamped with the span of the tightest failing sub-expression, and the CLI caret uses it — `2d6+1d0+3` points at `1d0` ([#120](https://github.com/edloidas/roll-parser/issues/120))
+- Root exports for the previously missing `GroupNode`/`SortNode`/`CritThresholdNode` types and `isGroup`/`isSort`/`isCritThreshold` guards ([#120](https://github.com/edloidas/roll-parser/issues/120))
 - Benchmark suite (`bun bench`, mitata) covering parse, evaluate, and end-to-end roll paths ([#119](https://github.com/edloidas/roll-parser/issues/119))
 - Coverage thresholds enforced in CI (100% functions, ≥95% lines per file); coverage was previously disabled in `bunfig.toml` and unmeasurable even with `--coverage` ([#119](https://github.com/edloidas/roll-parser/issues/119))
 - CLI prints the notation with a caret under the error position for lexer/parser errors ([#118](https://github.com/edloidas/roll-parser/issues/118))

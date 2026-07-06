@@ -105,24 +105,22 @@ export function applyRecursiveReroll(
     let current = original;
     let iterations = 0;
 
+    // ? Mutate flags in place — the same DieResult objects are shared with
+    //   the RollPart tree, and both views must reflect reroll state.
     while (matchesCondition(current.result, operator, value)) {
       if (iterations >= env.maxRerollIterations) {
         throw rerollLimitError(env.maxRerollIterations);
       }
 
-      result.push({
-        ...current,
-        modifiers: [...stripSlotFlags(current.modifiers), 'rerolled', 'dropped'],
-      });
+      current.modifiers = [...stripSlotFlags(current.modifiers), 'rerolled', 'dropped'];
+      result.push(current);
 
       current = rollReplacement(current.sides, rng, env);
       iterations += 1;
     }
 
-    result.push({
-      ...current,
-      modifiers: [...stripSlotFlags(current.modifiers), 'kept'],
-    });
+    current.modifiers = [...stripSlotFlags(current.modifiers), 'kept'];
+    result.push(current);
   }
 
   return result;
@@ -148,24 +146,19 @@ export function applyRerollOnce(
       continue;
     }
 
+    // ? Mutate flags in place — see `applyRecursiveReroll`.
     if (!matchesCondition(original.result, operator, value)) {
-      result.push({
-        ...original,
-        modifiers: [...stripSlotFlags(original.modifiers), 'kept'],
-      });
+      original.modifiers = [...stripSlotFlags(original.modifiers), 'kept'];
+      result.push(original);
       continue;
     }
 
-    result.push({
-      ...original,
-      modifiers: [...stripSlotFlags(original.modifiers), 'rerolled', 'dropped'],
-    });
+    original.modifiers = [...stripSlotFlags(original.modifiers), 'rerolled', 'dropped'];
+    result.push(original);
 
     const replacement = rollReplacement(original.sides, rng, env);
-    result.push({
-      ...replacement,
-      modifiers: [...stripSlotFlags(replacement.modifiers), 'kept'],
-    });
+    replacement.modifiers = [...stripSlotFlags(replacement.modifiers), 'kept'];
+    result.push(replacement);
   }
 
   return result;
