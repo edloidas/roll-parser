@@ -58,6 +58,19 @@ describe('parseArgs', () => {
         },
       });
     });
+
+    test('treats negative prefix dice notation as positional args', () => {
+      for (const notation of ['-d6', '-D6', '-dF', '-(2d6)']) {
+        const result = parseArgs([notation]);
+        expect(result.ok).toBe(true);
+        if (result.ok) expect(result.args.notation).toBe(notation);
+      }
+    });
+
+    test('rejects unknown short options that do not look like notation', () => {
+      const result = parseArgs(['-x']);
+      expect(result).toEqual({ ok: false, error: 'Unknown option: -x' });
+    });
   });
 
   describe('help flag', () => {

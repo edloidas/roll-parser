@@ -59,7 +59,8 @@ export function parseArgs(argv: string[]): ParseArgsResult {
       seed = value;
     } else if (arg.startsWith('--')) {
       return { ok: false, error: `Unknown option: ${arg}` };
-    } else if (arg.startsWith('-') && arg.length > 1 && !/^\d/.test(arg.slice(1))) {
+    } else if (arg.startsWith('-') && arg.length > 1 && !/^[\ddD(]/.test(arg.slice(1))) {
+      // Negative prefix notation (-3, -d6, -D6, -dF, -(2d6)) stays positional
       return { ok: false, error: `Unknown option: ${arg}` };
     } else {
       positional.push(arg);
