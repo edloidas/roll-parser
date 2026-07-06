@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Notation Guide — roll-parser</title>
+    <meta
+      name="description"
+      content="A living guide to roll-parser dice notation: dice, arithmetic, keep/drop, exploding, rerolls, success counting, checks, groups, and variables — each a live, rollable example."
+    />
+    <link rel="icon" type="image/svg+xml" href="./public/favicon.svg" />
+    <link
+      rel="preload"
+      as="font"
+      type="font/woff2"
+      href="./public/fonts/cinzel-latin.woff2"
+      crossorigin
+    />
+    <link
+      rel="preload"
+      as="font"
+      type="font/woff2"
+      href="./public/fonts/alegreya-latin.woff2"
+      crossorigin
+    />
+    <link rel="stylesheet" href="./src/style.css" />
+    <link rel="stylesheet" href="./src/reference.css" />
+  </head>
+  <body class="ref-body">
+    <!-- Shared SVG gradients — #rp-rainbow for the logo, #rp-gold for dice. -->
+    <svg class="defs" aria-hidden="true" width="0" height="0" focusable="false">
+      <defs>
+        <linearGradient id="rp-rainbow" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#ff4d6d" />
+          <stop offset="20%" stop-color="#ff9e3d" />
+          <stop offset="40%" stop-color="#ffe14d" />
+          <stop offset="60%" stop-color="#4dff9e" />
+          <stop offset="80%" stop-color="#4dc4ff" />
+          <stop offset="100%" stop-color="#b06dff" />
+        </linearGradient>
+        <linearGradient id="rp-gold" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#d9a441" />
+          <stop offset="100%" stop-color="#a3622f" />
+        </linearGradient>
+      </defs>
+    </svg>
+
+    <header class="ref-header">
+      <a class="ref-home" href="./index.html" aria-label="Back to the roll-parser playground">
+        <svg class="logo-die ref-logo-die" viewBox="0 0 100 100" aria-hidden="true">
+          <polygon
+            class="logo-stroke"
+            points="50,4 89.8,27 89.8,73 50,96 10.2,73 10.2,27"
+          />
+          <polygon class="logo-stroke" points="50,26 72,64 28,64" />
+          <path
+            class="logo-stroke"
+            d="M50,4 L50,26 M89.8,27 L72,64 M89.8,73 L72,64 M50,96 L50,64 M10.2,73 L28,64 M10.2,27 L28,64 M28,64 L50,64 M72,64 L50,64"
+          />
+          <text class="logo-num" x="50" y="20" text-anchor="middle">20</text>
+        </svg>
+        <span class="ref-home-word">roll-parser</span>
+      </a>
+      <h1 class="ref-title">Notation Guide</h1>
+    </header>
+
+    <div class="ref-layout">
+      <nav class="toc" id="toc" aria-label="Sections"></nav>
+      <main class="guide" id="guide"></main>
+    </div>
+
+    <footer class="footer">
+      <a href="./index.html">Playground</a>
+      <span class="dot">·</span>
+      <a href="https://github.com/edloidas/roll-parser">GitHub</a>
+      <span class="dot">·</span>
+      <a href="https://www.npmjs.com/package/roll-parser">npm</a>
+      <span class="dot">·</span>
+      <span class="version" id="version"></span>
+    </footer>
+
+    <script type="module" src="./src/reference.ts"></script>
+  </body>
+</html>

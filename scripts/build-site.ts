@@ -1,24 +1,31 @@
 /**
  * Builds the static GitHub Pages site into `site/dist/`.
  *
- * Bundles `site/src/main.ts` → `site/dist/assets/main.js` with `Bun.build`,
- * copies the stylesheet and favicon, and rewrites `index.html` so every asset
- * URL is relative (`./assets/...`) — required for hosting under the
+ * Bundles both entrypoints (`main.ts`, `reference.ts`) → `site/dist/assets/`
+ * with a single `Bun.build`, copies the stylesheets, favicon, and self-hosted
+ * fonts, and rewrites both HTML files so every asset URL is relative
+ * (`./assets/...`, `./fonts/...`) — required for hosting under the
  * `/roll-parser/` path on GitHub Pages. Exits non-zero on any failure.
  */
 
-import { rm } from 'node:fs/promises';
+import { readdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 
 const SITE_DIR = join(import.meta.dir, '..', 'site');
+const SRC_DIR = join(SITE_DIR, 'src');
+const PUBLIC_DIR = join(SITE_DIR, 'public');
 const DIST_DIR = join(SITE_DIR, 'dist');
 const ASSETS_DIR = join(DIST_DIR, 'assets');
+const FONTS_DIR = join(DIST_DIR, 'fonts');
+
+const STYLESHEETS = ['style.css', 'reference.css'];
+const HTML_PAGES = ['index.html', 'reference.html'];
 
 async function build(): Promise<void> {
   await rm(DIST_DIR, { recursive: true, force: true });
 
   const output = await Bun.build({
-    entrypoints: [join(SITE_DIR, 'src', 'main.ts')],
+    entrypoints: [join(SRC_DIR, 'main.ts'), join(SRC_DIR, 'reference.ts')],
     outdir: ASSETS_DIR,
     target: 'browser',
     minify: true,
@@ -32,27 +39,52 @@ async function build(): Promise<void> {
   }
 
   await copyStyles();
-  await Bun.write(join(DIST_DIR, 'favicon.svg'), Bun.file(join(SITE_DIR, 'public', 'favicon.svg')));
+  await copyFonts();
+  await Bun.write(join(DIST_DIR, 'favicon.svg'), Bun.file(join(PUBLIC_DIR, 'favicon.svg')));
   await writeHtml();
 
   console.log(`Site built → ${DIST_DIR}`);
 }
 
-/** Copies the stylesheet into `assets/`. */
+/**
+ * Copies the stylesheets into `assets/`, rewriting the dev-relative font path
+ * (`../public/fonts/`) to its dist location (`../fonts/`) so `url(...)` still
+ * resolves from the CSS file's new home in `assets/`.
+ */
 async function copyStyles(): Promise<void> {
-  await Bun.write(join(ASSETS_DIR, 'style.css'), Bun.file(join(SITE_DIR, 'src', 'style.css')));
+  for (const name of STYLESHEETS) {
+    const css = await Bun.file(join(SRC_DIR, name)).text();
+    const rewritten = css.replaceAll('../public/fonts/', '../fonts/');
+    await Bun.write(join(ASSETS_DIR, name), rewritten);
+  }
 }
 
-/** Rewrites the dev HTML's asset paths to the built, relative ones. */
+/** Copies every self-hosted font into `dist/fonts/`. */
+async function copyFonts(): Promise<void> {
+  const srcFonts = join(PUBLIC_DIR, 'fonts');
+  const entries = await readdir(srcFonts);
+
+  for (const entry of entries) {
+    if (!entry.endsWith('.woff2')) continue;
+    await Bun.write(join(FONTS_DIR, entry), Bun.file(join(srcFonts, entry)));
+  }
+}
+
+/** Rewrites each dev HTML file's asset paths to the built, relative ones. */
 async function writeHtml(): Promise<void> {
-  const html = await Bun.file(join(SITE_DIR, 'index.html')).text();
+  for (const page of HTML_PAGES) {
+    const html = await Bun.file(join(SITE_DIR, page)).text();
 
-  const rewritten = html
-    .replace('./src/style.css', './assets/style.css')
-    .replace('./src/main.ts', './assets/main.js')
-    .replace('./public/favicon.svg', './favicon.svg');
+    const rewritten = html
+      .replaceAll('./src/style.css', './assets/style.css')
+      .replaceAll('./src/reference.css', './assets/reference.css')
+      .replaceAll('./src/main.ts', './assets/main.js')
+      .replaceAll('./src/reference.ts', './assets/reference.js')
+      .replaceAll('./public/fonts/', './fonts/')
+      .replaceAll('./public/favicon.svg', './favicon.svg');
 
-  await Bun.write(join(DIST_DIR, 'index.html'), rewritten);
+    await Bun.write(join(DIST_DIR, page), rewritten);
+  }
 }
 
 await build();

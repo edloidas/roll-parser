@@ -9,10 +9,25 @@
       content="Interactive playground for roll-parser: type dice notation and watch it roll. Shareable, seeded, reproducible."
     />
     <link rel="icon" type="image/svg+xml" href="./public/favicon.svg" />
+    <link
+      rel="preload"
+      as="font"
+      type="font/woff2"
+      href="./public/fonts/cinzel-latin.woff2"
+      crossorigin
+    />
+    <link
+      rel="preload"
+      as="font"
+      type="font/woff2"
+      href="./public/fonts/alegreya-latin.woff2"
+      crossorigin
+    />
     <link rel="stylesheet" href="./src/style.css" />
   </head>
   <body>
-    <!-- Shared rainbow gradient — referenced by id from every die SVG and the logo. -->
+    <!-- Shared SVG gradients — referenced by id from die/logo SVGs.
+         #rp-rainbow: logo only. #rp-gold: tray dice stroke. -->
     <svg class="defs" aria-hidden="true" width="0" height="0" focusable="false">
       <defs>
         <linearGradient id="rp-rainbow" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -23,8 +38,17 @@
           <stop offset="80%" stop-color="#4dc4ff" />
           <stop offset="100%" stop-color="#b06dff" />
         </linearGradient>
+        <linearGradient id="rp-gold" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#d9a441" />
+          <stop offset="100%" stop-color="#a3622f" />
+        </linearGradient>
       </defs>
     </svg>
+
+    <a class="guide-link" href="./reference.html" aria-label="Notation guide">
+      <span class="guide-glyph" aria-hidden="true">⤳</span>
+      <span class="guide-text">Guide</span>
+    </a>
 
     <div class="app" id="app">
       <main class="main">
@@ -66,21 +90,63 @@
               <span class="icon-glyph" aria-hidden="true">⟳</span>
             </button>
             <button id="copy" class="icon-btn" type="button" title="Copy shareable link" aria-label="Copy link">
-              <span class="icon-glyph" aria-hidden="true">🔗</span>
+              <!-- Inline SVG instead of the 🔗 emoji — emoji glyphs ignore CSS color. -->
+              <svg class="icon-glyph icon-link" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M10 14a5 5 0 0 0 7.07 0l3.18-3.18a5 5 0 0 0-7.07-7.07L11.5 5.4" />
+                <path d="M14 10a5 5 0 0 0-7.07 0l-3.18 3.18a5 5 0 0 0 7.07 7.07l1.67-1.66" />
+              </svg>
               <span class="copied-flag" id="copied" aria-hidden="true">copied</span>
             </button>
           </div>
 
           <div class="error-slot" id="error" role="alert" aria-live="assertive"></div>
 
-          <div class="chips" id="chips">
-            <button class="chip" type="button" data-notation="4d6kh3">4d6kh3</button>
-            <button class="chip" type="button" data-notation="2d20kl1+5">2d20kl1+5</button>
-            <button class="chip" type="button" data-notation="8d6!">8d6!</button>
-            <button class="chip" type="button" data-notation="10d10&gt;=6f1">10d10&gt;=6f1</button>
-            <button class="chip" type="button" data-notation="1d20+7 vs 15">1d20+7 vs 15</button>
-            <button class="chip" type="button" data-notation="4dF">4dF</button>
-            <button class="chip" type="button" data-notation="{1d8, 1d10}kh1">{1d8, 1d10}kh1</button>
+          <div class="examples" id="examples">
+            <div class="example-group">
+              <span class="example-label">D&amp;D 5e</span>
+              <div class="example-chips">
+                <button class="chip" type="button" data-notation="4d6kh3">4d6kh3</button>
+                <button class="chip" type="button" data-notation="2d20kh1+5">2d20kh1+5</button>
+                <button class="chip" type="button" data-notation="8d6">8d6</button>
+              </div>
+            </div>
+            <div class="example-group">
+              <span class="example-label">World of Darkness</span>
+              <div class="example-chips">
+                <button class="chip" type="button" data-notation="8d10&gt;=6f1">8d10&gt;=6f1</button>
+                <button class="chip" type="button" data-notation="6d10!=10&gt;=8">6d10!=10&gt;=8</button>
+              </div>
+            </div>
+            <div class="example-group">
+              <span class="example-label">Shadowrun</span>
+              <div class="example-chips">
+                <button class="chip" type="button" data-notation="12d6&gt;=5">12d6&gt;=5</button>
+              </div>
+            </div>
+            <div class="example-group">
+              <span class="example-label">Fate</span>
+              <div class="example-chips">
+                <button class="chip" type="button" data-notation="4dF+2">4dF+2</button>
+              </div>
+            </div>
+            <div class="example-group">
+              <span class="example-label">Pathfinder 2e</span>
+              <div class="example-chips">
+                <button class="chip" type="button" data-notation="1d20+7 vs 15">1d20+7 vs 15</button>
+              </div>
+            </div>
+            <div class="example-group">
+              <span class="example-label">Savage Worlds</span>
+              <div class="example-chips">
+                <button class="chip" type="button" data-notation="{1d8!, 1d6!}kh1">{1d8!, 1d6!}kh1</button>
+              </div>
+            </div>
+            <div class="example-group">
+              <span class="example-label">Call of Cthulhu</span>
+              <div class="example-chips">
+                <button class="chip" type="button" data-notation="d%">d%</button>
+              </div>
+            </div>
           </div>
         </div>
 

@@ -1,0 +1,368 @@
+/* Notation guide — page-specific layout on top of style.css tokens/components.
+   No token definitions here; the palette, fonts, dice, and buttons come from
+   style.css. This page scrolls normally (unlike the fixed-viewport playground). */
+
+.ref-body {
+  min-height: 100dvh;
+}
+
+/*
+ * * Header
+ */
+
+.ref-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 1.5rem 1.25rem 1rem;
+}
+
+.ref-home {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-decoration: none;
+  color: var(--text-muted);
+  transition: color 150ms ease;
+}
+
+.ref-home:hover {
+  color: var(--accent);
+}
+
+.ref-logo-die {
+  width: 40px;
+  height: 40px;
+}
+
+.ref-home-word {
+  font-family: var(--font-head);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: inherit;
+}
+
+.ref-title {
+  margin: 0;
+  font-family: var(--font-head);
+  font-size: clamp(1.6rem, 5vw, 2.4rem);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: var(--text);
+}
+
+/*
+ * * Layout
+ */
+
+.ref-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.5rem;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 0 1.25rem 4rem;
+}
+
+@media (min-width: 900px) {
+  .ref-layout {
+    grid-template-columns: 220px minmax(0, 1fr);
+    gap: 2.75rem;
+    align-items: start;
+  }
+}
+
+/*
+ * * Table of contents
+ */
+
+.toc {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.4rem;
+  overflow-x: auto;
+  padding: 0.5rem 0;
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  scrollbar-width: thin;
+}
+
+.toc-link {
+  flex: 0 0 auto;
+  padding: 0.3rem 0.7rem;
+  font-family: var(--font-head);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  color: var(--text-muted);
+  text-decoration: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  transition:
+    color 150ms ease,
+    border-color 150ms ease,
+    background 150ms ease;
+}
+
+.toc-link:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--surface-strong);
+}
+
+.toc-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (min-width: 900px) {
+  .toc {
+    flex-direction: column;
+    flex-wrap: nowrap;
+    overflow-x: visible;
+    top: 1.5rem;
+    padding: 0;
+    background: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .toc-link {
+    border-color: transparent;
+    background: none;
+    text-align: left;
+  }
+
+  .toc-link:hover {
+    background: var(--surface);
+  }
+}
+
+/*
+ * * Sections
+ */
+
+.ref-section {
+  scroll-margin-top: 4.5rem;
+  margin-bottom: 3rem;
+}
+
+.ref-section-title {
+  margin: 0 0 1.1rem;
+  font-family: var(--font-head);
+  font-size: clamp(1.25rem, 3.5vw, 1.7rem);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.5rem;
+}
+
+.widgets {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+@media (min-width: 620px) {
+  .widgets {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/*
+ * * Widgets
+ */
+
+.widget {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 1.1rem 1.2rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition:
+    transform var(--spring),
+    border-color 150ms ease,
+    background 150ms ease;
+}
+
+.widget:hover {
+  transform: translateY(-3px);
+  border-color: var(--accent-soft);
+  background: var(--surface-strong);
+}
+
+.widget-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.widget-notation {
+  font-family: var(--font-mono);
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text);
+  word-break: break-word;
+}
+
+.widget-roll {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem 0.7rem;
+  font-family: var(--font-head);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+  transition:
+    color 150ms ease,
+    border-color 150ms ease,
+    transform 150ms ease;
+}
+
+.widget-roll:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.widget-roll:active {
+  transform: scale(0.94);
+}
+
+.widget-roll:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.widget-roll-glyph {
+  font-size: 0.9rem;
+}
+
+.widget-note {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 0.98rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.widget-result:empty {
+  display: none;
+}
+
+.widget-result {
+  margin-top: 0.2rem;
+}
+
+.widget-tray {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.75rem;
+}
+
+.widget-panel {
+  text-align: left;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .widget-panel {
+    animation: widget-rise var(--spring) both;
+  }
+}
+
+@keyframes widget-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Scale the shared result renderer down to widget size. */
+.widget-panel .total {
+  margin: 0;
+  font-size: 2.4rem;
+}
+
+.widget-panel .success-summary {
+  justify-content: flex-start;
+  gap: 1.1rem;
+}
+
+.widget-panel .count-item b {
+  font-size: 2rem;
+}
+
+.widget-panel .breakdown {
+  margin: 0.5rem 0 0;
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.widget-panel .expr-note {
+  margin-top: 0.5rem;
+}
+
+.widget-error {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.widget-open {
+  align-self: flex-start;
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+  color: var(--text-dim);
+  text-decoration: none;
+  border-bottom: 1px dotted transparent;
+  transition:
+    color 150ms ease,
+    border-color 150ms ease;
+}
+
+.widget-open:hover {
+  color: var(--accent);
+  border-bottom-color: var(--accent-soft);
+}
+
+.widget-open:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/*
+ * * Footer
+ */
+
+.ref-body .footer {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 1.5rem 1.25rem 2.5rem;
+}

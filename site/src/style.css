@@ -1,42 +1,74 @@
-/* roll-parser playground — dark-first, rainbow-accented, fixed-viewport. */
+/* roll-parser — shared tokens & components + playground layout.
+   Warm candlelit palette; rainbow reserved for the logo/favicon, gold elsewhere.
+   The reference page loads this file for tokens, fonts, logo, dice, and buttons,
+   then layers reference.css on top. Keep token definitions here only. */
+
+/*
+ * * Fonts
+ */
+
+/* Variable fonts — one latin woff2 per family covers the 400–700 range.
+   Dev path is ../public/fonts; build rewrites it to ../fonts for dist. */
+@font-face {
+  font-family: 'Cinzel';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('../public/fonts/cinzel-latin.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Alegreya';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('../public/fonts/alegreya-latin.woff2') format('woff2');
+}
+
+/*
+ * * Tokens
+ */
 
 :root {
-  --bg: #0a0a0f;
-  --bg-glow: #16121f;
-  --surface: rgba(255, 255, 255, 0.04);
-  --surface-strong: rgba(255, 255, 255, 0.08);
-  --border: rgba(255, 255, 255, 0.12);
-  --text: #f4f3fb;
-  --text-muted: #9b98ad;
-  --text-dim: #6c6980;
-  --success: #4dff9e;
-  --failure: #ff5d73;
-  --rainbow: linear-gradient(
-    100deg,
-    #ff4d6d,
-    #ff9e3d,
-    #ffe14d,
-    #4dff9e,
-    #4dc4ff,
-    #b06dff
-  );
+  --bg: #16120b;
+  --bg-glow: #2a2113;
+  --surface: rgba(255, 240, 210, 0.05);
+  --surface-strong: rgba(255, 240, 210, 0.09);
+  --border: rgba(255, 230, 190, 0.15);
+  --text: #f0e6d2;
+  --text-muted: #b3a583;
+  --text-dim: #7d7259;
+  --accent: #d9a441;
+  --accent-soft: rgba(217, 164, 65, 0.4);
+  --success: #a3c585;
+  --failure: #cf6a5e;
+  --gold-gradient: linear-gradient(135deg, #f0c060, #d9a441 45%, #a3622f);
+
+  --font-head: 'Cinzel', 'Iowan Old Style', Georgia, serif;
+  --font-body: 'Alegreya', 'Iowan Old Style', Georgia, serif;
+  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, monospace;
+
   --radius: 14px;
   --die-size: 56px;
   --transition: 300ms cubic-bezier(0.22, 1, 0.36, 1);
+  --spring: 420ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 @media (prefers-color-scheme: light) {
   :root {
-    --bg: #f6f5fb;
-    --bg-glow: #ffffff;
-    --surface: rgba(20, 16, 40, 0.03);
-    --surface-strong: rgba(20, 16, 40, 0.06);
-    --border: rgba(20, 16, 40, 0.14);
-    --text: #16121f;
-    --text-muted: #5c5870;
-    --text-dim: #8b879c;
-    --success: #12a75a;
-    --failure: #d3243f;
+    --bg: #f5ecdb;
+    --bg-glow: #fffaf0;
+    --surface: rgba(43, 35, 23, 0.04);
+    --surface-strong: rgba(43, 35, 23, 0.07);
+    --border: rgba(43, 35, 23, 0.15);
+    --text: #2b2317;
+    --text-muted: #6b5d45;
+    --text-dim: #9a8b6f;
+    --accent: #a06b1f;
+    --accent-soft: rgba(160, 107, 31, 0.35);
+    --success: #4f7a3a;
+    --failure: #b04a3e;
+    --gold-gradient: linear-gradient(135deg, #b8842a, #a06b1f 45%, #7a4a18);
   }
 }
 
@@ -49,14 +81,13 @@
 html,
 body {
   margin: 0;
-  height: 100%;
 }
 
 body {
-  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--font-body);
   color: var(--text);
   background: var(--bg);
-  background-image: radial-gradient(120% 90% at 50% -10%, var(--bg-glow) 0%, var(--bg) 60%);
+  background-image: radial-gradient(120% 90% at 50% -10%, var(--bg-glow) 0%, var(--bg) 55%);
   background-attachment: fixed;
   -webkit-font-smoothing: antialiased;
 }
@@ -78,36 +109,7 @@ body {
 }
 
 /*
- * * Shell
- */
-
-.app {
-  display: flex;
-  flex-direction: column;
-  height: 100dvh;
-  overflow: hidden;
-  padding: 0 1rem;
-}
-
-.main {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 100%;
-  max-width: 720px;
-  margin: 0 auto;
-  padding-top: min(28vh, 220px);
-  transition: padding-top var(--transition);
-}
-
-.app.is-active .main {
-  padding-top: clamp(1rem, 4vh, 2.5rem);
-}
-
-/*
- * * Logo
+ * * Logo (shared)
  */
 
 .logo {
@@ -137,76 +139,24 @@ body {
 
 .logo-num {
   fill: var(--text);
+  font-family: var(--font-head);
   font-size: 13px;
   font-weight: 700;
   opacity: 0.85;
 }
 
 .wordmark {
+  font-family: var(--font-head);
   font-size: 2rem;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  background: var(--rainbow);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: var(--text);
   transition: font-size var(--transition);
 }
 
-.app.is-active .logo-die {
-  width: 48px;
-  height: 48px;
-}
-
-.app.is-active .logo-num {
-  font-size: 0;
-}
-
-.app.is-active .wordmark {
-  font-size: 1.35rem;
-}
-
 /*
- * * Dice tray
+ * * Dice (shared — rendered by dice.ts on both pages)
  */
-
-.tray {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 0.55rem;
-  width: 100%;
-  max-height: 0;
-  opacity: 0;
-  overflow: hidden;
-  margin: 0;
-  transition:
-    max-height var(--transition),
-    opacity var(--transition),
-    margin var(--transition);
-}
-
-.app.is-active .tray {
-  max-height: 40vh;
-  opacity: 1;
-  margin: 1.25rem 0;
-  overflow-y: auto;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .app.is-active .tray {
-    animation: hue-drift 12s linear infinite;
-  }
-}
-
-@keyframes hue-drift {
-  from {
-    filter: hue-rotate(0deg);
-  }
-  to {
-    filter: hue-rotate(360deg);
-  }
-}
 
 .die {
   position: relative;
@@ -243,13 +193,14 @@ body {
 
 .die-shape {
   fill: var(--surface-strong);
-  stroke: url(#rp-rainbow);
+  stroke: url(#rp-gold);
   stroke-width: 3.5;
   stroke-linejoin: round;
 }
 
 .die-value {
   fill: var(--text);
+  font-family: var(--font-body);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
@@ -258,6 +209,7 @@ body {
   position: absolute;
   bottom: -2px;
   right: -2px;
+  font-family: var(--font-mono);
   font-size: 0.55rem;
   font-weight: 700;
   color: var(--text-muted);
@@ -283,11 +235,11 @@ body {
 }
 
 .mark-explode {
-  color: #ff9e3d;
+  color: var(--accent);
 }
 
 .mark-reroll {
-  color: #4dc4ff;
+  color: var(--accent);
 }
 
 .die.is-dropped {
@@ -300,11 +252,11 @@ body {
 }
 
 .die.is-critical .die-shape {
-  filter: drop-shadow(0 0 6px rgba(255, 200, 90, 0.9));
+  filter: drop-shadow(0 0 6px rgba(217, 164, 65, 0.95));
 }
 
 .die.is-fumble .die-shape {
-  fill: rgba(255, 93, 115, 0.18);
+  fill: rgba(207, 106, 94, 0.2);
 }
 
 .die.is-success .die-shape {
@@ -328,49 +280,8 @@ body {
 }
 
 /*
- * * Input
+ * * Icon buttons (shared)
  */
-
-.input-zone {
-  width: 100%;
-  flex-shrink: 0;
-}
-
-.input-row {
-  display: flex;
-  gap: 0.5rem;
-  width: 100%;
-}
-
-.notation-input {
-  flex: 1;
-  min-width: 0;
-  font-size: 1.1rem;
-  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, monospace;
-  padding: 0.85rem 1rem;
-  color: var(--text);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  outline: none;
-  transition:
-    border-color 150ms ease,
-    box-shadow 150ms ease;
-}
-
-.notation-input::placeholder {
-  color: var(--text-dim);
-}
-
-.notation-input:focus-visible {
-  border-color: transparent;
-  box-shadow: 0 0 0 2px #4dc4ff;
-}
-
-.notation-input.is-invalid {
-  border-color: var(--failure);
-  box-shadow: 0 0 0 2px rgba(255, 93, 115, 0.4);
-}
 
 .icon-btn {
   position: relative;
@@ -384,11 +295,15 @@ body {
   cursor: pointer;
   transition:
     background 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease,
     transform 150ms ease;
 }
 
 .icon-btn:hover {
   background: var(--surface-strong);
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .icon-btn:active {
@@ -396,173 +311,58 @@ body {
 }
 
 .icon-btn:focus-visible {
-  outline: 2px solid #4dc4ff;
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
-.copied-flag {
-  position: absolute;
-  bottom: calc(100% + 6px);
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 0.7rem;
-  padding: 2px 6px;
-  border-radius: 6px;
-  background: var(--text);
-  color: var(--bg);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 150ms ease;
-  white-space: nowrap;
-}
-
-.copied-flag.is-visible {
-  opacity: 1;
+.icon-link {
+  width: 1.15em;
+  height: 1.15em;
+  vertical-align: -0.2em;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 /*
- * * Chips + error slot
+ * * Breakdown & degree markers (shared)
  */
 
-.chips {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 0.4rem;
-  margin-top: 0.9rem;
+.mk-dropped {
+  color: var(--text-dim);
+  text-decoration: line-through;
 }
 
-.app.is-active .chips {
-  display: none;
-}
-
-.chip {
-  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, monospace;
-  font-size: 0.85rem;
-  padding: 0.4rem 0.7rem;
-  color: var(--text-muted);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  cursor: pointer;
-  transition:
-    color 150ms ease,
-    border-color 150ms ease;
-}
-
-.chip:hover {
-  color: var(--text);
-  border-color: #4dc4ff;
-}
-
-.chip:focus-visible {
-  outline: 2px solid #4dc4ff;
-  outline-offset: 2px;
-}
-
-.error-slot {
-  margin-top: 0.75rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-}
-
-.error-slot:empty {
-  margin-top: 0;
-}
-
-.error-msg {
-  color: var(--failure);
-  font-size: 0.9rem;
-}
-
-.error-echo {
-  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, monospace;
-  font-size: 0.95rem;
-  color: var(--text-muted);
-  word-break: break-all;
-}
-
-.error-span {
-  background: rgba(255, 93, 115, 0.22);
-  color: var(--failure);
-  border-bottom: 2px solid var(--failure);
-  border-radius: 2px;
-}
-
-/*
- * * Result panel
- */
-
-.result-panel {
-  flex: 1;
-  min-height: 0;
-  width: 100%;
-  overflow-y: auto;
-  margin-top: 1.5rem;
-  text-align: center;
-}
-
-.total {
-  /* fit-content keeps the gradient box tight to the digits — a full-width box
-     would map only the middle hues onto a centered number. */
-  width: fit-content;
-  margin: 0 auto;
-  font-size: clamp(3rem, 12vw, 5.5rem);
-  font-weight: 800;
-  line-height: 1;
-  letter-spacing: -0.03em;
-  font-variant-numeric: tabular-nums;
-  background: var(--rainbow);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-
-.success-summary {
-  display: flex;
-  justify-content: center;
-  gap: 1.5rem;
-}
-
-.count-item {
-  display: flex;
-  flex-direction: column;
-  font-size: 0.85rem;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-
-.count-item b {
-  font-size: 3rem;
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
-}
-
-.count-success b {
+.mk-success {
   color: var(--success);
+  font-weight: 700;
 }
 
-.count-fail b {
+.mk-failure {
   color: var(--failure);
+  font-weight: 700;
 }
 
 .degree-badge {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  margin-bottom: 0.75rem;
   padding: 0.35rem 0.9rem;
   border-radius: 999px;
+  font-family: var(--font-head);
   font-weight: 700;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
+  letter-spacing: 0.02em;
   border: 1px solid var(--border);
 }
 
 .degree-nat {
+  font-family: var(--font-body);
   font-weight: 500;
   font-size: 0.8rem;
+  letter-spacing: 0;
   color: var(--text-muted);
 }
 
@@ -584,11 +384,345 @@ body {
   border-color: var(--failure);
 }
 
+/*
+ * ============================================================
+ * * Playground layout (index.html only)
+ * ============================================================
+ */
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  overflow: hidden;
+  padding: 0 1rem;
+}
+
+.main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+  padding-top: min(28vh, 220px);
+  transition: padding-top var(--transition);
+}
+
+.app.is-active .main {
+  padding-top: clamp(1rem, 4vh, 2.5rem);
+}
+
+.app.is-active .logo-die {
+  width: 48px;
+  height: 48px;
+}
+
+.app.is-active .logo-num {
+  font-size: 0;
+}
+
+.app.is-active .wordmark {
+  font-size: 1.35rem;
+}
+
+/* Guide link — top-right, present in both idle and active states. */
+.guide-link {
+  position: fixed;
+  top: 0.9rem;
+  right: 1rem;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.75rem;
+  font-family: var(--font-head);
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+  text-decoration: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  transition:
+    color 150ms ease,
+    border-color 150ms ease,
+    background 150ms ease;
+}
+
+.guide-link:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--surface-strong);
+}
+
+.guide-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.guide-glyph {
+  font-size: 1rem;
+}
+
+/*
+ * * Dice tray
+ */
+
+.tray {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.55rem;
+  width: 100%;
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  margin: 0;
+  transition:
+    max-height var(--transition),
+    opacity var(--transition),
+    margin var(--transition);
+}
+
+.app.is-active .tray {
+  max-height: 40vh;
+  opacity: 1;
+  margin: 1.25rem 0;
+  overflow-y: auto;
+}
+
+/*
+ * * Input
+ */
+
+.input-zone {
+  width: 100%;
+  flex-shrink: 0;
+}
+
+.input-row {
+  display: flex;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.notation-input {
+  flex: 1;
+  min-width: 0;
+  font-size: 1.1rem;
+  font-family: var(--font-mono);
+  padding: 0.85rem 1rem;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  outline: none;
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.notation-input::placeholder {
+  color: var(--text-dim);
+}
+
+.notation-input:focus-visible {
+  border-color: transparent;
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.notation-input.is-invalid {
+  border-color: var(--failure);
+  box-shadow: 0 0 0 2px rgba(207, 106, 94, 0.4);
+}
+
+.copied-flag {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-body);
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: var(--text);
+  color: var(--bg);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 150ms ease;
+  white-space: nowrap;
+}
+
+.copied-flag.is-visible {
+  opacity: 1;
+}
+
+/*
+ * * Grouped example chips + error slot
+ */
+
+.examples {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.75rem 1.25rem;
+  margin-top: 1.1rem;
+}
+
+.app.is-active .examples {
+  display: none;
+}
+
+.example-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.example-label {
+  font-family: var(--font-head);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.example-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.35rem;
+}
+
+.chip {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  padding: 0.35rem 0.65rem;
+  color: var(--text-muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+  transition:
+    color 150ms ease,
+    border-color 150ms ease;
+}
+
+.chip:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.chip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.error-slot {
+  margin-top: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.error-slot:empty {
+  margin-top: 0;
+}
+
+.error-msg {
+  color: var(--failure);
+  font-size: 0.9rem;
+}
+
+.error-echo {
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+  color: var(--text-muted);
+  word-break: break-all;
+}
+
+.error-span {
+  background: rgba(207, 106, 94, 0.22);
+  color: var(--failure);
+  border-bottom: 2px solid var(--failure);
+  border-radius: 2px;
+}
+
+/*
+ * * Result panel
+ */
+
+.result-panel {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  overflow-y: auto;
+  margin-top: 1.5rem;
+  text-align: center;
+}
+
+.total {
+  /* fit-content keeps the gradient box tight to the digits. */
+  width: fit-content;
+  margin: 0 auto;
+  font-family: var(--font-body);
+  font-size: clamp(3rem, 12vw, 5.5rem);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  background: var(--gold-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.success-summary {
+  display: flex;
+  justify-content: center;
+  gap: 1.5rem;
+}
+
+.count-item {
+  display: flex;
+  flex-direction: column;
+  font-family: var(--font-head);
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.count-item b {
+  font-family: var(--font-body);
+  font-size: 3rem;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.count-success b {
+  color: var(--success);
+}
+
+.count-fail b {
+  color: var(--failure);
+}
+
+.result-panel .degree-badge {
+  margin-bottom: 0.75rem;
+}
+
 .breakdown {
   margin: 1rem auto 0;
   max-width: 640px;
-  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, monospace;
-  font-size: 1rem;
+  font-family: var(--font-body);
+  font-size: 1.05rem;
   line-height: 1.7;
   color: var(--text);
   word-break: break-word;
@@ -599,24 +733,9 @@ body {
   font-style: italic;
 }
 
-.mk-dropped {
-  color: var(--text-dim);
-  text-decoration: line-through;
-}
-
-.mk-success {
-  color: var(--success);
-  font-weight: 700;
-}
-
-.mk-failure {
-  color: var(--failure);
-  font-weight: 700;
-}
-
 .expr-note {
   margin-top: 0.75rem;
-  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, monospace;
+  font-family: var(--font-mono);
   font-size: 0.85rem;
   color: var(--text-dim);
 }
@@ -642,7 +761,7 @@ body {
 }
 
 .footer a:hover {
-  color: var(--text);
+  color: var(--accent);
 }
 
 .footer .dot {
@@ -650,7 +769,7 @@ body {
 }
 
 /*
- * * Mobile
+ * * Mobile (playground)
  */
 
 @media (max-width: 640px) {
@@ -678,6 +797,20 @@ body {
 
   .app.is-active .main {
     padding-top: 0.75rem;
+  }
+
+  .guide-link .guide-text {
+    display: none;
+  }
+
+  .guide-link {
+    padding: 0.45rem 0.55rem;
+  }
+
+  /* Keep examples from pushing the input off-screen — show the first
+     three system groups only on narrow viewports. */
+  .example-group:nth-child(n + 4) {
+    display: none;
   }
 }
 

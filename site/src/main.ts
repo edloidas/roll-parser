@@ -20,7 +20,7 @@ const errorSlot = requireEl('error');
 const rerollBtn = requireEl('reroll');
 const copyBtn = requireEl('copy');
 const copiedFlag = requireEl('copied');
-const chips = requireEl('chips');
+const examples = requireEl('examples');
 const versionEl = requireEl('version');
 
 function requireEl<T extends HTMLElement = HTMLElement>(id: string): T {
@@ -135,7 +135,7 @@ copyBtn.addEventListener('click', () => {
   void copyLink();
 });
 
-chips.addEventListener('click', (event) => {
+examples.addEventListener('click', (event) => {
   const target = (event.target as HTMLElement).closest<HTMLButtonElement>('.chip');
   if (target == null) return;
 
