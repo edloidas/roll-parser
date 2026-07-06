@@ -74,5 +74,15 @@ describe('formatResult', () => {
       expect(output).not.toContain('**');
       expect(output).not.toContain('__');
     });
+
+    test('converts compound dropped sub-roll spans from group keep', () => {
+      // {1d8, 1d10}kh1 — the whole dropped sub-roll (`~~1d8[2]~~`) is one
+      // strikethrough span wrapping notation, not just a number.
+      const result = roll('{1d8, 1d10}kh1', { rng: createMockRng([2, 7]) });
+      const output = formatResult(result, true);
+
+      expect(output).toBe('{(1d8[2]), 1d10[7]} = 7');
+      expect(output).not.toContain('~~');
+    });
   });
 });

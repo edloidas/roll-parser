@@ -2,10 +2,12 @@
  * Critical / fumble threshold modifier.
  *
  * Overrides the default `critical`/`fumble` flag logic for a dice pool.
- * Replace, not merge — an empty threshold array forces the corresponding
- * flag to `false` on every die. Meta dice (rolled to compute
- * counts/sides/modifier args) are skipped so their bookkeeping stays
- * untouched.
+ * `cs` and `cf` are independent (Roll20 semantics): the evaluator passes
+ * `['default']` for a side with no explicit thresholds, so overriding one
+ * side never wipes the other. An empty threshold array (not produced by the
+ * evaluator) would force the corresponding flag to `false` on every die.
+ * Meta dice (rolled to compute counts/sides/modifier args) are skipped so
+ * their bookkeeping stays untouched.
  *
  * Display-only: does not alter `total`, explosion triggers, success
  * counting, or any other modifier flag. Dropped dice still participate —
@@ -52,7 +54,8 @@ function matchesCrit(threshold: ResolvedCritThreshold, die: DieResult): boolean 
 
 function matchesFumble(threshold: ResolvedCritThreshold, die: DieResult): boolean {
   if (threshold === 'default') {
-    return die.result === 1;
+    // ? Mirrors `createDieResult` — a d1 always rolls 1, never a fumble.
+    return die.result === 1 && die.sides > 1;
   }
   return matchesCondition(die.result, threshold.operator, threshold.value);
 }

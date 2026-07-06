@@ -28,6 +28,20 @@ Examples:
   roll-parser 4d6dl1 --seed "character-str"
 `;
 
+/**
+ * Prints the notation with a caret under the error position for errors that
+ * carry one (LexerError, ParseError). Skipped for multi-line notations and
+ * out-of-range positions to keep the caret honest.
+ */
+function writeErrorContext(notation: string, error: Error): void {
+  const position = 'position' in error ? error.position : undefined;
+  if (typeof position !== 'number' || !Number.isInteger(position)) return;
+  if (notation.includes('\n') || position < 0 || position > notation.length) return;
+
+  process.stderr.write(`  ${notation}\n`);
+  process.stderr.write(`  ${' '.repeat(position)}^\n`);
+}
+
 function main(): void {
   const parsed = parseArgs(process.argv.slice(2));
 
@@ -65,6 +79,7 @@ function main(): void {
   } catch (error) {
     if (isRollParserError(error)) {
       process.stderr.write(`Error: ${error.message}\n`);
+      writeErrorContext(args.notation, error);
       process.exitCode = 1;
       return;
     }

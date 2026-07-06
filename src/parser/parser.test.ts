@@ -530,6 +530,53 @@ describe('Parser', () => {
     it('should throw on modifier without target', () => {
       expect(() => parse('kh3')).toThrow(ParseError);
     });
+
+    it('should name the expected symbol and end of input in expect() errors', () => {
+      expect(() => parse('((1d6')).toThrow(`Expected ')' but got end of input`);
+      expect(() => parse('floor 2')).toThrow(`Expected '(' but got '2'`);
+    });
+
+    it('should throw a typed ParseError on excessive nesting depth', () => {
+      const deep = `${'('.repeat(20_000)}1d6${')'.repeat(20_000)}`;
+      expect(() => parse(deep)).toThrow(ParseError);
+      expect(() => parse(deep)).toThrow('maximum depth');
+    });
+
+    it('should accept reasonable nesting depth', () => {
+      const nested = `${'('.repeat(50)}1d6${')'.repeat(50)}`;
+      expect(() => parse(nested)).not.toThrow();
+    });
+  });
+
+  describe('ambiguous bare dice chains', () => {
+    it('should reject 4d6d1 with a drop/parenthesize hint', () => {
+      expect(() => parse('4d6d1')).toThrow(ParseError);
+      expect(() => parse('4d6d1')).toThrow('Ambiguous dice chain');
+    });
+
+    it('should reject dice chains onto percentile and Fate dice', () => {
+      expect(() => parse('2d6d%')).toThrow('Ambiguous dice chain');
+      expect(() => parse('2d6dF')).toThrow('Ambiguous dice chain');
+    });
+
+    it('should reject chains after modifiers and sorts', () => {
+      // Implicit kh count, then `d6` would chain onto the pool.
+      // (`4d6kh3d1` is different: the `3d1` binds as the kh count meta-dice.)
+      expect(() => parse('4d6kh d6')).toThrow('Ambiguous dice chain');
+      expect(() => parse('4d6s d6')).toThrow('Ambiguous dice chain');
+    });
+
+    it('should keep parenthesized nested dice legal', () => {
+      expect(parse('(4d6)d1')).toEqual(dice(grouped(dice(literal(4), literal(6))), literal(1)));
+    });
+
+    it('should keep computed counts and dice-as-sides legal', () => {
+      expect(parse('(1+1)d6')).toEqual(
+        dice(grouped(binary('+', literal(1), literal(1))), literal(6)),
+      );
+      // Sides position is not ambiguous — only the count side chains.
+      expect(parse('d(d6)')).toEqual(dice(literal(1), grouped(dice(literal(1), literal(6)))));
+    });
   });
 
   describe('edge cases', () => {
@@ -735,14 +782,13 @@ describe('Parser', () => {
       );
     });
 
-    it('should parse d6!d20 as computed dice count (exploded d6 becomes count)', () => {
-      // `d6!d20` = Dice(count=Explode(Dice(1,6)), sides=20) — an exploded
-      // d6 supplies the count for the outer d20. Unusual, but a legal
-      // consequence of the Pratt precedence: EXPLODE (BP.MODIFIER=35) binds
-      // to `d6` first, then the second DICE token (BP.DICE_LEFT=40) binds
-      // to the result as infix dice.
-      expect(parse('d6!d20')).toEqual(
-        dice(explode('standard', dice(literal(1), literal(6))), literal(20)),
+    it('should reject d6!d20 as an ambiguous bare dice chain', () => {
+      // EXPLODE (BP.MODIFIER=35) binds to `d6` first, then the second DICE
+      // token would bind the exploded pool as an infix count — the `4d6d1`
+      // trap in another costume. Parenthesized nesting stays legal.
+      expect(() => parse('d6!d20')).toThrow('Ambiguous dice chain');
+      expect(parse('(d6!)d20')).toEqual(
+        dice(grouped(explode('standard', dice(literal(1), literal(6)))), literal(20)),
       );
     });
   });

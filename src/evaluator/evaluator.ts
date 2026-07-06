@@ -144,12 +144,14 @@ type ModifierSpec = {
  * Creates a new die result with critical/fumble detection.
  */
 function createDieResult(sides: number, result: number): DieResult {
+  // ? `sides > 1` guards both flags — a d1 always rolls 1, so it is neither
+  //   an exceptional max (critical) nor an exceptional min (fumble).
   return {
     sides,
     result,
     modifiers: [],
     critical: result === sides && sides > 1,
-    fumble: result === 1,
+    fumble: result === 1 && sides > 1,
   };
 }
 
@@ -830,10 +832,12 @@ function evalSort(node: SortNode, rng: RNG, ctx: EvalContext, env: EvalEnv): num
  * AFTER the target pool), then overrides `critical`/`fumble` flags on the
  * produced dice in place.
  *
- * Replace semantics: an empty `failThresholds` array forces
- * `fumble: false` on every die — same for `successThresholds`. Bare
- * `cs`/`cf` uses the `'default'` sentinel resolved per-die to
- * `result === sides` or `result === 1`.
+ * Independent overrides (Roll20 semantics): `cs` thresholds replace only the
+ * crit criteria and `cf` thresholds replace only the fumble criteria. When a
+ * side has no explicit threshold, the `'default'` rule applies — so
+ * `1d20cf<3` keeps the default nat-20 crit. Bare `cs`/`cf` uses the
+ * `'default'` sentinel resolved per-die to `result === sides` or
+ * `result === 1`.
  *
  * Renders `<targetExpr><codes>[<dice>]`, mirroring `evalSort`/`evalExplode`.
  */
@@ -849,7 +853,13 @@ function evalCritThreshold(
   const successResolved = node.successThresholds.map((t) => resolveCritThreshold(t, rng, ctx, env));
   const failResolved = node.failThresholds.map((t) => resolveCritThreshold(t, rng, ctx, env));
 
-  applyCritThresholds(targetCtx.rolls, successResolved, failResolved);
+  // Independent overrides: a side with no explicit threshold falls back to
+  // the default rule instead of being wiped by the other side's override.
+  const successApplied: ResolvedCritThreshold[] =
+    successResolved.length > 0 ? successResolved : ['default'];
+  const failApplied: ResolvedCritThreshold[] = failResolved.length > 0 ? failResolved : ['default'];
+
+  applyCritThresholds(targetCtx.rolls, successApplied, failApplied);
 
   ctx.rolls.push(...targetCtx.rolls);
   propagateMetadata(ctx, targetCtx.versusMetadata);
@@ -916,6 +926,20 @@ function evalModifier(node: ModifierNode, rng: RNG, ctx: EvalContext, env: EvalE
 }
 
 /**
+ * Strips per-die markdown markers from an already-rendered sub-roll string.
+ * Used when a whole group sub-roll is dropped: the outer `~~...~~` wrap
+ * supersedes inner success (`**`), failure (`__`), and dropped (`~~`)
+ * markers, and leaving them in place would nest strikethroughs or show
+ * success highlights inside a dropped span.
+ */
+function stripInnerMarkers(rendered: string): string {
+  return rendered
+    .replace(/\*\*(-?\d+)\*\*/g, '$1')
+    .replace(/__(-?\d+)__/g, '$1')
+    .replace(/~~(-?\d+)~~/g, '$1');
+}
+
+/**
  * Evaluates a keep/drop modifier chain whose base target is a multi
  * sub-roll group. Each sub-roll is evaluated in isolation so its subtotal
  * and dice are captured separately. Synthetic dice — one per sub-roll,
@@ -975,13 +999,20 @@ function evalGroupModifier(
     if (isDropped) {
       // Flag every inner die dropped so propagated rolls match the total.
       // Keep existing `'kept'` stripped — the sub-roll didn't contribute,
-      // so its die-level kept annotation no longer applies.
+      // so its die-level kept annotation no longer applies. `'success'` /
+      // `'failure'` are stripped too: the top-level successes/failures scan
+      // must not count dice from a sub-roll that was dropped.
       const droppedRolls: DieResult[] = sub.rolls.map((d) => ({
         ...d,
-        modifiers: [...d.modifiers.filter((m) => m !== 'kept' && m !== 'dropped'), 'dropped'],
+        modifiers: [
+          ...d.modifiers.filter(
+            (m) => m !== 'kept' && m !== 'dropped' && m !== 'success' && m !== 'failure',
+          ),
+          'dropped',
+        ],
       }));
       ctx.rolls.push(...droppedRolls);
-      outerRendered.push(`~~${sub.rendered}~~`);
+      outerRendered.push(`~~${stripInnerMarkers(sub.rendered)}~~`);
     } else {
       ctx.rolls.push(...sub.rolls);
       outerRendered.push(sub.rendered);
@@ -1076,18 +1107,29 @@ function evalSuccessCount(
 
 /**
  * Extracts the "natural" d20 value from a roll-side dice pool. Returns the
- * single value when exactly one kept d20 is present; otherwise `undefined`.
+ * single value when exactly one primary kept d20 is present; otherwise
+ * `undefined`.
  *
  * Excludes dropped (`kh`/`kl`/`dh`/`dl`/`r`/`ro`) dice — these aren't the
- * final kept result. Multiple kept d20s (e.g., `1d20+1d20`) yield `undefined`
- * so no ambiguous upgrade/downgrade is applied.
+ * final kept result. Explosion continuation dice (appended by standard/
+ * penetrating explode, tagged `'exploded'` with no `initialResult`) are not
+ * primaries either — `1d20! vs DC` keeps the natural from the original d20.
+ * Compound explode accumulates into the original die and sets
+ * `initialResult`, so it stays a primary and the raw first face is used.
+ * Multiple primary kept d20s (e.g., `1d20+1d20`) yield `undefined` so no
+ * ambiguous upgrade/downgrade is applied.
  */
 function extractNatural(rolls: DieResult[]): number | undefined {
   // Rerolled intermediates are always stamped `['rerolled', 'dropped']`
   // (see `modifiers/reroll.ts`), so filtering by `'dropped'` covers them.
-  const keptD20s = rolls.filter((d) => d.sides === 20 && !d.modifiers.includes('dropped'));
-  if (keptD20s.length !== 1) return undefined;
-  const die = keptD20s[0];
+  const primaries = rolls.filter(
+    (d) =>
+      d.sides === 20 &&
+      !d.modifiers.includes('dropped') &&
+      !(d.modifiers.includes('exploded') && d.initialResult === undefined),
+  );
+  if (primaries.length !== 1) return undefined;
+  const die = primaries[0];
   return die?.initialResult ?? die?.result;
 }
 
@@ -1212,6 +1254,14 @@ export function evaluate(ast: ASTNode, rng: RNG, options: EvaluateOptions = {}):
   };
 
   const total = evalNode(ast, rng, ctx, env);
+
+  if (!Number.isFinite(total)) {
+    throw new EvaluatorError(
+      `Result is not a finite number: ${total}`,
+      'NON_FINITE_RESULT',
+      ast.type,
+    );
+  }
 
   const expression = ctx.expressionParts.join('');
   // ? Versus replaces the numeric total with the degree label in the rendered

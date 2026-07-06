@@ -117,7 +117,7 @@ export function applyStandardExplode(
         result: next,
         modifiers: ['exploded', 'kept'],
         critical: next === sides && sides > 1,
-        fumble: next === 1,
+        fumble: next === 1 && sides > 1,
       });
       last = next;
       iterations += 1;
@@ -208,7 +208,7 @@ export function applyPenetratingExplode(
         result: stored,
         modifiers: ['exploded', 'kept'],
         critical: raw === sides && sides > 1,
-        fumble: raw === 1,
+        fumble: raw === 1 && sides > 1,
       });
       lastRaw = raw;
       iterations += 1;
