@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.0-beta.0] - 2026-07-07
+
 ### Changed
 
 - **BREAKING:** package is now ESM-only. The `require` export condition shipped a file that was actually ESM (`bun build --target node` emits ESM), so it only ever worked via Node ≥22 `require(esm)` — which continues to work. Bundles are built with `--target node` (no `// @bun` pragma) and include linked sourcemaps; type declarations now resolve under `moduleResolution: node16/nodenext`, validated by `@arethetypeswrong/cli` + `publint` in CI ([#119](https://github.com/edloidas/roll-parser/issues/119))
@@ -84,5 +86,6 @@ Dice mechanics (Stage 2):
 - Dice count safety limit via `maxDice` option (default 10,000), enforced across the whole expression to prevent DoS via additive groups like `5000d6+5000d6` ([#19](https://github.com/edloidas/roll-parser/issues/19))
 - Parser and evaluator correctness: duplicate `kept` modifier entries, implicit modifier count defaulting to 1 (`4d6kh` → `4d6kh1`), `critical` flag suppression when `sides === 1`, negative `--seed` CLI values ([#21](https://github.com/edloidas/roll-parser/issues/21))
 
-[Unreleased]: https://github.com/edloidas/roll-parser/compare/v3.0.0-alpha.0...HEAD
+[Unreleased]: https://github.com/edloidas/roll-parser/compare/v3.0.0-beta.0...HEAD
+[3.0.0-beta.0]: https://github.com/edloidas/roll-parser/releases/tag/v3.0.0-beta.0
 [3.0.0-alpha.0]: https://github.com/edloidas/roll-parser/releases/tag/v3.0.0-alpha.0
