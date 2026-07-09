@@ -6,11 +6,12 @@
  */
 
 import { isRollParserError, roll, VERSION } from '../../src/index.js';
-import { renderTray } from './dice.js';
+import { renderLegend, renderTray } from './dice.js';
 import { renderErrorSlot, renderResultPanel } from './render.js';
 import { readUrlState, writeUrlState } from './url.js';
 
 const ROLL_DEBOUNCE_MS = 200;
+const COUNT_UP_MS = 450;
 
 const app = requireEl('app');
 const input = requireEl<HTMLInputElement>('notation');
@@ -34,6 +35,52 @@ function freshSeed(): string {
   return Math.random().toString(36).slice(2, 8);
 }
 
+/** Previous numeric total, so the count-up eases from the last value. */
+let lastTotal = 0;
+
+/** Whether the user asked to minimize motion — re-read live per call. */
+function prefersReducedMotion(): boolean {
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+/**
+ * Eases the big total from {@link lastTotal} up to `to` over {@link COUNT_UP_MS}.
+ * Skips (sets the final value immediately) under reduced motion or for
+ * non-integer totals, and no-ops when the panel shows counts instead of a sum.
+ */
+function animateTotal(to: number): void {
+  const el = result.querySelector<HTMLElement>('.total');
+  const from = Number.isInteger(lastTotal) ? lastTotal : 0;
+  lastTotal = to;
+
+  if (el == null) return;
+
+  if (prefersReducedMotion() || !Number.isInteger(to) || from === to) {
+    el.textContent = String(to);
+    return;
+  }
+
+  const start = performance.now();
+
+  const step = (now: number): void => {
+    const t = Math.min((now - start) / COUNT_UP_MS, 1);
+    const eased = 1 - (1 - t) ** 3;
+    el.textContent = String(Math.round(from + (to - from) * eased));
+    if (t < 1) requestAnimationFrame(step);
+  };
+
+  el.textContent = String(from);
+  requestAnimationFrame(step);
+}
+
+/** Re-triggers the result panel's fade+rise by replaying its animation. */
+function replayPanelAnimation(): void {
+  result.classList.remove('is-fresh');
+  // Force a reflow so removing then re-adding the class restarts the animation.
+  void result.offsetWidth;
+  result.classList.add('is-fresh');
+}
+
 function setActive(active: boolean): void {
   app.classList.toggle('is-active', active);
   tray.setAttribute('aria-hidden', active ? 'false' : 'true');
@@ -53,6 +100,7 @@ function performRoll(notation: string, seed: string): void {
     errorSlot.innerHTML = '';
     input.classList.remove('is-invalid');
     writeUrlState('', '');
+    lastTotal = 0;
     return;
   }
 
@@ -61,8 +109,10 @@ function performRoll(notation: string, seed: string): void {
   try {
     const rolled = roll(notation, { seed });
 
-    tray.innerHTML = renderTray(rolled.rolls);
+    tray.innerHTML = renderTray(rolled.rolls) + renderLegend(rolled.rolls);
     result.innerHTML = renderResultPanel(rolled);
+    replayPanelAnimation();
+    animateTotal(rolled.total);
     errorSlot.innerHTML = '';
     input.classList.remove('is-invalid');
     writeUrlState(notation, seed);

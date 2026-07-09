@@ -42,6 +42,7 @@
   --accent-soft: rgba(217, 164, 65, 0.4);
   --success: #a3c585;
   --failure: #cf6a5e;
+  --die-stroke: #8a7d63;
   --gold-gradient: linear-gradient(135deg, #f0c060, #d9a441 45%, #a3622f);
 
   --font-head: 'Cinzel', 'Iowan Old Style', Georgia, serif;
@@ -68,6 +69,7 @@
     --accent-soft: rgba(160, 107, 31, 0.35);
     --success: #4f7a3a;
     --failure: #b04a3e;
+    --die-stroke: #8a7a5c;
     --gold-gradient: linear-gradient(135deg, #b8842a, #a06b1f 45%, #7a4a18);
   }
 }
@@ -165,23 +167,25 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  /* `color` drives the stroke via currentColor, so state = one color swap. */
+  color: var(--die-stroke);
 }
 
 @media (prefers-reduced-motion: no-preference) {
   .die {
-    animation: die-pop 260ms cubic-bezier(0.22, 1.4, 0.4, 1) both;
-    animation-delay: calc(var(--i) * 30ms);
+    animation: die-pop var(--spring) both;
+    animation-delay: calc(var(--i) * 32ms);
   }
 }
 
 @keyframes die-pop {
   from {
     opacity: 0;
-    transform: scale(0.4) translateY(6px);
+    transform: rotate(-12deg) scale(0.4) translateY(6px);
   }
   to {
     opacity: 1;
-    transform: scale(1) translateY(0);
+    transform: rotate(0) scale(1) translateY(0);
   }
 }
 
@@ -193,9 +197,19 @@ body {
 
 .die-shape {
   fill: var(--surface-strong);
-  stroke: url(#rp-gold);
+  stroke: currentColor;
   stroke-width: 3.5;
   stroke-linejoin: round;
+  transition: stroke 150ms ease;
+}
+
+.die-facets {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  opacity: 0.4;
 }
 
 .die-value {
@@ -220,51 +234,70 @@ body {
 
 .die-mark {
   position: absolute;
-  top: -4px;
-  right: -4px;
-  width: 18px;
-  height: 18px;
+  top: -5px;
+  right: -5px;
+  width: 20px;
+  height: 20px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.7rem;
+  font-size: 0.82rem;
   font-weight: 700;
+  line-height: 1;
   border-radius: 50%;
-  background: var(--bg);
-  border: 1px solid var(--border);
 }
 
+/* Exploded — amber coin with a dark, readable glyph. */
 .mark-explode {
-  color: var(--accent);
+  color: #1a1206;
+  background: radial-gradient(circle at 35% 30%, #ffcf70, #e0952f);
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  box-shadow: 0 0 6px rgba(224, 149, 47, 0.7);
 }
 
 .mark-reroll {
   color: var(--accent);
+  background: var(--bg);
+  border: 1px solid var(--border);
+}
+
+/* Colored states — one currentColor swap tints stroke + facets together. */
+.die.is-success {
+  color: var(--success);
+}
+
+.die.is-failure {
+  color: var(--failure);
+}
+
+.die.is-fumble {
+  color: var(--failure);
+}
+
+.die.is-fumble .die-shape {
+  fill: rgba(207, 106, 94, 0.18);
+}
+
+.die.is-critical {
+  color: var(--accent);
+}
+
+.die.is-critical .die-shape {
+  stroke-width: 4;
+  filter: drop-shadow(0 0 7px rgba(240, 192, 96, 0.95));
+}
+
+.die.is-critical .die-value {
+  fill: var(--accent);
 }
 
 .die.is-dropped {
-  opacity: 0.35;
+  opacity: 0.4;
   filter: grayscale(1);
 }
 
 .die.is-dropped .die-value {
   text-decoration: line-through;
-}
-
-.die.is-critical .die-shape {
-  filter: drop-shadow(0 0 6px rgba(217, 164, 65, 0.95));
-}
-
-.die.is-fumble .die-shape {
-  fill: rgba(207, 106, 94, 0.2);
-}
-
-.die.is-success .die-shape {
-  stroke: var(--success);
-}
-
-.die.is-failure .die-shape {
-  stroke: var(--failure);
 }
 
 .die-overflow {
@@ -343,6 +376,240 @@ body {
 .mk-failure {
   color: var(--failure);
   font-weight: 700;
+}
+
+/*
+ * * Structured breakdown (shared)
+ */
+
+.breakdown.equation {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem 0.45rem;
+  line-height: 1.4;
+  word-break: normal;
+}
+
+.grp,
+.brace-grp {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  padding: 0.2rem 0.5rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.grp-label {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.grp-dice {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.grp-sub {
+  font-family: var(--font-body);
+  font-weight: 700;
+  color: var(--text);
+}
+
+.mini-die {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 3px;
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  background: var(--surface-strong);
+  border: 1.5px solid var(--die-stroke);
+  border-radius: 5px;
+}
+
+.mini-die.is-success {
+  border-color: var(--success);
+  color: var(--success);
+}
+
+.mini-die.is-failure {
+  border-color: var(--failure);
+  color: var(--failure);
+}
+
+.mini-die.is-critical {
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: 0 0 5px rgba(240, 192, 96, 0.6);
+}
+
+.mini-die.is-fumble {
+  border-color: var(--failure);
+  background: rgba(207, 106, 94, 0.18);
+}
+
+.mini-die.is-dropped {
+  opacity: 0.45;
+  filter: grayscale(1);
+  text-decoration: line-through;
+}
+
+.mini-dot {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ffcf70, #e0952f);
+  box-shadow: 0 0 3px rgba(224, 149, 47, 0.8);
+}
+
+.eq-op {
+  color: var(--text-muted);
+  padding: 0 0.1rem;
+}
+
+.eq-lit {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.eq-var {
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  color: var(--accent);
+}
+
+.eq-fn {
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.eq-paren,
+.eq-comma {
+  color: var(--text-dim);
+}
+
+.eq-vs {
+  font-family: var(--font-head);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  padding: 0 0.3rem;
+}
+
+.eq-dropped {
+  opacity: 0.5;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .equation .grp,
+  .equation .brace-grp {
+    animation: chip-in 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation-delay: calc(150ms + var(--i) * 45ms);
+  }
+}
+
+@keyframes chip-in {
+  from {
+    opacity: 0;
+    transform: translateY(5px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/*
+ * * Tray legend (playground)
+ */
+
+.tray-legend {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem 0.55rem;
+  margin-top: 0.35rem;
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.lg-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.lg-sep {
+  color: var(--text-dim);
+}
+
+.lg-sample {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  font-size: 0.66rem;
+  font-weight: 700;
+  color: var(--text);
+  border: 1.5px solid var(--die-stroke);
+  border-radius: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.lg-sample.is-critical {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.lg-sample.is-fumble {
+  border-color: var(--failure);
+  background: rgba(207, 106, 94, 0.18);
+}
+
+.lg-sample.is-success {
+  border-color: var(--success);
+  color: var(--success);
+}
+
+.lg-sample.is-failure {
+  border-color: var(--failure);
+  color: var(--failure);
+}
+
+.lg-sample.is-dropped {
+  opacity: 0.5;
+  text-decoration: line-through;
+}
+
+/* Reuse the die badge styling inline in the legend row. */
+.lg-badge {
+  position: static;
+  width: 1.15rem;
+  height: 1.15rem;
+  font-size: 0.72rem;
 }
 
 .degree-badge {
@@ -428,12 +695,17 @@ body {
   font-size: 1.35rem;
 }
 
-/* Guide link — top-right, present in both idle and active states. */
-.guide-link {
+/* Top navigation — Guide/Docs pills, present in both idle and active states. */
+.top-nav {
   position: fixed;
   top: 0.9rem;
   right: 1rem;
   z-index: 5;
+  display: flex;
+  gap: 0.4rem;
+}
+
+.guide-link {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
@@ -665,6 +937,23 @@ body {
   overflow-y: auto;
   margin-top: 1.5rem;
   text-align: center;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .result-panel.is-fresh {
+    animation: panel-rise var(--spring) both;
+  }
+}
+
+@keyframes panel-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .total {
