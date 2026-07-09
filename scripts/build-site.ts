@@ -43,7 +43,31 @@ async function build(): Promise<void> {
   await Bun.write(join(DIST_DIR, 'favicon.svg'), Bun.file(join(PUBLIC_DIR, 'favicon.svg')));
   await writeHtml();
 
+  await generateDocs();
+
   console.log(`Site built → ${DIST_DIR}`);
+}
+
+/**
+ * Generates the TypeDoc API reference into `dist/docs/`. Runs after the main
+ * build so the initial `rm -rf dist` cannot wipe it. Shells out to the local
+ * `typedoc` binary (config in `typedoc.json`) and exits non-zero on failure.
+ */
+async function generateDocs(): Promise<void> {
+  const proc = Bun.spawn(['bunx', 'typedoc'], {
+    cwd: join(import.meta.dir, '..'),
+    stdout: 'inherit',
+    stderr: 'inherit',
+  });
+
+  const code = await proc.exited;
+
+  if (code !== 0) {
+    console.error(`TypeDoc failed with exit code ${code}`);
+    process.exit(code);
+  }
+
+  console.log(`API reference built → ${join(DIST_DIR, 'docs')}`);
 }
 
 /**

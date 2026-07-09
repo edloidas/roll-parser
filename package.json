@@ -68,6 +68,7 @@
     "build:types": "tsc --emitDeclarationOnly -p tsconfig.build.json",
     "check:package": "attw --pack . --profile esm-only && publint",
     "bench": "bun run bench/roll.bench.ts",
+    "docs:build": "typedoc",
     "site:build": "bun scripts/build-site.ts",
     "site:dev": "bun ./site/index.html ./site/reference.html",
     "test": "bun test",
@@ -86,6 +87,7 @@
     "fast-check": "^4.6.0",
     "mitata": "^1.0.34",
     "publint": "^0.3.21",
+    "typedoc": "^0.28.20",
     "typescript": "^6.0.2"
   },
   "engines": {

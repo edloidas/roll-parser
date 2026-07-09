@@ -1,0 +1,18 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": ["src/index.ts", "src/testing.ts"],
+  "tsconfig": "tsconfig.json",
+  "out": "site/dist/docs",
+  "name": "roll-parser",
+  "readme": "README.md",
+  "includeVersion": true,
+  "excludeInternal": true,
+  "excludePrivate": true,
+  "excludeExternals": true,
+  "categorizeByGroup": true,
+  "navigationLinks": {
+    "Playground": "https://edloidas.github.io/roll-parser/",
+    "Guide": "https://edloidas.github.io/roll-parser/reference.html",
+    "GitHub": "https://github.com/edloidas/roll-parser"
+  }
+}
