@@ -20,7 +20,14 @@
       rel="preload"
       as="font"
       type="font/woff2"
-      href="./public/fonts/alegreya-latin.woff2"
+      href="./public/fonts/ibm-plex-sans-latin.woff2"
+      crossorigin
+    />
+    <link
+      rel="preload"
+      as="font"
+      type="font/woff2"
+      href="./public/fonts/b612-latin-700.woff2"
       crossorigin
     />
     <link rel="stylesheet" href="./src/style.css" />
@@ -45,13 +52,24 @@
       </defs>
     </svg>
 
+    <!-- UI glyphs are inline Lucide icons (https://lucide.dev, ISC license). -->
     <nav class="top-nav" aria-label="Site">
       <a class="guide-link" href="./reference" aria-label="Notation guide">
-        <span class="guide-glyph" aria-hidden="true">⤳</span>
+        <span class="guide-glyph" aria-hidden="true">
+          <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 7v14" />
+            <path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z" />
+          </svg>
+        </span>
         <span class="guide-text">Guide</span>
       </a>
       <a class="guide-link" href="./docs/" aria-label="API reference">
-        <span class="guide-glyph" aria-hidden="true">{}</span>
+        <span class="guide-glyph" aria-hidden="true">
+          <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5c0 1.1.9 2 2 2h1" />
+            <path d="M16 21h1a2 2 0 0 0 2-2v-5c0-1.1.9-2 2-2a2 2 0 0 1-2-2V5a2 2 0 0 0-2-2h-1" />
+          </svg>
+        </span>
         <span class="guide-text">Docs</span>
       </a>
     </nav>
@@ -70,36 +88,46 @@
               class="logo-stroke"
               d="M50,4 L50,26 M89.8,27 L72,64 M89.8,73 L72,64 M50,96 L50,64 M10.2,73 L28,64 M10.2,27 L28,64 M28,64 L50,64 M72,64 L50,64"
             />
-            <text class="logo-num" x="50" y="20" text-anchor="middle">20</text>
           </svg>
           <span class="wordmark">roll-parser</span>
         </a>
 
         <div class="tray" id="tray" aria-hidden="true"></div>
+        <div class="legend-slot" id="legend" aria-hidden="true"></div>
 
         <div class="input-zone">
           <div class="input-row">
             <label class="visually-hidden" for="notation">Dice notation</label>
-            <input
-              id="notation"
-              class="notation-input"
-              type="text"
-              inputmode="text"
-              autocomplete="off"
-              autocapitalize="off"
-              autocorrect="off"
-              spellcheck="false"
-              enterkeyhint="go"
-              placeholder="Try 4d6kh3, 1d20+7 vs 15, 8d6!…"
-            />
+            <div class="input-wrap" id="input-wrap">
+              <input
+                id="notation"
+                class="notation-input"
+                type="text"
+                inputmode="text"
+                autocomplete="off"
+                autocapitalize="off"
+                autocorrect="off"
+                spellcheck="false"
+                enterkeyhint="go"
+                placeholder="Try 4d6kh3, 2d20kh1+7, 8d6…"
+              />
+              <button id="clear" class="input-clear" type="button" title="Clear (Esc)" aria-label="Clear input">
+                <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M18 6 6 18" />
+                  <path d="m6 6 12 12" />
+                </svg>
+              </button>
+            </div>
             <button id="reroll" class="icon-btn" type="button" title="Reroll (Enter)" aria-label="Reroll">
-              <span class="icon-glyph" aria-hidden="true">⟳</span>
+              <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
+                <path d="M21 3v5h-5" />
+              </svg>
             </button>
             <button id="copy" class="icon-btn" type="button" title="Copy shareable link" aria-label="Copy link">
-              <!-- Inline SVG instead of the 🔗 emoji — emoji glyphs ignore CSS color. -->
-              <svg class="icon-glyph icon-link" viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M10 14a5 5 0 0 0 7.07 0l3.18-3.18a5 5 0 0 0-7.07-7.07L11.5 5.4" />
-                <path d="M14 10a5 5 0 0 0-7.07 0l-3.18 3.18a5 5 0 0 0 7.07 7.07l1.67-1.66" />
+              <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
               </svg>
               <span class="copied-flag" id="copied" aria-hidden="true">copied</span>
             </button>
@@ -112,15 +140,15 @@
               <span class="example-label">D&amp;D 5e</span>
               <div class="example-chips">
                 <button class="chip" type="button" data-notation="4d6kh3">4d6kh3</button>
-                <button class="chip" type="button" data-notation="2d20kh1+5">2d20kh1+5</button>
+                <button class="chip" type="button" data-notation="2d20kh1+7">2d20kh1+7</button>
                 <button class="chip" type="button" data-notation="8d6">8d6</button>
               </div>
             </div>
             <div class="example-group">
               <span class="example-label">World of Darkness</span>
               <div class="example-chips">
-                <button class="chip" type="button" data-notation="8d10&gt;=6f1">8d10&gt;=6f1</button>
-                <button class="chip" type="button" data-notation="6d10!=10&gt;=8">6d10!=10&gt;=8</button>
+                <button class="chip" type="button" data-notation="7d10&gt;=6f1">7d10&gt;=6f1</button>
+                <button class="chip" type="button" data-notation="5d10!=10&gt;=8">5d10!=10&gt;=8</button>
               </div>
             </div>
             <div class="example-group">
@@ -138,7 +166,7 @@
             <div class="example-group">
               <span class="example-label">Pathfinder 2e</span>
               <div class="example-chips">
-                <button class="chip" type="button" data-notation="1d20+7 vs 15">1d20+7 vs 15</button>
+                <button class="chip" type="button" data-notation="1d20+12 vs 20">1d20+12 vs 20</button>
               </div>
             </div>
             <div class="example-group">

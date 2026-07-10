@@ -256,8 +256,9 @@
   outline-offset: 2px;
 }
 
-.widget-roll-glyph {
-  font-size: 0.9rem;
+.widget-roll-glyph.icon-svg {
+  width: 0.95em;
+  height: 0.95em;
 }
 
 .widget-note {

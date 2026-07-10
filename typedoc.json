@@ -10,6 +10,8 @@
   "excludePrivate": true,
   "excludeExternals": true,
   "categorizeByGroup": true,
+  "hideGenerator": true,
+  "customCss": "site/typedoc.css",
   "navigationLinks": {
     "Playground": "https://edloidas.github.io/roll-parser/",
     "Guide": "https://edloidas.github.io/roll-parser/reference.html",

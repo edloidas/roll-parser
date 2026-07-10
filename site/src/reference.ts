@@ -123,12 +123,13 @@ const SECTIONS: Section[] = [
     title: 'By system',
     examples: [
       { notation: '4d6kh3', note: 'D&D 5e — roll an ability score.' },
-      { notation: '2d20kh1+5', note: 'D&D 5e — attack with advantage.' },
-      { notation: '8d10>=6f1', note: 'World of Darkness — successes with a botch threshold.' },
-      { notation: '6d10!=10>=8', note: 'World of Darkness — 10-again, successes on 8+.' },
+      { notation: '2d20kh1+7', note: 'D&D 5e — attack with advantage.' },
+      { notation: '8d6', note: 'D&D 5e — a fireball’s worth of damage dice.' },
+      { notation: '7d10>=6f1', note: 'World of Darkness — successes with a botch threshold.' },
+      { notation: '5d10!=10>=8', note: 'World of Darkness — 10-again, successes on 8+.' },
       { notation: '12d6>=5', note: 'Shadowrun — count hits on 5 or 6.' },
       { notation: '4dF+2', note: 'Fate — four Fudge dice plus a skill.' },
-      { notation: '1d20+7 vs 15', note: 'Pathfinder 2e — check against a DC.' },
+      { notation: '1d20+12 vs 20', note: 'Pathfinder 2e — check against a DC.' },
       { notation: '{1d8!, 1d6!}kh1', note: 'Savage Worlds — trait vs. wild die, exploding.' },
       { notation: 'd%', note: 'Call of Cthulhu — a percentile roll.' },
     ],
@@ -149,7 +150,7 @@ function escapeHtml(value: string): string {
 
 /** Playground deep-link for a notation, seedless so it rolls fresh. */
 function playgroundHref(notation: string): string {
-  return `./index.html?d=${encodeURIComponent(notation)}`;
+  return `./?d=${encodeURIComponent(notation)}`;
 }
 
 function widgetMarkup(example: Example): string {
@@ -162,7 +163,10 @@ function widgetMarkup(example: Example): string {
     '<div class="widget-head">',
     `<code class="widget-notation">${safe}</code>`,
     '<button class="widget-roll" type="button" aria-label="Roll this notation">',
-    '<span class="widget-roll-glyph" aria-hidden="true">⟳</span> roll',
+    // Lucide rotate-cw (https://lucide.dev, ISC license).
+    '<svg class="widget-roll-glyph icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">',
+    '<path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" /><path d="M21 3v5h-5" />',
+    '</svg> roll',
     '</button>',
     '</div>',
     `<p class="widget-note">${escapeHtml(example.note)}</p>`,

@@ -8,7 +8,7 @@
 import type { DieResult } from '../../src/index.js';
 
 /** Maximum dice drawn in the tray before collapsing into a `+N` overflow chip. */
-export const MAX_TRAY_DICE = 24;
+export const MAX_TRAY_DICE = 6;
 
 /** Escapes the characters that are unsafe inside an HTML attribute value. */
 function escapeAttr(value: string): string {

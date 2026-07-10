@@ -15,11 +15,14 @@ const COUNT_UP_MS = 450;
 
 const app = requireEl('app');
 const input = requireEl<HTMLInputElement>('notation');
+const inputWrap = requireEl('input-wrap');
 const tray = requireEl('tray');
+const legend = requireEl('legend');
 const result = requireEl('result');
 const errorSlot = requireEl('error');
 const rerollBtn = requireEl('reroll');
 const copyBtn = requireEl('copy');
+const clearBtn = requireEl('clear');
 const copiedFlag = requireEl('copied');
 const examples = requireEl('examples');
 const versionEl = requireEl('version');
@@ -84,6 +87,12 @@ function replayPanelAnimation(): void {
 function setActive(active: boolean): void {
   app.classList.toggle('is-active', active);
   tray.setAttribute('aria-hidden', active ? 'false' : 'true');
+  legend.setAttribute('aria-hidden', active ? 'false' : 'true');
+}
+
+/** Shows the clear (×) button only while the input holds text. */
+function syncClear(): void {
+  inputWrap.classList.toggle('has-value', input.value !== '');
 }
 
 /**
@@ -96,6 +105,7 @@ function performRoll(notation: string, seed: string): void {
   if (trimmed === '') {
     setActive(false);
     tray.innerHTML = '';
+    legend.innerHTML = '';
     result.innerHTML = '';
     errorSlot.innerHTML = '';
     input.classList.remove('is-invalid');
@@ -109,7 +119,8 @@ function performRoll(notation: string, seed: string): void {
   try {
     const rolled = roll(notation, { seed });
 
-    tray.innerHTML = renderTray(rolled.rolls) + renderLegend(rolled.rolls);
+    tray.innerHTML = renderTray(rolled.rolls);
+    legend.innerHTML = renderLegend(rolled.rolls);
     result.innerHTML = renderResultPanel(rolled);
     replayPanelAnimation();
     animateTotal(rolled.total);
@@ -163,15 +174,29 @@ async function copyLink(): Promise<void> {
   setTimeout(() => copiedFlag.classList.remove('is-visible'), 1200);
 }
 
+/** Empties the input, returns focus, and resets to the idle state. */
+function clearInput(): void {
+  input.value = '';
+  syncClear();
+  input.focus();
+  rollNow('');
+}
+
 //
 // * Wiring
 //
 
 input.addEventListener('input', () => {
+  syncClear();
   debouncedRoll(input.value);
 });
 
 input.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    clearInput();
+    return;
+  }
   if (event.key !== 'Enter') return;
   event.preventDefault();
   rollNow(input.value);
@@ -185,11 +210,16 @@ copyBtn.addEventListener('click', () => {
   void copyLink();
 });
 
+clearBtn.addEventListener('click', () => {
+  clearInput();
+});
+
 examples.addEventListener('click', (event) => {
   const target = (event.target as HTMLElement).closest<HTMLButtonElement>('.chip');
   if (target == null) return;
 
   input.value = target.dataset.notation ?? '';
+  syncClear();
   input.focus();
   rollNow(input.value);
 });
@@ -204,5 +234,6 @@ const initial = readUrlState();
 
 if (initial.notation !== '') {
   input.value = initial.notation;
+  syncClear();
   performRoll(initial.notation, initial.seed !== '' ? initial.seed : freshSeed());
 }

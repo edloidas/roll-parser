@@ -1,8 +1,10 @@
 # Fonts
 
-Self-hosted latin-subset variable woff2 files, downloaded from Google Fonts.
+Self-hosted latin-subset woff2 files, downloaded from Google Fonts.
 
-- **Cinzel** (`cinzel-latin.woff2`) — headings, wordmark, degree badges. Source: <https://fonts.google.com/specimen/Cinzel>. License: SIL Open Font License 1.1.
-- **Alegreya** (`alegreya-latin.woff2`) — body text, dice values, totals, breakdown numbers. Source: <https://fonts.google.com/specimen/Alegreya>. License: SIL Open Font License 1.1.
+- **Cinzel** (`cinzel-latin.woff2`) — headings, wordmark, section titles, degree badges, example labels (`--font-head`). Variable weight axis 400–700. Source: <https://fonts.google.com/specimen/Cinzel>. License: SIL Open Font License 1.1.
+- **IBM Plex Sans** (`ibm-plex-sans-latin.woff2`) — body text, notes, legend, footer, widget copy (`--font-body`). Variable weight axis 400–600. Source: <https://fonts.google.com/specimen/IBM+Plex+Sans>. License: SIL Open Font License 1.1.
+- **JetBrains Mono** (`jetbrains-mono-latin.woff2`) — notation input, chips, breakdown labels/operators, error echo, expr-note, widget notation (`--font-mono`). Variable weight axis 400–700. Source: <https://fonts.google.com/specimen/JetBrains+Mono>. License: SIL Open Font License 1.1.
+- **B612** (`b612-latin-400.woff2`, `b612-latin-700.woff2`) — dice values, mini-die values, the big total, and success/failure count numbers (`--font-num`). Static (non-variable): one file per weight, 400 and 700. Source: <https://fonts.google.com/specimen/B612>. License: SIL Open Font License 1.1.
 
-Each file is a variable font covering the weight axis; `@font-face` rules in `style.css` map weights 400–700 to the single file per family.
+Cinzel, IBM Plex Sans, and JetBrains Mono are variable fonts covering their weight axes in a single file each; their `@font-face` rules in `style.css` map the weight range to that one file. B612 is not offered as a variable font, so it ships as two static files.

@@ -7,8 +7,9 @@
  * * Fonts
  */
 
-/* Variable fonts — one latin woff2 per family covers the 400–700 range.
-   Dev path is ../public/fonts; build rewrites it to ../fonts for dist. */
+/* Self-hosted latin woff2. Cinzel, IBM Plex Sans, and JetBrains Mono are
+   variable (one file spans the weight range); B612 is static (one file per
+   weight). Dev path is ../public/fonts; build rewrites it to ../fonts. */
 @font-face {
   font-family: 'Cinzel';
   font-style: normal;
@@ -18,11 +19,35 @@
 }
 
 @font-face {
-  font-family: 'Alegreya';
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url('../public/fonts/ibm-plex-sans-latin.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
   font-style: normal;
   font-weight: 400 700;
   font-display: swap;
-  src: url('../public/fonts/alegreya-latin.woff2') format('woff2');
+  src: url('../public/fonts/jetbrains-mono-latin.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'B612';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../public/fonts/b612-latin-400.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'B612';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('../public/fonts/b612-latin-700.woff2') format('woff2');
 }
 
 /*
@@ -46,8 +71,9 @@
   --gold-gradient: linear-gradient(135deg, #f0c060, #d9a441 45%, #a3622f);
 
   --font-head: 'Cinzel', 'Iowan Old Style', Georgia, serif;
-  --font-body: 'Alegreya', 'Iowan Old Style', Georgia, serif;
-  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, monospace;
+  --font-body: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, monospace;
+  --font-num: 'B612', var(--font-body);
 
   --radius: 14px;
   --die-size: 56px;
@@ -78,6 +104,20 @@
 *::before,
 *::after {
   box-sizing: border-box;
+}
+
+/* ! JetBrains Mono ligatures rewrite notation (`!=` → ≠, `>=` → ⩾), which
+   changes its meaning — every notation glyph must stay literal. */
+.notation-input,
+.chip,
+.error-echo,
+.expr-note,
+.grp-label,
+.eq-var,
+.eq-fn,
+.die-badge,
+.widget-notation {
+  font-variant-ligatures: none;
 }
 
 html,
@@ -119,16 +159,13 @@ body {
   align-items: center;
   gap: 0.6rem;
   text-decoration: none;
-  transform-origin: center top;
-  transition: transform var(--transition);
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .logo-die {
-  width: 88px;
-  height: 88px;
-  transition:
-    width var(--transition),
-    height var(--transition);
+  width: 46px;
+  height: 46px;
 }
 
 .logo-stroke {
@@ -139,21 +176,12 @@ body {
   stroke-linecap: round;
 }
 
-.logo-num {
-  fill: var(--text);
-  font-family: var(--font-head);
-  font-size: 13px;
-  font-weight: 700;
-  opacity: 0.85;
-}
-
 .wordmark {
   font-family: var(--font-head);
-  font-size: 2rem;
+  font-size: 1.6rem;
   font-weight: 700;
   letter-spacing: 0.01em;
   color: var(--text);
-  transition: font-size var(--transition);
 }
 
 /*
@@ -214,7 +242,7 @@ body {
 
 .die-value {
   fill: var(--text);
-  font-family: var(--font-body);
+  font-family: var(--font-num);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
@@ -310,6 +338,8 @@ body {
   color: var(--text-muted);
   border: 1px dashed var(--border);
   border-radius: var(--radius);
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 /*
@@ -319,6 +349,9 @@ body {
 .icon-btn {
   position: relative;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 3rem;
   font-size: 1.2rem;
   color: var(--text);
@@ -326,6 +359,8 @@ body {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
   transition:
     background 150ms ease,
     border-color 150ms ease,
@@ -348,15 +383,12 @@ body {
   outline-offset: 2px;
 }
 
-.icon-link {
-  width: 1.15em;
-  height: 1.15em;
-  vertical-align: -0.2em;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+/* Inline Lucide icons — geometry carries fill/stroke as attributes; CSS only
+   sizes them so they scale with the host button's font-size. */
+.icon-svg {
+  display: block;
+  width: 1.4em;
+  height: 1.4em;
 }
 
 /*
@@ -430,9 +462,11 @@ body {
   min-width: 22px;
   height: 22px;
   padding: 0 3px;
-  font-family: var(--font-body);
+  font-family: var(--font-num);
   font-size: 0.82rem;
-  font-weight: 700;
+  /* B612 regular — the small breakdown chips read cleanly at 400, leaving 700
+     to the hero total and tray dice (and this loads the B612 400 face). */
+  font-weight: 400;
   font-variant-numeric: tabular-nums;
   color: var(--text);
   background: var(--surface-strong);
@@ -543,16 +577,16 @@ body {
  */
 
 .tray-legend {
-  flex-basis: 100%;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: center;
   gap: 0.3rem 0.55rem;
-  margin-top: 0.35rem;
   font-family: var(--font-body);
   font-size: 0.8rem;
   color: var(--text-muted);
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .lg-item {
@@ -682,19 +716,6 @@ body {
   padding-top: clamp(1rem, 4vh, 2.5rem);
 }
 
-.app.is-active .logo-die {
-  width: 48px;
-  height: 48px;
-}
-
-.app.is-active .logo-num {
-  font-size: 0;
-}
-
-.app.is-active .wordmark {
-  font-size: 1.35rem;
-}
-
 /* Top navigation — Guide/Docs pills, present in both idle and active states. */
 .top-nav {
   position: fixed;
@@ -703,6 +724,8 @@ body {
   z-index: 5;
   display: flex;
   gap: 0.4rem;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .guide-link {
@@ -737,34 +760,63 @@ body {
 }
 
 .guide-glyph {
-  font-size: 1rem;
+  display: inline-flex;
+  align-items: center;
+}
+
+.guide-glyph .icon-svg {
+  width: 1.05em;
+  height: 1.05em;
 }
 
 /*
  * * Dice tray
  */
 
+/* Single fixed-height row — never wraps, never scrolls. The extra headroom
+   over `--die-size` leaves room for the -5px explode/reroll badge overhang so
+   `overflow: visible` (needed for the badges) can't spawn a scrollbar. */
 .tray {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  align-items: center;
   justify-content: center;
   gap: 0.55rem;
   width: 100%;
-  max-height: 0;
+  height: 0;
   opacity: 0;
   overflow: hidden;
   margin: 0;
+  user-select: none;
+  -webkit-user-select: none;
   transition:
-    max-height var(--transition),
+    height var(--transition),
     opacity var(--transition),
     margin var(--transition);
 }
 
 .app.is-active .tray {
-  max-height: 40vh;
+  height: calc(var(--die-size) + 12px);
   opacity: 1;
   margin: 1.25rem 0;
-  overflow-y: auto;
+  overflow: visible;
+}
+
+/* Reserved slot for the state legend — fixed height while active so legend
+   content appears/disappears without nudging the input below it. */
+.legend-slot {
+  width: 100%;
+  height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition:
+    height var(--transition),
+    opacity var(--transition);
+}
+
+.app.is-active .legend-slot {
+  height: 1.7rem;
+  opacity: 1;
 }
 
 /*
@@ -782,12 +834,18 @@ body {
   width: 100%;
 }
 
-.notation-input {
+.input-wrap {
+  position: relative;
   flex: 1;
   min-width: 0;
+}
+
+.notation-input {
+  width: 100%;
   font-size: 1.1rem;
   font-family: var(--font-mono);
-  padding: 0.85rem 1rem;
+  /* Extra right padding so typed text never runs under the clear button. */
+  padding: 0.85rem 2.75rem 0.85rem 1rem;
   color: var(--text);
   background: var(--surface);
   border: 1px solid var(--border);
@@ -796,6 +854,53 @@ body {
   transition:
     border-color 150ms ease,
     box-shadow 150ms ease;
+}
+
+/* Clear (×) — inside the input on the right, shown only when non-empty. */
+.input-clear {
+  position: absolute;
+  top: 50%;
+  right: 0.55rem;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  padding: 0;
+  color: var(--text-muted);
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+  opacity: 0;
+  visibility: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+  transition:
+    color 150ms ease,
+    background 150ms ease,
+    opacity 150ms ease;
+}
+
+.input-wrap.has-value .input-clear {
+  opacity: 1;
+  visibility: visible;
+}
+
+.input-clear:hover {
+  color: var(--text);
+  background: var(--surface-strong);
+}
+
+.input-clear:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.input-clear .icon-svg {
+  width: 1.1em;
+  height: 1.1em;
 }
 
 .notation-input::placeholder {
@@ -863,6 +968,8 @@ body {
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--text-dim);
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .example-chips {
@@ -881,6 +988,8 @@ body {
   border: 1px solid var(--border);
   border-radius: 999px;
   cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
   transition:
     color 150ms ease,
     border-color 150ms ease;
@@ -905,6 +1014,12 @@ body {
 
 .error-slot:empty {
   margin-top: 0;
+}
+
+/* Reserve space while active so a transient parse error appearing mid-type
+   doesn't shove the result panel down. */
+.app.is-active .error-slot {
+  min-height: 1.5rem;
 }
 
 .error-msg {
@@ -960,7 +1075,7 @@ body {
   /* fit-content keeps the gradient box tight to the digits. */
   width: fit-content;
   margin: 0 auto;
-  font-family: var(--font-body);
+  font-family: var(--font-num);
   font-size: clamp(3rem, 12vw, 5.5rem);
   font-weight: 700;
   line-height: 1;
@@ -989,7 +1104,7 @@ body {
 }
 
 .count-item b {
-  font-family: var(--font-body);
+  font-family: var(--font-num);
   font-size: 3rem;
   line-height: 1;
   font-variant-numeric: tabular-nums;
@@ -1066,13 +1181,15 @@ body {
     padding-top: min(18vh, 120px);
   }
 
-  .wordmark {
-    font-size: 1.6rem;
+  /* Logo keeps one size across states; nudge it smaller on mobile so the
+     centered wordmark clears the fixed Guide/Docs pills. */
+  .logo-die {
+    width: 42px;
+    height: 42px;
   }
 
-  .logo-die {
-    width: 64px;
-    height: 64px;
+  .wordmark {
+    font-size: 1.3rem;
   }
 
   :root {
