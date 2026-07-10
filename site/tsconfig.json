@@ -4,6 +4,6 @@
   "compilerOptions": {
     "lib": ["ES2022", "DOM", "DOM.Iterable"]
   },
-  "include": ["src/**/*.ts", "../scripts/build-site.ts"],
+  "include": ["src/**/*.ts", "../scripts/build-site.ts", "../scripts/serve-site.ts"],
   "exclude": ["node_modules", "dist"]
 }
