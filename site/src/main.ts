@@ -8,6 +8,7 @@
 import { isRollParserError, roll, VERSION } from '../../src/index.js';
 import { renderLegend, renderTray } from './dice.js';
 import { renderErrorSlot, renderResultPanel } from './render.js';
+import { initTheme } from './theme.js';
 import { readUrlState, writeUrlState } from './url.js';
 
 const ROLL_DEBOUNCE_MS = 200;
@@ -227,6 +228,8 @@ examples.addEventListener('click', (event) => {
 //
 // * Bootstrap
 //
+
+initTheme();
 
 versionEl.textContent = `v${VERSION}`;
 

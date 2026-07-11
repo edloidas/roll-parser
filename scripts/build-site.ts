@@ -17,6 +17,7 @@ const PUBLIC_DIR = join(SITE_DIR, 'public');
 const DIST_DIR = join(SITE_DIR, 'dist');
 const ASSETS_DIR = join(DIST_DIR, 'assets');
 const FONTS_DIR = join(DIST_DIR, 'fonts');
+const DOCS_DIR = join(DIST_DIR, 'docs');
 
 const STYLESHEETS = ['style.css', 'reference.css'];
 const HTML_PAGES = ['index.html', 'reference.html'];
@@ -44,8 +45,40 @@ async function build(): Promise<void> {
   await writeHtml();
 
   await generateDocs();
+  await injectDocsThemeScript();
 
   console.log(`Site built → ${DIST_DIR}`);
+}
+
+/**
+ * Injects a synchronous, pre-paint theme script into every generated docs page.
+ *
+ * TypeDoc's own inline script (at `<body>` start) applies the theme from its
+ * `tsd-theme` key. This runs first — in `<head>` — and seeds `tsd-theme` from
+ * the site-wide `theme-preference` key (mapping `auto` → `os`), so TypeDoc
+ * paints the correct theme with no flash. The deferred bridge (`site/typedoc.js`)
+ * still handles write-back on change, the Settings panel, and live cross-tab sync.
+ */
+async function injectDocsThemeScript(): Promise<void> {
+  const script =
+    '<script>{' +
+    "const m={auto:'os',light:'light',dark:'dark'};" +
+    "const t=m[localStorage.getItem('theme-preference')]||'os';" +
+    "localStorage.setItem('tsd-theme',t);" +
+    'document.documentElement.dataset.theme=t;' +
+    '}</script>';
+
+  const entries = await readdir(DOCS_DIR, { recursive: true });
+
+  for (const entry of entries) {
+    if (!entry.endsWith('.html')) continue;
+
+    const path = join(DOCS_DIR, entry);
+    const html = await Bun.file(path).text();
+    if (html.includes('theme-preference')) continue;
+
+    await Bun.write(path, html.replace('<head>', `<head>${script}`));
+  }
 }
 
 /**

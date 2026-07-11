@@ -12,6 +12,7 @@
   "categorizeByGroup": true,
   "hideGenerator": true,
   "customCss": "site/typedoc.css",
+  "customJs": "site/typedoc.js",
   "navigationLinks": {
     "Playground": "https://edloidas.github.io/roll-parser/",
     "Guide": "https://edloidas.github.io/roll-parser/reference",

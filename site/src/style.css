@@ -81,8 +81,30 @@
   --spring: 420ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
+/* Light palette. The `:root` dark tokens above are the default (and the
+   forced-dark case); light applies when the toggle forces it, or — in `auto`
+   and before the theme script runs — when the OS prefers light. The forced
+   block and the `prefers-color-scheme` block below MUST hold identical values:
+   keep them in sync. */
+:root[data-theme='light'] {
+  --bg: #f5ecdb;
+  --bg-glow: #fffaf0;
+  --surface: rgba(43, 35, 23, 0.04);
+  --surface-strong: rgba(43, 35, 23, 0.07);
+  --border: rgba(43, 35, 23, 0.15);
+  --text: #2b2317;
+  --text-muted: #6b5d45;
+  --text-dim: #9a8b6f;
+  --accent: #a06b1f;
+  --accent-soft: rgba(160, 107, 31, 0.35);
+  --success: #4f7a3a;
+  --failure: #b04a3e;
+  --die-stroke: #8a7a5c;
+  --gold-gradient: linear-gradient(135deg, #b8842a, #a06b1f 45%, #7a4a18);
+}
+
 @media (prefers-color-scheme: light) {
-  :root {
+  :root:not([data-theme='dark']):not([data-theme='light']) {
     --bg: #f5ecdb;
     --bg-glow: #fffaf0;
     --surface: rgba(43, 35, 23, 0.04);
@@ -767,6 +789,60 @@ body {
 .guide-glyph .icon-svg {
   width: 1.05em;
   height: 1.05em;
+}
+
+/* Theme toggle — sits in .top-nav and cycles auto → light → dark. Only the
+   icon for the active mode shows, driven by the <html data-theme> attribute. */
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  width: 1.95rem;
+  height: 1.95rem;
+  padding: 0;
+  color: var(--text-muted);
+  cursor: pointer;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  transition:
+    color 150ms ease,
+    border-color 150ms ease,
+    background 150ms ease;
+}
+
+.theme-toggle:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--surface-strong);
+}
+
+.theme-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.theme-icon {
+  width: 1.05rem;
+  height: 1.05rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.theme-icon--auto,
+.theme-icon--light,
+.theme-icon--dark {
+  display: none;
+}
+
+:root[data-theme='auto'] .theme-icon--auto,
+:root[data-theme='light'] .theme-icon--light,
+:root[data-theme='dark'] .theme-icon--dark {
+  display: block;
 }
 
 /*

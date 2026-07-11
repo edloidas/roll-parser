@@ -10,6 +10,7 @@
 import { isRollParserError, roll, VERSION } from '../../src/index.js';
 import { renderTray } from './dice.js';
 import { renderErrorSlot, renderResultPanel } from './render.js';
+import { initTheme } from './theme.js';
 
 type Example = {
   notation: string;
@@ -270,4 +271,5 @@ function mount(): void {
   for (const widget of widgets) observer.observe(widget);
 }
 
+initTheme();
 mount();
