@@ -14,7 +14,7 @@
   "customCss": "site/typedoc.css",
   "navigationLinks": {
     "Playground": "https://edloidas.github.io/roll-parser/",
-    "Guide": "https://edloidas.github.io/roll-parser/reference.html",
+    "Guide": "https://edloidas.github.io/roll-parser/reference",
     "GitHub": "https://github.com/edloidas/roll-parser"
   }
 }
