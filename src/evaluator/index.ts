@@ -4,7 +4,7 @@
  * @module evaluator
  */
 
-export { DEFAULT_MAX_DICE, evaluate, EvaluatorError } from './evaluator.js';
+export { DEFAULT_MAX_DICE, EvaluatorError, evaluate } from './evaluator.js';
 export {
   applyDropHighest,
   applyDropLowest,

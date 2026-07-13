@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { isRollParserError, RollParserError } from '../errors.js';
+import type { ASTNode } from './ast.js';
 import {
   isBinaryOp,
   isCritThreshold,
@@ -18,7 +19,6 @@ import {
   isVariable,
   isVersus,
 } from './ast.js';
-import type { ASTNode } from './ast.js';
 import { parse } from './parser.js';
 
 describe('AST type guards', () => {

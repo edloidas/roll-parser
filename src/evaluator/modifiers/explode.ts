@@ -9,9 +9,8 @@
  */
 
 import type { RNG } from '../../rng/types.js';
-import type { CompareOp } from '../../types.js';
-import type { DieResult } from '../../types.js';
-import { EvaluatorError, type EvalEnv } from '../evaluator.js';
+import type { CompareOp, DieResult } from '../../types.js';
+import { type EvalEnv, EvaluatorError } from '../evaluator.js';
 
 /** Default maximum explosion iterations per die. */
 export const DEFAULT_MAX_EXPLODE_ITERATIONS = 1_000;

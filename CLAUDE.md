@@ -5,9 +5,9 @@ Dice roll notation parser. TypeScript library and CLI. Built with Bun.
 ## Commands
 
 ```bash
-bun check:fix   # Typecheck + lint + format with auto-fix — use during iteration
+bun check:fix   # Typecheck + biome check --write (lint + format + import sort) — use during iteration
 bun test        # Run tests
-bun validate    # Full check before commit: typecheck + lint + format:check + build + test
+bun validate    # Full pre-release gate: check + build + check:package + test:ci
 ```
 
 ## Constraints

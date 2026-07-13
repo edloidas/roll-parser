@@ -11,7 +11,7 @@
 
 import type { RNG } from '../../rng/types.js';
 import type { CompareOp, DieResult } from '../../types.js';
-import { EvaluatorError, type EvalEnv } from '../evaluator.js';
+import { type EvalEnv, EvaluatorError } from '../evaluator.js';
 import { matchesCondition } from './compare.js';
 
 /** Default maximum reroll iterations per die. */

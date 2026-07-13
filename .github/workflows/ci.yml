@@ -37,11 +37,8 @@ jobs:
       - name: Type check
         run: bun typecheck
 
-      - name: Lint
-        run: bun lint
-
-      - name: Format check
-        run: bun format:check
+      - name: Lint and format check
+        run: bunx biome check .
 
   build:
     name: Build
