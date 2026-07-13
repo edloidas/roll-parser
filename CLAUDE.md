@@ -10,6 +10,11 @@ bun test        # Run tests
 bun validate    # Full pre-release gate: check + build + check:package + test:ci
 ```
 
+A pre-commit hook auto-fixes staged `.ts`/`.tsx` files (nano-staged runs
+`biome check --write` on them, then re-stages). It installs automatically on
+`bun install` — the `prepare` script points `core.hooksPath` at `.githooks/`.
+Commits with unfixable lint errors are blocked.
+
 ## Constraints
 
 - Runtime: Bun — never use npm, yarn, or pnpm
