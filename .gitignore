@@ -1,50 +1,22 @@
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
-*~
-
-# AI Assistant
+# Local tooling
 .claude/plans/
+.claude/settings.local.json
 .codex/
-.cursor/
 .mcp.json
-settings.local.json
+.tmp/
 
-# Build files
+# Dependencies
+node_modules/
+
+# Build output
 dist/
-build/
 site/dist/
 # TS-only source tree — compiled JS in src/ is always a stray build artifact
 src/**/*.js
 src/**/*.js.map
 
-# Development files
-api/
-*.local
-
-# Dependencies
-node_modules/
-package-lock.json
-pnpm-lock.yaml
-
-# OS files
-.DS_Store
-Thumbs.db
-Desktop.ini
-
-# Logs
-logs/
-*.log
-npm-debug.log*
-bun-debug.log*
-
 # Test coverage
 coverage/
 
-# Misc
-.cache/
-.temp/
-.tmp/
-.eslintcache
+# macOS
+.DS_Store
