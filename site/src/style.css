@@ -77,6 +77,8 @@
 
   --radius: 14px;
   --die-size: 56px;
+  /* Shared height for the notation input and the square icon buttons beside it. */
+  --control-h: 52px;
   --transition: 300ms cubic-bezier(0.22, 1, 0.36, 1);
   --spring: 420ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
@@ -126,6 +128,15 @@
 *::before,
 *::after {
   box-sizing: border-box;
+}
+
+/* One gold focus ring for every link and button on both pages — components only
+   need a `border-radius` for the ring to hug their shape. The notation input
+   opts out: it draws a flush `box-shadow` ring instead. */
+a:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 /* ! JetBrains Mono ligatures rewrite notation (`!=` → ≠, `>=` → ⩾), which
@@ -181,8 +192,14 @@ body {
   align-items: center;
   gap: 0.6rem;
   text-decoration: none;
+  /* Rounds the shared focus ring; there is no painted border to round. */
+  border-radius: 10px;
   user-select: none;
   -webkit-user-select: none;
+}
+
+.logo:hover .wordmark {
+  color: var(--accent);
 }
 
 .logo-die {
@@ -204,6 +221,7 @@ body {
   font-weight: 700;
   letter-spacing: 0.01em;
   color: var(--text);
+  transition: color 150ms ease;
 }
 
 /*
@@ -356,8 +374,13 @@ body {
   display: none;
 }
 
+/* Revealing restarts the pop (a `display: none` die never ran it), so the
+   stagger re-bases on the fold-relative `--j` — the first die pops the instant
+   the chip is clicked. The interval is tighter than the visible row's 32ms so a
+   60-die tray cascades in well under a second instead of dripping. */
 .is-expanded > .die.is-folded {
   display: inline-flex;
+  animation-delay: calc(var(--j) * 14ms);
 }
 
 /* Squares up with a d6 so the chip reads as one more die in the row. */
@@ -394,11 +417,6 @@ button.die-overflow:hover {
   background: var(--surface);
 }
 
-button.die-overflow:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
 /*
  * * Icon buttons (shared)
  */
@@ -409,7 +427,8 @@ button.die-overflow:focus-visible {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 3rem;
+  width: var(--control-h);
+  height: var(--control-h);
   font-size: 1.2rem;
   color: var(--text);
   background: var(--surface);
@@ -431,13 +450,10 @@ button.die-overflow:focus-visible {
   color: var(--accent);
 }
 
-.icon-btn:active {
+/* ! Chrome matches `:active` on disabled buttons, so the press-scale needs an
+   explicit `:not(:disabled)` guard — otherwise dead buttons animate on click. */
+.icon-btn:not(:disabled):active {
   transform: scale(0.94);
-}
-
-.icon-btn:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
 }
 
 .icon-btn:disabled {
@@ -498,13 +514,17 @@ button.die-overflow:focus-visible {
   word-break: normal;
 }
 
+/* Vertical padding matches the horizontal so a wrapped chip — notation on the
+   first row, dice on the rest — leaves the last dice row as much room below as
+   the sides get. The dice are hard-edged boxes, so any shortfall reads as a
+   crop; `.grp-label` drops its leading for the same reason. */
 .grp,
 .brace-grp {
   display: inline-flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 0.3rem;
-  padding: 0.2rem 0.5rem;
+  padding: 0.45rem 0.5rem;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -513,6 +533,7 @@ button.die-overflow:focus-visible {
 .grp-label {
   font-family: var(--font-mono);
   font-size: 0.78rem;
+  line-height: 1;
   color: var(--text-muted);
 }
 
@@ -828,11 +849,6 @@ button.die-overflow:focus-visible {
   background: var(--surface-strong);
 }
 
-.guide-link:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
 .guide-glyph {
   display: inline-flex;
   align-items: center;
@@ -868,11 +884,6 @@ button.die-overflow:focus-visible {
   color: var(--accent);
   border-color: var(--accent);
   background: var(--surface-strong);
-}
-
-.theme-toggle:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
 }
 
 .theme-icon {
@@ -995,10 +1006,11 @@ button.die-overflow:focus-visible {
 
 .notation-input {
   width: 100%;
+  height: var(--control-h);
   font-size: 1.1rem;
   font-family: var(--font-mono);
   /* Extra right padding so typed text never runs under the clear button. */
-  padding: 0.85rem 2.75rem 0.85rem 1rem;
+  padding: 0 2.75rem 0 1rem;
   color: var(--text);
   background: var(--surface);
   border: 1px solid var(--border);
@@ -1046,11 +1058,6 @@ button.die-overflow:focus-visible {
 .input-clear:hover {
   color: var(--text);
   background: var(--surface-strong);
-}
-
-.input-clear:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
 }
 
 .input-clear .icon-svg {
@@ -1153,11 +1160,6 @@ button.die-overflow:focus-visible {
 .chip:hover {
   color: var(--text);
   border-color: var(--accent);
-}
-
-.chip:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
 }
 
 .error-slot {
@@ -1317,6 +1319,9 @@ button.die-overflow:focus-visible {
 .footer a {
   color: var(--text-muted);
   text-decoration: none;
+  /* Rounds the shared focus ring; there is no painted border to round. */
+  border-radius: 5px;
+  transition: color 150ms ease;
 }
 
 .footer a:hover {
@@ -1349,6 +1354,7 @@ button.die-overflow:focus-visible {
 
   :root {
     --die-size: 40px;
+    --control-h: 48px;
   }
 
   .notation-input {

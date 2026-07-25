@@ -125,6 +125,7 @@ const SECTIONS: Section[] = [
     examples: [
       { notation: '4d6kh3', note: 'D&D 5e — roll an ability score.' },
       { notation: '2d20kh1+7', note: 'D&D 5e — attack with advantage.' },
+      { notation: '2d6ro<3+4', note: 'D&D 5e — Great Weapon Fighting, rerolling 1s and 2s.' },
       { notation: '8d6', note: 'D&D 5e — a fireball’s worth of damage dice.' },
       { notation: '7d10>=6f1', note: 'World of Darkness — successes with a botch threshold.' },
       { notation: '5d10!=10>=8', note: 'World of Darkness — 10-again, successes on 8+.' },

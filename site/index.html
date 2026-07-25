@@ -143,7 +143,7 @@
                 autocorrect="off"
                 spellcheck="false"
                 enterkeyhint="go"
-                placeholder="Try 4d6kh3, 2d20kh1+7, 8d6…"
+                placeholder="Try 4d6kh3"
               />
               <button id="clear" class="input-clear" type="button" title="Clear (Esc)" aria-label="Clear input">
                 <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -159,7 +159,8 @@
                 <path d="M21 3v5h-5" />
               </svg>
             </button>
-            <button id="copy" class="icon-btn" type="button" title="Copy shareable link" aria-label="Copy link" disabled>
+            <!-- The link carries the seed, so it reproduces these exact dice. -->
+            <button id="copy" class="icon-btn" type="button" title="Copy link to this exact roll" aria-label="Copy link to this exact roll" disabled>
               <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
                 <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
@@ -176,46 +177,47 @@
             <div class="example-group example-group--mobile">
               <span class="example-label">D&amp;D 5e</span>
               <div class="example-chips">
-                <button class="chip" type="button" data-notation="4d6kh3">4d6kh3</button>
-                <button class="chip" type="button" data-notation="2d20kh1+7">2d20kh1+7</button>
-                <button class="chip" type="button" data-notation="8d6">8d6</button>
+                <button class="chip" type="button" data-notation="4d6kh3" title="Ability score — keep the highest 3 of 4d6">4d6kh3</button>
+                <button class="chip" type="button" data-notation="2d20kh1+7" title="Attack with advantage — keep the higher d20">2d20kh1+7</button>
+                <button class="chip" type="button" data-notation="2d6ro&lt;3+4" title="Great Weapon Fighting — reroll 1s and 2s once">2d6ro&lt;3+4</button>
+                <button class="chip" type="button" data-notation="8d6" title="Fireball — a big damage pool">8d6</button>
               </div>
             </div>
             <div class="example-group example-group--mobile">
               <span class="example-label">World of Darkness</span>
               <div class="example-chips">
-                <button class="chip" type="button" data-notation="7d10&gt;=6f1">7d10&gt;=6f1</button>
-                <button class="chip" type="button" data-notation="5d10!=10&gt;=8">5d10!=10&gt;=8</button>
+                <button class="chip" type="button" data-notation="7d10&gt;=6f1" title="Successes on 6+, 1s botch and subtract">7d10&gt;=6f1</button>
+                <button class="chip" type="button" data-notation="5d10!=10&gt;=8" title="10-again — 10s explode, successes on 8+">5d10!=10&gt;=8</button>
               </div>
             </div>
             <div class="example-group">
               <span class="example-label">Shadowrun</span>
               <div class="example-chips">
-                <button class="chip" type="button" data-notation="12d6&gt;=5">12d6&gt;=5</button>
+                <button class="chip" type="button" data-notation="12d6&gt;=5" title="Count hits on 5 or 6">12d6&gt;=5</button>
               </div>
             </div>
             <div class="example-group">
               <span class="example-label">Fate</span>
               <div class="example-chips">
-                <button class="chip" type="button" data-notation="4dF+2">4dF+2</button>
+                <button class="chip" type="button" data-notation="4dF+2" title="Four Fudge dice (−1/0/+1) plus a skill">4dF+2</button>
               </div>
             </div>
             <div class="example-group">
               <span class="example-label">Pathfinder 2e</span>
               <div class="example-chips">
-                <button class="chip" type="button" data-notation="1d20+12 vs 20">1d20+12 vs 20</button>
+                <button class="chip" type="button" data-notation="1d20+12 vs 20" title="Check against a DC — reports the degree of success">1d20+12 vs 20</button>
               </div>
             </div>
             <div class="example-group">
               <span class="example-label">Savage Worlds</span>
               <div class="example-chips">
-                <button class="chip" type="button" data-notation="{1d8!, 1d6!}kh1">{1d8!, 1d6!}kh1</button>
+                <button class="chip" type="button" data-notation="{1d8!, 1d6!}kh1" title="Trait vs. wild die, both acing — keep the better">{1d8!, 1d6!}kh1</button>
               </div>
             </div>
             <div class="example-group example-group--mobile">
-              <span class="example-label">Random</span>
+              <span class="example-label">Call of Cthulhu</span>
               <div class="example-chips">
-                <button class="chip" type="button" data-notation="d%">d%</button>
+                <button class="chip" type="button" data-notation="d%" title="Percentile roll — shorthand for 1d100">d%</button>
               </div>
             </div>
           </div>

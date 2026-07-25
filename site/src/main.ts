@@ -14,6 +14,22 @@ import { readUrlState, writeUrlState } from './url.js';
 const ROLL_DEBOUNCE_MS = 200;
 const COUNT_UP_MS = 450;
 
+/**
+ * Placeholder hints — one picked per load. Everyday D&D rolls, kept to seven
+ * characters or fewer so the hint never truncates on a narrow phone; the
+ * example chips below the input carry the breadth.
+ */
+const PLACEHOLDER_ROLLS = [
+  'd20',
+  '1d20+5',
+  '2d20kh1',
+  '2d20kl1',
+  '4d6kh3',
+  '2d6+3',
+  '1d8+4',
+  '8d6',
+] as const;
+
 const app = requireEl('app');
 const input = requireEl<HTMLInputElement>('notation');
 const inputWrap = requireEl('input-wrap');
@@ -37,6 +53,13 @@ function requireEl<T extends HTMLElement = HTMLElement>(id: string): T {
 /** Short base36 seed for a fresh random roll. */
 function freshSeed(): string {
   return Math.random().toString(36).slice(2, 8);
+}
+
+/** One {@link PLACEHOLDER_ROLLS} hint at random. Falls back to the markup's own. */
+function randomPlaceholder(): string {
+  const pick = PLACEHOLDER_ROLLS[Math.floor(Math.random() * PLACEHOLDER_ROLLS.length)];
+
+  return pick != null ? `Try ${pick}` : input.placeholder;
 }
 
 /** Previous numeric total, so the count-up eases from the last value. */
@@ -247,6 +270,7 @@ examples.addEventListener('click', (event) => {
 initTheme();
 initTrayToggle();
 
+input.placeholder = randomPlaceholder();
 versionEl.textContent = `v${VERSION}`;
 
 const initial = readUrlState();

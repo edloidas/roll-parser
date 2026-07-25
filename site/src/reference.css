@@ -26,6 +26,8 @@
   gap: 0.5rem;
   text-decoration: none;
   color: var(--text-muted);
+  /* Rounds the shared focus ring; there is no painted border to round. */
+  border-radius: 10px;
   transition: color 150ms ease;
 }
 
@@ -120,11 +122,6 @@
   background: var(--surface-strong);
 }
 
-.toc-link:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
 @media (min-width: 900px) {
   .toc {
     flex-direction: column;
@@ -158,9 +155,22 @@
  * * Sections
  */
 
+/* The offset clears the TOC, which sticks across the top of the viewport at this
+   width (~54px tall) and would otherwise cover the heading a TOC link jumps to. */
 .ref-section {
   scroll-margin-top: 4.5rem;
   margin-bottom: 3rem;
+}
+
+/* ! Must stay after the rule above — media queries add no specificity, so the
+   base value would otherwise win on both layouts. */
+@media (min-width: 900px) {
+  /* The TOC is a sidebar here and covers nothing, so the full offset would just
+     park the heading 72px down with the previous section still in frame. Match
+     the sidebar's own sticky `top` instead, so the two align. */
+  .ref-section {
+    scroll-margin-top: 1.5rem;
+  }
 }
 
 .ref-section-title {
@@ -255,11 +265,6 @@
 
 .widget-roll:active {
   transform: scale(0.94);
-}
-
-.widget-roll:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
 }
 
 .widget-roll-glyph.icon-svg {
@@ -366,11 +371,6 @@
   background: var(--surface-strong);
   text-decoration: underline dotted var(--accent-soft);
   text-underline-offset: 3px;
-}
-
-.widget-open:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
 }
 
 /*
