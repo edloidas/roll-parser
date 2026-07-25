@@ -6,9 +6,13 @@ TypeScript-first, Bun-optimized, Pratt parser architecture.
 </p>
 
 <p align="center">
-  <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-6-blue.svg" alt="TypeScript"></a>
+  <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-7-blue.svg" alt="TypeScript"></a>
   <a href="https://bun.sh/"><img src="https://img.shields.io/badge/Bun-1.3+-black.svg" alt="Bun"></a>
   <a href="https://nodejs.org/"><img src="https://img.shields.io/badge/Node.js-22.12%2B-339933.svg" alt="Node.js"></a>
+</p>
+
+<p align="center">
+  <a href="https://roll-parser.edloidas.io/"><strong>Try it online →</strong></a>
 </p>
 
 ## Status

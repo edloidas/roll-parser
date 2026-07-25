@@ -238,18 +238,19 @@ Findings grouped into GitHub issues:
 | [#20](https://github.com/edloidas/roll-parser/issues/20) | `ci: fix test pipeline and add quality gates` | #2, #24–#27 | ✓ Closed |
 | [#21](https://github.com/edloidas/roll-parser/issues/21) | `fix: parser and evaluator correctness` | #3, #4, #19, #21, #23 | ✓ Closed |
 | [#22](https://github.com/edloidas/roll-parser/issues/22) | `build: fix npm publish artifacts` | #6–#8, #28, #29, #32, #33, #35 | ✓ Closed |
-| [#23](https://github.com/edloidas/roll-parser/issues/23) | `docs: update documentation for v3` | #9–#11, #31, #34 | Open |
+| [#23](https://github.com/edloidas/roll-parser/issues/23) | `docs: update documentation for v3` | #9–#11, #31, #34 | ✓ Closed |
 | [#24](https://github.com/edloidas/roll-parser/issues/24) | `refactor: clean up public API surface` | #13–#16, #20, #22, #30, #37, #38 | ✓ Closed |
-| [#25](https://github.com/edloidas/roll-parser/issues/25) | `epic: implement Stage 2 — system compatibility` | #18 + Stage 2 roadmap | Open |
-| [#30](https://github.com/edloidas/roll-parser/issues/30) | `epic: implement Stage 3 — advanced features` | Stage 3 roadmap | Open |
+| [#25](https://github.com/edloidas/roll-parser/issues/25) | `epic: implement Stage 2 — system compatibility` | #18 + Stage 2 roadmap | ✓ Closed |
+| [#30](https://github.com/edloidas/roll-parser/issues/30) | `epic: implement Stage 3 — advanced features` | Stage 3 roadmap | ✓ Closed |
 
 Deferred (no issue): #5, #17, #36
 
-## Unimplemented Roadmap Features
+## Roadmap Features — Shipped
 
-From `PRD.md`, everything below is still missing:
+From `PRD.md`. Everything below is now implemented and lives in the `[Unreleased]`
+CHANGELOG section, pending the next alpha release. Both epics are closed.
 
-### Stage 2 → [#25](https://github.com/edloidas/roll-parser/issues/25)
+### Stage 2 → [#25](https://github.com/edloidas/roll-parser/issues/25) ✓
 
 | Feature | Syntax |
 |---------|--------|
@@ -262,7 +263,7 @@ From `PRD.md`, everything below is still missing:
 | Percentile dice | `d%` |
 | Fate/Fudge dice | `dF` |
 
-### Stage 3 → [#30](https://github.com/edloidas/roll-parser/issues/30)
+### Stage 3 → [#30](https://github.com/edloidas/roll-parser/issues/30) ✓
 
 | Feature | Syntax |
 |---------|--------|
@@ -271,3 +272,16 @@ From `PRD.md`, everything below is still missing:
 | Sorting modifiers | `4d6s`, `4d6sd` |
 | Critical/fumble thresholds | `1d20cs>19`, `1d20cf<2` |
 | Rich JSON `parts` output | Structured breakdown per sub-expression |
+
+## Still Deferred
+
+Documented known limitations, no issue filed:
+
+- **#5** — non-integer division results are not floored (`1d6/3` → `1.333…`)
+- **#17** — power operator has no overflow guard (`2**999` → `Infinity`); partly
+  mitigated by #118, which now throws `NON_FINITE_RESULT` on non-finite totals
+- **#36** — large number literal precision loss (JS float limits)
+
+Stage 4 candidates (see [STAGE3.md](./STAGE3.md) "Out of Scope"): roll
+descriptions/labels, min/max clamp modifiers, unique modifier, alias expansion
+(`adv`/`dis`), dot-notation variables, meta-expression sub-trees in `parts`.

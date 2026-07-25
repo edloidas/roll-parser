@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <!-- Apply the stored theme before paint to avoid a flash. Shared across the
+         edloidas.io site via the origin-wide `theme-preference` key; see src/theme.ts. -->
+    <script>
+      document.documentElement.dataset.theme = localStorage.getItem('theme-preference') || 'auto';
+    </script>
+    <title>Not found — roll-parser</title>
+    <meta name="robots" content="noindex" />
+    <!-- Deliberately self-contained: no external CSS, fonts, JS, or favicon.
+         The host serves this file for *any* unmatched path, so relative asset
+         URLs would resolve against the wrong directory at depth (`/a/b/c`),
+         and root-absolute ones break under a subpath deployment. Inline
+         everything and the page renders correctly wherever it is served from.
+         Token values mirror `src/style.css` — keep the two in sync. -->
+    <style>
+      :root {
+        --bg: #16120b;
+        --bg-glow: #2a2113;
+        --border: rgba(255, 230, 190, 0.15);
+        --text: #f0e6d2;
+        --text-muted: #b3a583;
+        --accent: #d9a441;
+      }
+      :root[data-theme='light'] {
+        --bg: #f5ecdb;
+        --bg-glow: #fffaf0;
+        --border: rgba(43, 35, 23, 0.15);
+        --text: #2b2317;
+        --text-muted: #6b5d45;
+        --accent: #a06b1f;
+      }
+      @media (prefers-color-scheme: light) {
+        :root:not([data-theme='dark']):not([data-theme='light']) {
+          --bg: #f5ecdb;
+          --bg-glow: #fffaf0;
+          --border: rgba(43, 35, 23, 0.15);
+          --text: #2b2317;
+          --text-muted: #6b5d45;
+          --accent: #a06b1f;
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100svh;
+        display: grid;
+        place-items: center;
+        padding: 2rem 1.5rem;
+        background: radial-gradient(ellipse at 50% 0%, var(--bg-glow), var(--bg) 70%);
+        color: var(--text);
+        font-family: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+        text-align: center;
+      }
+      .die {
+        width: 84px;
+        height: 84px;
+        fill: none;
+        stroke: var(--accent);
+        stroke-width: 3;
+        stroke-linejoin: round;
+        opacity: 0.9;
+      }
+      h1 {
+        margin: 1.25rem 0 0;
+        font-family: 'Cinzel', 'Iowan Old Style', Georgia, serif;
+        font-size: clamp(1.75rem, 6vw, 2.5rem);
+        font-weight: 700;
+        letter-spacing: 0.01em;
+      }
+      p {
+        margin: 0.65rem 0 0;
+        color: var(--text-muted);
+        font-size: 1.02rem;
+        line-height: 1.55;
+      }
+      code {
+        font-family: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+        font-size: 0.94em;
+        color: var(--accent);
+      }
+      .links {
+        margin-top: 1.75rem;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.7rem;
+        justify-content: center;
+      }
+      .links a {
+        padding: 0.6rem 1.15rem;
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        color: var(--text);
+        text-decoration: none;
+        font-size: 0.95rem;
+        transition: border-color 300ms cubic-bezier(0.22, 1, 0.36, 1);
+      }
+      .links a:hover,
+      .links a:focus-visible {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <!-- d20: pointy-top hexagon outline with central triangle facets, matching the site logo. -->
+      <svg class="die" viewBox="0 0 100 100" aria-hidden="true">
+        <polygon points="50,4 89.8,27 89.8,73 50,96 10.2,73 10.2,27" />
+        <polygon points="50,26 72,64 28,64" />
+      </svg>
+
+      <h1>Nothing rolled here</h1>
+      <p>
+        That page does not exist — a <code>natural 1</code> on the navigation check.
+      </p>
+
+      <nav class="links" aria-label="Recovery">
+        <a href="/">Playground</a>
+        <a href="/reference">Notation guide</a>
+        <a href="/docs/">API reference</a>
+      </nav>
+    </main>
+  </body>
+</html>
