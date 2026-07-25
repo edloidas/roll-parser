@@ -10,6 +10,13 @@ import type { DieResult } from '../../src/index.js';
 /** Maximum dice drawn in the tray before collapsing into a `+N` overflow chip. */
 export const MAX_TRAY_DICE = 6;
 
+/**
+ * Ceiling for a tray the `+N` chip can unfold. Up to this many dice are
+ * rendered up-front (the tail folded away by CSS) so unfolding is a class
+ * toggle; past it the chip goes inert rather than paint hundreds of SVGs.
+ */
+export const MAX_TRAY_EXPANDED = 60;
+
 /** Escapes the characters that are unsafe inside an HTML attribute value. */
 function escapeAttr(value: string): string {
   return value
@@ -177,9 +184,10 @@ export function dieTitle(die: DieResult): string {
 
 /**
  * Renders one die as an SVG element string. `index` drives the staggered
- * pop-in animation via a CSS custom property.
+ * pop-in animation via a CSS custom property; `folded` marks dice past the
+ * tray's first row, which stay hidden until the `+N` chip unfolds them.
  */
-export function renderDie(die: DieResult, index: number): string {
+export function renderDie(die: DieResult, index: number, folded = false): string {
   const label = labelFor(die);
   const fontSize = label.length >= 3 ? 30 : 42;
   const badge = isFallbackShape(die.sides) ? `<span class="die-badge">d${die.sides}</span>` : '';
@@ -191,7 +199,7 @@ export function renderDie(die: DieResult, index: number): string {
     : '';
   const facets = facetsFor(die.sides);
   const facetGroup = facets !== '' ? `<g class="die-facets">${facets}</g>` : '';
-  const classes = ['die', ...dieStates(die)].join(' ');
+  const classes = ['die', ...dieStates(die), ...(folded ? ['is-folded'] : [])].join(' ');
 
   return [
     `<span class="${classes}" style="--i:${index}" title="${escapeAttr(dieTitle(die))}">`,
@@ -209,17 +217,60 @@ export function renderDie(die: DieResult, index: number): string {
 
 /**
  * Builds the tray markup from a result's dice, dropping `meta` dice and
- * capping at {@link MAX_TRAY_DICE} with a `+N` overflow chip.
+ * capping at {@link MAX_TRAY_DICE} with a `+N` overflow chip. Within
+ * {@link MAX_TRAY_EXPANDED} the hidden dice are still rendered — folded away
+ * so the chip can unfold them without a re-render.
  */
 export function renderTray(rolls: DieResult[]): string {
   const visible = rolls.filter((die) => !die.modifiers.includes('meta'));
-  const shown = visible.slice(0, MAX_TRAY_DICE);
-  const overflow = visible.length - shown.length;
+  const hidden = visible.length - MAX_TRAY_DICE;
 
-  const dice = shown.map((die, i) => renderDie(die, i)).join('');
-  const overflowChip = overflow > 0 ? `<span class="die-overflow">+${overflow}</span>` : '';
+  if (hidden <= 0) return visible.map((die, i) => renderDie(die, i)).join('');
 
-  return dice + overflowChip;
+  const label = `+${hidden}`;
+
+  if (visible.length > MAX_TRAY_EXPANDED) {
+    const dice = visible
+      .slice(0, MAX_TRAY_DICE)
+      .map((die, i) => renderDie(die, i))
+      .join('');
+
+    return `${dice}<span class="die-overflow" title="${visible.length} dice — too many to show">${label}</span>`;
+  }
+
+  const dice = visible.map((die, i) => renderDie(die, i, i >= MAX_TRAY_DICE)).join('');
+  const chip = [
+    '<button class="die-overflow" type="button" aria-expanded="false"',
+    ` data-more="${label}" data-total="${visible.length}"`,
+    ` title="Show all ${visible.length} dice">${label}</button>`,
+  ].join('');
+
+  return dice + chip;
+}
+
+/** Repaints an overflow chip for the fold state of the tray it belongs to. */
+function syncOverflowChip(chip: HTMLElement, expanded: boolean): void {
+  const total = chip.dataset.total ?? '';
+
+  chip.textContent = expanded ? '−' : (chip.dataset.more ?? '');
+  chip.title = expanded ? 'Show fewer dice' : `Show all ${total} dice`;
+  chip.setAttribute('aria-expanded', String(expanded));
+}
+
+/**
+ * Delegates overflow-chip clicks at the document, so trays rebuilt on every
+ * roll never need re-wiring. Call once per page.
+ */
+export function initTrayToggle(): void {
+  document.addEventListener('click', (event) => {
+    const target = event.target as HTMLElement;
+    const chip = target.closest<HTMLElement>('button.die-overflow');
+    const tray = chip?.parentElement;
+    if (chip == null || tray == null) return;
+
+    const expanded = tray.classList.toggle('is-expanded');
+    syncOverflowChip(chip, expanded);
+  });
 }
 
 /** A single legend entry: marker glyph or sample swatch + label. */

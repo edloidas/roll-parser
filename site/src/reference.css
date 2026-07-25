@@ -131,13 +131,19 @@
     flex-wrap: nowrap;
     overflow-x: visible;
     top: 1.5rem;
+    gap: 0;
     padding: 0;
     background: none;
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
   }
 
+  /* Sidebar links read as a list, not pills: no tracking, no gap — the padding
+     carries the rhythm and doubles as the hover hit area. */
   .toc-link {
+    padding: 0.5rem 0.8rem;
+    font-size: 0.875rem;
+    letter-spacing: normal;
     border-color: transparent;
     background: none;
     text-align: left;
@@ -336,21 +342,30 @@
   gap: 0.35rem;
 }
 
+/* Pinned to the card's bottom edge — `margin-top: auto` lets a short card leave
+   a gap rather than float the link up under the note. Padding is the hit area
+   (misclicks used to roll the widget); the negative inset keeps the text
+   optically flush with the card's left edge. */
 .widget-open {
   align-self: flex-start;
+  margin-top: auto;
+  margin-left: -0.5rem;
+  padding: 0.4rem 0.5rem;
   font-family: var(--font-body);
   font-size: 0.82rem;
   color: var(--text-dim);
   text-decoration: none;
-  border-bottom: 1px dotted transparent;
+  border-radius: 8px;
   transition:
     color 150ms ease,
-    border-color 150ms ease;
+    background 150ms ease;
 }
 
 .widget-open:hover {
   color: var(--accent);
-  border-bottom-color: var(--accent-soft);
+  background: var(--surface-strong);
+  text-decoration: underline dotted var(--accent-soft);
+  text-underline-offset: 3px;
 }
 
 .widget-open:focus-visible {

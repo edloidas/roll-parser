@@ -6,7 +6,7 @@
  */
 
 import { isRollParserError, roll, VERSION } from '../../src/index.js';
-import { renderLegend, renderTray } from './dice.js';
+import { initTrayToggle, renderLegend, renderTray } from './dice.js';
 import { renderErrorSlot, renderResultPanel } from './render.js';
 import { initTheme } from './theme.js';
 import { readUrlState, writeUrlState } from './url.js';
@@ -21,8 +21,8 @@ const tray = requireEl('tray');
 const legend = requireEl('legend');
 const result = requireEl('result');
 const errorSlot = requireEl('error');
-const rerollBtn = requireEl('reroll');
-const copyBtn = requireEl('copy');
+const rerollBtn = requireEl<HTMLButtonElement>('reroll');
+const copyBtn = requireEl<HTMLButtonElement>('copy');
 const clearBtn = requireEl('clear');
 const copiedFlag = requireEl('copied');
 const examples = requireEl('examples');
@@ -97,6 +97,16 @@ function syncClear(): void {
 }
 
 /**
+ * Gates reroll and copy on there being a roll on screen — with nothing rolled
+ * there is no result to redo and no notation in the URL to share. Parse errors
+ * leave the flag alone: the previous result and its link are still current.
+ */
+function setRollActions(enabled: boolean): void {
+  rerollBtn.disabled = !enabled;
+  copyBtn.disabled = !enabled;
+}
+
+/**
  * Rolls `notation` with `seed` and paints the UI. On parser errors the
  * previous successful result stays put; only the error slot updates.
  */
@@ -105,12 +115,14 @@ function performRoll(notation: string, seed: string): void {
 
   if (trimmed === '') {
     setActive(false);
+    tray.classList.remove('is-expanded');
     tray.innerHTML = '';
     legend.innerHTML = '';
     result.innerHTML = '';
     errorSlot.innerHTML = '';
     input.classList.remove('is-invalid');
     writeUrlState('', '');
+    setRollActions(false);
     lastTotal = 0;
     return;
   }
@@ -120,6 +132,8 @@ function performRoll(notation: string, seed: string): void {
   try {
     const rolled = roll(notation, { seed });
 
+    // Every roll starts folded — the fresh chip is rendered in its `+N` state.
+    tray.classList.remove('is-expanded');
     tray.innerHTML = renderTray(rolled.rolls);
     legend.innerHTML = renderLegend(rolled.rolls);
     result.innerHTML = renderResultPanel(rolled);
@@ -128,6 +142,7 @@ function performRoll(notation: string, seed: string): void {
     errorSlot.innerHTML = '';
     input.classList.remove('is-invalid');
     writeUrlState(notation, seed);
+    setRollActions(true);
   } catch (error) {
     input.classList.add('is-invalid');
     errorSlot.innerHTML = renderErrorSlot(error, notation, isRollParserError);
@@ -230,6 +245,7 @@ examples.addEventListener('click', (event) => {
 //
 
 initTheme();
+initTrayToggle();
 
 versionEl.textContent = `v${VERSION}`;
 

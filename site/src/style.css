@@ -350,18 +350,53 @@ body {
   text-decoration: line-through;
 }
 
+/* Dice past the tray's first row, hidden until the `+N` chip unfolds the tray.
+   The chip is a sibling, so `is-expanded` on the tray reveals them. */
+.die.is-folded {
+  display: none;
+}
+
+.is-expanded > .die.is-folded {
+  display: inline-flex;
+}
+
+/* Squares up with a d6 so the chip reads as one more die in the row. */
 .die-overflow {
   align-self: center;
-  padding: 0 0.6rem;
-  height: var(--die-size);
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  min-width: var(--die-size);
+  height: var(--die-size);
+  padding: 0 0.6rem;
+  font-family: inherit;
+  font-size: 1rem;
   font-weight: 700;
   color: var(--text-muted);
+  background: transparent;
   border: 1px dashed var(--border);
   border-radius: var(--radius);
   user-select: none;
   -webkit-user-select: none;
+}
+
+button.die-overflow {
+  cursor: pointer;
+  transition:
+    color 150ms ease,
+    border-color 150ms ease,
+    background 150ms ease;
+}
+
+button.die-overflow:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--surface);
+}
+
+button.die-overflow:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 /*
@@ -405,12 +440,29 @@ body {
   outline-offset: 2px;
 }
 
+.icon-btn:disabled {
+  color: var(--text-dim);
+  cursor: default;
+  opacity: 0.55;
+}
+
+.icon-btn:disabled:hover {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--text-dim);
+}
+
 /* Inline Lucide icons — geometry carries fill/stroke as attributes; CSS only
    sizes them so they scale with the host button's font-size. */
 .icon-svg {
   display: block;
   width: 1.4em;
   height: 1.4em;
+}
+
+.icon-btn .icon-svg {
+  width: 1.25em;
+  height: 1.25em;
 }
 
 /*
@@ -846,6 +898,20 @@ body {
 }
 
 /*
+ * * Idle logo gap
+ */
+
+/* Idle, the collapsed tray and legend leave the logo resting on the input —
+   open the same gap the examples get below it. */
+.app .logo {
+  transition: margin-bottom var(--transition);
+}
+
+.app:not(.is-active) .logo {
+  margin-bottom: 1.1rem;
+}
+
+/*
  * * Dice tray
  */
 
@@ -876,6 +942,17 @@ body {
   opacity: 1;
   margin: 1.25rem 0;
   overflow: visible;
+}
+
+/* Unfolded: wrap into as many rows as fit, then scroll. The result panel below
+   is `flex: 1` with its own scroll, so it yields the space instead of clipping.
+   `overflow-y` kills the badge overhang `visible` allowed — padding buys it back. */
+.app.is-active .tray.is-expanded {
+  flex-wrap: wrap;
+  height: auto;
+  max-height: 34vh;
+  padding: 6px 4px;
+  overflow-y: auto;
 }
 
 /* Reserved slot for the state legend — fixed height while active so legend
@@ -944,6 +1021,8 @@ body {
   width: 1.9rem;
   height: 1.9rem;
   padding: 0;
+  /* Anchors the glyph's `em` sizing — buttons don't inherit font-size. */
+  font-size: 1rem;
   color: var(--text-muted);
   background: transparent;
   border: 0;
@@ -975,8 +1054,8 @@ body {
 }
 
 .input-clear .icon-svg {
-  width: 1.1em;
-  height: 1.1em;
+  width: 1.3em;
+  height: 1.3em;
 }
 
 .notation-input::placeholder {
@@ -1258,7 +1337,7 @@ body {
   }
 
   /* Logo keeps one size across states; nudge it smaller on mobile so the
-     centered wordmark clears the fixed Guide/Docs pills. */
+     centered wordmark clears the fixed theme toggle. */
   .logo-die {
     width: 42px;
     height: 42px;
@@ -1281,17 +1360,15 @@ body {
     padding-top: 0.75rem;
   }
 
-  .guide-link .guide-text {
+  /* Guide/Docs pills crowd the centered logo at this width — drop them and keep
+     the theme toggle. Both stay reachable from the footer. */
+  .guide-link {
     display: none;
   }
 
-  .guide-link {
-    padding: 0.45rem 0.55rem;
-  }
-
-  /* Keep examples from pushing the input off-screen — show the first
-     three system groups only on narrow viewports. */
-  .example-group:nth-child(n + 4) {
+  /* Keep examples from pushing the input off-screen — only the marked groups
+     survive on narrow viewports. */
+  .example-group:not(.example-group--mobile) {
     display: none;
   }
 }

@@ -8,7 +8,7 @@
  */
 
 import { isRollParserError, roll, VERSION } from '../../src/index.js';
-import { renderTray } from './dice.js';
+import { initTrayToggle, renderTray } from './dice.js';
 import { renderErrorSlot, renderResultPanel } from './render.js';
 import { initTheme } from './theme.js';
 
@@ -38,7 +38,7 @@ const SECTIONS: Section[] = [
   },
   {
     id: 'arithmetic',
-    title: 'Arithmetic & math functions',
+    title: 'Math functions',
     examples: [
       { notation: '2d6+3', note: 'Add a flat modifier to a roll.' },
       { notation: '(1d6+2)*3', note: 'Parentheses group sub-expressions before scaling.' },
@@ -244,8 +244,11 @@ function mount(): void {
 
   guide.addEventListener('click', (event) => {
     const target = event.target as HTMLElement;
-    // Let the playground link navigate instead of rolling.
+    // Let the playground link navigate, and the overflow chip unfold its tray,
+    // instead of rolling. Neither stops propagation — the delegated tray
+    // toggle on `document` still sees the chip click.
     if (target.closest('.widget-open') != null) return;
+    if (target.closest('button.die-overflow') != null) return;
 
     const widget = target.closest<HTMLElement>('.widget');
     if (widget == null) return;
@@ -272,4 +275,5 @@ function mount(): void {
 }
 
 initTheme();
+initTrayToggle();
 mount();

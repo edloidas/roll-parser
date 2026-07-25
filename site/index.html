@@ -152,13 +152,14 @@
                 </svg>
               </button>
             </div>
-            <button id="reroll" class="icon-btn" type="button" title="Reroll (Enter)" aria-label="Reroll">
+            <!-- Both start disabled — nothing to reroll or link to until a roll lands. -->
+            <button id="reroll" class="icon-btn" type="button" title="Reroll (Enter)" aria-label="Reroll" disabled>
               <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
                 <path d="M21 3v5h-5" />
               </svg>
             </button>
-            <button id="copy" class="icon-btn" type="button" title="Copy shareable link" aria-label="Copy link">
+            <button id="copy" class="icon-btn" type="button" title="Copy shareable link" aria-label="Copy link" disabled>
               <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
                 <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
@@ -169,8 +170,10 @@
 
           <div class="error-slot" id="error" role="alert" aria-live="assertive"></div>
 
+          <!-- `example-group--mobile` marks the groups that survive the narrow
+               viewport; the rest are hidden by the mobile media query. -->
           <div class="examples" id="examples">
-            <div class="example-group">
+            <div class="example-group example-group--mobile">
               <span class="example-label">D&amp;D 5e</span>
               <div class="example-chips">
                 <button class="chip" type="button" data-notation="4d6kh3">4d6kh3</button>
@@ -178,7 +181,7 @@
                 <button class="chip" type="button" data-notation="8d6">8d6</button>
               </div>
             </div>
-            <div class="example-group">
+            <div class="example-group example-group--mobile">
               <span class="example-label">World of Darkness</span>
               <div class="example-chips">
                 <button class="chip" type="button" data-notation="7d10&gt;=6f1">7d10&gt;=6f1</button>
@@ -209,8 +212,8 @@
                 <button class="chip" type="button" data-notation="{1d8!, 1d6!}kh1">{1d8!, 1d6!}kh1</button>
               </div>
             </div>
-            <div class="example-group">
-              <span class="example-label">Call of Cthulhu</span>
+            <div class="example-group example-group--mobile">
+              <span class="example-label">Random</span>
               <div class="example-chips">
                 <button class="chip" type="button" data-notation="d%">d%</button>
               </div>
