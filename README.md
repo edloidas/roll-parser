@@ -8,7 +8,7 @@ TypeScript-first, Bun-optimized, Pratt parser architecture.
 <p align="center">
   <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-6-blue.svg" alt="TypeScript"></a>
   <a href="https://bun.sh/"><img src="https://img.shields.io/badge/Bun-1.3+-black.svg" alt="Bun"></a>
-  <a href="https://nodejs.org/"><img src="https://img.shields.io/badge/Node.js-22%2B-339933.svg" alt="Node.js"></a>
+  <a href="https://nodejs.org/"><img src="https://img.shields.io/badge/Node.js-22.12%2B-339933.svg" alt="Node.js"></a>
 </p>
 
 ## Status
@@ -47,8 +47,9 @@ bun add roll-parser
 npm install roll-parser
 ```
 
-The package is **ESM-only**. On Node.js ≥ 22 (required), CommonJS consumers
-can still `require('roll-parser')` via `require(esm)`.
+The package is **ESM-only**. On Node.js ≥ 22.12 (required), CommonJS consumers
+can still `require('roll-parser')` via `require(esm)`, which is unflagged from
+that release onward.
 
 ## Usage
 
