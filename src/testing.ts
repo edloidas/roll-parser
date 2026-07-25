@@ -8,8 +8,8 @@
 
 // Direct value exports force the bundler to inline the code
 import {
-  MockRNGExhaustedError as _MockRNGExhaustedError,
   createMockRng as _createMockRng,
+  MockRNGExhaustedError as _MockRNGExhaustedError,
 } from './rng/mock.js';
 
 export const createMockRng = _createMockRng;

@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <!-- Apply the stored theme before paint to avoid a flash. Shared across the
+         edloidas.io site via the origin-wide `theme-preference` key; see src/theme.ts. -->
+    <script>
+      document.documentElement.dataset.theme = localStorage.getItem('theme-preference') || 'auto';
+    </script>
+    <title>Notation Guide — roll-parser</title>
+    <meta
+      name="description"
+      content="A living guide to roll-parser dice notation: dice, arithmetic, keep/drop, exploding, rerolls, success counting, checks, groups, and variables — each a live, rollable example."
+    />
+    <link rel="icon" type="image/svg+xml" href="./public/favicon.svg" />
+    <link
+      rel="preload"
+      as="font"
+      type="font/woff2"
+      href="./public/fonts/cinzel-latin.woff2"
+      crossorigin
+    />
+    <link
+      rel="preload"
+      as="font"
+      type="font/woff2"
+      href="./public/fonts/ibm-plex-sans-latin.woff2"
+      crossorigin
+    />
+    <link
+      rel="preload"
+      as="font"
+      type="font/woff2"
+      href="./public/fonts/b612-latin-700.woff2"
+      crossorigin
+    />
+    <link rel="stylesheet" href="./src/style.css" />
+    <link rel="stylesheet" href="./src/reference.css" />
+  </head>
+  <body class="ref-body">
+    <!-- Shared SVG gradients — #rp-rainbow for the logo, #rp-gold for dice. -->
+    <svg class="defs" aria-hidden="true" width="0" height="0" focusable="false">
+      <defs>
+        <linearGradient id="rp-rainbow" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#ff4d6d" />
+          <stop offset="20%" stop-color="#ff9e3d" />
+          <stop offset="40%" stop-color="#ffe14d" />
+          <stop offset="60%" stop-color="#4dff9e" />
+          <stop offset="80%" stop-color="#4dc4ff" />
+          <stop offset="100%" stop-color="#b06dff" />
+        </linearGradient>
+        <linearGradient id="rp-gold" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#d9a441" />
+          <stop offset="100%" stop-color="#a3622f" />
+        </linearGradient>
+      </defs>
+    </svg>
+
+    <nav class="top-nav" aria-label="Theme">
+      <button
+        type="button"
+        class="theme-toggle"
+        id="theme-toggle"
+        aria-label="Toggle theme (auto, light, dark)"
+        title="Toggle theme"
+      >
+        <svg class="theme-icon theme-icon--auto" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 2v2" />
+          <path d="M14.837 16.385a6 6 0 1 1-7.223-7.222c.624-.147.97.66.715 1.248a4 4 0 0 0 5.26 5.259c.589-.255 1.396.09 1.248.715" />
+          <path d="M16 12a4 4 0 0 0-4-4" />
+          <path d="m19 5-1.256 1.256" />
+          <path d="M20 12h2" />
+        </svg>
+        <svg class="theme-icon theme-icon--light" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="4" />
+          <path d="M12 2v2" />
+          <path d="M12 20v2" />
+          <path d="m4.93 4.93 1.41 1.41" />
+          <path d="m17.66 17.66 1.41 1.41" />
+          <path d="M2 12h2" />
+          <path d="M20 12h2" />
+          <path d="m6.34 17.66-1.41 1.41" />
+          <path d="m19.07 4.93-1.41 1.41" />
+        </svg>
+        <svg class="theme-icon theme-icon--dark" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
+        </svg>
+      </button>
+    </nav>
+
+    <header class="ref-header">
+      <a class="ref-home" href="./" aria-label="Back to the roll-parser playground">
+        <svg class="logo-die ref-logo-die" viewBox="0 0 100 100" aria-hidden="true">
+          <polygon
+            class="logo-stroke"
+            points="50,4 89.8,27 89.8,73 50,96 10.2,73 10.2,27"
+          />
+          <polygon class="logo-stroke" points="50,26 72,64 28,64" />
+          <path
+            class="logo-stroke"
+            d="M50,4 L50,26 M89.8,27 L72,64 M89.8,73 L72,64 M50,96 L50,64 M10.2,73 L28,64 M10.2,27 L28,64 M28,64 L50,64 M72,64 L50,64"
+          />
+        </svg>
+        <span class="ref-home-word">roll-parser</span>
+      </a>
+      <h1 class="ref-title">Notation Guide</h1>
+    </header>
+
+    <div class="ref-layout">
+      <nav class="toc" id="toc" aria-label="Sections"></nav>
+      <main class="guide" id="guide"></main>
+    </div>
+
+    <footer class="footer">
+      <a href="./">Playground</a>
+      <span class="dot">·</span>
+      <a href="./docs/">Docs</a>
+      <span class="dot">·</span>
+      <a href="https://github.com/edloidas/roll-parser">GitHub</a>
+      <span class="dot">·</span>
+      <a href="https://www.npmjs.com/package/roll-parser">npm</a>
+      <span class="dot">·</span>
+      <span class="version" id="version"></span>
+    </footer>
+
+    <script type="module" src="./src/reference.ts"></script>
+  </body>
+</html>

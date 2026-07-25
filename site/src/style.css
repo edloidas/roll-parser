@@ -1,0 +1,1311 @@
+/* roll-parser — shared tokens & components + playground layout.
+   Warm candlelit palette; rainbow reserved for the logo/favicon, gold elsewhere.
+   The reference page loads this file for tokens, fonts, logo, dice, and buttons,
+   then layers reference.css on top. Keep token definitions here only. */
+
+/*
+ * * Fonts
+ */
+
+/* Self-hosted latin woff2. Cinzel, IBM Plex Sans, and JetBrains Mono are
+   variable (one file spans the weight range); B612 is static (one file per
+   weight). Dev path is ../public/fonts; build rewrites it to ../fonts. */
+@font-face {
+  font-family: 'Cinzel';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('../public/fonts/cinzel-latin.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('../public/fonts/ibm-plex-sans-latin.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('../public/fonts/jetbrains-mono-latin.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'B612';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../public/fonts/b612-latin-400.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'B612';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('../public/fonts/b612-latin-700.woff2') format('woff2');
+}
+
+/*
+ * * Tokens
+ */
+
+:root {
+  --bg: #16120b;
+  --bg-glow: #2a2113;
+  --surface: rgba(255, 240, 210, 0.05);
+  --surface-strong: rgba(255, 240, 210, 0.09);
+  --border: rgba(255, 230, 190, 0.15);
+  --text: #f0e6d2;
+  --text-muted: #b3a583;
+  --text-dim: #7d7259;
+  --accent: #d9a441;
+  --accent-soft: rgba(217, 164, 65, 0.4);
+  --success: #a3c585;
+  --failure: #cf6a5e;
+  --die-stroke: #8a7d63;
+  --gold-gradient: linear-gradient(135deg, #f0c060, #d9a441 45%, #a3622f);
+
+  --font-head: 'Cinzel', 'Iowan Old Style', Georgia, serif;
+  --font-body: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, monospace;
+  --font-num: 'B612', var(--font-body);
+
+  --radius: 14px;
+  --die-size: 56px;
+  --transition: 300ms cubic-bezier(0.22, 1, 0.36, 1);
+  --spring: 420ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Light palette. The `:root` dark tokens above are the default (and the
+   forced-dark case); light applies when the toggle forces it, or — in `auto`
+   and before the theme script runs — when the OS prefers light. The forced
+   block and the `prefers-color-scheme` block below MUST hold identical values:
+   keep them in sync. */
+:root[data-theme='light'] {
+  --bg: #f5ecdb;
+  --bg-glow: #fffaf0;
+  --surface: rgba(43, 35, 23, 0.04);
+  --surface-strong: rgba(43, 35, 23, 0.07);
+  --border: rgba(43, 35, 23, 0.15);
+  --text: #2b2317;
+  --text-muted: #6b5d45;
+  --text-dim: #9a8b6f;
+  --accent: #a06b1f;
+  --accent-soft: rgba(160, 107, 31, 0.35);
+  --success: #4f7a3a;
+  --failure: #b04a3e;
+  --die-stroke: #8a7a5c;
+  --gold-gradient: linear-gradient(135deg, #b8842a, #a06b1f 45%, #7a4a18);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme='dark']):not([data-theme='light']) {
+    --bg: #f5ecdb;
+    --bg-glow: #fffaf0;
+    --surface: rgba(43, 35, 23, 0.04);
+    --surface-strong: rgba(43, 35, 23, 0.07);
+    --border: rgba(43, 35, 23, 0.15);
+    --text: #2b2317;
+    --text-muted: #6b5d45;
+    --text-dim: #9a8b6f;
+    --accent: #a06b1f;
+    --accent-soft: rgba(160, 107, 31, 0.35);
+    --success: #4f7a3a;
+    --failure: #b04a3e;
+    --die-stroke: #8a7a5c;
+    --gold-gradient: linear-gradient(135deg, #b8842a, #a06b1f 45%, #7a4a18);
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* ! JetBrains Mono ligatures rewrite notation (`!=` → ≠, `>=` → ⩾), which
+   changes its meaning — every notation glyph must stay literal. */
+.notation-input,
+.chip,
+.error-echo,
+.expr-note,
+.grp-label,
+.eq-var,
+.eq-fn,
+.die-badge,
+.widget-notation {
+  font-variant-ligatures: none;
+}
+
+html,
+body {
+  margin: 0;
+}
+
+body {
+  font-family: var(--font-body);
+  color: var(--text);
+  background: var(--bg);
+  background-image: radial-gradient(120% 90% at 50% -10%, var(--bg-glow) 0%, var(--bg) 55%);
+  background-attachment: fixed;
+  -webkit-font-smoothing: antialiased;
+}
+
+.defs {
+  position: absolute;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/*
+ * * Logo (shared)
+ */
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  text-decoration: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.logo-die {
+  width: 46px;
+  height: 46px;
+}
+
+.logo-stroke {
+  fill: none;
+  stroke: url(#rp-rainbow);
+  stroke-width: 3;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.wordmark {
+  font-family: var(--font-head);
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: var(--text);
+}
+
+/*
+ * * Dice (shared — rendered by dice.ts on both pages)
+ */
+
+.die {
+  position: relative;
+  width: var(--die-size);
+  height: var(--die-size);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* `color` drives the stroke via currentColor, so state = one color swap. */
+  color: var(--die-stroke);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .die {
+    animation: die-pop var(--spring) both;
+    animation-delay: calc(var(--i) * 32ms);
+  }
+}
+
+@keyframes die-pop {
+  from {
+    opacity: 0;
+    transform: rotate(-12deg) scale(0.4) translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: rotate(0) scale(1) translateY(0);
+  }
+}
+
+.die svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.die-shape {
+  fill: var(--surface-strong);
+  stroke: currentColor;
+  stroke-width: 3.5;
+  stroke-linejoin: round;
+  transition: stroke 150ms ease;
+}
+
+.die-facets {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  opacity: 0.4;
+}
+
+.die-value {
+  fill: var(--text);
+  font-family: var(--font-num);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.die-badge {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  font-family: var(--font-mono);
+  font-size: 0.55rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  background: var(--bg);
+  border-radius: 6px;
+  padding: 0 3px;
+}
+
+.die-mark {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1;
+  border-radius: 50%;
+}
+
+/* Exploded — amber coin with a dark, readable glyph. */
+.mark-explode {
+  color: #1a1206;
+  background: radial-gradient(circle at 35% 30%, #ffcf70, #e0952f);
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  box-shadow: 0 0 6px rgba(224, 149, 47, 0.7);
+}
+
+.mark-reroll {
+  color: var(--accent);
+  background: var(--bg);
+  border: 1px solid var(--border);
+}
+
+/* Colored states — one currentColor swap tints stroke + facets together. */
+.die.is-success {
+  color: var(--success);
+}
+
+.die.is-failure {
+  color: var(--failure);
+}
+
+.die.is-fumble {
+  color: var(--failure);
+}
+
+.die.is-fumble .die-shape {
+  fill: rgba(207, 106, 94, 0.18);
+}
+
+.die.is-critical {
+  color: var(--accent);
+}
+
+.die.is-critical .die-shape {
+  stroke-width: 4;
+  filter: drop-shadow(0 0 7px rgba(240, 192, 96, 0.95));
+}
+
+.die.is-critical .die-value {
+  fill: var(--accent);
+}
+
+.die.is-dropped {
+  opacity: 0.4;
+  filter: grayscale(1);
+}
+
+.die.is-dropped .die-value {
+  text-decoration: line-through;
+}
+
+.die-overflow {
+  align-self: center;
+  padding: 0 0.6rem;
+  height: var(--die-size);
+  display: inline-flex;
+  align-items: center;
+  font-weight: 700;
+  color: var(--text-muted);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/*
+ * * Icon buttons (shared)
+ */
+
+.icon-btn {
+  position: relative;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 3rem;
+  font-size: 1.2rem;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease,
+    transform 150ms ease;
+}
+
+.icon-btn:hover {
+  background: var(--surface-strong);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.icon-btn:active {
+  transform: scale(0.94);
+}
+
+.icon-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Inline Lucide icons — geometry carries fill/stroke as attributes; CSS only
+   sizes them so they scale with the host button's font-size. */
+.icon-svg {
+  display: block;
+  width: 1.4em;
+  height: 1.4em;
+}
+
+/*
+ * * Breakdown & degree markers (shared)
+ */
+
+.mk-dropped {
+  color: var(--text-dim);
+  text-decoration: line-through;
+}
+
+.mk-success {
+  color: var(--success);
+  font-weight: 700;
+}
+
+.mk-failure {
+  color: var(--failure);
+  font-weight: 700;
+}
+
+/*
+ * * Structured breakdown (shared)
+ */
+
+.breakdown.equation {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem 0.45rem;
+  line-height: 1.4;
+  word-break: normal;
+}
+
+.grp,
+.brace-grp {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  padding: 0.2rem 0.5rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.grp-label {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.grp-dice {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.grp-sub {
+  font-family: var(--font-body);
+  font-weight: 700;
+  color: var(--text);
+}
+
+.mini-die {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 3px;
+  font-family: var(--font-num);
+  font-size: 0.82rem;
+  /* B612 regular — the small breakdown chips read cleanly at 400, leaving 700
+     to the hero total and tray dice (and this loads the B612 400 face). */
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  background: var(--surface-strong);
+  border: 1.5px solid var(--die-stroke);
+  border-radius: 5px;
+}
+
+.mini-die.is-success {
+  border-color: var(--success);
+  color: var(--success);
+}
+
+.mini-die.is-failure {
+  border-color: var(--failure);
+  color: var(--failure);
+}
+
+.mini-die.is-critical {
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: 0 0 5px rgba(240, 192, 96, 0.6);
+}
+
+.mini-die.is-fumble {
+  border-color: var(--failure);
+  background: rgba(207, 106, 94, 0.18);
+}
+
+.mini-die.is-dropped {
+  opacity: 0.45;
+  filter: grayscale(1);
+  text-decoration: line-through;
+}
+
+.mini-dot {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ffcf70, #e0952f);
+  box-shadow: 0 0 3px rgba(224, 149, 47, 0.8);
+}
+
+.eq-op {
+  color: var(--text-muted);
+  padding: 0 0.1rem;
+}
+
+.eq-lit {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.eq-var {
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  color: var(--accent);
+}
+
+.eq-fn {
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.eq-paren,
+.eq-comma {
+  color: var(--text-dim);
+}
+
+.eq-vs {
+  font-family: var(--font-head);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  padding: 0 0.3rem;
+}
+
+.eq-dropped {
+  opacity: 0.5;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .equation .grp,
+  .equation .brace-grp {
+    animation: chip-in 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation-delay: calc(150ms + var(--i) * 45ms);
+  }
+}
+
+@keyframes chip-in {
+  from {
+    opacity: 0;
+    transform: translateY(5px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/*
+ * * Tray legend (playground)
+ */
+
+.tray-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem 0.55rem;
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.lg-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.lg-sep {
+  color: var(--text-dim);
+}
+
+.lg-sample {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  font-size: 0.66rem;
+  font-weight: 700;
+  color: var(--text);
+  border: 1.5px solid var(--die-stroke);
+  border-radius: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.lg-sample.is-critical {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.lg-sample.is-fumble {
+  border-color: var(--failure);
+  background: rgba(207, 106, 94, 0.18);
+}
+
+.lg-sample.is-success {
+  border-color: var(--success);
+  color: var(--success);
+}
+
+.lg-sample.is-failure {
+  border-color: var(--failure);
+  color: var(--failure);
+}
+
+.lg-sample.is-dropped {
+  opacity: 0.5;
+  text-decoration: line-through;
+}
+
+/* Reuse the die badge styling inline in the legend row. */
+.lg-badge {
+  position: static;
+  width: 1.15rem;
+  height: 1.15rem;
+  font-size: 0.72rem;
+}
+
+.degree-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.9rem;
+  border-radius: 999px;
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: 0.9rem;
+  letter-spacing: 0.02em;
+  border: 1px solid var(--border);
+}
+
+.degree-nat {
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 0.8rem;
+  letter-spacing: 0;
+  color: var(--text-muted);
+}
+
+.deg-crit-success {
+  color: var(--success);
+  border-color: var(--success);
+}
+
+.deg-success {
+  color: var(--success);
+}
+
+.deg-failure {
+  color: var(--failure);
+}
+
+.deg-crit-failure {
+  color: var(--failure);
+  border-color: var(--failure);
+}
+
+/*
+ * ============================================================
+ * * Playground layout (index.html only)
+ * ============================================================
+ */
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  overflow: hidden;
+  padding: 0 1rem;
+}
+
+.main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+  padding-top: min(28vh, 220px);
+  transition: padding-top var(--transition);
+}
+
+.app.is-active .main {
+  padding-top: clamp(1rem, 4vh, 2.5rem);
+}
+
+/* Top navigation — Guide/Docs pills, present in both idle and active states. */
+.top-nav {
+  position: fixed;
+  top: 0.9rem;
+  right: 1rem;
+  z-index: 5;
+  display: flex;
+  gap: 0.4rem;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.guide-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.75rem;
+  font-family: var(--font-head);
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+  text-decoration: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  transition:
+    color 150ms ease,
+    border-color 150ms ease,
+    background 150ms ease;
+}
+
+.guide-link:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--surface-strong);
+}
+
+.guide-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.guide-glyph {
+  display: inline-flex;
+  align-items: center;
+}
+
+.guide-glyph .icon-svg {
+  width: 1.05em;
+  height: 1.05em;
+}
+
+/* Theme toggle — sits in .top-nav and cycles auto → light → dark. Only the
+   icon for the active mode shows, driven by the <html data-theme> attribute. */
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  width: 1.95rem;
+  height: 1.95rem;
+  padding: 0;
+  color: var(--text-muted);
+  cursor: pointer;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  transition:
+    color 150ms ease,
+    border-color 150ms ease,
+    background 150ms ease;
+}
+
+.theme-toggle:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--surface-strong);
+}
+
+.theme-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.theme-icon {
+  width: 1.05rem;
+  height: 1.05rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.theme-icon--auto,
+.theme-icon--light,
+.theme-icon--dark {
+  display: none;
+}
+
+:root[data-theme='auto'] .theme-icon--auto,
+:root[data-theme='light'] .theme-icon--light,
+:root[data-theme='dark'] .theme-icon--dark {
+  display: block;
+}
+
+/*
+ * * Dice tray
+ */
+
+/* Single fixed-height row — never wraps, never scrolls. The extra headroom
+   over `--die-size` leaves room for the -5px explode/reroll badge overhang so
+   `overflow: visible` (needed for the badges) can't spawn a scrollbar. */
+.tray {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  width: 100%;
+  height: 0;
+  opacity: 0;
+  overflow: hidden;
+  margin: 0;
+  user-select: none;
+  -webkit-user-select: none;
+  transition:
+    height var(--transition),
+    opacity var(--transition),
+    margin var(--transition);
+}
+
+.app.is-active .tray {
+  height: calc(var(--die-size) + 12px);
+  opacity: 1;
+  margin: 1.25rem 0;
+  overflow: visible;
+}
+
+/* Reserved slot for the state legend — fixed height while active so legend
+   content appears/disappears without nudging the input below it. */
+.legend-slot {
+  width: 100%;
+  height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition:
+    height var(--transition),
+    opacity var(--transition);
+}
+
+.app.is-active .legend-slot {
+  height: 1.7rem;
+  opacity: 1;
+}
+
+/*
+ * * Input
+ */
+
+.input-zone {
+  width: 100%;
+  flex-shrink: 0;
+}
+
+.input-row {
+  display: flex;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.input-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.notation-input {
+  width: 100%;
+  font-size: 1.1rem;
+  font-family: var(--font-mono);
+  /* Extra right padding so typed text never runs under the clear button. */
+  padding: 0.85rem 2.75rem 0.85rem 1rem;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  outline: none;
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+/* Clear (×) — inside the input on the right, shown only when non-empty. */
+.input-clear {
+  position: absolute;
+  top: 50%;
+  right: 0.55rem;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  padding: 0;
+  color: var(--text-muted);
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+  opacity: 0;
+  visibility: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+  transition:
+    color 150ms ease,
+    background 150ms ease,
+    opacity 150ms ease;
+}
+
+.input-wrap.has-value .input-clear {
+  opacity: 1;
+  visibility: visible;
+}
+
+.input-clear:hover {
+  color: var(--text);
+  background: var(--surface-strong);
+}
+
+.input-clear:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.input-clear .icon-svg {
+  width: 1.1em;
+  height: 1.1em;
+}
+
+.notation-input::placeholder {
+  color: var(--text-dim);
+}
+
+.notation-input:focus-visible {
+  border-color: transparent;
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.notation-input.is-invalid {
+  border-color: var(--failure);
+  box-shadow: 0 0 0 2px rgba(207, 106, 94, 0.4);
+}
+
+.copied-flag {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-body);
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: var(--text);
+  color: var(--bg);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 150ms ease;
+  white-space: nowrap;
+}
+
+.copied-flag.is-visible {
+  opacity: 1;
+}
+
+/*
+ * * Grouped example chips + error slot
+ */
+
+.examples {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.75rem 1.25rem;
+  margin-top: 1.1rem;
+}
+
+.app.is-active .examples {
+  display: none;
+}
+
+.example-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.example-label {
+  font-family: var(--font-head);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.example-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.35rem;
+}
+
+.chip {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  padding: 0.35rem 0.65rem;
+  color: var(--text-muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  transition:
+    color 150ms ease,
+    border-color 150ms ease;
+}
+
+.chip:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.chip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.error-slot {
+  margin-top: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.error-slot:empty {
+  margin-top: 0;
+}
+
+/* Reserve space while active so a transient parse error appearing mid-type
+   doesn't shove the result panel down. */
+.app.is-active .error-slot {
+  min-height: 1.5rem;
+}
+
+.error-msg {
+  color: var(--failure);
+  font-size: 0.9rem;
+}
+
+.error-echo {
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+  color: var(--text-muted);
+  word-break: break-all;
+}
+
+.error-span {
+  background: rgba(207, 106, 94, 0.22);
+  color: var(--failure);
+  border-bottom: 2px solid var(--failure);
+  border-radius: 2px;
+}
+
+/*
+ * * Result panel
+ */
+
+.result-panel {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  overflow-y: auto;
+  margin-top: 1.5rem;
+  text-align: center;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .result-panel.is-fresh {
+    animation: panel-rise var(--spring) both;
+  }
+}
+
+@keyframes panel-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.total {
+  /* fit-content keeps the gradient box tight to the digits. */
+  width: fit-content;
+  margin: 0 auto;
+  font-family: var(--font-num);
+  font-size: clamp(3rem, 12vw, 5.5rem);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  background: var(--gold-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.success-summary {
+  display: flex;
+  justify-content: center;
+  gap: 1.5rem;
+}
+
+.count-item {
+  display: flex;
+  flex-direction: column;
+  font-family: var(--font-head);
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.count-item b {
+  font-family: var(--font-num);
+  font-size: 3rem;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.count-success b {
+  color: var(--success);
+}
+
+.count-fail b {
+  color: var(--failure);
+}
+
+.result-panel .degree-badge {
+  margin-bottom: 0.75rem;
+}
+
+.breakdown {
+  margin: 1rem auto 0;
+  max-width: 640px;
+  font-family: var(--font-body);
+  font-size: 1.05rem;
+  line-height: 1.7;
+  color: var(--text);
+  word-break: break-word;
+}
+
+.breakdown.too-many {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.expr-note {
+  margin-top: 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+
+/*
+ * * Footer
+ */
+
+.footer {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.9rem 0;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+
+.footer a {
+  color: var(--text-muted);
+  text-decoration: none;
+}
+
+.footer a:hover {
+  color: var(--accent);
+}
+
+.footer .dot {
+  opacity: 0.5;
+}
+
+/*
+ * * Mobile (playground)
+ */
+
+@media (max-width: 640px) {
+  .main {
+    padding-top: min(18vh, 120px);
+  }
+
+  /* Logo keeps one size across states; nudge it smaller on mobile so the
+     centered wordmark clears the fixed Guide/Docs pills. */
+  .logo-die {
+    width: 42px;
+    height: 42px;
+  }
+
+  .wordmark {
+    font-size: 1.3rem;
+  }
+
+  :root {
+    --die-size: 40px;
+  }
+
+  .notation-input {
+    /* 16px+ prevents iOS from zooming the viewport on focus. */
+    font-size: 16px;
+  }
+
+  .app.is-active .main {
+    padding-top: 0.75rem;
+  }
+
+  .guide-link .guide-text {
+    display: none;
+  }
+
+  .guide-link {
+    padding: 0.45rem 0.55rem;
+  }
+
+  /* Keep examples from pushing the input off-screen — show the first
+     three system groups only on narrow viewports. */
+  .example-group:nth-child(n + 4) {
+    display: none;
+  }
+}
+
+/*
+ * * Reduced motion
+ */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

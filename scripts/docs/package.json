@@ -1,0 +1,10 @@
+{
+  "name": "@roll-parser/docs-builder",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Isolated dependency tree for the TypeDoc API reference. TypeDoc 0.28.x peers at TypeScript <=6.0.x and crashes on the repo's TypeScript 7, so the generator gets a nested typescript@6 here rather than holding the library back. Nesting (not the scoped @typescript/typescript6 republish) is required because TypeDoc imports the bare 'typescript' specifier, so the older compiler must occupy that name in its resolution scope. Delete this workspace and move typedoc back to the root once TypeDoc 1.0 ships TypeScript 7 support.",
+  "dependencies": {
+    "typedoc": "^0.28.20",
+    "typescript": "^6.0.2"
+  }
+}

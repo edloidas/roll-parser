@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <!-- Apply the stored theme before paint to avoid a flash. Shared across the
+         edloidas.io site via the origin-wide `theme-preference` key; see src/theme.ts. -->
+    <script>
+      document.documentElement.dataset.theme = localStorage.getItem('theme-preference') || 'auto';
+    </script>
+    <title>roll-parser — interactive dice notation playground</title>
+    <meta
+      name="description"
+      content="Interactive playground for roll-parser: type dice notation and watch it roll. Shareable, seeded, reproducible."
+    />
+    <link rel="icon" type="image/svg+xml" href="./public/favicon.svg" />
+    <link
+      rel="preload"
+      as="font"
+      type="font/woff2"
+      href="./public/fonts/cinzel-latin.woff2"
+      crossorigin
+    />
+    <link
+      rel="preload"
+      as="font"
+      type="font/woff2"
+      href="./public/fonts/ibm-plex-sans-latin.woff2"
+      crossorigin
+    />
+    <link
+      rel="preload"
+      as="font"
+      type="font/woff2"
+      href="./public/fonts/b612-latin-700.woff2"
+      crossorigin
+    />
+    <link rel="stylesheet" href="./src/style.css" />
+  </head>
+  <body>
+    <!-- Shared SVG gradients — referenced by id from die/logo SVGs.
+         #rp-rainbow: logo only. #rp-gold: tray dice stroke. -->
+    <svg class="defs" aria-hidden="true" width="0" height="0" focusable="false">
+      <defs>
+        <linearGradient id="rp-rainbow" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#ff4d6d" />
+          <stop offset="20%" stop-color="#ff9e3d" />
+          <stop offset="40%" stop-color="#ffe14d" />
+          <stop offset="60%" stop-color="#4dff9e" />
+          <stop offset="80%" stop-color="#4dc4ff" />
+          <stop offset="100%" stop-color="#b06dff" />
+        </linearGradient>
+        <linearGradient id="rp-gold" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#d9a441" />
+          <stop offset="100%" stop-color="#a3622f" />
+        </linearGradient>
+      </defs>
+    </svg>
+
+    <!-- UI glyphs are inline Lucide icons (https://lucide.dev, ISC license). -->
+    <nav class="top-nav" aria-label="Site">
+      <a class="guide-link" href="./reference" aria-label="Notation guide">
+        <span class="guide-glyph" aria-hidden="true">
+          <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 7v14" />
+            <path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z" />
+          </svg>
+        </span>
+        <span class="guide-text">Guide</span>
+      </a>
+      <a class="guide-link" href="./docs/" aria-label="API reference">
+        <span class="guide-glyph" aria-hidden="true">
+          <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5c0 1.1.9 2 2 2h1" />
+            <path d="M16 21h1a2 2 0 0 0 2-2v-5c0-1.1.9-2 2-2a2 2 0 0 1-2-2V5a2 2 0 0 0-2-2h-1" />
+          </svg>
+        </span>
+        <span class="guide-text">Docs</span>
+      </a>
+      <button
+        type="button"
+        class="theme-toggle"
+        id="theme-toggle"
+        aria-label="Toggle theme (auto, light, dark)"
+        title="Toggle theme"
+      >
+        <svg class="theme-icon theme-icon--auto" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 2v2" />
+          <path d="M14.837 16.385a6 6 0 1 1-7.223-7.222c.624-.147.97.66.715 1.248a4 4 0 0 0 5.26 5.259c.589-.255 1.396.09 1.248.715" />
+          <path d="M16 12a4 4 0 0 0-4-4" />
+          <path d="m19 5-1.256 1.256" />
+          <path d="M20 12h2" />
+        </svg>
+        <svg class="theme-icon theme-icon--light" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="4" />
+          <path d="M12 2v2" />
+          <path d="M12 20v2" />
+          <path d="m4.93 4.93 1.41 1.41" />
+          <path d="m17.66 17.66 1.41 1.41" />
+          <path d="M2 12h2" />
+          <path d="M20 12h2" />
+          <path d="m6.34 17.66-1.41 1.41" />
+          <path d="m19.07 4.93-1.41 1.41" />
+        </svg>
+        <svg class="theme-icon theme-icon--dark" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
+        </svg>
+      </button>
+    </nav>
+
+    <div class="app" id="app">
+      <main class="main">
+        <a class="logo" href="https://github.com/edloidas/roll-parser" aria-label="roll-parser on GitHub">
+          <svg class="logo-die" viewBox="0 0 100 100" aria-hidden="true">
+            <!-- d20: pointy-top hexagon outline with central triangle facets -->
+            <polygon
+              class="logo-stroke"
+              points="50,4 89.8,27 89.8,73 50,96 10.2,73 10.2,27"
+            />
+            <polygon class="logo-stroke" points="50,26 72,64 28,64" />
+            <path
+              class="logo-stroke"
+              d="M50,4 L50,26 M89.8,27 L72,64 M89.8,73 L72,64 M50,96 L50,64 M10.2,73 L28,64 M10.2,27 L28,64 M28,64 L50,64 M72,64 L50,64"
+            />
+          </svg>
+          <span class="wordmark">roll-parser</span>
+        </a>
+
+        <div class="tray" id="tray" aria-hidden="true"></div>
+        <div class="legend-slot" id="legend" aria-hidden="true"></div>
+
+        <div class="input-zone">
+          <div class="input-row">
+            <label class="visually-hidden" for="notation">Dice notation</label>
+            <div class="input-wrap" id="input-wrap">
+              <input
+                id="notation"
+                class="notation-input"
+                type="text"
+                inputmode="text"
+                autocomplete="off"
+                autocapitalize="off"
+                autocorrect="off"
+                spellcheck="false"
+                enterkeyhint="go"
+                placeholder="Try 4d6kh3, 2d20kh1+7, 8d6…"
+              />
+              <button id="clear" class="input-clear" type="button" title="Clear (Esc)" aria-label="Clear input">
+                <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M18 6 6 18" />
+                  <path d="m6 6 12 12" />
+                </svg>
+              </button>
+            </div>
+            <button id="reroll" class="icon-btn" type="button" title="Reroll (Enter)" aria-label="Reroll">
+              <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
+                <path d="M21 3v5h-5" />
+              </svg>
+            </button>
+            <button id="copy" class="icon-btn" type="button" title="Copy shareable link" aria-label="Copy link">
+              <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+              </svg>
+              <span class="copied-flag" id="copied" aria-hidden="true">copied</span>
+            </button>
+          </div>
+
+          <div class="error-slot" id="error" role="alert" aria-live="assertive"></div>
+
+          <div class="examples" id="examples">
+            <div class="example-group">
+              <span class="example-label">D&amp;D 5e</span>
+              <div class="example-chips">
+                <button class="chip" type="button" data-notation="4d6kh3">4d6kh3</button>
+                <button class="chip" type="button" data-notation="2d20kh1+7">2d20kh1+7</button>
+                <button class="chip" type="button" data-notation="8d6">8d6</button>
+              </div>
+            </div>
+            <div class="example-group">
+              <span class="example-label">World of Darkness</span>
+              <div class="example-chips">
+                <button class="chip" type="button" data-notation="7d10&gt;=6f1">7d10&gt;=6f1</button>
+                <button class="chip" type="button" data-notation="5d10!=10&gt;=8">5d10!=10&gt;=8</button>
+              </div>
+            </div>
+            <div class="example-group">
+              <span class="example-label">Shadowrun</span>
+              <div class="example-chips">
+                <button class="chip" type="button" data-notation="12d6&gt;=5">12d6&gt;=5</button>
+              </div>
+            </div>
+            <div class="example-group">
+              <span class="example-label">Fate</span>
+              <div class="example-chips">
+                <button class="chip" type="button" data-notation="4dF+2">4dF+2</button>
+              </div>
+            </div>
+            <div class="example-group">
+              <span class="example-label">Pathfinder 2e</span>
+              <div class="example-chips">
+                <button class="chip" type="button" data-notation="1d20+12 vs 20">1d20+12 vs 20</button>
+              </div>
+            </div>
+            <div class="example-group">
+              <span class="example-label">Savage Worlds</span>
+              <div class="example-chips">
+                <button class="chip" type="button" data-notation="{1d8!, 1d6!}kh1">{1d8!, 1d6!}kh1</button>
+              </div>
+            </div>
+            <div class="example-group">
+              <span class="example-label">Call of Cthulhu</span>
+              <div class="example-chips">
+                <button class="chip" type="button" data-notation="d%">d%</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <section class="result-panel" id="result" aria-live="polite" aria-label="Roll result"></section>
+      </main>
+
+      <footer class="footer">
+        <a href="./reference">Guide</a>
+        <span class="dot">·</span>
+        <a href="./docs/">Docs</a>
+        <span class="dot">·</span>
+        <a href="https://github.com/edloidas/roll-parser">GitHub</a>
+        <span class="dot">·</span>
+        <a href="https://www.npmjs.com/package/roll-parser">npm</a>
+        <span class="dot">·</span>
+        <span class="version" id="version"></span>
+      </footer>
+    </div>
+
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>

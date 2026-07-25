@@ -11,7 +11,7 @@ import { createMockRng } from '../rng/mock.js';
 import type { DieResult } from '../types.js';
 import { DegreeOfSuccess } from '../types.js';
 import type { EvalContext } from './evaluator.js';
-import { DEFAULT_MAX_DICE, evaluate, EvaluatorError, mergeMetaRolls } from './evaluator.js';
+import { DEFAULT_MAX_DICE, EvaluatorError, evaluate, mergeMetaRolls } from './evaluator.js';
 
 /**
  * Helper to safely get a die result at index, throwing if not present.

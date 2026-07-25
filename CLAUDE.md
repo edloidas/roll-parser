@@ -5,10 +5,24 @@ Dice roll notation parser. TypeScript library and CLI. Built with Bun.
 ## Commands
 
 ```bash
-bun check:fix   # Typecheck + lint + format with auto-fix — use during iteration
+bun check:fix   # Typecheck + biome check --write (lint + format + import sort) — use during iteration
 bun test        # Run tests
-bun validate    # Full check before commit: typecheck + lint + format:check + build + test
+bun validate    # Full pre-release gate: check + build + check:package + test:ci
 ```
+
+Demo site (`site/`, deployed to Cloudflare Pages by `.github/workflows/deploy-site.yml`):
+
+```bash
+bun site:dev     # Bun HTML dev server with HMR — no TypeDoc, so /docs/ is absent
+bun site:build   # Full static build into site/dist/, including the TypeDoc reference
+bun site:check   # Verify site/dist/ — asset references resolve, no dev paths leaked
+bun site:preview # site:build, then serve site/dist/ locally with host-style routing
+```
+
+A pre-commit hook auto-fixes staged `.ts`/`.tsx` files (nano-staged runs
+`biome check --write` on them, then re-stages). It installs automatically on
+`bun install` — the `prepare` script points `core.hooksPath` at `.githooks/`.
+Commits with unfixable lint errors are blocked.
 
 ## Constraints
 
@@ -17,6 +31,12 @@ bun validate    # Full check before commit: typecheck + lint + format:check + bu
 - Library + CLI, ESM-only compiled JS (Node ≥22.12 consumes via `import` or `require(esm)` — 22.12 is where `require(esm)` is unflagged)
 - Relative imports in `src/` carry explicit `.js` extensions — required for nodenext-safe `.d.ts` output (verified by `bun run check:package`)
 - Do not pass `--sourcemap` with `--outfile` to `bun build` — Bun 1.3.x silently writes nothing; use `--outdir` (+ `--entry-naming` for the CLI)
+- TypeDoc lives in the `scripts/docs` workspace, not the root, and is invoked from
+  `scripts/docs/node_modules/.bin/typedoc`. TypeDoc 0.28.x peers at TypeScript
+  `<=6.0.x` and throws on the root `typescript@7`, so that workspace nests a
+  `typescript@6` for it to resolve. Do not "simplify" it back to the root — the
+  root install would hand TypeDoc TypeScript 7 and `site:build` would fail. Fold
+  it back only once TypeDoc 1.0 ships TypeScript 7 support.
 
 ## Ad-hoc scripts
 

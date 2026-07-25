@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'bun:test';
-import { parse, ParseError, Parser } from './parser.js';
 import { lex } from '../lexer/lexer.js';
 import type { ComparePoint } from '../types.js';
 import type {
@@ -22,6 +21,7 @@ import type {
   VariableNode,
   VersusNode,
 } from './ast.js';
+import { ParseError, Parser, parse } from './parser.js';
 
 // * Helper functions for readable assertions
 
