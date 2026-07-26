@@ -42,13 +42,23 @@ import {
 
 /**
  * Error thrown when the parser encounters invalid syntax.
+ *
+ * `position` is a zero-based UTF-16 offset into the notation. It is
+ * deliberately absent from `message` — read it from the field, or uniformly
+ * across all roll-parser errors via `getErrorSpan`.
  */
 export class ParseError extends RollParserError {
   readonly position: number;
   readonly token: Token | undefined;
 
-  constructor(message: string, code: RollParserErrorCode, position: number, token?: Token) {
-    super(`${message} at position ${position}`, code);
+  constructor(
+    message: string,
+    code: RollParserErrorCode,
+    position: number,
+    token?: Token,
+    options?: ErrorOptions,
+  ) {
+    super(message, code, options);
     this.name = 'ParseError';
     this.position = position;
     this.token = token ?? undefined;

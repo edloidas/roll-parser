@@ -6,7 +6,7 @@
  * @module cli/index
  */
 
-import { isRollParserError } from '../errors.js';
+import { getErrorSpan, isRollParserError } from '../errors.js';
 import { VERSION } from '../index.js';
 import { roll } from '../roll.js';
 import { parseArgs } from './args.js';
@@ -29,19 +29,22 @@ Examples:
 `;
 
 /**
- * Prints the notation with a caret under the error position for errors that
- * carry one (LexerError/ParseError `position`, EvaluatorError `start`).
- * Skipped for multi-line notations and out-of-range positions to keep the
- * caret honest.
+ * Prints the notation with a caret under the error position. `getErrorSpan`
+ * normalizes the lexer/parser `position` and the evaluator `start`/`end`
+ * shapes, so no duck-typing is needed here. Skipped for multi-line notations
+ * and out-of-range positions to keep the caret honest.
  */
-function writeErrorContext(notation: string, error: Error): void {
-  const position =
-    'position' in error ? error.position : 'start' in error ? error.start : undefined;
-  if (typeof position !== 'number' || !Number.isInteger(position)) return;
-  if (notation.includes('\n') || position < 0 || position > notation.length) return;
+function writeErrorContext(notation: string, error: unknown): void {
+  const span = getErrorSpan(error);
+  if (span == null) return;
+  if (notation.includes('\n') || span.start > notation.length) return;
+
+  // ? Indent by code points, not UTF-16 units — astral characters (e.g. '🎲')
+  //   occupy two units but print as one column, which shifts the caret right.
+  const column = [...notation.slice(0, span.start)].length;
 
   process.stderr.write(`  ${notation}\n`);
-  process.stderr.write(`  ${' '.repeat(position)}^\n`);
+  process.stderr.write(`  ${' '.repeat(column)}^\n`);
 }
 
 function main(): void {

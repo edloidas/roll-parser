@@ -82,6 +82,14 @@ describe('CLI integration', () => {
     expect(stderr).toContain('    ^');
   });
 
+  test('carets count code points, not UTF-16 units', async () => {
+    // `&` sits at UTF-16 offset 6 but visual column 5 — the astral `🎲`
+    // occupies two units and one column.
+    const { stderr, exitCode } = await runCli(['@{🎲}+&']);
+    expect(exitCode).toBe(1);
+    expect(stderr).toContain('  @{🎲}+&\n       ^\n');
+  });
+
   test('no arguments exits with code 2', async () => {
     const { stderr, exitCode } = await runCli([]);
     expect(exitCode).toBe(2);

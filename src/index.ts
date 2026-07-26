@@ -4,8 +4,8 @@
  * @module roll-parser
  */
 
-export type { RollParserErrorCode } from './errors.js';
-export { isRollParserError, RollParserError } from './errors.js';
+export type { ErrorSpan, RollParserErrorCode } from './errors.js';
+export { getErrorSpan, isRollParserError, RollParserError } from './errors.js';
 export {
   DEFAULT_MAX_DICE,
   DEFAULT_MAX_EXPLODE_ITERATIONS,
