@@ -5,30 +5,19 @@
  */
 
 import { evaluate } from './evaluator/evaluator.js';
-import { lex } from './lexer/lexer.js';
-import { Parser } from './parser/parser.js';
+import { parse } from './parser/parser.js';
 import { SeededRNG } from './rng/seeded.js';
 import type { RNG } from './rng/types.js';
-import type { EvaluateOptions, RollResult } from './types.js';
+import type { EvaluationLimits, RollResult } from './types.js';
 
 /**
  * Options for the roll function.
  */
-export type RollOptions = {
+export type RollOptions = EvaluationLimits & {
   /** Custom RNG instance (takes precedence over seed) */
   rng?: RNG;
   /** Seed for deterministic rolls (ignored if rng provided) */
   seed?: string | number;
-  /** Maximum total dice allowed per evaluation (default: 10,000) */
-  maxDice?: number;
-  /** Maximum explosion iterations allowed per die (default: 1,000) */
-  maxExplodeIterations?: number;
-  /** Maximum reroll iterations allowed per die (default: 1,000) */
-  maxRerollIterations?: number;
-  /** Variable context for `@name` / `@{name}` references (default: empty) */
-  context?: Record<string, number>;
-  /** Behavior when a referenced variable is missing from context (default: 'throw') */
-  onMissingVariable?: 'throw' | 'zero';
 };
 
 /**
@@ -55,20 +44,9 @@ export type RollOptions = {
  * ```
  */
 export function roll(notation: string, options: RollOptions = {}): RollResult {
-  const rng = options.rng ?? new SeededRNG(options.seed);
-  const tokens = lex(notation);
-  const ast = new Parser(tokens).parse();
-  const evalOptions: EvaluateOptions = { notation };
-  if (options.maxDice != null) evalOptions.maxDice = options.maxDice;
-  if (options.maxExplodeIterations != null) {
-    evalOptions.maxExplodeIterations = options.maxExplodeIterations;
-  }
-  if (options.maxRerollIterations != null) {
-    evalOptions.maxRerollIterations = options.maxRerollIterations;
-  }
-  if (options.context != null) evalOptions.context = options.context;
-  if (options.onMissingVariable != null) {
-    evalOptions.onMissingVariable = options.onMissingVariable;
-  }
-  return evaluate(ast, rng, evalOptions);
+  // ? `limits` is exactly `EvaluationLimits`, so it forwards wholesale — an
+  //   explicitly-undefined key is harmless, `evaluate` nullish-checks each one.
+  const { rng, seed, ...limits } = options;
+
+  return evaluate(parse(notation), rng ?? new SeededRNG(seed), { ...limits, notation });
 }

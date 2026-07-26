@@ -18,8 +18,6 @@ import { matchesCondition } from './compare.js';
 /** Default maximum reroll iterations per die. */
 export const DEFAULT_MAX_REROLL_ITERATIONS = 1_000;
 
-export { matchesCondition };
-
 /**
  * Rolls a replacement die for the given sides, charging it against the global
  * dice limit. Fate dice (sides === 0) re-roll on the {-1, 0, +1} range.

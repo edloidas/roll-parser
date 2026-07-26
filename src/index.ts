@@ -4,6 +4,10 @@
  * @module roll-parser
  */
 
+// ? Named import — Bun's bundler tree-shakes the JSON module down to the
+//   single used property, so the full manifest is not embedded in dist.
+import { version } from '../package.json';
+
 export type { ErrorSpan, RollParserErrorCode } from './errors.js';
 export { getErrorSpan, isRollParserError, RollParserError } from './errors.js';
 export {
@@ -13,10 +17,13 @@ export {
   EvaluatorError,
   evaluate,
 } from './evaluator/evaluator.js';
-export { LexerError } from './lexer/lexer.js';
+export { LexerError, lex } from './lexer/lexer.js';
+export type { Token } from './lexer/tokens.js';
+export { TokenType } from './lexer/tokens.js';
 export type {
   ASTNode,
   BinaryOpNode,
+  CritThreshold,
   CritThresholdNode,
   DiceNode,
   ExplodeNode,
@@ -52,7 +59,7 @@ export {
   isVariable,
   isVersus,
 } from './parser/ast.js';
-export { ParseError, parse } from './parser/parser.js';
+export { MAX_PARSE_DEPTH, ParseError, parse } from './parser/parser.js';
 export { SeededRNG } from './rng/seeded.js';
 export type { RNG } from './rng/types.js';
 export type { RollOptions } from './roll.js';
@@ -63,6 +70,7 @@ export type {
   DieModifier,
   DieResult,
   EvaluateOptions,
+  EvaluationLimits,
   ModifierSpec,
   ResolvedComparePoint,
   ResolvedCritThreshold,
@@ -72,8 +80,5 @@ export type {
 } from './types.js';
 export { DegreeOfSuccess } from './types.js';
 
-// ? Named import — Bun's bundler tree-shakes the JSON module down to the
-//   single used property, so the full manifest is not embedded in dist.
-import { version } from '../package.json';
-
+/** Installed roll-parser version, taken from the package manifest. */
 export const VERSION: string = version;

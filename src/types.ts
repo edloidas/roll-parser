@@ -18,8 +18,8 @@ export type CompareOp = '>' | '>=' | '<' | '<=' | '=';
  * matching the pattern used by DiceNode.count and DiceNode.sides.
  */
 export type ComparePoint = {
-  operator: CompareOp;
-  value: ASTNode;
+  readonly operator: CompareOp;
+  readonly value: ASTNode;
 };
 
 /**
@@ -27,8 +27,8 @@ export type ComparePoint = {
  * `RollPart` where meta-expressions are already resolved.
  */
 export type ResolvedComparePoint = {
-  operator: CompareOp;
-  value: number;
+  readonly operator: CompareOp;
+  readonly value: number;
 };
 
 /**
@@ -94,9 +94,9 @@ export type DieResult = {
  * rolled number).
  */
 export type ModifierSpec = {
-  kind: 'keep' | 'drop';
-  selector: 'highest' | 'lowest';
-  count: number;
+  readonly kind: 'keep' | 'drop';
+  readonly selector: 'highest' | 'lowest';
+  readonly count: number;
 };
 
 /**
@@ -180,8 +180,12 @@ export type RollPartType = RollPart['type'];
 
 /**
  * Complete roll result with all metadata.
+ *
+ * The top level is `Readonly` — a result describes one completed evaluation
+ * and is never re-targeted. The `rolls` array and the `parts` tree stay
+ * mutable so consumers can annotate or re-sort their own views.
  */
-export type RollResult = {
+export type RollResult = Readonly<{
   /** Final computed total */
   total: number;
   /** Original input notation */
@@ -190,7 +194,13 @@ export type RollResult = {
   expression: string;
   /** Rendered result with individual rolls shown */
   rendered: string;
-  /** All individual die results */
+  /**
+   * All individual die results, in evaluation order.
+   *
+   * Shares `DieResult` object references with the `rolls[]` arrays inside
+   * `parts` — no deep clone. Mutating a die here is visible through the part
+   * tree and vice versa; clone first if that matters.
+   */
   rolls: DieResult[];
   /** Structured breakdown of the evaluated expression, mirroring the AST 1:1. */
   parts: RollPart;
@@ -216,14 +226,14 @@ export type RollResult = {
    * exactly one kept d20 was rolled on the roll side of a `vs` expression.
    */
   natural?: number;
-};
+}>;
 
 /**
- * Options for the evaluate function.
+ * Evaluation guardrails and variable resolution, shared by `EvaluateOptions`
+ * and `RollOptions`. Every field is optional — the defaults bound adversarial
+ * notation without capping any realistic expression.
  */
-export type EvaluateOptions = {
-  /** Original notation string (for result metadata) */
-  notation?: string;
+export type EvaluationLimits = {
   /** Maximum total dice allowed per evaluation (default: 10,000) */
   maxDice?: number;
   /** Maximum explosion iterations allowed per die (default: 1,000) */
@@ -231,7 +241,15 @@ export type EvaluateOptions = {
   /** Maximum reroll iterations allowed per die (default: 1,000) */
   maxRerollIterations?: number;
   /** Variable context for `@name` / `@{name}` references (default: empty) */
-  context?: Record<string, number>;
+  context?: Readonly<Record<string, number>>;
   /** Behavior when a referenced variable is missing from context (default: 'throw') */
   onMissingVariable?: 'throw' | 'zero';
+};
+
+/**
+ * Options for the evaluate function.
+ */
+export type EvaluateOptions = EvaluationLimits & {
+  /** Original notation string (for result metadata) */
+  notation?: string;
 };
