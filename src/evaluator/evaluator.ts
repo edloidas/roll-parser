@@ -1532,32 +1532,32 @@ export function evaluate(ast: ASTNode, rng: RNG, options: EvaluateOptions = {}):
   const trailing = ctx.versusMetadata ? degreeLabel(ctx.versusMetadata.degree) : String(total);
   const rendered = `${ctx.renderedParts.join('')} = ${trailing}`;
 
-  const result: RollResult = {
+  // ? `RollResult` is `Readonly`, so the optional fields are folded in via
+  //   conditional spreads instead of post-construction assignment.
+  const versus = ctx.versusMetadata;
+
+  return {
     total,
     notation: options.notation ?? expression,
     expression,
     rendered,
     rolls: ctx.rolls,
     parts: part,
+    ...(env.hasSuccessCount ? countTaggedDice(ctx.rolls) : {}),
+    ...(versus ? { degree: versus.degree } : {}),
+    ...(versus?.natural !== undefined ? { natural: versus.natural } : {}),
   };
+}
 
-  if (env.hasSuccessCount) {
-    let successes = 0;
-    let failures = 0;
-    for (const die of ctx.rolls) {
-      if (die.modifiers.includes('success')) successes += 1;
-      else if (die.modifiers.includes('failure')) failures += 1;
-    }
-    result.successes = successes;
-    result.failures = failures;
+/** Tallies the `'success'` / `'failure'` tags across a whole roll. */
+function countTaggedDice(rolls: DieResult[]): { successes: number; failures: number } {
+  let successes = 0;
+  let failures = 0;
+
+  for (const die of rolls) {
+    if (die.modifiers.includes('success')) successes += 1;
+    else if (die.modifiers.includes('failure')) failures += 1;
   }
 
-  if (ctx.versusMetadata) {
-    result.degree = ctx.versusMetadata.degree;
-    if (ctx.versusMetadata.natural !== undefined) {
-      result.natural = ctx.versusMetadata.natural;
-    }
-  }
-
-  return result;
+  return { successes, failures };
 }

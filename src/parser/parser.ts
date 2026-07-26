@@ -111,7 +111,7 @@ const BP = {
  * would also break the `isRollParserError` contract). Bounding parse depth
  * also bounds AST depth, protecting the recursive AST walkers and evaluator.
  */
-const MAX_PARSE_DEPTH = 128;
+export const MAX_PARSE_DEPTH = 128;
 
 /** Human-readable symbols for tokens named in `expect()` error messages. */
 const TOKEN_DISPLAY: Partial<Record<TokenType, string>> = {
@@ -769,18 +769,21 @@ export class Parser {
           ? 'compound'
           : 'penetrating';
 
-    const node: ExplodeNode = {
+    const start = target.start ?? token.position;
+    if (!this.isComparePointAhead()) {
+      return { type: 'Explode', variant, target, start, end: token.end };
+    }
+
+    const threshold = this.parseComparePoint();
+
+    return {
       type: 'Explode',
       variant,
       target,
-      start: target.start ?? token.position,
-      end: token.end,
+      threshold,
+      start,
+      end: threshold.value.end ?? token.end,
     };
-    if (this.isComparePointAhead()) {
-      node.threshold = this.parseComparePoint();
-      node.end = node.threshold.value.end ?? token.end;
-    }
-    return node;
   }
 
   private parseReroll(target: ASTNode, token: Token): RerollNode {
@@ -932,13 +935,19 @@ export class Parser {
       chainTarget = chainTarget.expression;
     }
     if (isCritThreshold(chainTarget)) {
-      if (token.type === TokenType.CRIT_SUCCESS) {
-        chainTarget.successThresholds.push(threshold);
-      } else {
-        chainTarget.failThresholds.push(threshold);
-      }
-      chainTarget.end = end;
-      return chainTarget;
+      // ? Rebuilt rather than mutated — `NodeSpan` is readonly, and the
+      //   discarded `Grouped` wrapper must not keep a stale `end`.
+      const isSuccess = token.type === TokenType.CRIT_SUCCESS;
+      return {
+        ...chainTarget,
+        successThresholds: isSuccess
+          ? [...chainTarget.successThresholds, threshold]
+          : chainTarget.successThresholds,
+        failThresholds: isSuccess
+          ? chainTarget.failThresholds
+          : [...chainTarget.failThresholds, threshold],
+        end,
+      };
     }
 
     return {
@@ -972,29 +981,36 @@ export class Parser {
     const value = this.parseExpression(BP.DICE_LEFT);
     this.rejectSuccessCountTarget(value, token);
     this.rejectVersusTarget(value, token);
-    const node: SuccessCountNode = {
+    const start = target.start ?? token.position;
+    const end = value.end ?? token.end;
+
+    if (this.peek().type !== TokenType.FAIL) {
+      return { type: 'SuccessCount', target, threshold: { operator, value }, start, end };
+    }
+
+    this.advance();
+    const failThreshold = this.parseFailThreshold(token);
+
+    return {
       type: 'SuccessCount',
       target,
       threshold: { operator, value },
-      start: target.start ?? token.position,
-      end: value.end ?? token.end,
+      failThreshold,
+      start,
+      end: failThreshold.value.end ?? end,
     };
+  }
 
-    if (this.peek().type === TokenType.FAIL) {
-      this.advance();
-      if (this.isComparePointAhead()) {
-        node.failThreshold = this.parseComparePoint();
-      } else {
-        // ? Same threshold binding as above (BP.DICE_LEFT).
-        const failValue = this.parseExpression(BP.DICE_LEFT);
-        this.rejectSuccessCountTarget(failValue, token);
-        this.rejectVersusTarget(failValue, token);
-        node.failThreshold = { operator: '=', value: failValue };
-      }
-      node.end = node.failThreshold.value.end ?? node.end ?? token.end;
-    }
+  /** Parses the `f...` suffix of a success count. Bare `fN` means `f=N`. */
+  private parseFailThreshold(token: Token): ComparePoint {
+    if (this.isComparePointAhead()) return this.parseComparePoint();
 
-    return node;
+    // ? Same threshold binding as `parseComparePoint` (BP.DICE_LEFT).
+    const failValue = this.parseExpression(BP.DICE_LEFT);
+    this.rejectSuccessCountTarget(failValue, token);
+    this.rejectVersusTarget(failValue, token);
+
+    return { operator: '=', value: failValue };
   }
 
   private parseVersus(left: ASTNode, token: Token): VersusNode {
@@ -1029,7 +1045,7 @@ export class Parser {
   /**
    * Checks whether the next token is a comparison operator.
    */
-  isComparePointAhead(): boolean {
+  private isComparePointAhead(): boolean {
     const type = this.peek().type;
     return (
       type === TokenType.GREATER ||
@@ -1054,7 +1070,7 @@ export class Parser {
    * @returns A ComparePoint with the operator and value AST node
    * @throws {ParseError} If the next token is not a comparison operator
    */
-  parseComparePoint(): ComparePoint {
+  private parseComparePoint(): ComparePoint {
     const token = this.peek();
     const operator = this.getCompareOp(token);
 

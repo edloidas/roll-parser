@@ -15,13 +15,8 @@
  * @module evaluator/modifiers/success-count
  */
 
-import type { CompareOp, DieResult } from '../../types.js';
+import type { DieResult, ResolvedComparePoint } from '../../types.js';
 import { matchesCondition } from './compare.js';
-
-export type ResolvedThreshold = {
-  operator: CompareOp;
-  value: number;
-};
 
 export type SuccessCountResult = {
   total: number;
@@ -31,8 +26,8 @@ export type SuccessCountResult = {
 
 export function countSuccesses(
   dice: DieResult[],
-  threshold: ResolvedThreshold,
-  failThreshold?: ResolvedThreshold,
+  threshold: ResolvedComparePoint,
+  failThreshold?: ResolvedComparePoint,
 ): SuccessCountResult {
   let successes = 0;
   let failures = 0;

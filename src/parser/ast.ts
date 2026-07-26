@@ -15,8 +15,8 @@ import type { ComparePoint } from '../types.js';
  * consumers) remain valid without positions.
  */
 export type NodeSpan = {
-  start?: number;
-  end?: number;
+  readonly start?: number;
+  readonly end?: number;
 };
 
 /**
