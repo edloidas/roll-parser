@@ -1641,6 +1641,102 @@ describe('evaluate', () => {
       expect(result.successes).toBe(0);
       expect((result.successes ?? Number.NaN) + 5).toBe(5);
     });
+
+    describe('fail threshold comparator round-trip', () => {
+      const POOL = [1, 2, 3, 7, 9];
+
+      test('f<3 keeps its comparator — 5d10>=6f<3', () => {
+        const result = evaluate(parse('5d10>=6f<3'), createMockRng([...POOL]));
+
+        expect(result.expression).toBe('5d10>=6f<3');
+        expect(result.rendered).toBe('5d10>=6f<3[__1__, __2__, 3, **7**, **9**] = 0');
+        expect(result.successes).toBe(2);
+        expect(result.failures).toBe(2);
+      });
+
+      test('f>3 keeps its comparator — 5d10>=6f>3', () => {
+        const result = evaluate(parse('5d10>=6f>3'), createMockRng([...POOL]));
+
+        expect(result.expression).toBe('5d10>=6f>3');
+        expect(result.rendered).toBe('5d10>=6f>3[1, 2, 3, **7**, **9**] = 2');
+        expect(result.successes).toBe(2);
+        expect(result.failures).toBe(0);
+      });
+
+      test('f<=3 keeps its comparator — 5d10>=6f<=3', () => {
+        const result = evaluate(parse('5d10>=6f<=3'), createMockRng([...POOL]));
+
+        expect(result.expression).toBe('5d10>=6f<=3');
+        expect(result.successes).toBe(2);
+        expect(result.failures).toBe(3);
+      });
+
+      test('f>=3 keeps its comparator — 5d10>=6f>=3', () => {
+        const result = evaluate(parse('5d10>=6f>=3'), createMockRng([...POOL]));
+
+        expect(result.expression).toBe('5d10>=6f>=3');
+        expect(result.successes).toBe(2);
+        expect(result.failures).toBe(1);
+      });
+
+      test('bare f3 stays bare — 5d10>=6f3', () => {
+        const result = evaluate(parse('5d10>=6f3'), createMockRng([...POOL]));
+
+        expect(result.expression).toBe('5d10>=6f3');
+        expect(result.rendered).toBe('5d10>=6f3[1, 2, __3__, **7**, **9**] = 1');
+        expect(result.failures).toBe(1);
+      });
+
+      test('explicit f=3 normalizes to bare f3 — 5d10>=6f=3', () => {
+        const result = evaluate(parse('5d10>=6f=3'), createMockRng([...POOL]));
+
+        expect(result.expression).toBe('5d10>=6f3');
+        expect(result.failures).toBe(1);
+      });
+
+      test('f<3 and f3 no longer collide in expression', () => {
+        const withOperator = evaluate(parse('5d10>=6f<3'), createMockRng([...POOL]));
+        const bare = evaluate(parse('5d10>=6f3'), createMockRng([...POOL]));
+
+        expect(withOperator.failures).not.toBe(bare.failures);
+        expect(withOperator.expression).not.toBe(bare.expression);
+      });
+
+      test('emitted expression re-parses to the same semantics', () => {
+        for (const notation of ['5d10>=6f<3', '5d10>=6f>3', '5d10>=6f<=3', '5d10>=6f3']) {
+          const first = evaluate(parse(notation), createMockRng([...POOL]));
+          const second = evaluate(parse(first.expression), createMockRng([...POOL]));
+
+          expect(second.expression).toBe(first.expression);
+          expect(second.total).toBe(first.total);
+          expect(second.successes).toBe(first.successes);
+          expect(second.failures).toBe(first.failures);
+        }
+      });
+
+      test('meta fail threshold resolves to a literal with its comparator — 5d10>=6f<(1d2)', () => {
+        // Draw order: pool first, then threshold meta-expressions.
+        const result = evaluate(parse('5d10>=6f<(1d2)'), createMockRng([...POOL, 2]));
+
+        expect(result.expression).toBe('5d10>=6f<2');
+        expect(result.failures).toBe(1);
+      });
+
+      test('negative fail threshold keeps its comparator — 4dF>=1f<0', () => {
+        const result = evaluate(parse('4dF>=1f<0'), createMockRng([1, 0, -1, 1]));
+
+        expect(result.expression).toBe('4dF>=1f<0');
+        expect(result.successes).toBe(2);
+        expect(result.failures).toBe(1);
+      });
+
+      test('empty pool renders the comparator too — 0d6>=6f<3', () => {
+        const result = evaluate(parse('0d6>=6f<3'), createMockRng([]));
+
+        expect(result.expression).toBe('0d6>=6f<3');
+        expect(result.rendered).toBe('0d6>=6f<3 = 0');
+      });
+    });
   });
 
   describe('versus (PF2e degrees of success)', () => {
