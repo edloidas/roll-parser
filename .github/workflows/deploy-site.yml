@@ -13,16 +13,21 @@ concurrency:
   group: deploy-site-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   deploy:
     name: Build & Deploy
     runs-on: ubuntu-latest
     # The `secrets` context cannot be read from a step-level `if`, so surface
     # credential presence as a job-level value the conditions below can test.
-    # This also covers forks, which never receive the secrets: they still build
-    # and verify the site, and skip only the publish step.
+    # Forks never receive the secrets, so IS_UPSTREAM separates "expected to
+    # publish" from "expected to build only" — missing credentials are a hard
+    # failure here and a clean skip on forks.
     env:
       HAS_CLOUDFLARE_CREDENTIALS: ${{ secrets.CLOUDFLARE_API_TOKEN != '' && secrets.CLOUDFLARE_ACCOUNT_ID != '' }}
+      IS_UPSTREAM: ${{ github.repository == 'edloidas/roll-parser' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -49,28 +54,42 @@ jobs:
       - name: Verify built site
         run: bun run site:check
 
+      # ! Guard against a silent green run: on this repo the credentials are
+      # ! expected, so their absence is a misconfiguration, not a skip.
+      - name: Require Cloudflare credentials
+        if: env.IS_UPSTREAM == 'true' && env.HAS_CLOUDFLARE_CREDENTIALS != 'true'
+        run: |
+          echo '::error::Missing CLOUDFLARE_API_TOKEN and/or CLOUDFLARE_ACCOUNT_ID repository secrets — the site was built but cannot be published.'
+          exit 1
+
       - name: Deploy to Cloudflare Pages
         if: env.HAS_CLOUDFLARE_CREDENTIALS == 'true'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
+          # Log outside the workspace so it cannot dirty the tree wrangler
+          # inspects for the deployment's commit metadata.
+          log="${RUNNER_TEMP}/deploy.log"
+
           bunx wrangler@4 pages deploy site/dist \
             --project-name roll-parser \
-            --branch "${GITHUB_REF_NAME}" | tee deploy.log
+            --branch "${GITHUB_REF_NAME}" \
+            --commit-hash "${GITHUB_SHA}" \
+            --commit-message "$(git log -1 --pretty=%s)" | tee "${log}"
 
           {
             echo "### Site deployed"
             echo
-            grep -oE 'https://[a-z0-9.-]+\.pages\.dev' deploy.log | sort -u | sed 's/^/- /'
+            grep -oE 'https://[a-z0-9.-]+\.pages\.dev' "${log}" | sort -u | sed 's/^/- /'
           } >> "${GITHUB_STEP_SUMMARY}"
 
       - name: Report skipped deploy
-        if: env.HAS_CLOUDFLARE_CREDENTIALS != 'true'
+        if: env.IS_UPSTREAM != 'true' && env.HAS_CLOUDFLARE_CREDENTIALS != 'true'
         run: |
           {
             echo "### Site built but not deployed"
             echo
-            echo 'Set the `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`'
-            echo 'repository secrets to enable publishing.'
+            echo 'Forks do not receive the Cloudflare credentials, so this run'
+            echo 'verified the site without publishing it.'
           } >> "${GITHUB_STEP_SUMMARY}"

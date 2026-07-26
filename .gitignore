@@ -4,6 +4,7 @@
 .codex/
 .mcp.json
 .tmp/
+.wrangler/
 
 # Dependencies
 node_modules/
