@@ -65,6 +65,7 @@
     "build:cli": "bun build src/cli/index.ts --outdir dist --entry-naming 'cli.[ext]' --target node --sourcemap=linked",
     "build:types": "tsc --emitDeclarationOnly -p tsconfig.build.json",
     "check:package": "attw --pack . --profile esm-only && publint",
+    "check:size": "size-limit",
     "bench": "bun run bench/roll.bench.ts",
     "site:build": "bun scripts/build-site.ts",
     "site:check": "bun scripts/check-site.ts",
@@ -73,21 +74,48 @@
     "test": "bun test",
     "test:watch": "bun test --watch",
     "test:ci": "bun test --bail --coverage",
-    "validate": "bun run check && bun run build && bun run check:package && bun test:ci",
+    "validate": "bun run check && bun run build && bun run check:package && bun run check:size && bun test:ci",
     "release:dry": "bun run check:version && bun run check:changelog && bun run check && bun run build && bun run check:package && bun test",
     "prepublishOnly": "bun run release:dry"
   },
   "nano-staged": {
     "*.{ts,tsx}": "biome check --write --no-errors-on-unmatched"
   },
+  "size-limit": [
+    {
+      "name": "index.js (full library)",
+      "path": "dist/index.js",
+      "limit": "12 kB"
+    },
+    {
+      "name": "index.js — { parse }",
+      "path": "dist/index.js",
+      "import": "{ parse }",
+      "limit": "5.5 kB"
+    },
+    {
+      "name": "index.js — { roll }",
+      "path": "dist/index.js",
+      "import": "{ roll }",
+      "limit": "11.5 kB"
+    },
+    {
+      "name": "testing.js — { createMockRng }",
+      "path": "dist/testing.js",
+      "import": "{ createMockRng }",
+      "limit": "250 B"
+    }
+  ],
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.5",
     "@biomejs/biome": "^2.5.5",
+    "@size-limit/preset-small-lib": "^12.1.0",
     "@types/bun": "^1.3.14",
     "fast-check": "^4.9.0",
     "mitata": "^1.0.34",
     "nano-staged": "^1.0.2",
     "publint": "^0.3.21",
+    "size-limit": "^12.1.0",
     "typescript": "^7.0.2"
   },
   "engines": {
