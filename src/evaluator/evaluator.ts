@@ -29,6 +29,7 @@ import type {
 import { isModifier } from '../parser/ast.js';
 import type { RNG } from '../rng/types.js';
 import type {
+  CompareOp,
   ComparePoint,
   DieResult,
   EvaluateOptions,
@@ -1279,6 +1280,19 @@ function resolveThreshold(
   return resolved;
 }
 
+/**
+ * Builds the failure-threshold suffix of a success-count expression, e.g.
+ * `f3`, `f<3`, `f>=3`.
+ *
+ * `'='` is elided because bare `fN` parses back to `{ operator: '=' }`, so
+ * `f3` is the canonical spelling. Every other operator must be emitted —
+ * dropping it silently rewrites `f<3` into `f3`, which counts a different
+ * set of dice as failures.
+ */
+function formatFailCode(operator: CompareOp, value: number): string {
+  return operator === '=' ? `f${value}` : `f${operator}${value}`;
+}
+
 function evalSuccessCount(
   node: SuccessCountNode,
   rng: RNG,
@@ -1299,9 +1313,12 @@ function evalSuccessCount(
       ? resolveThreshold(node.failThreshold.value, rng, ctx, env, 'fail threshold')
       : undefined;
 
-  const code = `${node.threshold.operator}${thresholdValue}${
-    failValue != null ? `f${failValue}` : ''
-  }`;
+  const failCode =
+    failValue != null && node.failThreshold != null
+      ? formatFailCode(node.failThreshold.operator, failValue)
+      : '';
+
+  const code = `${node.threshold.operator}${thresholdValue}${failCode}`;
 
   const buildPart = (total: number, successes: number, failures: number): RollPart => {
     const part: RollPart = {
