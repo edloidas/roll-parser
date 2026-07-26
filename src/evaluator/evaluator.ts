@@ -4,8 +4,7 @@
  * @module evaluator/evaluator
  */
 
-import type { RollParserErrorCode } from '../errors.js';
-import { RollParserError } from '../errors.js';
+import { EvaluatorError } from '../errors.js';
 import type {
   ASTNode,
   BinaryOpNode,
@@ -38,6 +37,7 @@ import type {
   RollResult,
 } from '../types.js';
 import { DegreeOfSuccess } from '../types.js';
+import type { EvalEnv } from './env.js';
 import { applyCritThresholds, type ResolvedCritThreshold } from './modifiers/crit-threshold.js';
 import {
   applyCompoundExplode,
@@ -62,69 +62,23 @@ import {
 import { sortDice } from './modifiers/sort.js';
 import { countSuccesses } from './modifiers/success-count.js';
 
-/**
- * Error thrown during AST evaluation.
- */
-export class EvaluatorError extends RollParserError {
-  readonly nodeType: string | undefined;
-  /**
-   * Source span of the tightest AST node that was being evaluated when the
-   * error was thrown — stamped by `evalNode` on the way up, so the innermost
-   * node wins. `undefined` when the AST was built without parser spans.
-   */
-  start: number | undefined;
-  end: number | undefined;
-
-  constructor(message: string, code: RollParserErrorCode, nodeType?: string) {
-    super(message, code);
-    this.name = 'EvaluatorError';
-    this.nodeType = nodeType ?? undefined;
-    this.start = undefined;
-    this.end = undefined;
-  }
-}
+// ? Re-exported for existing importers — the class moved to `errors.ts` so
+//   `modifiers/explode.ts` and `modifiers/reroll.ts` can throw it without an
+//   ESM value cycle back into this module.
+export { EvaluatorError };
 
 /** Default maximum total dice allowed per evaluation. */
 export const DEFAULT_MAX_DICE = 10_000;
 
-export { DEFAULT_MAX_EXPLODE_ITERATIONS, DEFAULT_MAX_REROLL_ITERATIONS };
-
 /**
- * Per-evaluation shared environment (created once, shared across all branches).
- *
- * Exported for use by modifier implementations under `./modifiers/*`. Not part
- * of the public library API.
+ * Largest rollable `sides` value. `SeededRNG.nextInt` cannot sample ranges
+ * above 2^53 without bias and throws a bare `RangeError` there, so cap one
+ * below that and report an `EvaluatorError` instead — every failure the
+ * library raises must satisfy `isRollParserError`.
  */
-export type EvalEnv = {
-  readonly maxDice: number;
-  readonly maxExplodeIterations: number;
-  readonly maxRerollIterations: number;
-  totalDiceRolled: number;
-  /**
-   * Set to `true` by `evalSuccessCount`. Propagates through the shared env
-   * so `evaluate()` can include `successes`/`failures` fields even when no
-   * die was tagged (impossible threshold).
-   */
-  hasSuccessCount: boolean;
-  /**
-   * `true` while the evaluator is inside a `VersusNode`'s roll or DC
-   * sub-evaluation. `evalVersus` rejects nesting via this flag — catches
-   * paren-nested versus (`1d20 vs (5 vs 3)`) that slip past the parser's
-   * left-chain check.
-   */
-  insideVersus: boolean;
-  /**
-   * User-supplied variable map for `@name` / `@{name}` references. Always
-   * defined — `evaluate()` defaults to an empty object so lookups can be
-   * branch-free on presence.
-   */
-  readonly context: Readonly<Record<string, number>>;
-  /**
-   * Behavior when a referenced variable is missing from `context`. Always
-   * defined — `evaluate()` defaults to `'throw'`.
-   */
-  readonly onMissingVariable: 'throw' | 'zero';
-};
+const MAX_DICE_SIDES = Number.MAX_SAFE_INTEGER;
+
+export { DEFAULT_MAX_EXPLODE_ITERATIONS, DEFAULT_MAX_REROLL_ITERATIONS };
 
 /**
  * Per-branch mutable accumulator for tracking rolls and output during recursion.
@@ -176,6 +130,20 @@ type EvalResult = {
 function partSpan(node: ASTNode): { start?: number; end?: number } {
   if (node.start === undefined || node.end === undefined) return {};
   return { start: node.start, end: node.end };
+}
+
+/**
+ * Appends every element of `source` to `target`.
+ *
+ * Replaces `target.push(...source)` — the spread form passes one argument per
+ * element and overflows the call stack somewhere above half a million dice,
+ * which a user-raised `maxDice` can reach. A `RangeError` there would escape
+ * the `isRollParserError` contract.
+ */
+function appendAll<T>(target: T[], source: readonly T[]): void {
+  for (const item of source) {
+    target.push(item);
+  }
 }
 
 /** Maps internal modifier specs to the public `RollPart` spec shape. */
@@ -283,9 +251,8 @@ function evalNode(node: ASTNode, rng: RNG, ctx: EvalContext, env: EvalEnv): Eval
   try {
     return evalNodeInner(node, rng, ctx, env);
   } catch (error) {
-    if (error instanceof EvaluatorError && error.start === undefined && node.start !== undefined) {
-      error.start = node.start;
-      error.end = node.end;
+    if (error instanceof EvaluatorError && node.start !== undefined) {
+      error.stampSpan(node.start, node.end);
     }
     throw error;
   }
@@ -437,6 +404,13 @@ function evalDice(node: DiceNode, rng: RNG, ctx: EvalContext, env: EvalEnv): Eva
   if (!Number.isInteger(sides) || sides < 1) {
     throw new EvaluatorError(`Invalid dice sides: ${sides}`, 'INVALID_DICE_SIDES', 'Dice');
   }
+  if (sides > MAX_DICE_SIDES) {
+    throw new EvaluatorError(
+      `Dice sides ${sides} exceeds maximum of ${MAX_DICE_SIDES}`,
+      'INVALID_DICE_SIDES',
+      'Dice',
+    );
+  }
 
   if (env.totalDiceRolled + count > env.maxDice) {
     throw new EvaluatorError(
@@ -454,7 +428,7 @@ function evalDice(node: DiceNode, rng: RNG, ctx: EvalContext, env: EvalEnv): Eva
   }
 
   const markedDice = markAllKept(dice);
-  ctx.rolls.push(...markedDice);
+  appendAll(ctx.rolls, markedDice);
 
   const total = sumKeptDice(markedDice);
   const notation = `${count}d${sides}`;
@@ -493,7 +467,7 @@ function evalFateDice(node: FateDiceNode, rng: RNG, ctx: EvalContext, env: EvalE
   }
 
   const markedDice = markAllKept(dice);
-  ctx.rolls.push(...markedDice);
+  appendAll(ctx.rolls, markedDice);
 
   const total = sumKeptDice(markedDice);
   const notation = `${count}dF`;
@@ -538,7 +512,7 @@ function propagateMetadata(parent: EvalContext, metadata: EvalContext['versusMet
  * those with its own operator/function syntax.
  */
 function mergeContext(parent: EvalContext, child: EvalContext): void {
-  parent.rolls.push(...child.rolls);
+  appendAll(parent.rolls, child.rolls);
   propagateMetadata(parent, child.versusMetadata);
 }
 
@@ -731,12 +705,31 @@ function applyFunction(name: string, values: number[]): number {
     case 'abs':
       return Math.abs(requireUnaryArg(name, values));
     case 'max':
-      return Math.max(...values);
+      return extremumOf(values, 'max');
     case 'min':
-      return Math.min(...values);
+      return extremumOf(values, 'min');
     default:
       throw new EvaluatorError(`Unknown function: ${name}`, 'UNKNOWN_FUNCTION', 'FunctionCall');
   }
+}
+
+/**
+ * Folded replacement for `Math.max(...values)` / `Math.min(...values)`.
+ *
+ * `max`/`min` are variadic, so a pathological argument count blows the call
+ * stack with a bare `RangeError` in the spread form. NaN still poisons the
+ * result the way `Math.max` does, so a non-finite argument keeps surfacing as
+ * `NON_FINITE_RESULT` rather than being silently skipped.
+ */
+function extremumOf(values: number[], kind: 'max' | 'min'): number {
+  let result = kind === 'max' ? Number.NEGATIVE_INFINITY : Number.POSITIVE_INFINITY;
+
+  for (const value of values) {
+    if (Number.isNaN(value)) return Number.NaN;
+    if (kind === 'max' ? value > result : value < result) result = value;
+  }
+
+  return result;
 }
 
 function requireUnaryArg(name: string, values: number[]): number {
@@ -897,7 +890,7 @@ function evalExplode(node: ExplodeNode, rng: RNG, ctx: EvalContext, env: EvalEnv
         ? applyCompoundExplode(targetCtx.rolls, shouldExplode, rng, env)
         : applyPenetratingExplode(targetCtx.rolls, shouldExplode, rng, env);
 
-  ctx.rolls.push(...expanded);
+  appendAll(ctx.rolls, expanded);
   ctx.expressionParts.push(`${targetExpr}${code}`);
   // ? Include the explode code in rendered output so readers can attribute
   //   the extra dice. Modifier rendering (kh/dl) skips its code because
@@ -945,7 +938,7 @@ function evalReroll(node: RerollNode, rng: RNG, ctx: EvalContext, env: EvalEnv):
     ? applyRerollOnce(targetCtx.rolls, node.condition.operator, thresholdValue, rng, env)
     : applyRecursiveReroll(targetCtx.rolls, node.condition.operator, thresholdValue, rng, env);
 
-  ctx.rolls.push(...pool);
+  appendAll(ctx.rolls, pool);
   ctx.expressionParts.push(`${targetExpr}${code}`);
   ctx.renderedParts.push(`${targetExpr}${code}${renderDice(pool)}`);
 
@@ -981,7 +974,7 @@ function evalSort(node: SortNode, rng: RNG, ctx: EvalContext, env: EvalEnv): Eva
 
   const sortedRolls = sortDice(targetCtx.rolls, node.order);
 
-  ctx.rolls.push(...sortedRolls);
+  appendAll(ctx.rolls, sortedRolls);
   propagateMetadata(ctx, targetCtx.versusMetadata);
 
   const code = node.order === 'ascending' ? 's' : 'sd';
@@ -1038,7 +1031,7 @@ function evalCritThreshold(
 
   applyCritThresholds(targetCtx.rolls, successApplied, failApplied);
 
-  ctx.rolls.push(...targetCtx.rolls);
+  appendAll(ctx.rolls, targetCtx.rolls);
   propagateMetadata(ctx, targetCtx.versusMetadata);
 
   const targetExpr = targetCtx.expressionParts.join('');
@@ -1099,7 +1092,7 @@ function evalModifier(node: ModifierNode, rng: RNG, ctx: EvalContext, env: EvalE
 
   const mergedDice = mergeDropSets(targetCtx.rolls, specs);
 
-  ctx.rolls.push(...mergedDice);
+  appendAll(ctx.rolls, mergedDice);
 
   const total = sumKeptDice(mergedDice);
 
@@ -1211,11 +1204,11 @@ function evalGroupModifier(
           'dropped',
         ];
       }
-      ctx.rolls.push(...sub.rolls);
+      appendAll(ctx.rolls, sub.rolls);
       outerRendered.push(`~~${stripInnerMarkers(sub.rendered)}~~`);
     } else {
       keptIndices.push(i);
-      ctx.rolls.push(...sub.rolls);
+      appendAll(ctx.rolls, sub.rolls);
       outerRendered.push(sub.rendered);
       total += sub.subtotal;
     }
@@ -1354,7 +1347,7 @@ function evalSuccessCount(
       : undefined,
   );
 
-  ctx.rolls.push(...targetCtx.rolls);
+  appendAll(ctx.rolls, targetCtx.rolls);
   ctx.expressionParts.push(`${targetExpr}${code}`);
   ctx.renderedParts.push(`${targetExpr}${code}${renderDice(targetCtx.rolls)}`);
 
@@ -1440,7 +1433,8 @@ function evalVersus(node: VersusNode, rng: RNG, ctx: EvalContext, env: EvalEnv):
 
     const degree = calculateDegree(rollResult.total, dcResult.total, natural);
 
-    ctx.rolls.push(...rollCtx.rolls, ...dcCtx.rolls);
+    appendAll(ctx.rolls, rollCtx.rolls);
+    appendAll(ctx.rolls, dcCtx.rolls);
 
     const rollExpr = rollCtx.expressionParts.join('');
     const dcExpr = dcCtx.expressionParts.join('');

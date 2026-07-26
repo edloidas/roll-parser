@@ -10,13 +10,23 @@ import { type Token, TokenType } from './tokens.js';
 
 /**
  * Error thrown when the lexer encounters an invalid character.
+ *
+ * `position` is a zero-based UTF-16 offset into the input. It is deliberately
+ * absent from `message` — read it from the field, or uniformly across all
+ * roll-parser errors via `getErrorSpan`.
  */
 export class LexerError extends RollParserError {
   readonly position: number;
   readonly character: string;
 
-  constructor(message: string, code: RollParserErrorCode, position: number, character: string) {
-    super(`${message} at position ${position}: '${character}'`, code);
+  constructor(
+    message: string,
+    code: RollParserErrorCode,
+    position: number,
+    character: string,
+    options?: ErrorOptions,
+  ) {
+    super(`${message}: '${character}'`, code, options);
     this.name = 'LexerError';
     this.position = position;
     this.character = character;

@@ -8,6 +8,7 @@
 import {
   DegreeOfSuccess,
   type DieResult,
+  getErrorSpan,
   type RollParserError,
   type RollPart,
   type RollResult,
@@ -297,14 +298,8 @@ export function renderErrorSlot(
   return `<span class="error-msg">${message}</span>${highlighted}`;
 }
 
-type SpannedError = RollParserError & {
-  position?: number;
-  start?: number;
-  end?: number;
-};
-
 /** Wraps the offending character span of the notation in a highlight marker. */
-function highlightNotation(notation: string, error: SpannedError): string {
+function highlightNotation(notation: string, error: RollParserError): string {
   if (notation === '') return '';
 
   const { start, end } = resolveSpan(error, notation.length);
@@ -317,23 +312,21 @@ function highlightNotation(notation: string, error: SpannedError): string {
   return `<code class="error-echo">${before}<mark class="error-span">${marked}</mark>${after}</code>`;
 }
 
-/** Normalizes lexer/parser `position` and evaluator `start`/`end` into a span. */
+/**
+ * Clamps the library's normalized error span to the notation. Errors without
+ * a span (or with one past the end) fall back to echoing the notation plain.
+ */
 function resolveSpan(
-  error: SpannedError,
+  error: RollParserError,
   length: number,
 ): { start: number | undefined; end: number } {
-  if (error.start != null) {
-    const start = clamp(error.start, 0, length);
-    const end = error.end != null ? clamp(error.end, start, length) : Math.min(start + 1, length);
-    return { start, end };
-  }
+  const span = getErrorSpan(error);
+  if (span == null) return { start: undefined, end: length };
 
-  if (error.position != null) {
-    const start = clamp(error.position, 0, length);
-    return { start, end: Math.min(start + 1, length) };
-  }
+  const start = clamp(span.start, 0, length);
+  const end = span.end != null ? clamp(span.end, start, length) : Math.min(start + 1, length);
 
-  return { start: undefined, end: length };
+  return { start, end };
 }
 
 function clamp(value: number, min: number, max: number): number {

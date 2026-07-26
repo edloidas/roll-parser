@@ -5,9 +5,11 @@
  */
 
 import { describe, expect, test } from 'bun:test';
+import { isRollParserError } from '../errors.js';
 import type { ASTNode } from '../parser/ast.js';
 import { parse } from '../parser/parser.js';
 import { createMockRng } from '../rng/mock.js';
+import { SeededRNG } from '../rng/seeded.js';
 import type { DieResult } from '../types.js';
 import { DegreeOfSuccess } from '../types.js';
 import type { EvalContext } from './evaluator.js';
@@ -22,6 +24,16 @@ function getDie(rolls: DieResult[], index: number): DieResult {
     throw new Error(`Expected die at index ${index}, but only ${rolls.length} dice found`);
   }
   return die;
+}
+
+/** Runs `fn`, returning whatever it threw. Fails when nothing is thrown. */
+function captureError(fn: () => unknown): unknown {
+  try {
+    fn();
+  } catch (error) {
+    return error;
+  }
+  throw new Error('Expected the callback to throw');
 }
 
 describe('evaluate', () => {
@@ -3425,6 +3437,83 @@ describe('evaluate', () => {
       expect(result.total).toBe(1);
       expect(result.rolls.map((d) => d.fumble)).toEqual([true]);
       expect(result.expression).toBe('{1d6}kh1cf<2');
+    });
+  });
+
+  describe('error contract escapes (#128)', () => {
+    // ? Above the engine's argument-list ceiling (~640k in Bun 1.3 on Linux),
+    //   which is where `push(...array)` and `Math.max(...array)` used to blow
+    //   the stack with a bare `RangeError`.
+    const OVER_SPREAD_LIMIT = 700_000;
+
+    test('sides beyond the safe-integer ceiling raise a typed error', () => {
+      const error = captureError(() =>
+        evaluate(parse('1d99999999999999999999'), createMockRng([])),
+      );
+
+      expect(isRollParserError(error)).toBe(true);
+      expect(error).toBeInstanceOf(EvaluatorError);
+      expect((error as EvaluatorError).code).toBe('INVALID_DICE_SIDES');
+    });
+
+    test('sides one past MAX_SAFE_INTEGER raise a typed error', () => {
+      const error = captureError(() =>
+        evaluate(parse(`1d${Number.MAX_SAFE_INTEGER + 1}`), createMockRng([])),
+      );
+
+      expect(isRollParserError(error)).toBe(true);
+      expect((error as EvaluatorError).code).toBe('INVALID_DICE_SIDES');
+    });
+
+    test('sides at MAX_SAFE_INTEGER still roll', () => {
+      const result = evaluate(parse(`1d${Number.MAX_SAFE_INTEGER}`), createMockRng([7]));
+
+      expect(result.total).toBe(7);
+    });
+
+    test('pools past the spread limit evaluate instead of overflowing the stack', () => {
+      const result = evaluate(parse(`${OVER_SPREAD_LIMIT}d1+1`), new SeededRNG('spread'), {
+        maxDice: OVER_SPREAD_LIMIT + 1,
+      });
+
+      expect(result.total).toBe(OVER_SPREAD_LIMIT + 1);
+      expect(result.rolls).toHaveLength(OVER_SPREAD_LIMIT);
+    });
+
+    test('pools past the spread limit still report the dice limit as a typed error', () => {
+      const error = captureError(() =>
+        evaluate(parse(`${OVER_SPREAD_LIMIT}d1`), new SeededRNG('spread')),
+      );
+
+      expect(isRollParserError(error)).toBe(true);
+      expect((error as EvaluatorError).code).toBe('DICE_LIMIT_EXCEEDED');
+    });
+
+    test('max/min past the spread limit fold instead of overflowing the stack', () => {
+      // ? Hand-built AST — the equivalent notation is a multi-megabyte string
+      //   whose lexing dominates the runtime without testing anything extra.
+      const args: ASTNode[] = Array.from({ length: OVER_SPREAD_LIMIT }, (_, i) => ({
+        type: 'Literal',
+        value: i % 97,
+      }));
+
+      expect(evaluate({ type: 'FunctionCall', name: 'max', args }, createMockRng([])).total).toBe(
+        96,
+      );
+      expect(evaluate({ type: 'FunctionCall', name: 'min', args }, createMockRng([])).total).toBe(
+        0,
+      );
+    });
+
+    test('max propagates NaN the way Math.max does', () => {
+      // `10**400` overflows to Infinity, so `Infinity - Infinity` is NaN — the
+      // fold must keep poisoning the total so NON_FINITE_RESULT still fires.
+      const error = captureError(() =>
+        evaluate(parse('max(10**400-10**400, 1)'), createMockRng([])),
+      );
+
+      expect(isRollParserError(error)).toBe(true);
+      expect((error as EvaluatorError).code).toBe('NON_FINITE_RESULT');
     });
   });
 });
