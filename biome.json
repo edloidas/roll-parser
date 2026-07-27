@@ -42,6 +42,6 @@
     }
   },
   "files": {
-    "includes": ["src/**/*.ts", "site/src/**/*.ts", "scripts/build-site.ts"]
+    "includes": ["src/**/*.ts", "site/src/**/*.ts", "scripts/**/*.ts", "bench/**/*.ts"]
   }
 }

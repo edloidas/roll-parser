@@ -8,29 +8,35 @@
  * `/roll-parser/` path on GitHub Pages. Exits non-zero on any failure.
  */
 
+import { existsSync } from 'node:fs';
 import { readdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
+import type { RewritePair } from './site-manifest.js';
+import {
+  ASSETS_DIR_NAME,
+  CSS_REWRITES,
+  DOCS_DIR_NAME,
+  FONTS_DIR_NAME,
+  HTML_PAGES,
+  HTML_REWRITES,
+  PUBLIC_FILES,
+  SCRIPT_ENTRYPOINTS,
+  STYLESHEETS,
+} from './site-manifest.js';
 
 const SITE_DIR = join(import.meta.dir, '..', 'site');
 const SRC_DIR = join(SITE_DIR, 'src');
 const PUBLIC_DIR = join(SITE_DIR, 'public');
 const DIST_DIR = join(SITE_DIR, 'dist');
-const ASSETS_DIR = join(DIST_DIR, 'assets');
-const FONTS_DIR = join(DIST_DIR, 'fonts');
-const DOCS_DIR = join(DIST_DIR, 'docs');
-
-const STYLESHEETS = ['style.css', 'reference.css'];
-// `404.html` carries no external asset references, so the rewrite pass is a
-// no-op for it — it is listed only to get copied into `dist/`. Both GitHub
-// Pages and Cloudflare Pages serve it by convention for unmatched paths;
-// without it Cloudflare falls back to `index.html` with a 200.
-const HTML_PAGES = ['index.html', 'reference.html', '404.html'];
+const ASSETS_DIR = join(DIST_DIR, ASSETS_DIR_NAME);
+const FONTS_DIR = join(DIST_DIR, FONTS_DIR_NAME);
+const DOCS_DIR = join(DIST_DIR, DOCS_DIR_NAME);
 
 async function build(): Promise<void> {
   await rm(DIST_DIR, { recursive: true, force: true });
 
   const output = await Bun.build({
-    entrypoints: [join(SRC_DIR, 'main.ts'), join(SRC_DIR, 'reference.ts')],
+    entrypoints: SCRIPT_ENTRYPOINTS.map((name) => join(SRC_DIR, name)),
     outdir: ASSETS_DIR,
     target: 'browser',
     minify: true,
@@ -45,7 +51,7 @@ async function build(): Promise<void> {
 
   await copyStyles();
   await copyFonts();
-  await Bun.write(join(DIST_DIR, 'favicon.svg'), Bun.file(join(PUBLIC_DIR, 'favicon.svg')));
+  await copyPublicFiles();
   await writeHtml();
 
   await generateDocs();
@@ -97,15 +103,23 @@ async function injectDocsThemeScript(): Promise<void> {
  */
 async function generateDocs(): Promise<void> {
   const root = join(import.meta.dir, '..');
+  const typedocBin = join(root, 'scripts', 'docs', 'node_modules', '.bin', 'typedoc');
 
-  const proc = Bun.spawn(
-    [join(root, 'scripts', 'docs', 'node_modules', '.bin', 'typedoc'), '--options', 'typedoc.json'],
-    {
-      cwd: root,
-      stdout: 'inherit',
-      stderr: 'inherit',
-    },
-  );
+  if (!existsSync(typedocBin)) {
+    console.error(
+      `TypeDoc binary not found at ${typedocBin}.\n` +
+        'The API reference is generated from the `scripts/docs` workspace, which nests its own\n' +
+        'typescript@6 because TypeDoc 0.28.x rejects the root typescript@7 — see the rationale in\n' +
+        'scripts/docs/package.json. Run `bun install` at the repo root to install that workspace.',
+    );
+    process.exit(1);
+  }
+
+  const proc = Bun.spawn([typedocBin, '--options', 'typedoc.json'], {
+    cwd: root,
+    stdout: 'inherit',
+    stderr: 'inherit',
+  });
 
   const code = await proc.exited;
 
@@ -114,7 +128,7 @@ async function generateDocs(): Promise<void> {
     process.exit(code);
   }
 
-  console.log(`API reference built → ${join(DIST_DIR, 'docs')}`);
+  console.log(`API reference built → ${DOCS_DIR}`);
 }
 
 /**
@@ -125,8 +139,14 @@ async function generateDocs(): Promise<void> {
 async function copyStyles(): Promise<void> {
   for (const name of STYLESHEETS) {
     const css = await Bun.file(join(SRC_DIR, name)).text();
-    const rewritten = css.replaceAll('../public/fonts/', '../fonts/');
-    await Bun.write(join(ASSETS_DIR, name), rewritten);
+    await Bun.write(join(ASSETS_DIR, name), applyRewrites(css, CSS_REWRITES));
+  }
+}
+
+/** Copies the loose `public/` files that sit at the `dist/` root. */
+async function copyPublicFiles(): Promise<void> {
+  for (const name of PUBLIC_FILES) {
+    await Bun.write(join(DIST_DIR, name), Bun.file(join(PUBLIC_DIR, name)));
   }
 }
 
@@ -145,17 +165,12 @@ async function copyFonts(): Promise<void> {
 async function writeHtml(): Promise<void> {
   for (const page of HTML_PAGES) {
     const html = await Bun.file(join(SITE_DIR, page)).text();
-
-    const rewritten = html
-      .replaceAll('./src/style.css', './assets/style.css')
-      .replaceAll('./src/reference.css', './assets/reference.css')
-      .replaceAll('./src/main.ts', './assets/main.js')
-      .replaceAll('./src/reference.ts', './assets/reference.js')
-      .replaceAll('./public/fonts/', './fonts/')
-      .replaceAll('./public/favicon.svg', './favicon.svg');
-
-    await Bun.write(join(DIST_DIR, page), rewritten);
+    await Bun.write(join(DIST_DIR, page), applyRewrites(html, HTML_REWRITES));
   }
+}
+
+function applyRewrites(source: string, rewrites: RewritePair[]): string {
+  return rewrites.reduce((text, [from, to]) => text.replaceAll(from, to), source);
 }
 
 await build();

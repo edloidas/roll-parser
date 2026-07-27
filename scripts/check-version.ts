@@ -11,7 +11,9 @@ if (input == null) {
 const tagVersion = input.replace(/^v/, '');
 
 if (tagVersion !== pkgVersion) {
-  console.error(`Tag "${input}" (${tagVersion}) does not match package.json version (${pkgVersion})`);
+  console.error(
+    `Tag "${input}" (${tagVersion}) does not match package.json version (${pkgVersion})`,
+  );
   process.exit(1);
 }
 
