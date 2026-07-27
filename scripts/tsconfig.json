@@ -1,0 +1,7 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "../tsconfig.json",
+  // Non-recursive on purpose: `docs/` is a workspace that exists only to hold a
+  // nested TypeDoc dependency tree (see its `package.json`), and has no sources.
+  "include": ["*.ts"]
+}

@@ -4,11 +4,8 @@
   "compilerOptions": {
     "lib": ["ES2022", "DOM", "DOM.Iterable"]
   },
-  "include": [
-    "src/**/*.ts",
-    "../scripts/build-site.ts",
-    "../scripts/serve-site.ts",
-    "../scripts/check-site.ts"
-  ],
+  // Only the browser sources — the site build scripts are plain Bun programs and
+  // belong to `scripts/tsconfig.json`, which checks all of `scripts/` at once.
+  "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "dist"]
 }

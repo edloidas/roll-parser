@@ -12,21 +12,9 @@
 
 import { readdir } from 'node:fs/promises';
 import { join, normalize } from 'node:path';
+import { DOCS_DIR_NAME, FONTS_DIR_NAME, REQUIRED_FILES } from './site-manifest.js';
 
 const DIST_DIR = join(import.meta.dir, '..', 'site', 'dist');
-
-/** Files the build must always emit. */
-const REQUIRED_FILES = [
-  'index.html',
-  'reference.html',
-  '404.html',
-  'favicon.svg',
-  'assets/main.js',
-  'assets/reference.js',
-  'assets/style.css',
-  'assets/reference.css',
-  'docs/index.html',
-];
 
 /** Extensions treated as on-disk assets; anything else is a route. */
 const ASSET_EXTENSIONS = ['.css', '.js', '.svg', '.woff2', '.woff', '.png', '.ico', '.json'];
@@ -64,19 +52,19 @@ async function checkRequiredFiles(): Promise<void> {
 /** The build copies self-hosted fonts; an empty `fonts/` means that step broke. */
 async function checkFontsPresent(): Promise<void> {
   try {
-    const entries = await readdir(join(DIST_DIR, 'fonts'));
+    const entries = await readdir(join(DIST_DIR, FONTS_DIR_NAME));
     const fonts = entries.filter((entry) => entry.endsWith('.woff2'));
 
-    if (fonts.length === 0) errors.push('fonts/ contains no .woff2 files');
+    if (fonts.length === 0) errors.push(`${FONTS_DIR_NAME}/ contains no .woff2 files`);
   } catch {
-    errors.push('missing required directory: fonts/');
+    errors.push(`missing required directory: ${FONTS_DIR_NAME}/`);
   }
 }
 
 /** Every local asset URL in every built page must resolve to a real file. */
 async function checkHtmlReferences(): Promise<void> {
   const pages = (await readdir(DIST_DIR, { recursive: true })).filter(
-    (entry) => entry.endsWith('.html') && !entry.startsWith('docs/'),
+    (entry) => entry.endsWith('.html') && !entry.startsWith(`${DOCS_DIR_NAME}/`),
   );
 
   for (const page of pages) {

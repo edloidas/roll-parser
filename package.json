@@ -53,7 +53,7 @@
   "workspaces": ["scripts/docs"],
   "scripts": {
     "prepare": "git config core.hooksPath .githooks",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p site/tsconfig.json",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p site/tsconfig.json && tsc --noEmit -p scripts/tsconfig.json && tsc --noEmit -p bench/tsconfig.json",
     "check": "bun typecheck && biome check .",
     "check:fix": "bun typecheck && biome check --write .",
     "check:version": "bun scripts/check-version.ts",
