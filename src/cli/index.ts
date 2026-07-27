@@ -3,93 +3,24 @@
 /**
  * CLI entry point for roll-parser.
  *
+ * Owns the process-level wiring only; the command itself lives in
+ * `./main.js` so it stays testable without spawning a subprocess.
+ *
  * @module cli/index
  */
 
-import { getErrorSpan, isRollParserError } from '../errors.js';
-import { VERSION } from '../index.js';
-import { roll } from '../roll.js';
-import { parseArgs } from './args.js';
-import { formatResult } from './format.js';
+import { main } from './main.js';
 
-const HELP_TEXT = `roll-parser v${VERSION}
+const exitCode = main({
+  argv: process.argv.slice(2),
+  stdout: (text) => {
+    process.stdout.write(text);
+  },
+  stderr: (text) => {
+    process.stderr.write(text);
+  },
+});
 
-Usage: roll-parser <notation> [options]
-
-Options:
-  -h, --help       Show this help message
-  --version        Show version number
-  -v, --verbose    Show detailed roll breakdown
-  --seed <value>   Use seed for reproducible rolls
-
-Examples:
-  roll-parser 2d6+3
-  roll-parser 4d6kh3 --verbose
-  roll-parser 4d6dl1 --seed "character-str"
-`;
-
-/**
- * Prints the notation with a caret under the error position. `getErrorSpan`
- * normalizes the lexer/parser `position` and the evaluator `start`/`end`
- * shapes, so no duck-typing is needed here. Skipped for multi-line notations
- * and out-of-range positions to keep the caret honest.
- */
-function writeErrorContext(notation: string, error: unknown): void {
-  const span = getErrorSpan(error);
-  if (span == null) return;
-  if (notation.includes('\n') || span.start > notation.length) return;
-
-  // ? Indent by code points, not UTF-16 units — astral characters (e.g. '🎲')
-  //   occupy two units but print as one column, which shifts the caret right.
-  const column = [...notation.slice(0, span.start)].length;
-
-  process.stderr.write(`  ${notation}\n`);
-  process.stderr.write(`  ${' '.repeat(column)}^\n`);
-}
-
-function main(): void {
-  const parsed = parseArgs(process.argv.slice(2));
-
-  if (!parsed.ok) {
-    process.stderr.write(`Error: ${parsed.error}\n`);
-    process.stderr.write('Run "roll-parser --help" for usage.\n');
-    process.exitCode = 2;
-    return;
-  }
-
-  const { args } = parsed;
-
-  if (args.showHelp) {
-    process.stdout.write(HELP_TEXT);
-    return;
-  }
-
-  if (args.showVersion) {
-    process.stdout.write(`${VERSION}\n`);
-    return;
-  }
-
-  if (args.notation == null) {
-    process.stderr.write('Error: No dice notation provided.\n');
-    process.stderr.write('Run "roll-parser --help" for usage.\n');
-    process.exitCode = 2;
-    return;
-  }
-
-  try {
-    const options = args.seed != null ? { seed: args.seed } : {};
-    const result = roll(args.notation, options);
-    const output = formatResult(result, args.verbose);
-    process.stdout.write(`${output}\n`);
-  } catch (error) {
-    if (isRollParserError(error)) {
-      process.stderr.write(`Error: ${error.message}\n`);
-      writeErrorContext(args.notation, error);
-      process.exitCode = 1;
-      return;
-    }
-    throw error;
-  }
-}
-
-main();
+// ? Left unset on success — assigning 0 would override an exit code a
+//   surrounding runtime hook may already have set.
+if (exitCode !== 0) process.exitCode = exitCode;

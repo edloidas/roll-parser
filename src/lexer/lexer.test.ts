@@ -853,6 +853,106 @@ describe('Lexer', () => {
         expect((e as LexerError).message).not.toContain('did you mean');
       }
     });
+
+    it('should hint at the sd/kh split for merged sort+keep identifiers', () => {
+      // `4d6sdkh2` — maximal munch merges `sd` + `kh` into one identifier.
+      try {
+        lex('4d6sdkh2');
+        expect.unreachable('expected LexerError');
+      } catch (e) {
+        expect(e).toBeInstanceOf(LexerError);
+        expect((e as LexerError).message).toContain(`did you mean 'sd' followed by 'kh'`);
+        expect((e as LexerError).message).toContain('sd1kh');
+        expect((e as LexerError).position).toBe(3);
+      }
+    });
+  });
+
+  describe('unicode and whitespace boundaries', () => {
+    // These pin the lexer's *current* behavior. Only ASCII space, tab, CR and
+    // LF are whitespace; everything else that looks blank or numeric to a
+    // human is an unexpected character with a code-point-accurate position.
+
+    it('should reject a no-break space as an unexpected character', () => {
+      try {
+        lex('2d6 +3');
+        expect.unreachable('expected LexerError');
+      } catch (e) {
+        expect(e).toBeInstanceOf(LexerError);
+        expect((e as LexerError).character).toBe(' ');
+        expect((e as LexerError).position).toBe(3);
+      }
+    });
+
+    it('should reject a zero-width space as an unexpected character', () => {
+      try {
+        lex('2d6​+3');
+        expect.unreachable('expected LexerError');
+      } catch (e) {
+        expect((e as LexerError).character).toBe('​');
+        expect((e as LexerError).position).toBe(3);
+      }
+    });
+
+    it('should reject a leading byte-order mark', () => {
+      try {
+        lex('﻿2d6');
+        expect.unreachable('expected LexerError');
+      } catch (e) {
+        expect((e as LexerError).character).toBe('﻿');
+        expect((e as LexerError).position).toBe(0);
+      }
+    });
+
+    it('should reject full-width digits', () => {
+      try {
+        lex('１ｄ６');
+        expect.unreachable('expected LexerError');
+      } catch (e) {
+        expect((e as LexerError).character).toBe('１');
+        expect((e as LexerError).position).toBe(0);
+      }
+    });
+
+    it('should skip CRLF like any other whitespace run', () => {
+      const tokens = lex('2d6\r\n+3');
+
+      expect(tokens).toHaveLength(6);
+      expect(tokens[3]).toMatchObject({ type: TokenType.PLUS, value: '+', position: 5 });
+      expect(tokens[4]).toMatchObject({ type: TokenType.NUMBER, value: '3', position: 6 });
+    });
+
+    it('should accept unicode inside braced variable names', () => {
+      expect(lex('@{力}')[0]).toEqual({
+        type: TokenType.AT,
+        value: '力',
+        position: 0,
+        end: 4,
+      });
+    });
+
+    it('should accept astral characters inside braced variable names', () => {
+      // `🎲` spans two UTF-16 units, so `end` is 5 for a four-code-point source.
+      expect(lex('@{🎲}')[0]).toEqual({
+        type: TokenType.AT,
+        value: '🎲',
+        position: 0,
+        end: 5,
+      });
+    });
+
+    it('should reject a bare @ followed by a non-ASCII name', () => {
+      // The bare form is `[A-Za-z_][A-Za-z0-9_]*` only — `@力` reads as an
+      // empty variable name rather than a unicode identifier.
+      try {
+        lex('@力');
+        expect.unreachable('expected LexerError');
+      } catch (e) {
+        expect(e).toBeInstanceOf(LexerError);
+        expect((e as LexerError).message).toContain('Empty @ variable name');
+        expect((e as LexerError).position).toBe(0);
+      }
+    });
   });
 
   describe('Lexer class', () => {

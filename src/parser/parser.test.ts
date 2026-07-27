@@ -2782,6 +2782,18 @@ describe('Parser', () => {
         expect(() => parseAst('{abs(4dF)}cf')).toThrow(ParseError);
       });
 
+      // #134 — both guards match `{1d20 vs 4dF}cf`; `rejectVersusTarget` runs
+      // first, so `deepContainsFatePool` never walks the Versus children here.
+      it('should report NESTED_VERSUS before the Fate guard: {1d20 vs 4dF}cf', () => {
+        try {
+          parseAst('{1d20 vs 4dF}cf');
+          expect.unreachable('expected ParseError');
+        } catch (e) {
+          expect(e).toBeInstanceOf(ParseError);
+          expect((e as ParseError).code).toBe('NESTED_VERSUS');
+        }
+      });
+
       // #109 — single-sub-roll Group passthrough also smuggles Versus past
       // `rejectVersusTarget`'s shallow check at the cs/cf consumer site.
       it('should reject cs on Versus inside single-sub group: {1d20 vs 15}cs>18', () => {

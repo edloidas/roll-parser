@@ -1,9 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { createMockRng, MockRNGExhaustedError } from './mock.js';
 import { SeededRNG } from './seeded.js';
-
-// Note: Property-based tests with fast-check are available when the package is installed.
-// Run `bun install` to enable them.
+import type { RNG } from './types.js';
 
 describe('SeededRNG', () => {
   describe('reproducibility', () => {
@@ -595,5 +593,72 @@ describe('MockRNG', () => {
       expect(error).toBeInstanceOf(Error);
       expect(error).toBeInstanceOf(MockRNGExhaustedError);
     });
+  });
+});
+
+//
+// * Conformance
+//
+
+/**
+ * One implementation under test. `create` receives the values a scripted RNG
+ * should hand back; `SeededRNG` ignores them and generates its own, which is
+ * exactly why every assertion below is stated as a range or an identity rather
+ * than an expected value.
+ */
+type RngImplementation = {
+  name: string;
+  create: (values: number[]) => RNG;
+  /** How `nextInt` handles `min > max` — see the `RNG` TSDoc in `types.ts`. */
+  invertedBounds: 'swap' | 'throw';
+};
+
+const IMPLEMENTATIONS: RngImplementation[] = [
+  { name: 'SeededRNG', create: () => new SeededRNG('conformance'), invertedBounds: 'swap' },
+  { name: 'MockRNG', create: (values) => createMockRng(values), invertedBounds: 'throw' },
+];
+
+describe.each(IMPLEMENTATIONS)('RNG conformance — $name', (impl: RngImplementation) => {
+  it('next() stays in [0, 1)', () => {
+    const rng = impl.create([0, 0.25, 0.5, 0.75, 0.999]);
+
+    for (let i = 0; i < 5; i++) {
+      const value = rng.next();
+      expect(value).toBeGreaterThanOrEqual(0);
+      expect(value).toBeLessThan(1);
+    }
+  });
+
+  it('nextInt returns integers inside the requested range', () => {
+    const rng = impl.create([1, 6, 3, 4, 2]);
+
+    for (let i = 0; i < 5; i++) {
+      const value = rng.nextInt(1, 6);
+      expect(Number.isInteger(value)).toBe(true);
+      expect(value).toBeGreaterThanOrEqual(1);
+      expect(value).toBeLessThanOrEqual(6);
+    }
+  });
+
+  it('nextInt(n, n) returns n', () => {
+    const rng = impl.create([7, 0, -3]);
+
+    expect(rng.nextInt(7, 7)).toBe(7);
+    expect(rng.nextInt(0, 0)).toBe(0);
+    expect(rng.nextInt(-3, -3)).toBe(-3);
+  });
+
+  it('handles inverted bounds per its documented contract', () => {
+    // ? The two implementations deliberately diverge here; the shared block
+    //   asserts each side of the divergence rather than papering over it.
+    const rng = impl.create([3]);
+
+    if (impl.invertedBounds === 'throw') {
+      expect(() => rng.nextInt(6, 1)).toThrow(RangeError);
+      return;
+    }
+
+    const reference = impl.create([3]);
+    expect(rng.nextInt(6, 1)).toBe(reference.nextInt(1, 6));
   });
 });
