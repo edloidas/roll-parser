@@ -16,18 +16,32 @@ import { formatResult } from './format.js';
 
 const HELP_TEXT = `roll-parser v${VERSION}
 
-Usage: roll-parser <notation> [options]
+Usage: roll-parser [options] [--] <notation>
 
 Options:
   -h, --help       Show this help message
   --version        Show version number
   -v, --verbose    Show detailed roll breakdown
+  --json           Print the whole result as compact JSON (wins over --verbose)
   --seed <value>   Use seed for reproducible rolls
+  --               Treat every following argument as notation
+
+JSON output:
+  Emits the complete result, including the structured "parts" tree. The
+  "degree" field (DegreeOfSuccess) serializes as a number: 0 critical failure,
+  1 failure, 2 success, 3 critical success. Errors stay plain text on stderr.
+
+Exit codes:
+  0  Success
+  1  Roll or parse error
+  2  Usage error
 
 Examples:
   roll-parser 2d6+3
   roll-parser 4d6kh3 --verbose
   roll-parser 4d6dl1 --seed "character-str"
+  roll-parser "1d20+7 vs 25" --json
+  roll-parser -- -1d6+3
 `;
 
 /** Sink for one stream's worth of CLI output. */
@@ -64,6 +78,10 @@ export function writeErrorContext(notation: string, error: unknown, write: Write
  * Runs one CLI invocation and returns the process exit code: `0` on success,
  * `1` for a roll-parser error, `2` for a usage error. Anything that is not a
  * `RollParserError` propagates so the runtime reports it with a stack.
+ *
+ * `--json` swaps the success payload only — diagnostics stay plain text on
+ * stderr and the exit codes are identical, so scripts can branch on the code
+ * before parsing stdout.
  */
 export function main(env: CliEnv): number {
   const { argv, stdout, stderr } = env;
@@ -96,7 +114,7 @@ export function main(env: CliEnv): number {
   try {
     const options = args.seed != null ? { seed: args.seed } : {};
     const result = roll(args.notation, options);
-    const output = formatResult(result, args.verbose);
+    const output = formatResult(result, { json: args.json, verbose: args.verbose });
     stdout(`${output}\n`);
   } catch (error) {
     if (isRollParserError(error)) {

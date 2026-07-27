@@ -72,6 +72,33 @@ describe('cli main', () => {
       expect(exitCode).toBe(0);
       expect(stdout).toContain('Usage: roll-parser');
     });
+
+    test('--help wins over an earlier usage error', () => {
+      const { stdout, stderr, exitCode } = run(['--oops', '--help']);
+
+      expect(exitCode).toBe(0);
+      expect(stdout).toContain('Usage: roll-parser');
+      expect(stderr).toBe('');
+    });
+
+    test('--version wins over an earlier usage error', () => {
+      const { stdout, stderr, exitCode } = run(['--oops', '--version']);
+
+      expect(exitCode).toBe(0);
+      expect(stdout).toBe(`${VERSION}\n`);
+      expect(stderr).toBe('');
+    });
+
+    test('help documents json output and exit codes', () => {
+      const { stdout } = run(['--help']);
+
+      expect(stdout).toContain('--json');
+      expect(stdout).toContain('DegreeOfSuccess');
+      expect(stdout).toContain('Exit codes:');
+      expect(stdout).toContain('0  Success');
+      expect(stdout).toContain('1  Roll or parse error');
+      expect(stdout).toContain('2  Usage error');
+    });
   });
 
   describe('rolling', () => {
@@ -108,12 +135,86 @@ describe('cli main', () => {
       );
     });
 
+    test('--json prints the whole result as parseable JSON', () => {
+      const { stdout, stderr, exitCode } = run(['4d6kh3', '--seed', 'test', '--json']);
+
+      expect(exitCode).toBe(0);
+      expect(stderr).toBe('');
+      expect(stdout.endsWith('\n')).toBe(true);
+      expect(stdout.trimEnd()).not.toContain('\n');
+
+      const parsed = JSON.parse(stdout);
+
+      expect(parsed.total).toBe(12);
+      expect(parsed.notation).toBe('4d6kh3');
+      expect(parsed.rolls).toHaveLength(4);
+      expect(parsed.parts.type).toBe('modifier');
+      expect(parsed.parts.total).toBe(12);
+      expect(parsed.parts.target.type).toBe('dice');
+      expect(parsed.parts.target.rolls.map((die: { result: number }) => die.result)).toEqual([
+        3, 6, 3, 3,
+      ]);
+    });
+
+    test('--json wins over --verbose', () => {
+      expect(run(['4d6kh3', '--seed', 'test', '--json', '--verbose']).stdout).toBe(
+        run(['4d6kh3', '--seed', 'test', '--json']).stdout,
+      );
+    });
+
+    test('--json leaves errors as plain text on stderr', () => {
+      const { stdout, stderr, exitCode } = run(['2d6+&', '--json']);
+
+      expect(exitCode).toBe(1);
+      expect(stdout).toBe('');
+      expect(stderr).toBe(`Error: Unexpected character: '&'\n  2d6+&\n      ^\n`);
+    });
+
     test('an unseeded roll still lands in range', () => {
       const { stdout, exitCode } = run(['3d6']);
 
       expect(exitCode).toBe(0);
       expect(Number(stdout.trim())).toBeGreaterThanOrEqual(3);
       expect(Number(stdout.trim())).toBeLessThanOrEqual(18);
+    });
+  });
+
+  describe('terminator', () => {
+    test('-- protects a negative notation', () => {
+      const { stdout, exitCode } = run(['--seed', 'test', '--', '-1d6+3']);
+
+      expect(exitCode).toBe(0);
+      expect(stdout).toBe('0\n');
+      expect(stdout).toBe(run(['-1d6+3', '--seed', 'test']).stdout);
+    });
+
+    test('-- protects a group notation', () => {
+      const { stdout, exitCode } = run(['--seed', 'test', '--', '{2d20kh1,1d8}kh1']);
+
+      expect(exitCode).toBe(0);
+      expect(stdout).toBe('11\n');
+    });
+
+    test('-- lets a variable notation reach the evaluator', () => {
+      const { stderr, exitCode } = run(['--seed', 'test', '--', '@str+1']);
+
+      // Exit 1 (evaluation), not exit 2 (usage) — the argument was not eaten.
+      expect(exitCode).toBe(1);
+      expect(stderr).toContain('Undefined variable: str');
+    });
+
+    test('a dash-prefixed group is notation even without --', () => {
+      const { stdout, exitCode } = run(['-{2d6}', '--seed', 'test']);
+
+      expect(exitCode).toBe(0);
+      expect(stdout).toBe('-9\n');
+    });
+
+    test('a bare -- reports the missing notation', () => {
+      const { stderr, exitCode } = run(['--']);
+
+      expect(exitCode).toBe(2);
+      expect(stderr).toContain('No dice notation provided');
     });
   });
 

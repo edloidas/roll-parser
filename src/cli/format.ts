@@ -9,16 +9,35 @@
 import type { RollResult } from '../types.js';
 
 /**
+ * Output mode selectors for {@link formatResult}.
+ */
+export type FormatOptions = {
+  /** Emit the whole result as compact JSON. Takes precedence over `verbose`. */
+  json?: boolean;
+  /** Show the detailed roll breakdown instead of the bare total. */
+  verbose?: boolean;
+};
+
+/**
  * Formats a roll result for terminal display.
  *
  * In normal mode, returns just the total. In verbose mode, returns the
- * rendered breakdown with terminal-safe formatting for dropped dice.
+ * rendered breakdown with terminal-safe formatting for dropped dice. In JSON
+ * mode, returns the complete `RollResult` — including the structured `parts`
+ * tree — as a single-line `JSON.stringify` payload, where `degree` appears as
+ * its numeric `DegreeOfSuccess` value.
  *
  * @param result - The roll result to format
- * @param verbose - Whether to show the detailed breakdown
+ * @param options - Output mode; JSON wins when combined with verbose
  * @returns Formatted string for terminal output
  */
-export function formatResult(result: RollResult, verbose: boolean): string {
+export function formatResult(result: RollResult, options: FormatOptions = {}): string {
+  const { json = false, verbose = false } = options;
+
+  if (json) {
+    return JSON.stringify(result);
+  }
+
   if (!verbose) {
     return String(result.total);
   }
