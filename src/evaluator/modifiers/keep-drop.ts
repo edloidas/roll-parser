@@ -5,136 +5,72 @@
  */
 
 import type { DieResult, ModifierSpec } from '../../types.js';
-import { rewriteFlags, SELECTION_FLAGS } from './flags.js';
+
+/** One selectable die: its rolled value and its slot in the original pool. */
+type EligibleDie = { result: number; index: number };
 
 /**
- * Marks all eligible dice as `'kept'`. Dice that already carry `'dropped'`
- * (e.g., intermediate rerolls, or the loser of a prior modifier) are left
- * untouched so those drops cannot be silently revived.
- */
-export function markAllKept(dice: DieResult[]): DieResult[] {
-  return dice.map((die) => {
-    if (die.modifiers.includes('dropped')) return die;
-    return {
-      ...die,
-      modifiers: die.modifiers.includes('kept') ? die.modifiers : [...die.modifiers, 'kept'],
-    };
-  });
-}
-
-/**
- * Returns indexed dice that are eligible for keep/drop selection — dice that
- * have not already been dropped by a preceding modifier (e.g. reroll's
- * intermediate dice carry `'dropped'` and must be ignored here).
- */
-function eligibleIndexed(dice: DieResult[]): { die: DieResult; index: number }[] {
-  return dice
-    .map((die, index) => ({ die, index }))
-    .filter(({ die }) => !die.modifiers.includes('dropped'));
-}
-
-/**
- * Rebuilds a die's slot flags (`kept` / `dropped`) from the selection set.
- * Pre-dropped dice are returned unchanged so their state is preserved.
- */
-function applySelection(
-  dice: DieResult[],
-  selectionIndices: Set<number>,
-  selectionMarker: 'kept' | 'dropped',
-): DieResult[] {
-  const otherMarker = selectionMarker === 'kept' ? 'dropped' : 'kept';
-
-  return dice.map((die, index) => {
-    if (die.modifiers.includes('dropped')) return die;
-
-    const isSelected = selectionIndices.has(index);
-    const marker = isSelected ? selectionMarker : otherMarker;
-
-    return {
-      ...die,
-      modifiers: rewriteFlags(die.modifiers, SELECTION_FLAGS, marker),
-    };
-  });
-}
-
-/**
- * Drops every non-already-dropped die. Used by keep-N when N <= 0 and by
- * drop-N when N >= eligible.length.
- */
-function markAllDropped(dice: DieResult[]): DieResult[] {
-  return dice.map((die) => {
-    if (die.modifiers.includes('dropped')) return die;
-    return {
-      ...die,
-      modifiers: [...die.modifiers.filter((m) => m !== 'kept'), 'dropped'],
-    };
-  });
-}
-
-/**
- * Shared keep/drop selection. `count` names how many dice the modifier acts
- * on: the N kept for `keep`, the N dropped for `drop`.
+ * Records into `droppedMask` every pool slot that `kind` / `selector` /
+ * `count` drops.
  *
- * Both degenerate cases are checked in the order each variant used to check
- * them — keep-all first for `keep` (`count >= eligible`), keep-all first for
- * `drop` too (`count <= 0`) — so a zero-eligible pool resolves identically
- * either way.
+ * Nothing is cloned and no flag is written. The caller owns the merge, so a
+ * chain like `4d6kh3dl1` runs one pass per spec over the same mask and then
+ * rewrites each die's slot flags exactly once — where the previous
+ * clone-per-spec appliers rebuilt the whole pool for every spec only to have
+ * their flags read back and discarded.
+ *
+ * Dice already carrying `'dropped'` (reroll intermediates, meta dice, a
+ * preceding chain's losers) are ineligible for selection and stay dropped.
  */
-function applyKeepDrop(
+export function markDroppedIndices(
   dice: DieResult[],
   count: number,
   kind: ModifierSpec['kind'],
   selector: ModifierSpec['selector'],
-): DieResult[] {
-  const eligible = eligibleIndexed(dice);
+  droppedMask: Uint8Array,
+): void {
+  const eligible: EligibleDie[] = [];
+
+  for (let index = 0; index < dice.length; index++) {
+    const die = dice[index];
+    if (die == null) continue;
+
+    if (die.modifiers.includes('dropped')) {
+      droppedMask[index] = 1;
+      continue;
+    }
+
+    eligible.push({ result: die.result, index });
+  }
+
   const isKeep = kind === 'keep';
 
-  if (isKeep ? count >= eligible.length : count <= 0) return markAllKept(dice);
-  if (isKeep ? count <= 0 : count >= eligible.length) return markAllDropped(dice);
+  // Keep-everything: a keep covering the whole eligible pool, or a zero drop.
+  if (isKeep ? count >= eligible.length : count <= 0) return;
 
-  const sorted =
-    selector === 'highest'
-      ? eligible.sort((a, b) => b.die.result - a.die.result)
-      : eligible.sort((a, b) => a.die.result - b.die.result);
-  const selectedIndices = new Set(sorted.slice(0, count).map((item) => item.index));
+  // Drop-everything: a zero keep, or a drop covering the whole eligible pool.
+  if (isKeep ? count <= 0 : count >= eligible.length) {
+    for (const item of eligible) {
+      droppedMask[item.index] = 1;
+    }
+    return;
+  }
 
-  return applySelection(dice, selectedIndices, isKeep ? 'kept' : 'dropped');
-}
+  // ? Stable sort — ties resolve by original pool order, matching the
+  //   `slice(0, count)` selection this replaced.
+  eligible.sort(
+    selector === 'highest' ? (a, b) => b.result - a.result : (a, b) => a.result - b.result,
+  );
 
-/**
- * Applies keep highest modifier - keeps the N highest eligible dice, marks
- * others as dropped. Dice already marked `'dropped'` are left unchanged.
- *
- * @param dice - Array of die results
- * @param count - Number of dice to keep
- * @returns New array with appropriate modifiers applied
- */
-export function applyKeepHighest(dice: DieResult[], count: number): DieResult[] {
-  return applyKeepDrop(dice, count, 'keep', 'highest');
-}
+  // The sort puts the acted-on dice first: `keep` drops everything past
+  // `count`, `drop` drops the selection itself.
+  const start = isKeep ? count : 0;
+  const end = isKeep ? eligible.length : count;
 
-/**
- * Applies keep lowest modifier - keeps the N lowest eligible dice, marks
- * others as dropped. Dice already marked `'dropped'` are left unchanged.
- */
-export function applyKeepLowest(dice: DieResult[], count: number): DieResult[] {
-  return applyKeepDrop(dice, count, 'keep', 'lowest');
-}
-
-/**
- * Applies drop highest modifier - drops the N highest eligible dice, keeps
- * the rest. Dice already marked `'dropped'` are left unchanged.
- */
-export function applyDropHighest(dice: DieResult[], count: number): DieResult[] {
-  return applyKeepDrop(dice, count, 'drop', 'highest');
-}
-
-/**
- * Applies drop lowest modifier - drops the N lowest eligible dice, keeps
- * the rest. Dice already marked `'dropped'` are left unchanged.
- */
-export function applyDropLowest(dice: DieResult[], count: number): DieResult[] {
-  return applyKeepDrop(dice, count, 'drop', 'lowest');
+  for (let i = start; i < end; i++) {
+    const item = eligible[i];
+    if (item != null) droppedMask[item.index] = 1;
+  }
 }
 
 /**
@@ -144,7 +80,11 @@ export function applyDropLowest(dice: DieResult[], count: number): DieResult[] {
  * @returns Sum of non-dropped dice
  */
 export function sumKeptDice(dice: DieResult[]): number {
-  return dice
-    .filter((die) => !die.modifiers.includes('dropped'))
-    .reduce((sum, die) => sum + die.result, 0);
+  let total = 0;
+
+  for (const die of dice) {
+    if (!die.modifiers.includes('dropped')) total += die.result;
+  }
+
+  return total;
 }

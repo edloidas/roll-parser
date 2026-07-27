@@ -30,6 +30,7 @@ import type { RNG } from '../rng/types.js';
 import type {
   CompareOp,
   ComparePoint,
+  DieModifier,
   DieResult,
   EvaluateOptions,
   ModifierSpec,
@@ -50,14 +51,7 @@ import {
   DEFAULT_MAX_EXPLODE_ITERATIONS,
 } from './modifiers/explode.js';
 import { rewriteFlags, SELECTION_AND_TALLY_FLAGS, SELECTION_FLAGS } from './modifiers/flags.js';
-import {
-  applyDropHighest,
-  applyDropLowest,
-  applyKeepHighest,
-  applyKeepLowest,
-  markAllKept,
-  sumKeptDice,
-} from './modifiers/keep-drop.js';
+import { markDroppedIndices, sumKeptDice } from './modifiers/keep-drop.js';
 import {
   applyRecursiveReroll,
   applyRerollOnce,
@@ -200,21 +194,31 @@ function toPublicSpecs(specs: ModifierChainEntry[]): ModifierSpec[] {
  * `RollResult.rolls` for audit, not for display.
  */
 function renderDice(dice: DieResult[]): string {
-  const parts = dice
-    .filter((die) => !die.modifiers.includes('meta'))
-    .map((die) => {
-      if (die.modifiers.includes('dropped')) {
-        return `~~${die.result}~~`;
-      }
-      if (die.modifiers.includes('success')) {
-        return `**${die.result}**`;
-      }
-      if (die.modifiers.includes('failure')) {
-        return `__${die.result}__`;
-      }
-      return String(die.result);
-    });
-  return `[${parts.join(', ')}]`;
+  // ? Single pass building one string. The filter + map + join form allocated
+  //   two intermediate arrays plus a string per die on the hottest path in
+  //   the evaluator.
+  let rendered = '[';
+  let isFirst = true;
+
+  for (const die of dice) {
+    const { modifiers } = die;
+    if (modifiers.includes('meta')) continue;
+
+    if (!isFirst) rendered += ', ';
+    isFirst = false;
+
+    rendered += renderDie(die.result, modifiers);
+  }
+
+  return `${rendered}]`;
+}
+
+/** Marker-wrapped spelling of one die, per `renderDice`'s priority order. */
+function renderDie(result: number, modifiers: readonly DieModifier[]): string {
+  if (modifiers.includes('dropped')) return `~~${result}~~`;
+  if (modifiers.includes('success')) return `**${result}**`;
+  if (modifiers.includes('failure')) return `__${result}__`;
+  return String(result);
 }
 
 /**
@@ -396,10 +400,18 @@ function evalVariable(node: VariableNode, ctx: EvalContext, env: EvalEnv): EvalR
 //
 
 /**
- * Evaluates a meta sub-expression (dice count, dice sides, a threshold) in an
- * isolated context and forwards its rolls into `ctx` as meta dice.
+ * Evaluates a meta sub-expression (dice count, dice sides, a modifier count, a
+ * threshold) in an isolated context and forwards its rolls into `ctx` as meta
+ * dice.
+ *
+ * A `Literal` operand — the overwhelming majority (`3d6`, `4d6kh3`, `1d20!>18`)
+ * — is answered from the node without allocating the throwaway context: a
+ * literal draws no RNG, produces no rolls, and cannot throw, so the merge has
+ * nothing to carry. Draw order is untouched (see `.claude/rules/rng.md`).
  */
 function evalMetaOperand(node: ASTNode, rng: RNG, ctx: EvalContext, env: EvalEnv): number {
+  if (node.type === 'Literal') return node.value;
+
   const metaCtx = createContext();
   const value = evalNode(node, rng, metaCtx, env).total;
   mergeMetaRolls(ctx, metaCtx);
@@ -414,10 +426,16 @@ function requireDiceCount(count: number, nodeType: 'Dice' | 'FateDice'): void {
 }
 
 /**
- * Rolls `count` dice, marks them kept, and writes the pool into `ctx` —
- * the tail shared by `evalDice` and `evalFateDice`. `rollDie` produces one
- * die (drawing exactly one RNG value), `notation` is the canonical
- * `NdX` / `NdF` spelling used by both the expression and rendered forms.
+ * Rolls `count` dice and writes the pool into `ctx` — the tail shared by
+ * `evalDice` and `evalFateDice`. `rollDie` produces one die (drawing exactly
+ * one RNG value), `notation` is the canonical `NdX` / `NdF` spelling used by
+ * both the expression and rendered forms.
+ *
+ * `rollDie` is responsible for stamping `'kept'` at construction. A fresh pool
+ * has no pre-dropped dice, so the `markAllKept` pass this used to run could
+ * only ever append that one flag — at the cost of cloning every die. The same
+ * reasoning makes the running `total` exact: nothing here is dropped, so it
+ * equals `sumKeptDice(dice)`.
  */
 function rollPool(
   count: number,
@@ -426,17 +444,20 @@ function rollPool(
   ctx: EvalContext,
 ): { total: number; rolls: DieResult[] } {
   const dice: DieResult[] = [];
+  let total = 0;
+
   for (let i = 0; i < count; i++) {
-    dice.push(rollDie());
+    const die = rollDie();
+    dice.push(die);
+    total += die.result;
   }
 
-  const markedDice = markAllKept(dice);
-  appendAll(ctx.rolls, markedDice);
+  appendAll(ctx.rolls, dice);
 
   ctx.expressionParts.push(notation);
-  ctx.renderedParts.push(`${notation}${renderDice(markedDice)}`);
+  ctx.renderedParts.push(`${notation}${renderDice(dice)}`);
 
-  return { total: sumKeptDice(markedDice), rolls: markedDice };
+  return { total, rolls: dice };
 }
 
 /**
@@ -468,7 +489,9 @@ function evalDice(node: DiceNode, rng: RNG, ctx: EvalContext, env: EvalEnv): Eva
   const { total, rolls } = rollPool(
     count,
     `${count}d${sides}`,
-    () => createDieResult(sides, rng.nextInt(1, sides), []),
+    // ? Fresh `['kept']` per die — `success-count` appends tally flags in
+    //   place, so a shared literal would tag the whole pool at once.
+    () => createDieResult(sides, rng.nextInt(1, sides), ['kept']),
     ctx,
   );
 
@@ -484,7 +507,7 @@ function evalFateDice(node: FateDiceNode, rng: RNG, ctx: EvalContext, env: EvalE
   const { total, rolls } = rollPool(
     count,
     `${count}dF`,
-    () => createFateDieResult(rng.nextInt(-1, 1), []),
+    () => createFateDieResult(rng.nextInt(-1, 1), ['kept']),
     ctx,
   );
 
@@ -796,9 +819,7 @@ function flattenModifierChain(
   let current: ASTNode = node;
 
   while (isModifier(current)) {
-    const countCtx = createContext();
-    const modCount = evalNode(current.count, rng, countCtx, env).total;
-    mergeMetaRolls(ctx, countCtx);
+    const modCount = evalMetaOperand(current.count, rng, ctx, env);
 
     if (!Number.isInteger(modCount) || modCount < 0) {
       throw new EvaluatorError(
@@ -822,47 +843,34 @@ function flattenModifierChain(
 }
 
 /**
- * Applies a single modifier spec to a dice pool.
- */
-function applyModifierSpec(dice: DieResult[], spec: ModifierChainEntry): DieResult[] {
-  if (spec.kind === 'keep') {
-    return spec.selector === 'highest'
-      ? applyKeepHighest(dice, spec.count)
-      : applyKeepLowest(dice, spec.count);
-  }
-  return spec.selector === 'highest'
-    ? applyDropHighest(dice, spec.count)
-    : applyDropLowest(dice, spec.count);
-}
-
-/**
  * Applies each modifier independently to the full dice pool
  * and merges drop sets via union. A die is dropped if ANY modifier dropped it.
  *
  * Mutates each die's flags in place — the same `DieResult` objects are
- * shared between `RollResult.rolls` and the `RollPart` tree. The per-spec
- * appliers still work on copies internally (each spec must see the
- * unmodified pool), only the merged outcome is written back.
+ * shared between `RollResult.rolls` and the `RollPart` tree. Each spec still
+ * selects against the unmodified pool: `markDroppedIndices` reads results and
+ * writes only into `droppedMask`, so no spec can observe another's outcome.
  */
 function mergeDropSets(baseDice: DieResult[], specs: ModifierChainEntry[]): DieResult[] {
-  const droppedIndices = new Set<number>();
+  const droppedMask = new Uint8Array(baseDice.length);
 
   for (const spec of specs) {
-    const result = applyModifierSpec(baseDice, spec);
-    for (let i = 0; i < result.length; i++) {
-      if (result[i]?.modifiers.includes('dropped')) {
-        droppedIndices.add(i);
-      }
-    }
+    markDroppedIndices(baseDice, spec.count, spec.kind, spec.selector, droppedMask);
   }
 
-  baseDice.forEach((die, index) => {
-    die.modifiers = rewriteFlags(
-      die.modifiers,
-      SELECTION_FLAGS,
-      droppedIndices.has(index) ? 'dropped' : 'kept',
-    );
-  });
+  for (let index = 0; index < baseDice.length; index++) {
+    const die = baseDice[index];
+    if (die == null) continue;
+
+    const marker = droppedMask[index] === 1 ? 'dropped' : 'kept';
+    const { modifiers } = die;
+
+    // ? Already exactly this slot flag — `rewriteFlags` would rebuild an
+    //   identical single-element array. Fresh pool dice hit this every time.
+    if (modifiers.length === 1 && modifiers[0] === marker) continue;
+
+    die.modifiers = rewriteFlags(modifiers, SELECTION_FLAGS, marker);
+  }
 
   return baseDice;
 }
@@ -905,9 +913,7 @@ function evalExplode(node: ExplodeNode, rng: RNG, ctx: EvalContext, env: EvalEnv
 
   let thresholdValue: number | undefined;
   if (node.threshold != null) {
-    const thresholdCtx = createContext();
-    thresholdValue = evalNode(node.threshold.value, rng, thresholdCtx, env).total;
-    mergeMetaRolls(ctx, thresholdCtx);
+    thresholdValue = evalMetaOperand(node.threshold.value, rng, ctx, env);
   }
 
   const code = formatExplodeCode(node.variant, node.threshold, thresholdValue);
@@ -953,9 +959,7 @@ function evalReroll(node: RerollNode, rng: RNG, ctx: EvalContext, env: EvalEnv):
   const target = evalNode(node.target, rng, targetCtx, env);
   const targetExpr = targetCtx.expressionParts.join('');
 
-  const thresholdCtx = createContext();
-  const thresholdValue = evalNode(node.condition.value, rng, thresholdCtx, env).total;
-  mergeMetaRolls(ctx, thresholdCtx);
+  const thresholdValue = evalMetaOperand(node.condition.value, rng, ctx, env);
 
   const code = `${node.once ? 'ro' : 'r'}${node.condition.operator}${thresholdValue}`;
   const condition: ResolvedComparePoint = {
@@ -1114,9 +1118,8 @@ function resolveCritThreshold(
   env: EvalEnv,
 ): ResolvedCritThreshold {
   if (threshold === 'default') return 'default';
-  const thresholdCtx = createContext();
-  const resolved = evalNode(threshold.value, rng, thresholdCtx, env).total;
-  mergeMetaRolls(ctx, thresholdCtx);
+
+  const resolved = evalMetaOperand(threshold.value, rng, ctx, env);
   if (!Number.isFinite(resolved)) {
     throw new EvaluatorError(
       `Invalid crit threshold: ${resolved}`,
@@ -1312,9 +1315,7 @@ function resolveThreshold(
   env: EvalEnv,
   role: 'threshold' | 'fail threshold',
 ): number {
-  const thresholdCtx = createContext();
-  const resolved = evalNode(value, rng, thresholdCtx, env).total;
-  mergeMetaRolls(ctx, thresholdCtx);
+  const resolved = evalMetaOperand(value, rng, ctx, env);
 
   if (!Number.isFinite(resolved)) {
     throw new EvaluatorError(`Invalid ${role}: ${resolved}`, 'INVALID_THRESHOLD', 'SuccessCount');
