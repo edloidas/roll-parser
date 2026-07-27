@@ -8,6 +8,9 @@
  * @module evaluator/env
  */
 
+import { EvaluatorError } from '../errors.js';
+import type { ASTNode } from '../parser/ast.js';
+
 /**
  * Per-evaluation shared environment (created once, shared across all branches).
  *
@@ -44,3 +47,27 @@ export type EvalEnv = {
    */
   readonly onMissingVariable: 'throw' | 'zero';
 };
+
+/**
+ * Reserves `count` dice against the global `maxDice` budget, throwing
+ * `DICE_LIMIT_EXCEEDED` when the reservation would overshoot.
+ *
+ * Every path that consumes RNG draws for dice charges through here — initial
+ * pools (`evalDice` / `evalFateDice`), explosion continuations, and reroll
+ * replacements — so the limit and its message have one definition.
+ */
+export function chargeDice(env: EvalEnv, count: number, nodeType: ASTNode['type']): void {
+  if (env.totalDiceRolled + count > env.maxDice) {
+    throw new EvaluatorError(
+      `Total dice count ${env.totalDiceRolled + count} exceeds limit of ${env.maxDice}`,
+      'DICE_LIMIT_EXCEEDED',
+      nodeType,
+    );
+  }
+  env.totalDiceRolled += count;
+}
+
+/** Single-die shorthand for {@link chargeDice}. */
+export function chargeDie(env: EvalEnv, nodeType: ASTNode['type']): void {
+  chargeDice(env, 1, nodeType);
+}

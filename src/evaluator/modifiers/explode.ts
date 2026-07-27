@@ -11,7 +11,8 @@
 import { EvaluatorError } from '../../errors.js';
 import type { RNG } from '../../rng/types.js';
 import type { CompareOp, DieResult } from '../../types.js';
-import type { EvalEnv } from '../env.js';
+import { createDieResult } from '../die.js';
+import { chargeDie, type EvalEnv } from '../env.js';
 
 /** Default maximum explosion iterations per die. */
 export const DEFAULT_MAX_EXPLODE_ITERATIONS = 1_000;
@@ -52,14 +53,7 @@ export function buildShouldExplode(
  * Rolls one explosion die, charging it against the global dice limit.
  */
 function rollExplosion(sides: number, rng: RNG, env: EvalEnv): number {
-  if (env.totalDiceRolled + 1 > env.maxDice) {
-    throw new EvaluatorError(
-      `Total dice count ${env.totalDiceRolled + 1} exceeds limit of ${env.maxDice}`,
-      'DICE_LIMIT_EXCEEDED',
-      'Explode',
-    );
-  }
-  env.totalDiceRolled += 1;
+  chargeDie(env, 'Explode');
   return rng.nextInt(1, sides);
 }
 
@@ -88,6 +82,58 @@ function canExplode(die: DieResult): boolean {
 }
 
 /**
+ * Shared implementation of the two appending explode variants. The explosion
+ * predicate always runs on the RAW roll; `storeResult` maps that raw roll to
+ * the value recorded on the appended die, which is the only thing standard
+ * and penetrating explosions disagree about.
+ *
+ * `critical`/`fumble` are likewise derived from the raw roll — a penetrating
+ * die that rolled its max face is still a crit even though it stores one less.
+ */
+function applyAppendingExplode(
+  pool: DieResult[],
+  shouldExplode: ShouldExplode,
+  rng: RNG,
+  env: EvalEnv,
+  storeResult: (raw: number) => number,
+): DieResult[] {
+  const result: DieResult[] = [];
+
+  for (const original of pool) {
+    result.push(original);
+    if (!canExplode(original)) continue;
+
+    const sides = original.sides;
+    let lastRaw = original.result;
+    let iterations = 0;
+
+    while (shouldExplode(lastRaw, sides)) {
+      if (iterations >= env.maxExplodeIterations) {
+        throw explodeLimitError(env.maxExplodeIterations);
+      }
+      const raw = rollExplosion(sides, rng, env);
+      const die = createDieResult(sides, raw, ['exploded', 'kept']);
+      die.result = storeResult(raw);
+      result.push(die);
+      lastRaw = raw;
+      iterations += 1;
+    }
+  }
+
+  return result;
+}
+
+/** Records the raw roll unchanged — standard explode. */
+function keepRaw(raw: number): number {
+  return raw;
+}
+
+/** Records one less than the raw roll — penetrating explode. */
+function penetratingPenalty(raw: number): number {
+  return raw - 1;
+}
+
+/**
  * Standard explode: append each new die to the pool. The original die keeps
  * its modifiers untouched; new dice carry `['exploded', 'kept']`.
  */
@@ -97,34 +143,7 @@ export function applyStandardExplode(
   rng: RNG,
   env: EvalEnv,
 ): DieResult[] {
-  const result: DieResult[] = [];
-
-  for (const original of pool) {
-    result.push(original);
-    if (!canExplode(original)) continue;
-
-    const sides = original.sides;
-    let last = original.result;
-    let iterations = 0;
-
-    while (shouldExplode(last, sides)) {
-      if (iterations >= env.maxExplodeIterations) {
-        throw explodeLimitError(env.maxExplodeIterations);
-      }
-      const next = rollExplosion(sides, rng, env);
-      result.push({
-        sides,
-        result: next,
-        modifiers: ['exploded', 'kept'],
-        critical: next === sides && sides > 1,
-        fumble: next === 1 && sides > 1,
-      });
-      last = next;
-      iterations += 1;
-    }
-  }
-
-  return result;
+  return applyAppendingExplode(pool, shouldExplode, rng, env, keepRaw);
 }
 
 /**
@@ -187,33 +206,5 @@ export function applyPenetratingExplode(
   rng: RNG,
   env: EvalEnv,
 ): DieResult[] {
-  const result: DieResult[] = [];
-
-  for (const original of pool) {
-    result.push(original);
-    if (!canExplode(original)) continue;
-
-    const sides = original.sides;
-    let lastRaw = original.result;
-    let iterations = 0;
-
-    while (shouldExplode(lastRaw, sides)) {
-      if (iterations >= env.maxExplodeIterations) {
-        throw explodeLimitError(env.maxExplodeIterations);
-      }
-      const raw = rollExplosion(sides, rng, env);
-      const stored = raw - 1;
-      result.push({
-        sides,
-        result: stored,
-        modifiers: ['exploded', 'kept'],
-        critical: raw === sides && sides > 1,
-        fumble: raw === 1 && sides > 1,
-      });
-      lastRaw = raw;
-      iterations += 1;
-    }
-  }
-
-  return result;
+  return applyAppendingExplode(pool, shouldExplode, rng, env, penetratingPenalty);
 }

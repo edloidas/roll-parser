@@ -7,6 +7,34 @@
 import type { RNG } from './types.js';
 
 /**
+ * Draws discarded after seeding. xorshift128 needs a short run-in before its
+ * low bits decorrelate from the splitmix32 state expansion.
+ */
+const WARMUP_DRAWS = 20;
+
+/** 2^32 — the size of the uint32 output space. */
+const UINT32_SPACE = 0x100000000;
+
+/** 2^53 — the widest integer JavaScript numbers represent exactly. */
+const MAX_EXACT_INT = 2 ** 53;
+
+/** 2^21 — shift applied to the high draw when composing a 53-bit value. */
+const HIGH_DRAW_SCALE = 0x200000;
+
+/** Bits discarded from the low draw so the two draws total 53 bits. */
+const LOW_DRAW_SHIFT = 11;
+
+/** splitmix32 increment (32-bit golden ratio). */
+const GOLDEN_RATIO_32 = 0x9e3779b9;
+
+/** splitmix32 mixing multipliers. */
+const SPLITMIX_MULTIPLIER_1 = 0x85ebca6b;
+const SPLITMIX_MULTIPLIER_2 = 0xc2b2ae35;
+
+/** djb2 hash offset basis. */
+const DJB2_SEED = 5381;
+
+/**
  * Seedable pseudo-random number generator using xorshift128.
  *
  * Produces reproducible sequences from identical seeds.
@@ -35,29 +63,24 @@ export class SeededRNG implements RNG {
 
     this.initState(seed);
 
-    // Warm-up: discard first 20 values for better initial distribution
-    for (let i = 0; i < 20; i++) {
+    // Warm-up: discard the first draws for better initial distribution
+    for (let i = 0; i < WARMUP_DRAWS; i++) {
       this.nextUint32();
     }
   }
 
   private initState(seed?: string | number): void {
-    const numSeed =
-      seed == null
-        ? (Date.now() ^ (Math.random() * 0xffffffff)) >>> 0
-        : typeof seed === 'string'
-          ? this.hashString(seed)
-          : seed >>> 0;
+    const numSeed = this.toNumericSeed(seed);
 
     // Split seed into 4 state values using splitmix32
     let s = numSeed;
     const state: number[] = [];
 
     for (let i = 0; i < 4; i++) {
-      s = (s + 0x9e3779b9) >>> 0;
+      s = (s + GOLDEN_RATIO_32) >>> 0;
       let z = s;
-      z = Math.imul(z ^ (z >>> 16), 0x85ebca6b) >>> 0;
-      z = Math.imul(z ^ (z >>> 13), 0xc2b2ae35) >>> 0;
+      z = Math.imul(z ^ (z >>> 16), SPLITMIX_MULTIPLIER_1) >>> 0;
+      z = Math.imul(z ^ (z >>> 13), SPLITMIX_MULTIPLIER_2) >>> 0;
       state.push((z ^ (z >>> 16)) >>> 0);
     }
 
@@ -72,9 +95,16 @@ export class SeededRNG implements RNG {
     }
   }
 
+  /** Normalizes the constructor seed into a uint32. */
+  private toNumericSeed(seed?: string | number): number {
+    if (seed == null) return (Date.now() ^ (Math.random() * 0xffffffff)) >>> 0;
+    if (typeof seed === 'string') return this.hashString(seed);
+    return seed >>> 0;
+  }
+
   private hashString(str: string): number {
     // djb2 hash algorithm
-    let hash = 5381;
+    let hash = DJB2_SEED;
     for (let i = 0; i < str.length; i++) {
       hash = ((hash << 5) + hash + str.charCodeAt(i)) >>> 0;
     }
@@ -99,7 +129,7 @@ export class SeededRNG implements RNG {
 
   next(): number {
     // Convert uint32 to [0, 1) float
-    return this.nextUint32() / 0x100000000;
+    return this.nextUint32() / UINT32_SPACE;
   }
 
   nextInt(min: number, max: number): number {
@@ -116,13 +146,13 @@ export class SeededRNG implements RNG {
 
     // Ranges wider than 2^32 need two draws — a single uint32 can never
     // produce the upper part of the range and would silently truncate it.
-    if (range > 0x100000000) {
+    if (range > UINT32_SPACE) {
       return lo + this.nextBoundedWide(range);
     }
 
     // Rejection sampling for unbiased distribution
     // Avoids modulo bias by rejecting values that would cause uneven distribution
-    const threshold = (0x100000000 - range) % range;
+    const threshold = (UINT32_SPACE - range) % range;
     let value: number;
     do {
       value = this.nextUint32();
@@ -138,18 +168,17 @@ export class SeededRNG implements RNG {
    * throw instead of silently degrading.
    */
   private nextBoundedWide(range: number): number {
-    const MAX_53 = 2 ** 53;
-    if (range > MAX_53) {
+    if (range > MAX_EXACT_INT) {
       throw new RangeError(`nextInt range ${range} exceeds 2^53 and cannot be sampled exactly`);
     }
 
     // Largest multiple of `range` below 2^53 — values at or above it are
     // rejected to avoid modulo bias.
-    const limit = Math.floor(MAX_53 / range) * range;
+    const limit = Math.floor(MAX_EXACT_INT / range) * range;
     let value: number;
     do {
       // 32 high bits shifted up by 21 + top 21 bits of a second draw = 53 bits.
-      value = this.nextUint32() * 0x200000 + (this.nextUint32() >>> 11);
+      value = this.nextUint32() * HIGH_DRAW_SCALE + (this.nextUint32() >>> LOW_DRAW_SHIFT);
     } while (value >= limit);
 
     return value % range;

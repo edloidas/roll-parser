@@ -4,7 +4,8 @@
  * @module evaluator/modifiers/keep-drop
  */
 
-import type { DieResult } from '../../types.js';
+import type { DieResult, ModifierSpec } from '../../types.js';
+import { rewriteFlags, SELECTION_FLAGS } from './flags.js';
 
 /**
  * Marks all eligible dice as `'kept'`. Dice that already carry `'dropped'`
@@ -51,7 +52,7 @@ function applySelection(
 
     return {
       ...die,
-      modifiers: [...die.modifiers.filter((m) => m !== 'kept' && m !== 'dropped'), marker],
+      modifiers: rewriteFlags(die.modifiers, SELECTION_FLAGS, marker),
     };
   });
 }
@@ -71,6 +72,36 @@ function markAllDropped(dice: DieResult[]): DieResult[] {
 }
 
 /**
+ * Shared keep/drop selection. `count` names how many dice the modifier acts
+ * on: the N kept for `keep`, the N dropped for `drop`.
+ *
+ * Both degenerate cases are checked in the order each variant used to check
+ * them — keep-all first for `keep` (`count >= eligible`), keep-all first for
+ * `drop` too (`count <= 0`) — so a zero-eligible pool resolves identically
+ * either way.
+ */
+function applyKeepDrop(
+  dice: DieResult[],
+  count: number,
+  kind: ModifierSpec['kind'],
+  selector: ModifierSpec['selector'],
+): DieResult[] {
+  const eligible = eligibleIndexed(dice);
+  const isKeep = kind === 'keep';
+
+  if (isKeep ? count >= eligible.length : count <= 0) return markAllKept(dice);
+  if (isKeep ? count <= 0 : count >= eligible.length) return markAllDropped(dice);
+
+  const sorted =
+    selector === 'highest'
+      ? eligible.sort((a, b) => b.die.result - a.die.result)
+      : eligible.sort((a, b) => a.die.result - b.die.result);
+  const selectedIndices = new Set(sorted.slice(0, count).map((item) => item.index));
+
+  return applySelection(dice, selectedIndices, isKeep ? 'kept' : 'dropped');
+}
+
+/**
  * Applies keep highest modifier - keeps the N highest eligible dice, marks
  * others as dropped. Dice already marked `'dropped'` are left unchanged.
  *
@@ -79,15 +110,7 @@ function markAllDropped(dice: DieResult[]): DieResult[] {
  * @returns New array with appropriate modifiers applied
  */
 export function applyKeepHighest(dice: DieResult[], count: number): DieResult[] {
-  const eligible = eligibleIndexed(dice);
-
-  if (count >= eligible.length) return markAllKept(dice);
-  if (count <= 0) return markAllDropped(dice);
-
-  const sorted = [...eligible].sort((a, b) => b.die.result - a.die.result);
-  const keptIndices = new Set(sorted.slice(0, count).map((item) => item.index));
-
-  return applySelection(dice, keptIndices, 'kept');
+  return applyKeepDrop(dice, count, 'keep', 'highest');
 }
 
 /**
@@ -95,15 +118,7 @@ export function applyKeepHighest(dice: DieResult[], count: number): DieResult[] 
  * others as dropped. Dice already marked `'dropped'` are left unchanged.
  */
 export function applyKeepLowest(dice: DieResult[], count: number): DieResult[] {
-  const eligible = eligibleIndexed(dice);
-
-  if (count >= eligible.length) return markAllKept(dice);
-  if (count <= 0) return markAllDropped(dice);
-
-  const sorted = [...eligible].sort((a, b) => a.die.result - b.die.result);
-  const keptIndices = new Set(sorted.slice(0, count).map((item) => item.index));
-
-  return applySelection(dice, keptIndices, 'kept');
+  return applyKeepDrop(dice, count, 'keep', 'lowest');
 }
 
 /**
@@ -111,15 +126,7 @@ export function applyKeepLowest(dice: DieResult[], count: number): DieResult[] {
  * the rest. Dice already marked `'dropped'` are left unchanged.
  */
 export function applyDropHighest(dice: DieResult[], count: number): DieResult[] {
-  const eligible = eligibleIndexed(dice);
-
-  if (count <= 0) return markAllKept(dice);
-  if (count >= eligible.length) return markAllDropped(dice);
-
-  const sorted = [...eligible].sort((a, b) => b.die.result - a.die.result);
-  const droppedIndices = new Set(sorted.slice(0, count).map((item) => item.index));
-
-  return applySelection(dice, droppedIndices, 'dropped');
+  return applyKeepDrop(dice, count, 'drop', 'highest');
 }
 
 /**
@@ -127,15 +134,7 @@ export function applyDropHighest(dice: DieResult[], count: number): DieResult[] 
  * the rest. Dice already marked `'dropped'` are left unchanged.
  */
 export function applyDropLowest(dice: DieResult[], count: number): DieResult[] {
-  const eligible = eligibleIndexed(dice);
-
-  if (count <= 0) return markAllKept(dice);
-  if (count >= eligible.length) return markAllDropped(dice);
-
-  const sorted = [...eligible].sort((a, b) => a.die.result - b.die.result);
-  const droppedIndices = new Set(sorted.slice(0, count).map((item) => item.index));
-
-  return applySelection(dice, droppedIndices, 'dropped');
+  return applyKeepDrop(dice, count, 'drop', 'lowest');
 }
 
 /**

@@ -20,10 +20,6 @@
 import type { DieResult, ResolvedCritThreshold } from '../../types.js';
 import { matchesCondition } from './compare.js';
 
-// ? Re-exported for existing importers — the definition moved to types.ts so
-//   the public RollPart union can reference it without a circular import.
-export type { ResolvedCritThreshold } from '../../types.js';
-
 /**
  * Applies success/fail threshold arrays to a dice pool, overriding each
  * die's `critical` and `fumble` flags in place. A die matches `'default'`

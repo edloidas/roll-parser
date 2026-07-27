@@ -29,16 +29,15 @@ import type {
   VariableNode,
   VersusNode,
 } from './ast.js';
+import { isCritThreshold, isSuccessCount } from './ast.js';
 import {
   containsDicePool,
   containsFatePool,
   containsMultiSubGroup,
   containsVersus,
   deepContainsDicePool,
-  isCritThreshold,
-  isSuccessCount,
   unwrapTransparent,
-} from './ast.js';
+} from './guards.js';
 
 /**
  * Error thrown when the parser encounters invalid syntax.
@@ -61,7 +60,7 @@ export class ParseError extends RollParserError {
     super(message, code, options);
     this.name = 'ParseError';
     this.position = position;
-    this.token = token ?? undefined;
+    this.token = token;
   }
 }
 
@@ -113,14 +112,22 @@ const BP = {
  */
 export const MAX_PARSE_DEPTH = 128;
 
-/** Human-readable symbols for tokens named in `expect()` error messages. */
-const TOKEN_DISPLAY: Partial<Record<TokenType, string>> = {
+/**
+ * Human-readable symbols for the tokens `expect()` can be asked for.
+ *
+ * `satisfies` keeps the key literals, so `ExpectableToken` narrows `expect()`
+ * to exactly these tokens and the lookup can never miss.
+ */
+const TOKEN_DISPLAY = {
   [TokenType.LPAREN]: `'('`,
   [TokenType.RPAREN]: `')'`,
   [TokenType.LBRACE]: `'{'`,
   [TokenType.RBRACE]: `'}'`,
   [TokenType.COMMA]: `','`,
-};
+} satisfies Partial<Record<TokenType, string>>;
+
+/** Token types that carry a display symbol and may be passed to `expect()`. */
+type ExpectableToken = keyof typeof TOKEN_DISPLAY;
 
 /**
  * Arity table for math functions. `min` and `max` are inclusive.
@@ -133,6 +140,20 @@ const FUNCTION_ARITY: Record<string, { min: number; max: number }> = {
   abs: { min: 1, max: 1 },
   max: { min: 2, max: Number.POSITIVE_INFINITY },
   min: { min: 2, max: Number.POSITIVE_INFINITY },
+};
+
+/** Renders an arity range for the `INVALID_FUNCTION_ARITY` message. */
+function formatArity(arity: { min: number; max: number }): string {
+  if (arity.max === Number.POSITIVE_INFINITY) return `at least ${arity.min}`;
+  if (arity.min === arity.max) return `${arity.min}`;
+  return `${arity.min}–${arity.max}`;
+}
+
+/** Explode variant produced by each explode token. */
+const EXPLODE_VARIANTS: Partial<Record<TokenType, ExplodeNode['variant']>> = {
+  [TokenType.EXPLODE]: 'standard',
+  [TokenType.EXPLODE_COMPOUND]: 'compound',
+  [TokenType.EXPLODE_PENETRATING]: 'penetrating',
 };
 
 /**
@@ -493,7 +514,7 @@ export class Parser {
     const close = this.expect(TokenType.RPAREN);
 
     const arity = FUNCTION_ARITY[token.value];
-    if (arity === undefined) {
+    if (arity == null) {
       // ? Unreachable in practice: lexer only emits FUNCTION for registered
       // names. Kept defensive to keep parser/evaluator error-code contract
       // symmetrical.
@@ -506,12 +527,7 @@ export class Parser {
     }
 
     if (args.length < arity.min || args.length > arity.max) {
-      const expected =
-        arity.max === Number.POSITIVE_INFINITY
-          ? `at least ${arity.min}`
-          : arity.min === arity.max
-            ? `${arity.min}`
-            : `${arity.min}–${arity.max}`;
+      const expected = formatArity(arity);
       throw new ParseError(
         `Function '${token.value}' expects ${expected} argument${arity.min === 1 && arity.max === 1 ? '' : 's'}, got ${args.length}`,
         'INVALID_FUNCTION_ARITY',
@@ -762,12 +778,9 @@ export class Parser {
       );
     }
 
-    const variant: ExplodeNode['variant'] =
-      token.type === TokenType.EXPLODE
-        ? 'standard'
-        : token.type === TokenType.EXPLODE_COMPOUND
-          ? 'compound'
-          : 'penetrating';
+    // ? `parseLed` dispatches here only for the three explode tokens, so the
+    //   lookup always hits; the fallback keeps the type non-optional.
+    const variant: ExplodeNode['variant'] = EXPLODE_VARIANTS[token.type] ?? 'penetrating';
 
     const start = target.start ?? token.position;
     if (!this.isComparePointAhead()) {
@@ -847,10 +860,11 @@ export class Parser {
     // ! Multi-sub-roll groups (`{a, b}s`, `({a, b})s`) need hierarchical
     //   sort per Stage 3 spec §3 (sort dice within each sub-roll, then sort
     //   sub-rolls by total) — `evalSort` only flat-sorts, so accepting the
-    //   syntax would silently ship non-spec behaviour. Reject at parse time
-    //   until the deferred Stage 4 implementation lands. Single-sub Groups
-    //   keep passing through (the unwrap returns a `Group` with one
-    //   expression, which is the user's flat-pool escape hatch).
+    //   syntax would silently ship non-spec behaviour. Single-sub Groups keep
+    //   passing through (the unwrap returns a `Group` with one expression,
+    //   which is the user's flat-pool escape hatch).
+    // TODO: Implement hierarchical multi-sub-roll group sort, then drop this
+    //   reject.
     const base = unwrapTransparent(target, ['Grouped', 'Modifier', 'Sort', 'CritThreshold']);
     if (base.type === 'Group' && base.expressions.length >= 2) {
       throw new ParseError(
@@ -1222,10 +1236,10 @@ export class Parser {
     return token;
   }
 
-  private expect(type: TokenType): Token {
+  private expect(type: ExpectableToken): Token {
     const token = this.peek();
     if (token.type !== type) {
-      const expected = TOKEN_DISPLAY[type] ?? TokenType[type];
+      const expected = TOKEN_DISPLAY[type];
       const got = token.type === TokenType.EOF ? 'end of input' : `'${token.value}'`;
       throw new ParseError(
         `Expected ${expected} but got ${got}`,

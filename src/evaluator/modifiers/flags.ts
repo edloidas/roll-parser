@@ -1,0 +1,48 @@
+/**
+ * Shared slot-flag rewriting for `DieResult.modifiers`.
+ *
+ * "Slot" flags (`kept` / `dropped` / `rerolled`) and tally flags
+ * (`success` / `failure`) are owned by whichever pass is currently deciding a
+ * die's fate, so each pass rebuilds them rather than appending. Every rewrite
+ * site strips its own exclusion list and appends its own markers — the lists
+ * differ, the mechanics do not.
+ *
+ * @module evaluator/modifiers/flags
+ */
+
+import type { DieModifier } from '../../types.js';
+
+/** Kept/dropped selection flags — rebuilt by every keep/drop pass. */
+export const SELECTION_FLAGS: readonly DieModifier[] = ['kept', 'dropped'];
+
+/**
+ * Selection flags plus the success-count tally flags. Stripped when a die
+ * leaves the pool that tagged it (meta sub-expressions, dropped group
+ * sub-rolls) so the top-level successes/failures scan cannot count it.
+ */
+export const SELECTION_AND_TALLY_FLAGS: readonly DieModifier[] = [
+  'kept',
+  'dropped',
+  'success',
+  'failure',
+];
+
+/** Selection flags plus `rerolled` — reassigned on every reroll pass. */
+export const REROLL_SLOT_FLAGS: readonly DieModifier[] = ['kept', 'dropped', 'rerolled'];
+
+/** Returns `modifiers` with every flag in `excluded` removed. */
+export function stripFlags(
+  modifiers: readonly DieModifier[],
+  excluded: readonly DieModifier[],
+): DieModifier[] {
+  return modifiers.filter((modifier) => !excluded.includes(modifier));
+}
+
+/** Returns `modifiers` with `excluded` removed and `added` appended, in order. */
+export function rewriteFlags(
+  modifiers: readonly DieModifier[],
+  excluded: readonly DieModifier[],
+  ...added: DieModifier[]
+): DieModifier[] {
+  return [...stripFlags(modifiers, excluded), ...added];
+}
