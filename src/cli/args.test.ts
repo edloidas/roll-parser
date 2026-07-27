@@ -199,9 +199,7 @@ describe('parseArgs', () => {
       expect(result).toEqual({ ok: false, error: 'Unknown option: --unknown' });
     });
 
-    test('returns error for unknown short flag', () => {
-      const result = parseArgs(['-x']);
-      expect(result).toEqual({ ok: false, error: 'Unknown option: -x' });
-    });
+    // The `-x` short-flag case lives in `notation parsing`, where it sits next
+    // to the negative-notation cases it draws the boundary against.
   });
 });

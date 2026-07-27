@@ -60,4 +60,6 @@ test('NdX total is always in valid range [N, N*X]', () => {
 ## Conventions
 
 - Co-locate with source: `foo.ts` → `foo.test.ts`
-- Target >90% statement coverage, 100% function coverage
+- Coverage floor: 95% lines, 100% functions — enforced by
+  `[test.coverageThreshold]` in `bunfig.toml` (`bun test --coverage`,
+  `bun test:ci`). Change both together.

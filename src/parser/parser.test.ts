@@ -172,6 +172,32 @@ describe('Parser', () => {
     });
   });
 
+  describe('signed literal operands', () => {
+    // #135 — replaces four fast-check "properties" that re-derived IEEE-754
+    // commutativity and identity over random literals. What they actually
+    // exercised was a signed literal reaching either operand position of every
+    // binary operator; that is a parser concern, so it is pinned here exactly.
+    const CASES: [notation: string, expected: ASTNode][] = [
+      ['-7+3', binary('+', unary(literal(7)), literal(3))],
+      ['3+-7', binary('+', literal(3), unary(literal(7)))],
+      ['-7*-3', binary('*', unary(literal(7)), unary(literal(3)))],
+      ['-7-3', binary('-', unary(literal(7)), literal(3))],
+      ['3--7', binary('-', literal(3), unary(literal(7)))],
+      ['-8/-2', binary('/', unary(literal(8)), unary(literal(2)))],
+      ['-8%3', binary('%', unary(literal(8)), literal(3))],
+      // `**` binds tighter than prefix `-`, so this is `-(2**3)`.
+      ['-2**3', unary(binary('**', literal(2), literal(3)))],
+      ['0+0', binary('+', literal(0), literal(0))],
+      ['-0.5*2', binary('*', unary(literal(0.5)), literal(2))],
+    ];
+
+    for (const [notation, expected] of CASES) {
+      it(`should parse ${notation}`, () => {
+        expect(parseAst(notation)).toEqual(expected);
+      });
+    }
+  });
+
   describe('basic dice', () => {
     it('should parse prefix dice (d20 → 1d20)', () => {
       expect(parseAst('d20')).toEqual(dice(literal(1), literal(20)));
