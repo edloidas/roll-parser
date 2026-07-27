@@ -12,6 +12,7 @@
 export type CliArgs = {
   notation: string | undefined;
   verbose: boolean;
+  json: boolean;
   seed: string | undefined;
   showHelp: boolean;
   showVersion: boolean;
@@ -22,6 +23,46 @@ export type CliArgs = {
  */
 export type ParseArgsResult = { ok: true; args: CliArgs } | { ok: false; error: string };
 
+/** Argument that stops option parsing — everything after it is notation. */
+const TERMINATOR = '--';
+
+/** Defaults every parse starts from. */
+const BASE_ARGS: CliArgs = {
+  notation: undefined,
+  verbose: false,
+  json: false,
+  seed: undefined,
+  showHelp: false,
+  showVersion: false,
+};
+
+/**
+ * Finds `--help` / `--version` anywhere before the `--` terminator. Help wins
+ * over version regardless of order, and both win over usage errors — a user
+ * who mistyped an option is asking for the manual, not for a diagnostic.
+ */
+function findInformationalFlag(argv: string[]): 'help' | 'version' | undefined {
+  let flag: 'help' | 'version' | undefined;
+
+  for (const arg of argv) {
+    if (arg === TERMINATOR) break;
+    if (arg === '--help' || arg === '-h') return 'help';
+    if (arg === '--version') flag = 'version';
+  }
+
+  return flag;
+}
+
+/**
+ * True for an argument that starts with `-` yet reads as notation rather than
+ * an option: negative numbers (`-3`) and negative-prefixed expressions
+ * (`-d6`, `-D6`, `-dF`, `-(2d6)`, `-{2d6}`, `-@str`). A fallback for users who
+ * do not reach for `--`; `--` remains the unambiguous form.
+ */
+function isNegativeNotation(arg: string): boolean {
+  return arg.length > 1 && /^[\ddD({@]/.test(arg.slice(1));
+}
+
 /**
  * Parses a raw argument array into typed CLI options.
  *
@@ -29,24 +70,39 @@ export type ParseArgsResult = { ok: true; args: CliArgs } | { ok: false; error: 
  * @returns Parsed result or an error message for usage errors
  */
 export function parseArgs(argv: string[]): ParseArgsResult {
+  const informational = findInformationalFlag(argv);
+  if (informational != null) {
+    return {
+      ok: true,
+      args: {
+        ...BASE_ARGS,
+        showHelp: informational === 'help',
+        showVersion: informational === 'version',
+      },
+    };
+  }
+
   let verbose = false;
+  let json = false;
   let seed: string | undefined;
-  let showHelp = false;
-  let showVersion = false;
   const positional: string[] = [];
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i] as string;
 
-    if (arg === '--help' || arg === '-h') {
-      showHelp = true;
-    } else if (arg === '--version') {
-      showVersion = true;
+    if (arg === TERMINATOR) {
+      positional.push(...argv.slice(i + 1));
+      break;
     } else if (arg === '--verbose' || arg === '-v') {
       verbose = true;
+    } else if (arg === '--json') {
+      json = true;
     } else if (arg === '--seed') {
+      // ? Any non-empty next argument counts, matching `--seed=<value>` — a
+      //   seed is an opaque string, so `--seed -abc` is a valid seed, not a
+      //   missing value. Genuinely ambiguous cases are what `--` is for.
       const next = argv[i + 1];
-      if (next === undefined || (next.startsWith('-') && !/^-\d/.test(next))) {
+      if (next == null || next === '') {
         return { ok: false, error: 'Missing value for --seed' };
       }
       seed = next;
@@ -59,15 +115,17 @@ export function parseArgs(argv: string[]): ParseArgsResult {
       seed = value;
     } else if (arg.startsWith('--')) {
       return { ok: false, error: `Unknown option: ${arg}` };
-    } else if (arg.startsWith('-') && arg.length > 1 && !/^[\ddD(]/.test(arg.slice(1))) {
-      // Negative prefix notation (-3, -d6, -D6, -dF, -(2d6)) stays positional
+    } else if (arg.startsWith('-') && !isNegativeNotation(arg)) {
       return { ok: false, error: `Unknown option: ${arg}` };
     } else {
       positional.push(arg);
     }
   }
 
+  // ? Positional arguments are joined, not treated as separate rolls — a shell
+  //   splits `roll-parser 2d6 + 3` into three words and the user means one
+  //   expression. Changing this would break every unquoted spaced notation.
   const notation = positional.length > 0 ? positional.join(' ') : undefined;
 
-  return { ok: true, args: { notation, verbose, seed, showHelp, showVersion } };
+  return { ok: true, args: { ...BASE_ARGS, notation, verbose, json, seed } };
 }
