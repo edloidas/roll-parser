@@ -6,11 +6,15 @@
  */
 
 import { describe, expect, test } from 'bun:test';
+import type { RollParserErrorCode } from './errors.js';
 import { EvaluatorError, getErrorSpan, isRollParserError, RollParserError } from './errors.js';
 import { evaluate } from './evaluator/evaluator.js';
 import { LexerError, lex } from './lexer/lexer.js';
-import { ParseError, parse } from './parser/parser.js';
+import type { ASTNode } from './parser/ast.js';
+import { MAX_PARSE_DEPTH, ParseError, parse } from './parser/parser.js';
 import { createMockRng } from './rng/mock.js';
+import type { RollOptions } from './roll.js';
+import { roll } from './roll.js';
 
 /** Runs `fn`, returning whatever it threw. Fails when nothing is thrown. */
 function captureError(fn: () => unknown): unknown {
@@ -153,4 +157,97 @@ describe('getErrorSpan', () => {
     expect(getErrorSpan(fractional)).toBeUndefined();
     expect(getErrorSpan(negative)).toBeUndefined();
   });
+});
+
+//
+// * Code contract
+//
+
+/**
+ * How one error code is provoked. `notation` cases go through the public
+ * `roll()` pipeline; `ast` cases hand-build a node the parser can never
+ * produce, which is the only way to reach the evaluator's exhaustiveness
+ * defaults.
+ */
+type CodeCase = { notation: string; options?: RollOptions } | { ast: ASTNode; why: string };
+
+// ? Deliberately outside the `ASTNode` union. Reaching `evalNode`'s
+//   exhaustiveness default is the whole point, and the parser cannot emit it.
+const UNKNOWN_NODE = { type: 'Nonesuch' } as unknown as ASTNode;
+
+// ? Same idea one level down: `evalBinary`'s operator switch is exhaustive
+//   over `BinaryOpNode['operator']`, so only a forged operator reaches it.
+const UNKNOWN_OPERATOR_NODE = {
+  type: 'BinaryOp',
+  operator: '^^',
+  left: { type: 'Literal', value: 1 },
+  right: { type: 'Literal', value: 2 },
+} as unknown as ASTNode;
+
+/**
+ * Every `RollParserErrorCode` mapped to an input that raises it.
+ *
+ * The `Record<RollParserErrorCode, …>` annotation is the completeness gate:
+ * adding a code to `ROLL_PARSER_ERROR_CODES` without adding a case here is a
+ * type error, so the contract cannot silently drift.
+ */
+const CODE_CASES: Record<RollParserErrorCode, CodeCase> = {
+  UNEXPECTED_CHARACTER: { notation: '2d6+&' },
+  UNEXPECTED_IDENTIFIER: { notation: '4d6zz' },
+  UNEXPECTED_TOKEN: { notation: '1 2' },
+  UNEXPECTED_END: { notation: '2d6+' },
+  EXPECTED_TOKEN: { notation: '(1+2' },
+  INVALID_DICE_COUNT: { notation: '(1/2)d6' },
+  INVALID_DICE_SIDES: { notation: '1d0' },
+  DICE_LIMIT_EXCEEDED: { notation: '20000d6' },
+  DIVISION_BY_ZERO: { notation: '1/0' },
+  MODULO_BY_ZERO: { notation: '5%0' },
+  UNKNOWN_OPERATOR: {
+    ast: UNKNOWN_OPERATOR_NODE,
+    why: 'the lexer only emits operators the evaluator switch already covers',
+  },
+  UNKNOWN_NODE_TYPE: {
+    ast: UNKNOWN_NODE,
+    why: 'the parser only builds node types the evaluator dispatch already covers',
+  },
+  INVALID_MODIFIER_COUNT: { notation: '4d6kh(0-1)' },
+  INVALID_MODIFIER_TARGET: { notation: '(1d6+5)kh1' },
+  EXPLODE_LIMIT_EXCEEDED: { notation: '1d1!' },
+  INVALID_EXPLODE_TARGET: { notation: '4dF!' },
+  REROLL_LIMIT_EXCEEDED: { notation: '1d1r<2' },
+  INVALID_REROLL_TARGET: { notation: '(1d6+5)r<2' },
+  INVALID_SUCCESS_COUNT_TARGET: { notation: '(1d6+5)>3' },
+  INVALID_SORT_TARGET: { notation: '5s' },
+  INVALID_CRIT_THRESHOLD_TARGET: { notation: '5cs>3' },
+  // `10**400` overflows to Infinity, which no finite threshold may be.
+  INVALID_THRESHOLD: { notation: '2d6cs>(10**400)' },
+  NESTED_VERSUS: { notation: '1d20 vs (5 vs 3)' },
+  INVALID_FUNCTION_ARITY: { notation: 'floor(1, 2)' },
+  UNKNOWN_FUNCTION: {
+    ast: { type: 'FunctionCall', name: 'sqrt', args: [{ type: 'Literal', value: 4 }] },
+    why: 'the lexer only tokenizes function names the evaluator registry knows',
+  },
+  UNDEFINED_VARIABLE: { notation: '@str' },
+  INVALID_VARIABLE_VALUE: { notation: '@str', options: { context: { str: Number.NaN } } },
+  AMBIGUOUS_DICE_CHAIN: { notation: '4d6d1' },
+  MAX_DEPTH_EXCEEDED: {
+    notation: `${'('.repeat(MAX_PARSE_DEPTH + 1)}1${')'.repeat(MAX_PARSE_DEPTH + 1)}`,
+  },
+  NON_FINITE_RESULT: { notation: '10**400' },
+};
+
+describe('error code contract', () => {
+  for (const [code, testCase] of Object.entries(CODE_CASES) as [RollParserErrorCode, CodeCase][]) {
+    test(`${code} is raised and typed`, () => {
+      const error = captureError(() =>
+        'ast' in testCase
+          ? evaluate(testCase.ast, createMockRng([]))
+          : roll(testCase.notation, { seed: 'code-contract', ...testCase.options }),
+      );
+
+      expect(isRollParserError(error)).toBe(true);
+      expect((error as RollParserError).code).toBe(code);
+      expect((error as Error).message).not.toBe('');
+    });
+  }
 });

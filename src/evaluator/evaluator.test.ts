@@ -13,7 +13,14 @@ import { SeededRNG } from '../rng/seeded.js';
 import type { DieResult } from '../types.js';
 import { DegreeOfSuccess } from '../types.js';
 import type { EvalContext } from './evaluator.js';
-import { DEFAULT_MAX_DICE, EvaluatorError, evaluate, mergeMetaRolls } from './evaluator.js';
+import {
+  DEFAULT_MAX_DICE,
+  DEFAULT_MAX_EXPLODE_ITERATIONS,
+  DEFAULT_MAX_REROLL_ITERATIONS,
+  EvaluatorError,
+  evaluate,
+  mergeMetaRolls,
+} from './evaluator.js';
 
 /**
  * Helper to safely get a die result at index, throwing if not present.
@@ -3437,6 +3444,150 @@ describe('evaluate', () => {
       expect(result.total).toBe(1);
       expect(result.rolls.map((d) => d.fumble)).toEqual([true]);
       expect(result.expression).toBe('{1d6}kh1cf<2');
+    });
+  });
+
+  describe('cross-family modifier combinations (#134)', () => {
+    // Draw order per `.claude/rules/rng.md`: keep/drop counts resolve before
+    // the base pool (all literal here, so no meta draws), threshold-style
+    // modifiers post-process a pool that already exists. Every sequence below
+    // is therefore `pool dice left-to-right, then explosion/reroll follow-ups`.
+
+    test('4d6!!kh3 compounds first, then keeps the highest three', () => {
+      // Draws: 4d6 pool [6, 3, 2, 5], then die 1 compounds on its 6 → 4.
+      const result = evaluate(parse('4d6!!kh3'), createMockRng([6, 3, 2, 5, 4]));
+
+      expect(result.rolls).toHaveLength(4);
+      expect(getDie(result.rolls, 0).result).toBe(10);
+      expect(getDie(result.rolls, 0).initialResult).toBe(6);
+      expect(getDie(result.rolls, 0).modifiers).toContain('exploded');
+      expect(getDie(result.rolls, 2).modifiers).toContain('dropped');
+      // Compound explode keeps the pool at four dice, so kh3 drops exactly one.
+      expect(result.total).toBe(10 + 3 + 5);
+      expect(result.rendered).toBe('4d6!![10, 3, ~~2~~, 5] = 18');
+    });
+
+    test('4d6!pkh3 keeps the highest three of the penetrated pool', () => {
+      // Draws: 4d6 pool [6, 3, 2, 5], then die 1 penetrates on its 6 → raw 4,
+      // stored as 3. The appended die sits directly after its originator, so
+      // the pool becomes [6, 3, 3, 2, 5] before kh3 selects.
+      const result = evaluate(parse('4d6!pkh3'), createMockRng([6, 3, 2, 5, 4]));
+
+      expect(result.rolls).toHaveLength(5);
+      expect(getDie(result.rolls, 1).result).toBe(3);
+      expect(getDie(result.rolls, 1).modifiers).toContain('exploded');
+      expect(result.rolls.map((die) => die.modifiers.includes('dropped'))).toEqual([
+        false,
+        false,
+        true,
+        true,
+        false,
+      ]);
+      expect(result.total).toBe(6 + 3 + 5);
+    });
+
+    test('4d6!pdl1 drops one die from the penetrated pool', () => {
+      // Same draws as above; dl1 removes only the lowest of the five.
+      const result = evaluate(parse('4d6!pdl1'), createMockRng([6, 3, 2, 5, 4]));
+
+      expect(result.rolls).toHaveLength(5);
+      expect(getDie(result.rolls, 3).result).toBe(2);
+      expect(getDie(result.rolls, 3).modifiers).toContain('dropped');
+      expect(result.total).toBe(6 + 3 + 3 + 5);
+    });
+
+    test('4d6cf<2r<3 flags fumbles before the reroll replaces the die', () => {
+      // Draws: 4d6 pool [1, 5, 2, 4], then one replacement per matching die —
+      // 6 for the 1, 3 for the 2. `cf<2` is the inner modifier, so the flag
+      // lands on the original die even though the reroll then drops it.
+      const result = evaluate(parse('4d6cf<2r<3'), createMockRng([1, 5, 2, 4, 6, 3]));
+
+      expect(result.rolls).toHaveLength(6);
+      expect(getDie(result.rolls, 0).fumble).toBe(true);
+      expect(getDie(result.rolls, 0).modifiers).toEqual(['rerolled', 'dropped']);
+      // The replacement dice were rolled after `cf` ran, so they keep the
+      // default fumble rule (`result === 1`).
+      expect(getDie(result.rolls, 1).fumble).toBe(false);
+      expect(result.total).toBe(6 + 5 + 3 + 4);
+      expect(result.rendered).toBe('4d6cf<2r<3[~~1~~, 6, 5, ~~2~~, 3, 4] = 18');
+    });
+
+    test('6d6!!>=8 binds the comparison to the explode, not to success counting', () => {
+      // `>=8` is unreachable on a d6, so nothing compounds and the result is a
+      // plain sum — `successes` stays undefined, proving this is not a
+      // SuccessCount node.
+      const result = evaluate(parse('6d6!!>=8'), createMockRng([6, 3, 2, 5, 4, 6]));
+
+      expect(result.rolls).toHaveLength(6);
+      expect(result.rolls.some((die) => die.modifiers.includes('exploded'))).toBe(false);
+      expect(result.successes).toBeUndefined();
+      expect(result.failures).toBeUndefined();
+      expect(result.total).toBe(26);
+    });
+  });
+
+  describe('iteration limits (#134)', () => {
+    test('DEFAULT_MAX_EXPLODE_ITERATIONS is 1,000', () => {
+      expect(DEFAULT_MAX_EXPLODE_ITERATIONS).toBe(1_000);
+    });
+
+    test('DEFAULT_MAX_REROLL_ITERATIONS is 1,000', () => {
+      expect(DEFAULT_MAX_REROLL_ITERATIONS).toBe(1_000);
+    });
+
+    test('1d1r<2 terminates on the default reroll cap with no override', () => {
+      const error = captureError(() => evaluate(parse('1d1r<2'), new SeededRNG('cap')));
+
+      expect((error as EvaluatorError).code).toBe('REROLL_LIMIT_EXCEEDED');
+      expect((error as Error).message).toBe(
+        `Reroll iteration limit of ${DEFAULT_MAX_REROLL_ITERATIONS} exceeded`,
+      );
+    });
+
+    test('1d1! terminates on the default cap with no override', () => {
+      const error = captureError(() => evaluate(parse('1d1!'), new SeededRNG('cap')));
+
+      expect(error).toBeInstanceOf(EvaluatorError);
+      expect((error as EvaluatorError).code).toBe('EXPLODE_LIMIT_EXCEEDED');
+      expect((error as Error).message).toBe(
+        `Explode iteration limit of ${DEFAULT_MAX_EXPLODE_ITERATIONS} exceeded`,
+      );
+    });
+
+    test('1d1!p is capped the same way as standard explode', () => {
+      const error = captureError(() =>
+        evaluate(parse('1d1!p'), new SeededRNG('cap'), { maxExplodeIterations: 3 }),
+      );
+
+      expect((error as EvaluatorError).code).toBe('EXPLODE_LIMIT_EXCEEDED');
+      expect((error as Error).message).toBe('Explode iteration limit of 3 exceeded');
+    });
+
+    test('a penetrating chain just under the cap completes', () => {
+      // Three explosions then a non-matching roll: raw 6,6,6,2 → stored
+      // 6 + 5 + 5 + 1.
+      const result = evaluate(parse('1d6!p'), createMockRng([6, 6, 6, 2]), {
+        maxExplodeIterations: 3,
+      });
+
+      expect(result.rolls).toHaveLength(4);
+      expect(result.total).toBe(6 + 5 + 5 + 1);
+    });
+
+    test('a Fate pool reaching the explode evaluator never rolls a zero-sided die', () => {
+      // ? Hand-built AST — `parseExplode` rejects `2dF!` with
+      //   INVALID_EXPLODE_TARGET, so `canExplode`'s `sides < 1` guard is only
+      //   reachable from a tree the parser cannot produce.
+      const ast: ASTNode = {
+        type: 'Explode',
+        variant: 'standard',
+        target: { type: 'FateDice', count: { type: 'Literal', value: 2 } },
+      };
+      const result = evaluate(ast, createMockRng([1, 1]));
+
+      expect(result.rolls).toHaveLength(2);
+      expect(result.rolls.every((die) => die.sides === 0)).toBe(true);
+      expect(result.total).toBe(2);
     });
   });
 
