@@ -1,0 +1,109 @@
+# Contributing
+
+Thanks for helping out. Bug reports, notation gaps, and pull requests are all
+welcome — open an [issue](https://github.com/edloidas/roll-parser/issues) first
+for anything larger than a fix.
+
+## Toolchain
+
+**[Bun](https://bun.sh) only.** Do not use npm, yarn, or pnpm in this
+repository. Bun is the test runner (`bun test`), the bundler (`bun build`
+produces `dist/`), the script runner, and the package manager whose lockfile
+(`bun.lock`) is committed. Installing with another manager writes a competing
+lockfile and produces a different dependency tree than CI resolves.
+
+```bash
+bun install     # also installs the pre-commit hook
+bun check:fix   # typecheck + biome check --write (lint, format, import sort)
+bun test        # 1272 tests, ~2s
+bun validate    # full gate: check, build, package checks, size budgets, coverage
+```
+
+Run `bun check:fix` and `bun test` while you work; run `bun validate` before
+opening a pull request. `bun test:ci` adds coverage, gated at 95% lines and
+100% functions per `bunfig.toml` — `.claude/rules/testing.md` restates those
+numbers and must be updated alongside them.
+
+## Pre-commit hook
+
+`bun install` runs the `prepare` script, which points `core.hooksPath` at
+`.githooks/`. The hook runs [nano-staged](https://github.com/usmanyunusov/nano-staged),
+which applies `biome check --write` to staged `.ts`/`.tsx` files and re-stages
+the result. Formatting and lint fixes land automatically; anything Biome cannot
+fix blocks the commit.
+
+## Code conventions
+
+Coding standards live in `.claude/rules/`: `typescript.md` (style, naming,
+types), `comments.md` (the `// !`, `// ?`, `// *`, `// TODO:` prefixes),
+`testing.md`, and `rng.md` (the `RNG` contract and MockRNG draw order). A few
+constraints worth calling out:
+
+- Relative imports inside `src/` carry explicit `.js` extensions. Without them
+  the emitted `.d.ts` is not resolvable under `moduleResolution: nodenext`,
+  which `bun run check:package` catches.
+- Nothing in the library may call `Math.random()` directly, and nothing outside
+  `src/cli/` may import from `node:` — the library has to stay browser-safe.
+- Every code sample in a JSDoc `@example` or in `README.md` must be executed
+  and produce the output it claims.
+
+## Commits and pull requests
+
+[Conventional Commits](https://www.conventionalcommits.org/), with the issue
+number appended:
+
+```
+<type>: <description> #<issue>
+```
+
+Types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `perf`,
+`build`, `ci`. Imperative mood, under 72 characters, no trailing period. The
+optional body is past tense, one line per change, backticks around code
+references. Add a `Changelog: skip` trailer to keep a commit out of the release
+notes.
+
+A pull request should be a single commit when it merges — squash locally and
+force-push rather than merging a chain of fixups.
+
+## Site and API reference
+
+The demo site in `site/` is deployed to Cloudflare Pages.
+
+```bash
+bun site:dev      # Bun HTML dev server with HMR (no TypeDoc, so /docs/ is absent)
+bun site:build    # full static build into site/dist/, including the TypeDoc reference
+bun site:check    # verify site/dist/ — assets resolve, no dev paths leaked
+bun site:preview  # build, then serve site/dist/ with host-style routing
+```
+
+TypeDoc lives in the `scripts/docs` workspace rather than the root, and
+`site:build` invokes it from `scripts/docs/node_modules/.bin/typedoc`. TypeDoc
+0.28.x peers at TypeScript `<=6.0.x` and throws on the root `typescript@7`, so
+that workspace nests its own `typescript@6` for TypeDoc to resolve. Nesting is
+required rather than a scoped republish, because TypeDoc imports the bare
+`typescript` specifier. Do not fold the workspace back into the root — the root
+install would hand TypeDoc TypeScript 7 and `site:build` would fail. It can go
+away once TypeDoc 1.0 supports TypeScript 7.
+
+## Publishing
+
+`package.json`'s `files` ships `src/` alongside `dist/`. That is deliberate:
+`declarationMap: true` emits `.d.ts.map` files pointing back at the TypeScript
+sources, so a consumer's "go to definition" lands on real code instead of a
+declaration stub. Removing `src/` from `files` breaks that silently — nothing
+fails, the jumps just stop working.
+
+## Releasing
+
+Maintainers only.
+
+1. Update `CHANGELOG.md` for the target version — `bun run check:changelog`
+   fails without a section for it, and `release:dry` fails at that step.
+   Sections are ordered Added, Changed, Deprecated, Removed, Fixed, Security,
+   Documentation.
+2. Bump `package.json` and commit it on its own as
+   `chore: release v<version>`. Never tag a pre-existing unrelated commit.
+3. Tag that commit `v<version>` and push the tag; `.github/workflows/release.yml`
+   takes it from there.
+
+`bun run release:dry` runs the whole gate locally first.

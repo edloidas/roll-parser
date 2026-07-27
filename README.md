@@ -683,9 +683,9 @@ Run `bun run bench` for the full suite, or `bench:lex` / `bench:parse` /
 ## Contributing
 
 Bug reports, notation gaps, and pull requests are welcome — open an
-[issue](https://github.com/edloidas/roll-parser/issues) to start. The toolchain
-is Bun-only: `bun install`, then `bun check:fix` and `bun test` while you work,
-and `bun validate` before you push.
+[issue](https://github.com/edloidas/roll-parser/issues) to start. See
+[CONTRIBUTING.md](CONTRIBUTING.md) for the Bun-only toolchain, the pre-commit
+hook, commit conventions, and the release flow.
 
 ## License
 
