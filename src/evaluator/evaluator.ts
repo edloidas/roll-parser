@@ -69,7 +69,16 @@ export { EvaluatorError };
 // * Limits
 //
 
-/** Default maximum total dice allowed per evaluation. */
+/**
+ * Default value of `EvaluationLimits.maxDice`: the number of dice a single
+ * evaluation may roll before `DICE_LIMIT_EXCEEDED` is thrown.
+ *
+ * Counted across the whole expression, not per pool, so `6000d6+6000d6`
+ * breaches it. Includes dice rolled by explosions, rerolls, and
+ * meta-expressions.
+ *
+ * @category Limits
+ */
 export const DEFAULT_MAX_DICE = 10_000;
 
 /**
@@ -1528,20 +1537,39 @@ function evalVersus(node: VersusNode, rng: RNG, ctx: EvalContext, env: EvalEnv):
 //
 
 /**
- * Evaluates a parsed AST and returns the roll result.
+ * Evaluates a parsed AST against an {@link RNG} and returns the roll result.
  *
- * @param ast - The parsed AST node
- * @param rng - Random number generator to use for dice rolls
- * @param options - Optional evaluation options
- * @returns Complete roll result with total and metadata
+ * The second half of the pipeline — {@link roll} is `evaluate(parse(...))`.
+ * Call it directly to reuse one AST across many rolls, or to drive a
+ * hand-built AST.
+ *
+ * Unlike `roll`, the RNG is required: `evaluate` never invents a randomness
+ * source, so a caller can never accidentally get an unseeded roll.
+ *
+ * @param ast - The AST to evaluate, from {@link parse} or hand-built
+ * @param rng - Randomness source; one `nextInt` call per die
+ * @param options - Evaluation limits plus the original `notation` string,
+ *   which the AST cannot supply
+ * @returns Complete {@link RollResult}
+ * @throws {EvaluatorError} On a limit breach, division by zero, an undefined
+ *   variable, or a non-finite total
  *
  * @example
  * ```typescript
+ * import { evaluate, parse } from 'roll-parser';
+ * import { createMockRng } from 'roll-parser/testing';
+ *
  * const ast = parse('2d6+3');
- * const rng = new SeededRNG('test');
- * const result = evaluate(ast, rng);
- * console.log(result.total); // Sum of dice plus 3
+ * const result = evaluate(ast, createMockRng([4, 2]), { notation: '2d6+3' });
+ * result.total; // 9
+ * result.rendered; // '2d6[4, 2] + 3 = 9'
  * ```
+ *
+ * Omitting `notation` falls back to the normalized `expression`, which is
+ * reconstructed from the AST — so `RollResult.notation` is always a string,
+ * just not necessarily the one the user typed.
+ *
+ * @category Core
  */
 export function evaluate(ast: ASTNode, rng: RNG, options: EvaluateOptions = {}): RollResult {
   const maxDice = clampLimit(options.maxDice, DEFAULT_MAX_DICE, SMALLEST_POSITIVE);

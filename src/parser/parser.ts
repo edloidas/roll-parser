@@ -45,9 +45,30 @@ import {
  * `position` is a zero-based UTF-16 offset into the notation. It is
  * deliberately absent from `message` — read it from the field, or uniformly
  * across all roll-parser errors via `getErrorSpan`.
+ *
+ * @example
+ * ```typescript
+ * import { ParseError, roll, TokenType } from 'roll-parser';
+ *
+ * try {
+ *   roll('4d6d1');
+ * } catch (error) {
+ *   const typed = error as ParseError;
+ *   typed.code; // 'AMBIGUOUS_DICE_CHAIN'
+ *   typed.position; // 3
+ *   typed.token?.type === TokenType.DICE; // true
+ * }
+ * ```
+ *
+ * @category Errors
  */
 export class ParseError extends RollParserError {
+  /** Zero-based UTF-16 offset in the notation where parsing failed. */
   readonly position: number;
+  /**
+   * The token the parser was looking at. `undefined` when the failure is not
+   * anchored to a token — currently only `MAX_DEPTH_EXCEEDED`.
+   */
   readonly token: Token | undefined;
 
   constructor(
@@ -109,6 +130,24 @@ const BP = {
  * `ParseError` instead of an uncaught `RangeError` stack overflow (which
  * would also break the `isRollParserError` contract). Bounding parse depth
  * also bounds AST depth, protecting the recursive AST walkers and evaluator.
+ *
+ * Not configurable — unlike the {@link EvaluationLimits} caps, this one always
+ * applies, so untrusted notation can never blow the stack.
+ *
+ * @example
+ * ```typescript
+ * import { isRollParserError, MAX_PARSE_DEPTH, parse } from 'roll-parser';
+ *
+ * MAX_PARSE_DEPTH; // 128
+ *
+ * try {
+ *   parse('('.repeat(20_000) + '1d6' + ')'.repeat(20_000));
+ * } catch (error) {
+ *   isRollParserError(error) && error.code; // 'MAX_DEPTH_EXCEEDED'
+ * }
+ * ```
+ *
+ * @category Limits
  */
 export const MAX_PARSE_DEPTH = 128;
 
@@ -1257,20 +1296,47 @@ export class Parser {
 }
 
 /**
- * Parse a dice notation string into an AST.
+ * Parses a dice notation string into an {@link ASTNode} tree, lexing it first.
+ *
+ * The AST is immutable data, so parse once and {@link evaluate} many times
+ * when rolling the same notation repeatedly — that skips the lexer and parser
+ * on every roll after the first. Use `parse` alone to validate notation
+ * without consuming randomness.
  *
  * @param notation - The dice notation to parse
- * @returns The root AST node
+ * @returns The root AST node, with `start`/`end` spans on every node
  * @throws {LexerError} If the input contains invalid characters
  * @throws {ParseError} If the input has invalid syntax
  *
  * @example
  * ```typescript
- * const ast = parse('2d6+3');
- * // { type: 'BinaryOp', operator: '+',
- * //   left: { type: 'Dice', count: 2, sides: 6 },
- * //   right: { type: 'Literal', value: 3 } }
+ * import { parse } from 'roll-parser';
+ *
+ * parse('2d6+3');
+ * // {
+ * //   type: 'BinaryOp', operator: '+', start: 0, end: 5,
+ * //   left: {
+ * //     type: 'Dice', start: 0, end: 3,
+ * //     count: { type: 'Literal', value: 2, start: 0, end: 1 },
+ * //     sides: { type: 'Literal', value: 6, start: 2, end: 3 },
+ * //   },
+ * //   right: { type: 'Literal', value: 3, start: 4, end: 5 },
+ * // }
  * ```
+ *
+ * `count` and `sides` are full nodes, not numbers — that is what makes
+ * computed dice like `(1d4)d6` expressible.
+ *
+ * @example Parse once, roll many
+ * ```typescript
+ * import { evaluate, parse, SeededRNG } from 'roll-parser';
+ *
+ * const ast = parse('4d6kh3');
+ * const rng = new SeededRNG('demo');
+ * const scores = Array.from({ length: 6 }, () => evaluate(ast, rng).total);
+ * ```
+ *
+ * @category Core
  */
 export function parse(notation: string): ASTNode {
   const tokens = lex(notation);

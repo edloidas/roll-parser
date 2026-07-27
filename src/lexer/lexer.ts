@@ -14,9 +14,34 @@ import { type Token, TokenType } from './tokens.js';
  * `position` is a zero-based UTF-16 offset into the input. It is deliberately
  * absent from `message` — read it from the field, or uniformly across all
  * roll-parser errors via `getErrorSpan`.
+ *
+ * Codes: `UNEXPECTED_CHARACTER` for a character that cannot start any token,
+ * `UNEXPECTED_IDENTIFIER` for a word that is not a known keyword.
+ *
+ * @example
+ * ```typescript
+ * import { LexerError, roll } from 'roll-parser';
+ *
+ * try {
+ *   roll('2d6+&');
+ * } catch (error) {
+ *   const typed = error as LexerError;
+ *   typed.code; // 'UNEXPECTED_CHARACTER'
+ *   typed.character; // '&'
+ *   typed.position; // 4
+ * }
+ * ```
+ *
+ * @category Errors
  */
 export class LexerError extends RollParserError {
+  /** Zero-based UTF-16 offset of the offending character in the input. */
   readonly position: number;
+  /**
+   * The offending text — a single character for `UNEXPECTED_CHARACTER` (the
+   * whole code point, so astral symbols are not split into surrogates), or
+   * the unrecognized word for `UNEXPECTED_IDENTIFIER`.
+   */
   readonly character: string;
 
   constructor(
@@ -384,17 +409,31 @@ export class Lexer {
 }
 
 /**
- * Tokenize a dice notation string.
+ * Tokenizes a dice notation string. The first stage of the pipeline —
+ * {@link parse} calls it for you; reach for `lex` directly only to build a
+ * syntax highlighter or an editor integration.
+ *
+ * Notation is case-insensitive and whitespace-tolerant: `2D20 + 5` and
+ * `2d20+5` produce the same tokens, and identifier tokens carry a lowercased
+ * `value`. The one exception is `@name`, whose case is preserved.
  *
  * @param input - The dice notation to tokenize
- * @returns Array of tokens including EOF
- * @throws {LexerError} If an invalid character is encountered
+ * @returns Every token in source order, always ending with one
+ *   `TokenType.EOF` token
+ * @throws {LexerError} If an invalid character or unknown identifier is found
  *
  * @example
  * ```typescript
+ * import { lex, TokenType } from 'roll-parser';
+ *
  * const tokens = lex('2d20+5');
- * // [NUMBER(2), DICE, NUMBER(20), PLUS, NUMBER(5), EOF]
+ * tokens.length; // 6 — NUMBER DICE NUMBER PLUS NUMBER EOF
+ * tokens[0]; // { type: TokenType.NUMBER, value: '2', position: 0, end: 1 }
+ * tokens[1].type === TokenType.DICE; // true
+ * tokens.at(-1)?.type === TokenType.EOF; // true
  * ```
+ *
+ * @category Core
  */
 export function lex(input: string): Token[] {
   return new Lexer(input).tokenize();

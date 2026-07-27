@@ -7,15 +7,22 @@
 import type { ASTNode } from './parser/ast.js';
 
 /**
- * Comparison operator for compare points.
+ * Comparison operator for compare points. Spelled exactly as it appears in
+ * notation — `4d6!>=5` carries `'>='`, bare `f1` normalizes to `'='`.
+ *
+ * @category AST
  */
 export type CompareOp = '>' | '>=' | '<' | '<=' | '=';
 
 /**
- * A comparison threshold used by exploding dice, reroll, and success counting.
+ * A comparison threshold used by exploding dice, reroll, success counting, and
+ * crit-threshold overrides.
  *
- * The value is an ASTNode to support computed thresholds (e.g., `>=ceil(5)`),
- * matching the pattern used by DiceNode.count and DiceNode.sides.
+ * The value is an {@link ASTNode} to support computed thresholds
+ * (`1d6!>(1d2+3)`), matching the pattern used by `DiceNode.count` and
+ * `DiceNode.sides`. The evaluated counterpart is {@link ResolvedComparePoint}.
+ *
+ * @category AST
  */
 export type ComparePoint = {
   readonly operator: CompareOp;
@@ -23,8 +30,11 @@ export type ComparePoint = {
 };
 
 /**
- * A ComparePoint whose value has been evaluated to a number. Used in
- * `RollPart` where meta-expressions are already resolved.
+ * A {@link ComparePoint} whose value has been evaluated to a number. Used
+ * throughout {@link RollPart}, where meta-expressions are already resolved —
+ * `1d6!>(1d2+3)` surfaces as `{ operator: '>', value: 5 }`.
+ *
+ * @category Results
  */
 export type ResolvedComparePoint = {
   readonly operator: CompareOp;
@@ -33,12 +43,36 @@ export type ResolvedComparePoint = {
 
 /**
  * A resolved crit threshold — `'default'` means the per-die default rule
- * (`result === sides` for critical, `result === 1` for fumble).
+ * (`result === sides` for critical, `result === 1` for fumble), which is what
+ * bare `cs` / `cf` produce.
+ *
+ * @category Results
  */
 export type ResolvedCritThreshold = ResolvedComparePoint | 'default';
 
 /**
- * Modifier flags applied to individual die results.
+ * Tags attached to a {@link DieResult} by the evaluator. A die can carry more
+ * than one (an exploded die that was later dropped is `['dropped',
+ * 'exploded']`), and the set drives the markers in `RollResult.rendered`.
+ *
+ * | Tag | Meaning | Rendered as |
+ * |-----|---------|-------------|
+ * | `'kept'` | Counted toward the total. Every non-dropped die carries it. | plain |
+ * | `'dropped'` | Excluded from the total by `kh`/`kl`/`dh`/`dl` or group selection. | `~~n~~` |
+ * | `'exploded'` | Produced by, or the trigger of, an explosion (`!`, `!!`, `!p`). | plain |
+ * | `'rerolled'` | The die was re-rolled by `r` / `ro`; the value shown is the final one. | plain |
+ * | `'success'` | Met a success-count threshold (`>=6`). | `**n**` |
+ * | `'failure'` | Met a failure threshold (`f1`). | `__n__` |
+ * | `'meta'` | Rolled by a meta-expression rather than by the visible pool. | not shown |
+ *
+ * `'meta'` is the one tag with no counterpart in the notation. Dice counts,
+ * sides, modifier counts and computed thresholds may themselves be dice
+ * (`(1d4)d6`, `4d6kh(1d2)`, `1d6!>(1d2+3)`). Those inner dice are not part of
+ * any pool, so they never appear in a {@link RollPart}; they are appended to
+ * `RollResult.rolls` tagged `'meta'` so an audit log can still show what the
+ * meta-expression rolled. Filter them out when summing or displaying a pool.
+ *
+ * @category Results
  */
 export type DieModifier =
   | 'dropped'
@@ -53,6 +87,27 @@ export type DieModifier =
  * PF2e Degree of Success. Produced by the `vs` operator when comparing a
  * roll against a Difficulty Class. Ordering is significant — natural 20
  * upgrades one step and natural 1 downgrades one step.
+ *
+ * Numeric by design: the enum members are plain numbers, so `--json` CLI
+ * output and `JSON.stringify` emit `0`–`3` and comparisons like
+ * `degree >= DegreeOfSuccess.Success` work.
+ *
+ * @example
+ * ```typescript
+ * import { DegreeOfSuccess, roll } from 'roll-parser';
+ * import { createMockRng } from 'roll-parser/testing';
+ *
+ * const result = roll('1d20+7 vs 15', { rng: createMockRng([12]) });
+ * result.degree; // DegreeOfSuccess.Success (2)
+ * result.natural; // 12 — the raw d20 face, used for the ±1 step
+ * result.rendered; // '1d20[12] + 7 vs 15 = Success'
+ *
+ * if (result.degree != null && result.degree >= DegreeOfSuccess.Success) {
+ *   // hit
+ * }
+ * ```
+ *
+ * @category Results
  */
 export enum DegreeOfSuccess {
   CriticalFailure = 0,
@@ -62,7 +117,25 @@ export enum DegreeOfSuccess {
 }
 
 /**
- * Individual die roll result with metadata.
+ * One physical die and everything the evaluator learned about it.
+ *
+ * The same object is shared between `RollResult.rolls` and the `rolls[]` of
+ * the {@link RollPart} that produced it — there is no deep clone, so mutating
+ * a die is visible through both views.
+ *
+ * @example
+ * ```typescript
+ * import { roll } from 'roll-parser';
+ * import { createMockRng } from 'roll-parser/testing';
+ *
+ * const result = roll('4d6kh3', { rng: createMockRng([3, 6, 2, 5]) });
+ * result.rolls[1];
+ * // { sides: 6, result: 6, modifiers: ['kept'], critical: true, fumble: false }
+ * result.rolls[2];
+ * // { sides: 6, result: 2, modifiers: ['dropped'], critical: false, fumble: false }
+ * ```
+ *
+ * @category Results
  */
 export type DieResult = {
   /**
@@ -92,6 +165,12 @@ export type DieResult = {
  * Per-spec keep/drop entry inside a flattened modifier chain. Counts are
  * resolved at evaluation time (meta-expressions like `kh(1d2)` become the
  * rolled number).
+ *
+ * Chained keep/drop modifiers flatten into one list — `4d6kh3dl1` yields two
+ * specs against a single pool, each applied independently, with drop sets
+ * unioned (Roll20 semantics).
+ *
+ * @category Results
  */
 export type ModifierSpec = {
   readonly kind: 'keep' | 'drop';
@@ -129,6 +208,61 @@ type RollPartBase = {
  * thresholds) are not surfaced as nested parts — their resolved numbers
  * appear in the owning part, and their dice are inspectable in
  * `RollResult.rolls` via the `'meta'` modifier tag.
+ *
+ * @example Walking the tree with an exhaustive switch
+ * ```typescript
+ * import type { RollPart } from 'roll-parser';
+ *
+ * function describe(part: RollPart): string {
+ *   switch (part.type) {
+ *     case 'literal':
+ *       return String(part.value);
+ *     case 'variable':
+ *       return `@${part.name}`;
+ *     case 'dice':
+ *       return `${part.count}d${part.sides}[${part.rolls.map((d) => d.result).join(', ')}]`;
+ *     case 'fateDice':
+ *       return `${part.count}dF`;
+ *     case 'grouped':
+ *       return `(${describe(part.inner)})`;
+ *     case 'binaryOp':
+ *       return `${describe(part.left)} ${part.operator} ${describe(part.right)}`;
+ *     case 'unaryOp':
+ *       return `-${describe(part.operand)}`;
+ *     case 'modifier':
+ *       return `${describe(part.target)} [${part.specs.length} keep/drop]`;
+ *     case 'explode':
+ *       return `${describe(part.target)} (${part.variant} explode)`;
+ *     case 'reroll':
+ *       return `${describe(part.target)} (reroll${part.once ? ' once' : ''})`;
+ *     case 'successCount':
+ *       return `${describe(part.target)} => ${part.successes}-${part.failures}`;
+ *     case 'versus':
+ *       return `${describe(part.roll)} vs ${describe(part.dc)}`;
+ *     case 'functionCall':
+ *       return `${part.name}(${part.args.map(describe).join(', ')})`;
+ *     case 'group':
+ *       return `{${part.parts.map(describe).join(', ')}}`;
+ *     case 'sort':
+ *       return `${describe(part.target)} (${part.order})`;
+ *     case 'critThreshold':
+ *       return `${describe(part.target)} (crit override)`;
+ *   }
+ * }
+ * ```
+ *
+ * @example Reading a concrete tree
+ * ```typescript
+ * import { roll } from 'roll-parser';
+ * import { createMockRng } from 'roll-parser/testing';
+ *
+ * const result = roll('4d6kh3 + 2', { rng: createMockRng([3, 6, 2, 5]) });
+ * result.parts.type; // 'binaryOp'
+ * result.parts.total; // 16 — always equal to result.total
+ * describe(result.parts); // '4d6[3, 6, 2, 5] [1 keep/drop] + 2'
+ * ```
+ *
+ * @category Results
  */
 export type RollPart =
   | (RollPartBase & { type: 'literal'; value: number })
@@ -175,15 +309,51 @@ export type RollPart =
       target: RollPart;
     });
 
-/** Convenience alias for consumers writing exhaustive switches. */
+/**
+ * The 16 discriminant strings of {@link RollPart}. Convenience alias for
+ * consumers writing exhaustive switches or part-type lookup tables.
+ *
+ * @category Results
+ */
 export type RollPartType = RollPart['type'];
 
 /**
- * Complete roll result with all metadata.
+ * Complete roll result with all metadata — what {@link roll} and
+ * {@link evaluate} return.
  *
  * The top level is `Readonly` — a result describes one completed evaluation
  * and is never re-targeted. The `rolls` array and the `parts` tree stay
  * mutable so consumers can annotate or re-sort their own views.
+ *
+ * Fully JSON-serializable; this is exactly what the CLI's `--json` flag emits.
+ *
+ * @example
+ * ```typescript
+ * import { roll } from 'roll-parser';
+ * import { createMockRng } from 'roll-parser/testing';
+ *
+ * const result = roll('3d6', { rng: createMockRng([4, 2, 6]) });
+ *
+ * JSON.stringify(result);
+ * // {
+ * //   "total": 12,
+ * //   "notation": "3d6",
+ * //   "expression": "3d6",
+ * //   "rendered": "3d6[4, 2, 6] = 12",
+ * //   "rolls": [
+ * //     { "sides": 6, "result": 4, "modifiers": ["kept"], "critical": false, "fumble": false },
+ * //     { "sides": 6, "result": 2, "modifiers": ["kept"], "critical": false, "fumble": false },
+ * //     { "sides": 6, "result": 6, "modifiers": ["kept"], "critical": true,  "fumble": false }
+ * //   ],
+ * //   "parts": {
+ * //     "type": "dice", "count": 3, "sides": 6,
+ * //     "rolls": [ ...the same three objects... ],
+ * //     "total": 12, "start": 0, "end": 3
+ * //   }
+ * // }
+ * ```
+ *
+ * @category Results
  */
 export type RollResult = Readonly<{
   /** Final computed total */
@@ -232,6 +402,38 @@ export type RollResult = Readonly<{
  * Evaluation guardrails and variable resolution, shared by `EvaluateOptions`
  * and `RollOptions`. Every field is optional — the defaults bound adversarial
  * notation without capping any realistic expression.
+ *
+ * Tighten them when the notation comes from users you do not control; the
+ * caps are the difference between a typed `EvaluatorError` and a request that
+ * rolls ten million dice. Parse depth is capped separately and
+ * unconditionally by {@link MAX_PARSE_DEPTH}.
+ *
+ * @example Untrusted input
+ * ```typescript
+ * import { isRollParserError, roll } from 'roll-parser';
+ *
+ * const limits = {
+ *   maxDice: 100,
+ *   maxExplodeIterations: 20,
+ *   maxRerollIterations: 20,
+ * };
+ *
+ * try {
+ *   roll('99999d6', limits).total;
+ * } catch (error) {
+ *   isRollParserError(error) && error.code; // 'DICE_LIMIT_EXCEEDED'
+ * }
+ * ```
+ *
+ * @example Variables
+ * ```typescript
+ * import { roll } from 'roll-parser';
+ *
+ * roll('1d20+@str', { context: { str: 4 }, seed: 'demo' }).total; // 16
+ * roll('1d20+@str', { onMissingVariable: 'zero', seed: 'demo' }).total; // 12
+ * ```
+ *
+ * @category Core
  */
 export type EvaluationLimits = {
   /** Maximum total dice allowed per evaluation (default: 10,000) */
@@ -247,9 +449,15 @@ export type EvaluationLimits = {
 };
 
 /**
- * Options for the evaluate function.
+ * Options for {@link evaluate}: the shared {@link EvaluationLimits} plus the
+ * original notation, which `evaluate` cannot recover from an AST.
+ *
+ * @category Core
  */
 export type EvaluateOptions = EvaluationLimits & {
-  /** Original notation string (for result metadata) */
+  /**
+   * Original notation string, echoed back as `RollResult.notation`. Defaults
+   * to the empty string when omitted — {@link roll} always forwards it.
+   */
   notation?: string;
 };

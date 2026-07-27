@@ -14,7 +14,15 @@ import type { CompareOp, DieResult } from '../../types.js';
 import { createDieResult } from '../die.js';
 import { chargeDie, type EvalEnv } from '../env.js';
 
-/** Default maximum explosion iterations per die. */
+/**
+ * Default value of `EvaluationLimits.maxExplodeIterations`: how many times a
+ * single die may explode before `EXPLODE_LIMIT_EXCEEDED` is thrown.
+ *
+ * Per die, not per pool — it bounds notations like `1d1!`, where the
+ * explosion condition can never stop being true.
+ *
+ * @category Limits
+ */
 export const DEFAULT_MAX_EXPLODE_ITERATIONS = 1_000;
 
 /**

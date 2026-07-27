@@ -9,7 +9,13 @@
   "excludeInternal": true,
   "excludePrivate": true,
   "excludeExternals": true,
-  "categorizeByGroup": true,
+  "categorizeByGroup": false,
+  "categoryOrder": ["Core", "Results", "AST", "Errors", "RNG", "Limits", "Testing", "*"],
+  "defaultCategory": "Other",
+  "navigation": {
+    "includeCategories": true,
+    "includeGroups": false
+  },
   "hideGenerator": true,
   "customCss": "site/typedoc.css",
   "customJs": "site/typedoc.js",
