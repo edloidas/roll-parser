@@ -7,15 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [3.0.0-beta.0] - 2026-07-07
+### Added
+
+- CLI `--json` flag that emits the complete `RollResult`, including the structured `parts` tree, as compact JSON on stdout. `DegreeOfSuccess` serializes as its numeric value; diagnostics stay plain text on stderr, so scripts can branch on the exit code before parsing ([#136](https://github.com/edloidas/roll-parser/issues/136))
+- CLI `--` terminator so every following argument is treated as notation, `--seed=<value>` alongside `--seed <value>`, `--help`/`--version` precedence over usage errors, and exit codes 0/1/2 documented in `--help` ([#136](https://github.com/edloidas/roll-parser/issues/136))
+- `getErrorSpan(error)`, which normalizes the lexer/parser `position` and the evaluator `start`/`end` into one `{ start, end? }` span ([#128](https://github.com/edloidas/roll-parser/issues/128))
+- Root exports for `Token`, `TokenType`, `CritThreshold`, `lex`, `MAX_PARSE_DEPTH`, and the new `EvaluationLimits` type shared by `RollOptions` and `EvaluateOptions` — `Token` and `CritThreshold` already leaked through `ParseError.token` and `CritThresholdNode` ([#129](https://github.com/edloidas/roll-parser/issues/129))
+- `roll-parser/testing` exports the `RNG` and `MockRNGExhaustedError` types it was missing ([#129](https://github.com/edloidas/roll-parser/issues/129))
+- Bundle-size budgets enforced in CI via `size-limit`, per named import: 12 kB for the full library, 5.5 kB for `{ parse }`, 11.5 kB for `{ roll }`, 250 B for `{ createMockRng }` ([#127](https://github.com/edloidas/roll-parser/issues/127))
+- Staged benchmark suite — one shared case table driving separate `bench:lex`, `bench:parse`, `bench:evaluate`, and `bench:roll` stages, a pool-scaling tripwire, and p50 trend tracking in CI ([#131](https://github.com/edloidas/roll-parser/issues/131))
+- Interactive demo site at [roll-parser.edloidas.io](https://roll-parser.edloidas.io/) — a playground, a notation guide where every example rolls in place, and the hosted TypeDoc API reference
 
 ### Changed
 
-- **BREAKING:** package is now ESM-only. The `require` export condition shipped a file that was actually ESM (`bun build --target node` emits ESM), so it only ever worked via Node ≥22 `require(esm)` — which continues to work. Bundles are built with `--target node` (no `// @bun` pragma) and include linked sourcemaps; type declarations now resolve under `moduleResolution: node16/nodenext`, validated by `@arethetypeswrong/cli` + `publint` in CI ([#119](https://github.com/edloidas/roll-parser/issues/119))
-- **BREAKING:** `cs`/`cf` are now independent overrides (Roll20 semantics). `1d20cf<3` keeps the default nat-20 crit instead of clearing it; `1d20cs>=19` keeps the default nat-1 fumble. The previous replace semantics required chaining `cscf<3` to preserve defaults ([#118](https://github.com/edloidas/roll-parser/issues/118))
-- **BREAKING:** bare `NdXdY` dice chains (e.g. `4d6d1`) are rejected at parse time with `AMBIGUOUS_DICE_CHAIN` instead of silently parsing as `(4d6)d1` — roll 4d6, use the result as a count of d1 dice — which is almost never intended. Use `4d6dl1` to drop dice or `(4d6)d1` for nested dice ([#118](https://github.com/edloidas/roll-parser/issues/118))
-- **BREAKING:** non-finite totals (`Infinity`/`NaN`, e.g. `2**1024`) now throw `NON_FINITE_RESULT` instead of returning a non-finite `total` ([#118](https://github.com/edloidas/roll-parser/issues/118))
-- **BREAKING:** `1d1` no longer reports `fumble: true` — a d1 always rolls 1, so it is neither critical nor fumble, mirroring the existing `critical` guard ([#118](https://github.com/edloidas/roll-parser/issues/118))
+- **BREAKING:** error messages no longer embed the source position. `LexerError` and `ParseError` report it through `position`, `EvaluatorError` through `start`/`end`, and all three uniformly through `getErrorSpan` ([#128](https://github.com/edloidas/roll-parser/issues/128))
+- **BREAKING:** `RollResult` is `Readonly` at the top level, and the `ModifierSpec`, `ComparePoint`, `ResolvedComparePoint`, and `NodeSpan` fields are readonly. The `rolls` array and the `parts` tree stay mutable so consumers can annotate their own views ([#129](https://github.com/edloidas/roll-parser/issues/129))
+- **BREAKING:** `engines.node` raised from `>=22.0.0` to `>=22.12.0`, the release where `require(esm)` became unflagged on the 22.x line
+- `EvaluatorError` moved to `errors.ts` and is re-exported from the evaluator, breaking an ESM value cycle. Every error constructor now threads `ErrorOptions`, so `cause` chains work ([#128](https://github.com/edloidas/roll-parser/issues/128))
+- Dice `sides` above `Number.MAX_SAFE_INTEGER` raise a typed `INVALID_DICE_SIDES` instead of a bare `RangeError` escaping from `SeededRNG.nextInt`, closing the last hole in the `isRollParserError` contract ([#128](https://github.com/edloidas/roll-parser/issues/128))
+- performance: evaluator hot path is 1.4–1.9x faster — `100d6` 23.9 µs to 12.8 µs, `1000d6` 224 µs to 148 µs p50 — by giving literal meta-operands a fast path, stamping `'kept'` at die construction instead of cloning a pass over the pool, and dropping redundant walks ([#132](https://github.com/edloidas/roll-parser/issues/132))
+- performance: lexer is 1.5–2.6x faster from charCode dispatch and slice capture, one string per token instead of one per character ([#133](https://github.com/edloidas/roll-parser/issues/133))
+
+### Fixed
+
+- Failure thresholds keep their comparator in `expression` and `rendered` — `10d10>=6f<3` rendered as `10d10>=6f3`, which re-parsed to a different expression. Bare `fN` stays the canonical form for `=` ([#124](https://github.com/edloidas/roll-parser/issues/124))
+- CLI caret column counts code points rather than UTF-16 units, so notation containing astral characters (`🎲`) no longer shifts the caret right ([#128](https://github.com/edloidas/roll-parser/issues/128))
+
+### Documentation
+
+- README rebuilt around real use cases: runnable examples above the fold, badges and site links, a complete notation reference including eleven previously undocumented forms, recipes by game system, the `RollResult`/`parts` tour, the MockRNG draw-order rules, the full error-code list, safety limits, a re-measured performance table with its protocol, and reviewed known limitations. Every sample is executed and asserts its claimed output ([#137](https://github.com/edloidas/roll-parser/issues/137))
+- JSDoc polished across the whole public surface: `@category` tags on every exported symbol wired into TypeDoc, verified `@example` blocks on the high-traffic entry points, and documented fields on every error class, `SeededRNG` method, and `DieModifier` member ([#138](https://github.com/edloidas/roll-parser/issues/138))
+- `CONTRIBUTING.md` covering the Bun-only toolchain and why, the pre-commit hook, Conventional Commits, the `scripts/docs` TypeScript pin, why `files` ships `src/`, and the release flow ([#139](https://github.com/edloidas/roll-parser/issues/139))
+
+## [3.0.0-beta.0] - 2026-07-07
 
 ### Added
 
@@ -27,6 +51,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CLI prints the notation with a caret under the error position for lexer/parser errors ([#118](https://github.com/edloidas/roll-parser/issues/118))
 - Lexer hints at modifier splits for merged identifiers: `4d6khs` now suggests `kh1s` ([#118](https://github.com/edloidas/roll-parser/issues/118))
 - `"./package.json"` export and `CHANGELOG.md` in the published tarball ([#119](https://github.com/edloidas/roll-parser/issues/119))
+
+### Changed
+
+- **BREAKING:** package is now ESM-only. The `require` export condition shipped a file that was actually ESM (`bun build --target node` emits ESM), so it only ever worked via Node ≥22 `require(esm)` — which continues to work. Bundles are built with `--target node` (no `// @bun` pragma) and include linked sourcemaps; type declarations now resolve under `moduleResolution: node16/nodenext`, validated by `@arethetypeswrong/cli` + `publint` in CI ([#119](https://github.com/edloidas/roll-parser/issues/119))
+- **BREAKING:** `cs`/`cf` are now independent overrides (Roll20 semantics). `1d20cf<3` keeps the default nat-20 crit instead of clearing it; `1d20cs>=19` keeps the default nat-1 fumble. The previous replace semantics required chaining `cscf<3` to preserve defaults ([#118](https://github.com/edloidas/roll-parser/issues/118))
+- **BREAKING:** bare `NdXdY` dice chains (e.g. `4d6d1`) are rejected at parse time with `AMBIGUOUS_DICE_CHAIN` instead of silently parsing as `(4d6)d1` — roll 4d6, use the result as a count of d1 dice — which is almost never intended. Use `4d6dl1` to drop dice or `(4d6)d1` for nested dice ([#118](https://github.com/edloidas/roll-parser/issues/118))
+- **BREAKING:** non-finite totals (`Infinity`/`NaN`, e.g. `2**1024`) now throw `NON_FINITE_RESULT` instead of returning a non-finite `total` ([#118](https://github.com/edloidas/roll-parser/issues/118))
+- **BREAKING:** `1d1` no longer reports `fumble: true` — a d1 always rolls 1, so it is neither critical nor fumble, mirroring the existing `critical` guard ([#118](https://github.com/edloidas/roll-parser/issues/118))
 
 ### Fixed
 
@@ -43,9 +75,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Single-sub-roll Group passthrough no longer flips Fate `+1` faces to fumble. `{4dF+1d6}cf`, `({4dF+1d6})cf`, and `{abs(4dF)}cf` now reject via a new `deepContainsFatePool` mirror of `deepContainsDicePool` used inside `containsFatePool`'s Group case ([#109](https://github.com/edloidas/roll-parser/issues/109))
 - Single-sub-roll Group passthrough no longer smuggles `Versus` past the meta-expression rejection, so `{1d20 vs 15}cs>18`, `{1d20 vs 15}s`, `{1d20 vs 15}kh1`, `{1+(1d20 vs 15)}cs>18`, `{abs(1d20 vs 15)}cs>18`, and `4d6>={1d20 vs 15}` now throw `NESTED_VERSUS`. `parseModifier` also gained the `rejectVersusTarget` call it was missing — closing a pre-existing inconsistency where `(1d20 vs 15)kh1` rejected with a different error code while the brace form silently dropped `degree`/`natural` ([#109](https://github.com/edloidas/roll-parser/issues/109))
 
-### Notes
+### Documentation
 
-These are intentional behaviours documented for the first time, not changes — semantics are unchanged.
+Intentional behaviours documented for the first time, not changes — semantics are unchanged.
 
 - Sort flattens additive pools: `(2d6+1d8)s` renders as one combined sorted list rather than per-pool brackets. Same applies to wrapped pools like `floor(4d6)s`. Totals are preserved ([#96](https://github.com/edloidas/roll-parser/issues/96))
 - Outer parens drop from `result.expression` when chained `cs`/`cf` thresholds collapse: `(1d20cs>19)cs=1` renders as `1d20cs>19cs=1`. Re-parses to the same AST; only the textual form differs ([#96](https://github.com/edloidas/roll-parser/issues/96))
