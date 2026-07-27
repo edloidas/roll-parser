@@ -108,7 +108,9 @@ export { DEFAULT_MAX_EXPLODE_ITERATIONS, DEFAULT_MAX_REROLL_ITERATIONS };
 /**
  * Per-branch mutable accumulator for tracking rolls and output during recursion.
  *
- * @internal exported for targeted `mergeMetaRolls` tests only; not a public API.
+ * Module-level export, deliberately absent from `src/index.ts` — the package
+ * surface never mentions it. See {@link mergeMetaRolls} for why the export
+ * exists at all.
  */
 export type EvalContext = {
   rolls: DieResult[];
@@ -235,7 +237,12 @@ function renderDie(result: number, modifiers: readonly DieModifier[]): string {
  * wrappings; this strip ensures a future parse regression cannot leak tags
  * into the top-level `successes`/`failures` scan).
  */
-/** @internal exported for targeted defense-in-depth tests only. */
+// ? Exported, not `@internal`. The strip above is unreachable through any
+//   parseable notation — every wrapping that could smuggle a tagged die into a
+//   meta position is rejected at parse time — so the only honest way to pin it
+//   is to call this directly with a hand-built context. Marking it `@internal`
+//   claimed a test-only export that TypeDoc then hid, leaving the guarantee
+//   undocumented; the export is real and narrow, so it is stated plainly.
 export function mergeMetaRolls(parent: EvalContext, source: EvalContext): void {
   for (const die of source.rolls) {
     parent.rolls.push({

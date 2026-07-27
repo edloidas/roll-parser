@@ -1,12 +1,33 @@
 /**
  * Property-based tests using fast-check.
  *
- * Tests invariants that should hold for all valid inputs.
+ * Tests invariants that should hold for all valid inputs. Properties earn
+ * their place here only when they are not re-derivable from the deterministic
+ * suites — arithmetic identities over literals and exact-value re-checks of
+ * `evaluator.test.ts` belong there, pinned, not here, resampled.
+ *
+ * ## Reproducing a failure
+ *
+ * The global seed is deliberately not pinned: a fixed seed turns these into
+ * 100–500 fixed cases and quietly stops exploring. On failure, fast-check
+ * prints the counterexample plus a line of the form
+ * `seed=<n>, path="<p>"` — re-run that exact case with
+ * `bun test src/property.test.ts -- --seed=<n>` in mind, or paste the seed and
+ * path into the failing `fc.assert` call's options
+ * (`{ numRuns: …, seed: <n>, path: '<p>' }`) to replay it deterministically.
  */
 
 import { describe, test } from 'bun:test';
 import fc from 'fast-check';
 import { roll } from './roll.js';
+
+/**
+ * Seed generator for properties that compare two rolls on the same random
+ * sequence. Integers, not strings: `SeededRNG` accepts both, the value is
+ * opaque to the property, and integer shrinking reports a readable
+ * counterexample instead of a random glyph soup.
+ */
+const seedArb = fc.integer();
 
 describe('property-based invariants', () => {
   describe('dice roll bounds', () => {
@@ -61,25 +82,9 @@ describe('property-based invariants', () => {
       );
     });
 
-    test('0dX always returns 0', () => {
-      fc.assert(
-        fc.property(fc.integer({ min: 1, max: 100 }), (sides) => {
-          const result = roll(`0d${sides}`);
-          return result.total === 0 && result.rolls.length === 0;
-        }),
-        { numRuns: 100 },
-      );
-    });
-
-    test('Nd1 always equals N', () => {
-      fc.assert(
-        fc.property(fc.integer({ min: 1, max: 50 }), (count) => {
-          const result = roll(`${count}d1`);
-          return result.total === count;
-        }),
-        { numRuns: 100 },
-      );
-    });
+    // ? `0dX` and `Nd1` are removed: both are the `[N, N*X]` bound above with
+    //   the interval collapsed to a point, and `evaluator.test.ts` already
+    //   pins the degenerate pools exactly.
   });
 
   describe('modifier invariants', () => {
@@ -163,9 +168,10 @@ describe('property-based invariants', () => {
         fc.property(
           fc.integer({ min: 0, max: 5 }),
           fc.integer({ min: 2, max: 20 }),
-          fc.integer({ min: 0, max: 0xffffffff }),
-          (count, sides, seed) => {
-            const threshold = Math.max(1, Math.min(sides, 1 + (seed % sides)));
+          fc.integer({ min: 1, max: 20 }),
+          seedArb,
+          (count, sides, rawThreshold, seed) => {
+            const threshold = Math.min(sides, rawThreshold);
             const result = roll(`${count}d${sides}>=${threshold}`, { seed: `prop-sc-${seed}` });
             return (
               typeof result.successes === 'number' &&
@@ -185,7 +191,7 @@ describe('property-based invariants', () => {
           fc.integer({ min: 2, max: 6 }),
           fc.integer({ min: 1, max: 20 }),
           fc.integer({ min: 1, max: 3 }),
-          fc.integer({ min: 0, max: 0xffffffff }),
+          seedArb,
           (count, sides, keep, seed) => {
             const keepN = Math.min(keep, count);
             const seedStr = `prop-test-${seed}`;
@@ -200,64 +206,17 @@ describe('property-based invariants', () => {
   });
 
   describe('arithmetic invariants', () => {
-    test('addition is commutative for literals', () => {
-      fc.assert(
-        fc.property(
-          fc.integer({ min: -100, max: 100 }),
-          fc.integer({ min: -100, max: 100 }),
-          (a, b) => {
-            const r1 = roll(`${a}+${b}`);
-            const r2 = roll(`${b}+${a}`);
-            return r1.total === r2.total;
-          },
-        ),
-        { numRuns: 100 },
-      );
-    });
-
-    test('multiplication is commutative for literals', () => {
-      fc.assert(
-        fc.property(
-          fc.integer({ min: -10, max: 10 }),
-          fc.integer({ min: -10, max: 10 }),
-          (a, b) => {
-            const r1 = roll(`${a}*${b}`);
-            const r2 = roll(`${b}*${a}`);
-            return r1.total === r2.total;
-          },
-        ),
-        { numRuns: 100 },
-      );
-    });
-
-    test('adding zero is identity', () => {
-      fc.assert(
-        fc.property(fc.integer({ min: -100, max: 100 }), (a) => {
-          const r1 = roll(`${a}+0`);
-          const r2 = roll(`${a}`);
-          return r1.total === r2.total;
-        }),
-        { numRuns: 100 },
-      );
-    });
-
-    test('multiplying by one is identity', () => {
-      fc.assert(
-        fc.property(fc.integer({ min: -100, max: 100 }), (a) => {
-          const r1 = roll(`${a}*1`);
-          const r2 = roll(`${a}`);
-          return r1.total === r2.total;
-        }),
-        { numRuns: 100 },
-      );
-    });
-
+    // ? Commutativity of `+`/`*` and the `+0`/`*1` identities are removed:
+    //   over literal operands they restate IEEE-754 arithmetic, not this
+    //   library's behavior. What they did incidentally exercise — signed
+    //   literals in either operand position — is pinned exactly by
+    //   `signed literal operands` in `parser.test.ts`.
     test('unary minus equivalent to subtraction from zero', () => {
       fc.assert(
         fc.property(
           fc.integer({ min: 1, max: 10 }),
           fc.integer({ min: 1, max: 20 }),
-          fc.integer({ min: 0, max: 0xffffffff }),
+          seedArb,
           (count, sides, seed) => {
             const seedStr = `neg-test-${seed}`;
             const r1 = roll(`-${count}d${sides}`, { seed: seedStr });
@@ -293,7 +252,7 @@ describe('property-based invariants', () => {
           fc.integer({ min: 1, max: 4 }),
           fc.integer({ min: 2, max: 20 }),
           fc.integer({ min: 1, max: 6 }),
-          fc.integer({ min: 0, max: 0xffffffff }),
+          seedArb,
           (shapeIdx, count, sides, lit, seed) => {
             // ? `kh{L}` needs a selector < count; clamp to keep the notation
             //   legal across all shape generators.
@@ -383,7 +342,7 @@ describe('property-based invariants', () => {
           fc.integer({ min: 1, max: 20 }),
           fc.integer({ min: 1, max: 4 }),
           fc.integer({ min: 1, max: 3 }),
-          fc.integer({ min: 0, max: 0xffffffff }),
+          seedArb,
           (count, sides, keep, drop, seed) => {
             const keepN = Math.min(keep, count);
             const dropN = Math.min(drop, count);
@@ -397,24 +356,9 @@ describe('property-based invariants', () => {
       );
     });
 
-    test('chained modifier total is always >= 0', () => {
-      fc.assert(
-        fc.property(
-          fc.integer({ min: 2, max: 8 }),
-          fc.integer({ min: 1, max: 20 }),
-          fc.integer({ min: 1, max: 4 }),
-          fc.integer({ min: 1, max: 4 }),
-          (count, sides, keep, drop) => {
-            const keepN = Math.min(keep, count);
-            const dropN = Math.min(drop, count);
-            const result = roll(`${count}d${sides}kh${keepN}dl${dropN}`);
-            return result.total >= 0;
-          },
-        ),
-        { numRuns: 300 },
-      );
-    });
-
+    // ? Non-negativity of a chained keep/drop total is removed: every die
+    //   face is >= 1 and the modifiers only ever remove dice, so the sum of a
+    //   kept subset cannot be negative regardless of what the evaluator does.
     test('chained modifier order does not affect total (commutativity)', () => {
       fc.assert(
         fc.property(
@@ -422,7 +366,7 @@ describe('property-based invariants', () => {
           fc.integer({ min: 1, max: 20 }),
           fc.integer({ min: 1, max: 4 }),
           fc.integer({ min: 1, max: 3 }),
-          fc.integer({ min: 0, max: 0xffffffff }),
+          seedArb,
           (count, sides, keep, drop, seed) => {
             const keepN = Math.min(keep, count);
             const dropN = Math.min(drop, count);
@@ -436,30 +380,17 @@ describe('property-based invariants', () => {
       );
     });
 
-    test('rolls array length equals dice count for chained modifiers', () => {
-      fc.assert(
-        fc.property(
-          fc.integer({ min: 2, max: 8 }),
-          fc.integer({ min: 1, max: 20 }),
-          fc.integer({ min: 1, max: 4 }),
-          fc.integer({ min: 1, max: 3 }),
-          (count, sides, keep, drop) => {
-            const keepN = Math.min(keep, count);
-            const dropN = Math.min(drop, count);
-            const result = roll(`${count}d${sides}kh${keepN}dl${dropN}`);
-            return result.rolls.length === count;
-          },
-        ),
-        { numRuns: 200 },
-      );
-    });
+    // ? Pool length under chained keep/drop is removed: `rolls array length
+    //   matches dice count` above already states it, and keep/drop provably
+    //   never adds or removes entries — it only sets the `dropped` flag, which
+    //   `chained kh+dl total <= single kh total` covers.
   });
 
   describe('seeded reproducibility', () => {
     test('same seed always produces same results', () => {
       fc.assert(
         fc.property(
-          fc.string({ minLength: 1, maxLength: 20 }),
+          seedArb,
           fc.integer({ min: 1, max: 10 }),
           fc.integer({ min: 1, max: 20 }),
           (seed, count, sides) => {
@@ -500,7 +431,7 @@ describe('property-based invariants', () => {
     test('original dice count is preserved (exploded + non-exploded partitioning)', () => {
       fc.assert(
         fc.property(
-          fc.string({ minLength: 1, maxLength: 12 }),
+          seedArb,
           fc.integer({ min: 1, max: 3 }),
           fc.integer({ min: 2, max: 8 }),
           (seed, count, sides) => {
@@ -520,7 +451,7 @@ describe('property-based invariants', () => {
     test('compound explode pool size equals original count', () => {
       fc.assert(
         fc.property(
-          fc.string({ minLength: 1, maxLength: 12 }),
+          seedArb,
           fc.integer({ min: 1, max: 5 }),
           fc.integer({ min: 2, max: 10 }),
           (seed, count, sides) => {
@@ -535,7 +466,7 @@ describe('property-based invariants', () => {
     test('seeded explode is reproducible', () => {
       fc.assert(
         fc.property(
-          fc.string({ minLength: 1, maxLength: 20 }),
+          seedArb,
           fc.integer({ min: 1, max: 5 }),
           fc.integer({ min: 2, max: 12 }),
           fc.constantFrom('!', '!!', '!p'),
@@ -552,7 +483,7 @@ describe('property-based invariants', () => {
     test('NdX! total >= NdX total for same seed (explosions only add value)', () => {
       fc.assert(
         fc.property(
-          fc.string({ minLength: 1, maxLength: 20 }),
+          seedArb,
           fc.integer({ min: 1, max: 3 }),
           fc.integer({ min: 4, max: 20 }),
           (seed, count, sides) => {
@@ -573,7 +504,7 @@ describe('property-based invariants', () => {
       // `r<2` on sides >= 2 terminates: result 1 matches, 2+ does not.
       fc.assert(
         fc.property(
-          fc.string({ minLength: 1, maxLength: 20 }),
+          seedArb,
           fc.integer({ min: 1, max: 5 }),
           fc.integer({ min: 4, max: 20 }),
           (seed, count, sides) => {
@@ -590,7 +521,7 @@ describe('property-based invariants', () => {
       // `ro` terminates regardless of match probability.
       fc.assert(
         fc.property(
-          fc.string({ minLength: 1, maxLength: 20 }),
+          seedArb,
           fc.integer({ min: 1, max: 5 }),
           fc.integer({ min: 2, max: 20 }),
           (seed, count, sides) => {
@@ -608,7 +539,7 @@ describe('property-based invariants', () => {
       // modifier flags, not termination behavior.
       fc.assert(
         fc.property(
-          fc.string({ minLength: 1, maxLength: 20 }),
+          seedArb,
           fc.integer({ min: 1, max: 5 }),
           fc.integer({ min: 2, max: 20 }),
           (seed, count, sides) => {
@@ -626,7 +557,7 @@ describe('property-based invariants', () => {
       // must be strictly less than `sides` so some results exceed it.
       fc.assert(
         fc.property(
-          fc.string({ minLength: 1, maxLength: 20 }),
+          seedArb,
           fc.integer({ min: 1, max: 5 }),
           fc.integer({ min: 4, max: 12 }),
           fc.constantFrom('r', 'ro'),
@@ -645,7 +576,7 @@ describe('property-based invariants', () => {
     test('floor(NdX/Y) <= NdX/Y for the same seeded roll', () => {
       fc.assert(
         fc.property(
-          fc.string({ minLength: 1, maxLength: 20 }),
+          seedArb,
           fc.integer({ min: 1, max: 10 }),
           fc.integer({ min: 2, max: 20 }),
           fc.integer({ min: 2, max: 10 }),
@@ -662,7 +593,7 @@ describe('property-based invariants', () => {
     test('ceil(NdX/Y) >= NdX/Y for the same seeded roll', () => {
       fc.assert(
         fc.property(
-          fc.string({ minLength: 1, maxLength: 20 }),
+          seedArb,
           fc.integer({ min: 1, max: 10 }),
           fc.integer({ min: 2, max: 20 }),
           fc.integer({ min: 2, max: 10 }),
@@ -679,7 +610,7 @@ describe('property-based invariants', () => {
     test('abs(expr) is always >= 0', () => {
       fc.assert(
         fc.property(
-          fc.string({ minLength: 1, maxLength: 20 }),
+          seedArb,
           fc.integer({ min: 1, max: 20 }),
           fc.integer({ min: 2, max: 20 }),
           fc.integer({ min: -100, max: 100 }),
@@ -697,7 +628,7 @@ describe('property-based invariants', () => {
     test('max(a, b) >= min(a, b) for two independent dice', () => {
       fc.assert(
         fc.property(
-          fc.string({ minLength: 1, maxLength: 20 }),
+          seedArb,
           fc.integer({ min: 2, max: 20 }),
           fc.integer({ min: 2, max: 20 }),
           (seed, sidesA, sidesB) => {
@@ -715,7 +646,7 @@ describe('property-based invariants', () => {
     test('NdXs total equals NdX total for the same seeded roll', () => {
       fc.assert(
         fc.property(
-          fc.string({ minLength: 1, maxLength: 20 }),
+          seedArb,
           fc.integer({ min: 1, max: 10 }),
           fc.integer({ min: 2, max: 20 }),
           (seed, count, sides) => {
@@ -731,7 +662,7 @@ describe('property-based invariants', () => {
     test('NdXs produces a monotonically non-decreasing rolls sequence', () => {
       fc.assert(
         fc.property(
-          fc.string({ minLength: 1, maxLength: 20 }),
+          seedArb,
           fc.integer({ min: 2, max: 12 }),
           fc.integer({ min: 2, max: 20 }),
           (seed, count, sides) => {
@@ -752,7 +683,7 @@ describe('property-based invariants', () => {
     test('NdXsd produces a monotonically non-increasing rolls sequence', () => {
       fc.assert(
         fc.property(
-          fc.string({ minLength: 1, maxLength: 20 }),
+          seedArb,
           fc.integer({ min: 2, max: 12 }),
           fc.integer({ min: 2, max: 20 }),
           (seed, count, sides) => {
@@ -770,10 +701,10 @@ describe('property-based invariants', () => {
       );
     });
 
-    test('sort preserves successes/failures counts when chained after SuccessCount is not allowed — sanity check that sort does not emit them', () => {
+    test('sort emits no successes/failures', () => {
       fc.assert(
         fc.property(
-          fc.string({ minLength: 1, maxLength: 20 }),
+          seedArb,
           fc.integer({ min: 1, max: 8 }),
           fc.integer({ min: 4, max: 20 }),
           (seed, count, sides) => {
@@ -788,7 +719,7 @@ describe('property-based invariants', () => {
     test('sort preserves dropped count after keep/drop', () => {
       fc.assert(
         fc.property(
-          fc.string({ minLength: 1, maxLength: 20 }),
+          seedArb,
           fc.integer({ min: 2, max: 8 }),
           fc.integer({ min: 2, max: 20 }),
           fc.integer({ min: 1, max: 3 }),
@@ -812,7 +743,7 @@ describe('property-based invariants', () => {
     test('cs threshold does not change total or rolls vs. base roll', () => {
       fc.assert(
         fc.property(
-          fc.string({ minLength: 1, maxLength: 20 }),
+          seedArb,
           fc.integer({ min: 1, max: 8 }),
           fc.integer({ min: 4, max: 20 }),
           fc.integer({ min: 2, max: 19 }),
@@ -836,7 +767,7 @@ describe('property-based invariants', () => {
     test('cs>=T marks every die with result >= T as critical', () => {
       fc.assert(
         fc.property(
-          fc.string({ minLength: 1, maxLength: 20 }),
+          seedArb,
           fc.integer({ min: 2, max: 10 }),
           fc.integer({ min: 4, max: 20 }),
           fc.integer({ min: 2, max: 19 }),
@@ -858,7 +789,7 @@ describe('property-based invariants', () => {
     test('cf<=T marks every die with result <= T as fumble', () => {
       fc.assert(
         fc.property(
-          fc.string({ minLength: 1, maxLength: 20 }),
+          seedArb,
           fc.integer({ min: 2, max: 10 }),
           fc.integer({ min: 4, max: 20 }),
           fc.integer({ min: 1, max: 5 }),
@@ -880,7 +811,7 @@ describe('property-based invariants', () => {
     test('crit threshold does not emit successes/failures', () => {
       fc.assert(
         fc.property(
-          fc.string({ minLength: 1, maxLength: 20 }),
+          seedArb,
           fc.integer({ min: 1, max: 8 }),
           fc.integer({ min: 4, max: 20 }),
           (seed, count, sides) => {

@@ -433,9 +433,8 @@ describe('SeededRNG', () => {
     });
   });
 
-  describe('property-based invariants (manual)', () => {
-    it('nextInt always returns value in valid range across random seeds', () => {
-      // Test with various seed/range combinations
+  describe('table-driven invariants', () => {
+    it('nextInt always returns value in valid range across fixed seeds', () => {
       const testCases = [
         { seed: 1, min: 1, max: 100 },
         { seed: 42, min: 1, max: 6 },
@@ -455,7 +454,7 @@ describe('SeededRNG', () => {
       }
     });
 
-    it('next always returns value in [0, 1) across random seeds', () => {
+    it('next always returns value in [0, 1) across fixed seeds', () => {
       const seeds = [1, 42, 999, 12345, 0, 0xffffffff];
 
       for (const seed of seeds) {

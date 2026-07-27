@@ -4,6 +4,11 @@
  * Deep-equal "snapshot" tests pin exact part trees for representative
  * notations under deterministic mock RNGs; the rest assert the contractual
  * invariants from STAGE3.md §5.
+ *
+ * The snapshots compare span-stripped trees. Spans are a separate contract
+ * with a separate failure mode — a one-character shift in the lexer would
+ * otherwise rewrite six unrelated snapshots — so they are pinned once, in
+ * `source spans`, against the notation text they must slice back to.
  */
 
 import { describe, expect, test } from 'bun:test';
@@ -49,11 +54,25 @@ function flattenParts(part: RollPart): RollPart[] {
   return out;
 }
 
+/** Recursively drops `start`/`end` so a snapshot pins structure only. */
+function stripSpans(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(stripSpans);
+  if (value == null || typeof value !== 'object') return value;
+
+  const out: Record<string, unknown> = {};
+  for (const [key, entry] of Object.entries(value)) {
+    if (key === 'start' || key === 'end') continue;
+    out[key] = stripSpans(entry);
+  }
+
+  return out;
+}
+
 describe('RollResult.parts', () => {
   describe('exact part trees (deterministic snapshots)', () => {
     test('1d20+5', () => {
       const result = roll('1d20+5', { rng: createMockRng([15]) });
-      expect(result.parts).toEqual({
+      expect(stripSpans(result.parts)).toEqual({
         type: 'binaryOp',
         operator: '+',
         left: {
@@ -62,19 +81,15 @@ describe('RollResult.parts', () => {
           sides: 20,
           rolls: [{ sides: 20, result: 15, modifiers: ['kept'], critical: false, fumble: false }],
           total: 15,
-          start: 0,
-          end: 4,
         },
-        right: { type: 'literal', value: 5, total: 5, start: 5, end: 6 },
+        right: { type: 'literal', value: 5, total: 5 },
         total: 20,
-        start: 0,
-        end: 6,
       });
     });
 
     test('4d6kh3 — flattened modifier chain with resolved specs', () => {
       const result = roll('4d6kh3', { rng: createMockRng([3, 6, 2, 5]) });
-      expect(result.parts).toEqual({
+      expect(stripSpans(result.parts)).toEqual({
         type: 'modifier',
         specs: [{ kind: 'keep', selector: 'highest', count: 3 }],
         target: {
@@ -91,18 +106,14 @@ describe('RollResult.parts', () => {
             { sides: 6, result: 5, modifiers: ['kept'], critical: false, fumble: false },
           ],
           total: 16,
-          start: 0,
-          end: 3,
         },
         total: 14,
-        start: 0,
-        end: 6,
       });
     });
 
     test('{1d6, 1d8}kh1 — group under keep with keptIndices', () => {
       const result = roll('{1d6, 1d8}kh1', { rng: createMockRng([2, 7]) });
-      expect(result.parts).toEqual({
+      expect(stripSpans(result.parts)).toEqual({
         type: 'modifier',
         specs: [{ kind: 'keep', selector: 'highest', count: 1 }],
         target: {
@@ -116,8 +127,6 @@ describe('RollResult.parts', () => {
                 { sides: 6, result: 2, modifiers: ['dropped'], critical: false, fumble: false },
               ],
               total: 2,
-              start: 1,
-              end: 4,
             },
             {
               type: 'dice',
@@ -125,24 +134,18 @@ describe('RollResult.parts', () => {
               sides: 8,
               rolls: [{ sides: 8, result: 7, modifiers: ['kept'], critical: false, fumble: false }],
               total: 7,
-              start: 6,
-              end: 9,
             },
           ],
           keptIndices: [1],
           total: 7,
-          start: 0,
-          end: 10,
         },
         total: 7,
-        start: 0,
-        end: 13,
       });
     });
 
     test('floor(1d10/2)', () => {
       const result = roll('floor(1d10/2)', { rng: createMockRng([7]) });
-      expect(result.parts).toEqual({
+      expect(stripSpans(result.parts)).toEqual({
         type: 'functionCall',
         name: 'floor',
         args: [
@@ -157,24 +160,18 @@ describe('RollResult.parts', () => {
                 { sides: 10, result: 7, modifiers: ['kept'], critical: false, fumble: false },
               ],
               total: 7,
-              start: 6,
-              end: 10,
             },
-            right: { type: 'literal', value: 2, total: 2, start: 11, end: 12 },
+            right: { type: 'literal', value: 2, total: 2 },
             total: 3.5,
-            start: 6,
-            end: 12,
           },
         ],
         total: 3,
-        start: 0,
-        end: 13,
       });
     });
 
     test('1d20 vs 15', () => {
       const result = roll('1d20 vs 15', { rng: createMockRng([18]) });
-      expect(result.parts).toEqual({
+      expect(stripSpans(result.parts)).toEqual({
         type: 'versus',
         roll: {
           type: 'dice',
@@ -182,20 +179,16 @@ describe('RollResult.parts', () => {
           sides: 20,
           rolls: [{ sides: 20, result: 18, modifiers: ['kept'], critical: false, fumble: false }],
           total: 18,
-          start: 0,
-          end: 4,
         },
-        dc: { type: 'literal', value: 15, total: 15, start: 8, end: 10 },
+        dc: { type: 'literal', value: 15, total: 15 },
         degree: DegreeOfSuccess.Success,
         total: 18,
-        start: 0,
-        end: 10,
       });
     });
 
     test('1d6!! — compound explode mutation visible through shared refs', () => {
       const result = roll('1d6!!', { rng: createMockRng([6, 3]) });
-      expect(result.parts).toEqual({
+      expect(stripSpans(result.parts)).toEqual({
         type: 'explode',
         variant: 'compound',
         target: {
@@ -213,13 +206,46 @@ describe('RollResult.parts', () => {
             },
           ],
           total: 6,
-          start: 0,
-          end: 3,
         },
         total: 9,
-        start: 0,
-        end: 5,
       });
+    });
+  });
+
+  describe('source spans', () => {
+    // One home for the span contract: every part's `[start, end)` must slice
+    // the notation back to exactly the source text that produced it. The
+    // structural snapshots above are span-stripped, so a lexer offset shift
+    // fails here and nowhere else.
+    const SPAN_CASES: [notation: string, draws: number[], expected: string[]][] = [
+      [
+        '4d6kh3 + floor(1d10/2)',
+        [3, 6, 2, 5, 7],
+        ['4d6kh3 + floor(1d10/2)', '4d6kh3', '4d6', 'floor(1d10/2)', '1d10/2', '1d10', '2'],
+      ],
+      ['{1d6, 1d8}kh1', [2, 7], ['{1d6, 1d8}kh1', '{1d6, 1d8}', '1d6', '1d8']],
+      ['1d20 vs 15', [18], ['1d20 vs 15', '1d20', '15']],
+      ['-1d6!!', [6, 3], ['-1d6!!', '1d6!!', '1d6']],
+    ];
+
+    for (const [notation, draws, expected] of SPAN_CASES) {
+      test(`${notation} spans slice back to their source text`, () => {
+        const result = roll(notation, { rng: createMockRng(draws) });
+        const slices = flattenParts(result.parts).map((part) =>
+          notation.slice(part.start, part.end),
+        );
+
+        expect(slices).toEqual(expected);
+      });
+    }
+
+    test('every part carries both offsets when a notation is supplied', () => {
+      const result = roll('4d6kh3 + floor(1d10/2)', { rng: createMockRng([3, 6, 2, 5, 7]) });
+
+      for (const part of flattenParts(result.parts)) {
+        expect(Number.isInteger(part.start)).toBe(true);
+        expect(Number.isInteger(part.end)).toBe(true);
+      }
     });
   });
 
@@ -375,13 +401,8 @@ describe('RollResult.parts', () => {
       '10d10>=6f1',
     ];
 
-    test('parts.total === result.total across representative notations', () => {
-      for (const notation of NOTATIONS) {
-        const result = roll(notation, { seed: `parts-${notation}` });
-        expect(result.parts.total).toBe(result.total);
-      }
-    });
-
+    // ? The fixed-seed loop this used to run is subsumed: the fast-check
+    //   property draws from the same `NOTATIONS` list over 300 runs.
     test('parts.total === result.total holds under fast-check', () => {
       fc.assert(
         fc.property(

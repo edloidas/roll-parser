@@ -493,14 +493,6 @@ describe('evaluate', () => {
       expect(getDie(result.rolls, 1).modifiers).toContain('kept');
     });
 
-    test('advantage roll (2d20kh1)', () => {
-      const ast = parse('2d20kh1');
-      const rng = createMockRng([12, 18]);
-      const result = evaluate(ast, rng);
-
-      expect(result.total).toBe(18);
-    });
-
     test('keep multiple highest', () => {
       const ast = parse('4d6kh3');
       const rng = createMockRng([3, 5, 2, 6]);
@@ -521,14 +513,6 @@ describe('evaluate', () => {
       expect(getDie(result.rolls, 0).modifiers).toContain('dropped');
       expect(getDie(result.rolls, 1).modifiers).toContain('kept');
     });
-
-    test('disadvantage roll (2d20kl1)', () => {
-      const ast = parse('2d20kl1');
-      const rng = createMockRng([18, 12]);
-      const result = evaluate(ast, rng);
-
-      expect(result.total).toBe(12);
-    });
   });
 
   describe('drop lowest modifier', () => {
@@ -539,14 +523,6 @@ describe('evaluate', () => {
 
       expect(result.total).toBe(12); // 4 + 5 + 3 = 12
       expect(getDie(result.rolls, 1).modifiers).toContain('dropped');
-    });
-
-    test('stat generation (4d6dl1)', () => {
-      const ast = parse('4d6dl1');
-      const rng = createMockRng([3, 5, 6, 2]);
-      const result = evaluate(ast, rng);
-
-      expect(result.total).toBe(14); // 3 + 5 + 6 = 14, drop 2
     });
   });
 
@@ -877,23 +853,21 @@ describe('evaluate', () => {
     });
 
     test('throws when single group exceeds limit', () => {
-      const ast = parse('5d6');
-      const rng = createMockRng([1, 2, 3, 4, 5]);
-
-      expect(() => evaluate(ast, rng, { maxDice: 4 })).toThrow(EvaluatorError);
-      expect(() => evaluate(ast, rng, { maxDice: 4 })).toThrow(
-        'Total dice count 5 exceeds limit of 4',
+      const error = captureError(() =>
+        evaluate(parse('5d6'), createMockRng([1, 2, 3, 4, 5]), { maxDice: 4 }),
       );
+
+      expect(error).toBeInstanceOf(EvaluatorError);
+      expect((error as Error).message).toBe('Total dice count 5 exceeds limit of 4');
     });
 
     test('throws when aggregate across groups exceeds limit', () => {
-      const ast = parse('3d6+3d6');
-      const rng = createMockRng([1, 2, 3, 4, 5, 6]);
-
-      expect(() => evaluate(ast, rng, { maxDice: 5 })).toThrow(EvaluatorError);
-      expect(() => evaluate(ast, rng, { maxDice: 5 })).toThrow(
-        'Total dice count 6 exceeds limit of 5',
+      const error = captureError(() =>
+        evaluate(parse('3d6+3d6'), createMockRng([1, 2, 3, 4, 5, 6]), { maxDice: 5 }),
       );
+
+      expect(error).toBeInstanceOf(EvaluatorError);
+      expect((error as Error).message).toBe('Total dice count 6 exceeds limit of 5');
     });
 
     test('aggregate limit allows exact total', () => {
@@ -2378,6 +2352,13 @@ describe('evaluate', () => {
 
     test('computed modifier count (kh) preserves meta die', () => {
       // d2 rolls 2 → kh2 → keep the two highest of [1, 3, 5, 6] = [5, 6].
+      //
+      // ? The keep count draws FIRST, before the 4d6 pool — keep/drop is the
+      //   asymmetric case in `.claude/rules/rng.md`: `flattenModifierChain`
+      //   resolves every modifier argument up front because `evalModifier`
+      //   needs the counts to drive selection on the pool it is about to roll.
+      //   Threshold-style modifiers (`cs`, `!`, `r`, `>`) post-process an
+      //   existing pool, so their metas draw last.
       const ast = parse('4d6kh(1d2)');
       const rng = createMockRng([2, 1, 3, 5, 6]);
       const result = evaluate(ast, rng);
@@ -2485,11 +2466,18 @@ describe('evaluate', () => {
     });
 
     test('meta dice count against maxDice (budget enforced)', () => {
-      const ast = parse('(1d4)d6');
-      const rng = createMockRng([2, 3, 5]);
-      const result = evaluate(ast, rng, { maxDice: 3 });
+      // The meta d4 plus the 2d6 it sizes cost three dice against the budget:
+      // exactly 3 fits, and 2 must throw — otherwise the meta die would be free.
+      const result = evaluate(parse('(1d4)d6'), createMockRng([2, 3, 5]), { maxDice: 3 });
 
       expect(result.rolls).toHaveLength(3);
+
+      const error = captureError(() =>
+        evaluate(parse('(1d4)d6'), createMockRng([2, 3, 5]), { maxDice: 2 }),
+      );
+
+      expect(error).toBeInstanceOf(EvaluatorError);
+      expect((error as EvaluatorError).code).toBe('DICE_LIMIT_EXCEEDED');
     });
 
     test('mergeMetaRolls strips success/failure modifiers (#69)', () => {

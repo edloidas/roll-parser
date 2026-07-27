@@ -48,39 +48,22 @@ describe('roll() integration', () => {
   });
 
   describe('modifiers', () => {
-    test('keep highest (4d6kh3)', () => {
-      // Rolls: [3, 1, 4, 2] → keep [3, 4, 2] = 9
+    // Per-modifier selection semantics are pinned once in
+    // `evaluator/evaluator.test.ts`. All this file owes is proof that `roll()`
+    // forwards the notation to the same evaluator and surfaces its flags.
+    test('roll() wires keep/drop through to the evaluator', () => {
+      // Rolls: [3, 1, 4, 2] → keep [3, 4, 2] = 9, drop the 1.
       const result = roll('4d6kh3', { rng: createMockRng([3, 1, 4, 2]) });
+
       expect(result.total).toBe(9);
-      expect(result.rolls.filter((r) => r.modifiers.includes('dropped'))).toHaveLength(1);
-    });
-
-    test('keep lowest (2d20kl1)', () => {
-      // Rolls: [15, 8] → keep 8
-      const result = roll('2d20kl1', { rng: createMockRng([15, 8]) });
-      expect(result.total).toBe(8);
-    });
-
-    test('drop lowest (4d6dl1)', () => {
-      // Rolls: [3, 1, 4, 2] → drop 1, sum = 9
-      const result = roll('4d6dl1', { rng: createMockRng([3, 1, 4, 2]) });
-      expect(result.total).toBe(9);
-    });
-
-    test('drop highest (4d6dh1)', () => {
-      // Rolls: [3, 1, 4, 2] → drop 4, sum = 6
-      const result = roll('4d6dh1', { rng: createMockRng([3, 1, 4, 2]) });
-      expect(result.total).toBe(6);
-    });
-
-    test('advantage (2d20kh1)', () => {
-      const result = roll('2d20kh1', { rng: createMockRng([7, 18]) });
-      expect(result.total).toBe(18);
-    });
-
-    test('disadvantage (2d20kl1)', () => {
-      const result = roll('2d20kl1', { rng: createMockRng([7, 18]) });
-      expect(result.total).toBe(7);
+      expect(result.rolls.map((die) => die.modifiers)).toEqual([
+        ['kept'],
+        ['dropped'],
+        ['kept'],
+        ['kept'],
+      ]);
+      expect(result.notation).toBe('4d6kh3');
+      expect(result.rendered).toBe('4d6[3, ~~1~~, 4, 2] = 9');
     });
   });
 
@@ -161,13 +144,14 @@ describe('roll() integration', () => {
       expect(r1.rolls.map((r) => r.result)).toEqual(r2.rolls.map((r) => r.result));
     });
 
-    test('different seeds produce different results (statistically)', () => {
+    test('ten fixed seeds decorrelate into at least five distinct d100 totals', () => {
+      // Deterministic, not statistical: the seeds are fixed, so this is a
+      // pinned property of `SeededRNG`'s seed hashing, not a sampling claim.
       const results = new Set<number>();
       for (let i = 0; i < 10; i++) {
-        const result = roll('1d100', { seed: `seed-${i}` });
-        results.add(result.total);
+        results.add(roll('1d100', { seed: `seed-${i}` }).total);
       }
-      // With 10 different seeds rolling d100, we expect at least 5 unique values
+
       expect(results.size).toBeGreaterThanOrEqual(5);
     });
 
