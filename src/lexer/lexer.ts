@@ -33,6 +33,19 @@ export class LexerError extends RollParserError {
   }
 }
 
+//
+// * Character codes
+//
+
+// ? Range tests compare code units rather than strings: `char.toLowerCase()`
+//   per character allocated a string on the hottest loop in the lexer.
+const CHAR_DIGIT_0 = 48;
+const CHAR_DIGIT_9 = 57;
+const CHAR_UPPER_A = 65;
+const CHAR_UPPER_Z = 90;
+const CHAR_LOWER_A = 97;
+const CHAR_LOWER_Z = 122;
+
 /** Known identifier keywords mapped to their token types. */
 const IDENTIFIER_KEYWORDS: Record<string, TokenType> = {
   kh: TokenType.KEEP_HIGH,
@@ -176,8 +189,7 @@ export class Lexer {
         if (this.match('!')) {
           return this.createTokenAt(TokenType.EXPLODE_COMPOUND, '!!', startPos);
         }
-        if (!this.isAtEnd() && this.peek().toLowerCase() === 'p') {
-          this.advance();
+        if (this.match('p') || this.match('P')) {
           return this.createTokenAt(TokenType.EXPLODE_PENETRATING, '!p', startPos);
         }
         return this.createTokenAt(TokenType.EXPLODE, char, startPos);
@@ -199,24 +211,26 @@ export class Lexer {
     }
   }
 
+  // ? Scanners record a start offset and slice once at the end rather than
+  //   accumulating `value += this.advance()` — one string per token instead
+  //   of one per character. `scanAt` already used this idiom.
   private scanNumber(): Token {
     const startPos = this.pos;
-    let value = '';
 
     // Integer part
     while (!this.isAtEnd() && this.isDigit(this.peek())) {
-      value += this.advance();
+      this.pos++;
     }
 
     // Decimal part
     if (!this.isAtEnd() && this.peek() === '.' && this.isDigit(this.peekNext())) {
-      value += this.advance(); // consume '.'
+      this.pos++; // consume '.'
       while (!this.isAtEnd() && this.isDigit(this.peek())) {
-        value += this.advance();
+        this.pos++;
       }
     }
 
-    return this.createTokenAt(TokenType.NUMBER, value, startPos);
+    return this.createTokenAt(TokenType.NUMBER, this.input.slice(startPos, this.pos), startPos);
   }
 
   /**
@@ -237,18 +251,15 @@ export class Lexer {
     const first = this.peek();
     const second = this.peekNext();
     if ((first === 'd' || first === 'D') && (second === 'f' || second === 'F')) {
-      this.advance();
-      this.advance();
+      this.pos += 2;
       return this.createTokenAt(TokenType.DICE_FATE, 'df', startPos);
     }
 
-    let value = '';
-
     while (!this.isAtEnd() && this.isAlpha(this.peek())) {
-      value += this.advance();
+      this.pos++;
     }
 
-    const lower = value.toLowerCase();
+    const lower = this.input.slice(startPos, this.pos).toLowerCase();
 
     if (lower === 'd' && !this.isAtEnd() && this.peek() === '%') {
       this.advance();
@@ -334,13 +345,19 @@ export class Lexer {
     return this.pos >= this.input.length;
   }
 
+  // ? `NaN` from an empty `peek()` fails every comparison, so end-of-input
+  //   still reads as "not a digit / not alpha" without an extra guard.
   private isDigit(char: string): boolean {
-    return char >= '0' && char <= '9';
+    const code = char.charCodeAt(0);
+    return code >= CHAR_DIGIT_0 && code <= CHAR_DIGIT_9;
   }
 
   private isAlpha(char: string): boolean {
-    const c = char.toLowerCase();
-    return c >= 'a' && c <= 'z';
+    const code = char.charCodeAt(0);
+    return (
+      (code >= CHAR_LOWER_A && code <= CHAR_LOWER_Z) ||
+      (code >= CHAR_UPPER_A && code <= CHAR_UPPER_Z)
+    );
   }
 
   private isIdentifierStart(char: string): boolean {
