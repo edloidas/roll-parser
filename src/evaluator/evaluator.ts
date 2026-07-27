@@ -32,13 +32,16 @@ import type {
   ComparePoint,
   DieResult,
   EvaluateOptions,
+  ModifierSpec,
   ResolvedComparePoint,
+  ResolvedCritThreshold,
   RollPart,
   RollResult,
 } from '../types.js';
 import { DegreeOfSuccess } from '../types.js';
-import type { EvalEnv } from './env.js';
-import { applyCritThresholds, type ResolvedCritThreshold } from './modifiers/crit-threshold.js';
+import { createDieResult, createFateDieResult } from './die.js';
+import { chargeDice, type EvalEnv } from './env.js';
+import { applyCritThresholds } from './modifiers/crit-threshold.js';
 import {
   applyCompoundExplode,
   applyPenetratingExplode,
@@ -46,6 +49,7 @@ import {
   buildShouldExplode,
   DEFAULT_MAX_EXPLODE_ITERATIONS,
 } from './modifiers/explode.js';
+import { rewriteFlags, SELECTION_AND_TALLY_FLAGS, SELECTION_FLAGS } from './modifiers/flags.js';
 import {
   applyDropHighest,
   applyDropLowest,
@@ -67,6 +71,10 @@ import { countSuccesses } from './modifiers/success-count.js';
 //   ESM value cycle back into this module.
 export { EvaluatorError };
 
+//
+// * Limits
+//
+
 /** Default maximum total dice allowed per evaluation. */
 export const DEFAULT_MAX_DICE = 10_000;
 
@@ -78,7 +86,30 @@ export const DEFAULT_MAX_DICE = 10_000;
  */
 const MAX_DICE_SIDES = Number.MAX_SAFE_INTEGER;
 
+/**
+ * Inclusive lower bound standing in for "strictly greater than zero" — every
+ * positive double is at least `Number.MIN_VALUE`, so `value >= SMALLEST_POSITIVE`
+ * and `value > 0` accept exactly the same finite inputs. Lets `clampLimit` take
+ * one inclusive bound while `maxDice` still rejects `0` and iteration limits
+ * still accept it.
+ */
+const SMALLEST_POSITIVE = Number.MIN_VALUE;
+
+/**
+ * Normalizes a user-supplied evaluation limit. Non-finite, absent, or
+ * below-`min` values fall back to the library default; anything accepted is
+ * floored to an integer.
+ */
+function clampLimit(value: number | undefined, fallback: number, min: number): number {
+  if (value == null || !Number.isFinite(value) || value < min) return fallback;
+  return Math.floor(value);
+}
+
 export { DEFAULT_MAX_EXPLODE_ITERATIONS, DEFAULT_MAX_REROLL_ITERATIONS };
+
+//
+// * Context
+//
 
 /**
  * Per-branch mutable accumulator for tracking rolls and output during recursion.
@@ -103,15 +134,19 @@ export type EvalContext = {
 };
 
 /**
+ * Creates an empty per-branch accumulator. Every sub-evaluation runs in a
+ * fresh context so its rolls and rendered fragments can be merged back on the
+ * parent's terms.
+ */
+function createContext(): EvalContext {
+  return { rolls: [], expressionParts: [], renderedParts: [] };
+}
+
+/**
  * Flattened representation of a keep/drop modifier for chain evaluation.
  * Superset of the public `ModifierSpec` (adds the notation `code`).
  */
-type ModifierSpec = {
-  modifier: 'keep' | 'drop';
-  selector: 'highest' | 'lowest';
-  count: number;
-  code: string;
-};
+type ModifierChainEntry = ModifierSpec & { code: string };
 
 /**
  * Every branch returns its numeric total AND the `RollPart` it contributes
@@ -123,12 +158,16 @@ type EvalResult = {
   part: RollPart;
 };
 
+//
+// * Shared helpers
+//
+
 /**
  * Copies an AST node's source span onto a part (spread into the literal).
  * Empty when the AST was built without parser spans.
  */
 function partSpan(node: ASTNode): { start?: number; end?: number } {
-  if (node.start === undefined || node.end === undefined) return {};
+  if (node.start == null || node.end == null) return {};
   return { start: node.start, end: node.end };
 }
 
@@ -146,40 +185,9 @@ function appendAll<T>(target: T[], source: readonly T[]): void {
   }
 }
 
-/** Maps internal modifier specs to the public `RollPart` spec shape. */
-function toPublicSpecs(
-  specs: ModifierSpec[],
-): { kind: 'keep' | 'drop'; selector: 'highest' | 'lowest'; count: number }[] {
-  return specs.map((spec) => ({ kind: spec.modifier, selector: spec.selector, count: spec.count }));
-}
-
-/**
- * Creates a new die result with critical/fumble detection.
- */
-function createDieResult(sides: number, result: number): DieResult {
-  // ? `sides > 1` guards both flags — a d1 always rolls 1, so it is neither
-  //   an exceptional max (critical) nor an exceptional min (fumble).
-  return {
-    sides,
-    result,
-    modifiers: [],
-    critical: result === sides && sides > 1,
-    fumble: result === 1 && sides > 1,
-  };
-}
-
-/**
- * Creates a Fate/Fudge die result. Uses `sides = 0` as a sentinel — Fate dice
- * have no max-face concept, so `critical` and `fumble` are always `false`.
- */
-function createFateDieResult(result: number): DieResult {
-  return {
-    sides: 0,
-    result,
-    modifiers: [],
-    critical: false,
-    fumble: false,
-  };
+/** Drops the internal notation `code`, leaving the public `ModifierSpec` shape. */
+function toPublicSpecs(specs: ModifierChainEntry[]): ModifierSpec[] {
+  return specs.map(({ code: _code, ...spec }) => spec);
 }
 
 /**
@@ -228,16 +236,14 @@ export function mergeMetaRolls(parent: EvalContext, source: EvalContext): void {
   for (const die of source.rolls) {
     parent.rolls.push({
       ...die,
-      modifiers: [
-        ...die.modifiers.filter(
-          (m) => m !== 'kept' && m !== 'dropped' && m !== 'success' && m !== 'failure',
-        ),
-        'meta',
-        'dropped',
-      ],
+      modifiers: rewriteFlags(die.modifiers, SELECTION_AND_TALLY_FLAGS, 'meta', 'dropped'),
     });
   }
 }
+
+//
+// * Node dispatch
+//
 
 /**
  * Evaluates an AST node, returning its total and `RollPart` while updating
@@ -251,7 +257,7 @@ function evalNode(node: ASTNode, rng: RNG, ctx: EvalContext, env: EvalEnv): Eval
   try {
     return evalNodeInner(node, rng, ctx, env);
   } catch (error) {
-    if (error instanceof EvaluatorError && node.start !== undefined) {
+    if (error instanceof EvaluatorError && node.start != null) {
       error.stampSpan(node.start, node.end);
     }
     throw error;
@@ -319,6 +325,10 @@ function evalNodeInner(node: ASTNode, rng: RNG, ctx: EvalContext, env: EvalEnv):
   }
 }
 
+//
+// * Leaf nodes
+//
+
 function evalLiteral(node: LiteralNode, ctx: EvalContext): EvalResult {
   const { value } = node;
   ctx.expressionParts.push(String(value));
@@ -381,6 +391,54 @@ function evalVariable(node: VariableNode, ctx: EvalContext, env: EvalEnv): EvalR
   };
 }
 
+//
+// * Dice pools
+//
+
+/**
+ * Evaluates a meta sub-expression (dice count, dice sides, a threshold) in an
+ * isolated context and forwards its rolls into `ctx` as meta dice.
+ */
+function evalMetaOperand(node: ASTNode, rng: RNG, ctx: EvalContext, env: EvalEnv): number {
+  const metaCtx = createContext();
+  const value = evalNode(node, rng, metaCtx, env).total;
+  mergeMetaRolls(ctx, metaCtx);
+  return value;
+}
+
+/** Rejects dice counts that cannot address a pool. */
+function requireDiceCount(count: number, nodeType: 'Dice' | 'FateDice'): void {
+  if (!Number.isInteger(count) || count < 0) {
+    throw new EvaluatorError(`Invalid dice count: ${count}`, 'INVALID_DICE_COUNT', nodeType);
+  }
+}
+
+/**
+ * Rolls `count` dice, marks them kept, and writes the pool into `ctx` —
+ * the tail shared by `evalDice` and `evalFateDice`. `rollDie` produces one
+ * die (drawing exactly one RNG value), `notation` is the canonical
+ * `NdX` / `NdF` spelling used by both the expression and rendered forms.
+ */
+function rollPool(
+  count: number,
+  notation: string,
+  rollDie: () => DieResult,
+  ctx: EvalContext,
+): { total: number; rolls: DieResult[] } {
+  const dice: DieResult[] = [];
+  for (let i = 0; i < count; i++) {
+    dice.push(rollDie());
+  }
+
+  const markedDice = markAllKept(dice);
+  appendAll(ctx.rolls, markedDice);
+
+  ctx.expressionParts.push(notation);
+  ctx.renderedParts.push(`${notation}${renderDice(markedDice)}`);
+
+  return { total: sumKeptDice(markedDice), rolls: markedDice };
+}
+
 /**
  * RNG draw order: `count` expression → `sides` expression → pool dice
  * (one `nextInt` per die, left-to-right). Meta-expressions on `count`/`sides`
@@ -390,17 +448,10 @@ function evalVariable(node: VariableNode, ctx: EvalContext, env: EvalEnv): EvalR
  * pool. See `.claude/rules/rng.md` for the full draw-order spec.
  */
 function evalDice(node: DiceNode, rng: RNG, ctx: EvalContext, env: EvalEnv): EvalResult {
-  const countCtx: EvalContext = { rolls: [], expressionParts: [], renderedParts: [] };
-  const count = evalNode(node.count, rng, countCtx, env).total;
-  mergeMetaRolls(ctx, countCtx);
+  const count = evalMetaOperand(node.count, rng, ctx, env);
+  const sides = evalMetaOperand(node.sides, rng, ctx, env);
 
-  const sidesCtx: EvalContext = { rolls: [], expressionParts: [], renderedParts: [] };
-  const sides = evalNode(node.sides, rng, sidesCtx, env).total;
-  mergeMetaRolls(ctx, sidesCtx);
-
-  if (!Number.isInteger(count) || count < 0) {
-    throw new EvaluatorError(`Invalid dice count: ${count}`, 'INVALID_DICE_COUNT', 'Dice');
-  }
+  requireDiceCount(count, 'Dice');
   if (!Number.isInteger(sides) || sides < 1) {
     throw new EvaluatorError(`Invalid dice sides: ${sides}`, 'INVALID_DICE_SIDES', 'Dice');
   }
@@ -412,74 +463,37 @@ function evalDice(node: DiceNode, rng: RNG, ctx: EvalContext, env: EvalEnv): Eva
     );
   }
 
-  if (env.totalDiceRolled + count > env.maxDice) {
-    throw new EvaluatorError(
-      `Total dice count ${env.totalDiceRolled + count} exceeds limit of ${env.maxDice}`,
-      'DICE_LIMIT_EXCEEDED',
-      'Dice',
-    );
-  }
-  env.totalDiceRolled += count;
+  chargeDice(env, count, 'Dice');
 
-  const dice: DieResult[] = [];
-  for (let i = 0; i < count; i++) {
-    const result = rng.nextInt(1, sides);
-    dice.push(createDieResult(sides, result));
-  }
+  const { total, rolls } = rollPool(
+    count,
+    `${count}d${sides}`,
+    () => createDieResult(sides, rng.nextInt(1, sides), []),
+    ctx,
+  );
 
-  const markedDice = markAllKept(dice);
-  appendAll(ctx.rolls, markedDice);
-
-  const total = sumKeptDice(markedDice);
-  const notation = `${count}d${sides}`;
-
-  ctx.expressionParts.push(notation);
-  ctx.renderedParts.push(`${notation}${renderDice(markedDice)}`);
-
-  return {
-    total,
-    part: { type: 'dice', count, sides, rolls: markedDice, total, ...partSpan(node) },
-  };
+  return { total, part: { type: 'dice', count, sides, rolls, total, ...partSpan(node) } };
 }
 
 function evalFateDice(node: FateDiceNode, rng: RNG, ctx: EvalContext, env: EvalEnv): EvalResult {
-  const countCtx: EvalContext = { rolls: [], expressionParts: [], renderedParts: [] };
-  const count = evalNode(node.count, rng, countCtx, env).total;
-  mergeMetaRolls(ctx, countCtx);
+  const count = evalMetaOperand(node.count, rng, ctx, env);
 
-  if (!Number.isInteger(count) || count < 0) {
-    throw new EvaluatorError(`Invalid dice count: ${count}`, 'INVALID_DICE_COUNT', 'FateDice');
-  }
+  requireDiceCount(count, 'FateDice');
+  chargeDice(env, count, 'FateDice');
 
-  if (env.totalDiceRolled + count > env.maxDice) {
-    throw new EvaluatorError(
-      `Total dice count ${env.totalDiceRolled + count} exceeds limit of ${env.maxDice}`,
-      'DICE_LIMIT_EXCEEDED',
-      'FateDice',
-    );
-  }
-  env.totalDiceRolled += count;
+  const { total, rolls } = rollPool(
+    count,
+    `${count}dF`,
+    () => createFateDieResult(rng.nextInt(-1, 1), []),
+    ctx,
+  );
 
-  const dice: DieResult[] = [];
-  for (let i = 0; i < count; i++) {
-    const result = rng.nextInt(-1, 1);
-    dice.push(createFateDieResult(result));
-  }
-
-  const markedDice = markAllKept(dice);
-  appendAll(ctx.rolls, markedDice);
-
-  const total = sumKeptDice(markedDice);
-  const notation = `${count}dF`;
-
-  ctx.expressionParts.push(notation);
-  ctx.renderedParts.push(`${notation}${renderDice(markedDice)}`);
-
-  return {
-    total,
-    part: { type: 'fateDice', count, rolls: markedDice, total, ...partSpan(node) },
-  };
+  return { total, part: { type: 'fateDice', count, rolls, total, ...partSpan(node) } };
 }
+
+//
+// * Context merging
+//
 
 /**
  * Propagates `versusMetadata` onto a parent so `degree`/`natural` survive
@@ -516,9 +530,13 @@ function mergeContext(parent: EvalContext, child: EvalContext): void {
   propagateMetadata(parent, child.versusMetadata);
 }
 
+//
+// * Arithmetic
+//
+
 function evalBinaryOp(node: BinaryOpNode, rng: RNG, ctx: EvalContext, env: EvalEnv): EvalResult {
-  const leftCtx: EvalContext = { rolls: [], expressionParts: [], renderedParts: [] };
-  const rightCtx: EvalContext = { rolls: [], expressionParts: [], renderedParts: [] };
+  const leftCtx = createContext();
+  const rightCtx = createContext();
 
   const left = evalNode(node.left, rng, leftCtx, env);
   const right = evalNode(node.right, rng, rightCtx, env);
@@ -581,7 +599,7 @@ function applyBinaryOperator(
 }
 
 function evalUnaryOp(node: UnaryOpNode, rng: RNG, ctx: EvalContext, env: EvalEnv): EvalResult {
-  const innerCtx: EvalContext = { rolls: [], expressionParts: [], renderedParts: [] };
+  const innerCtx = createContext();
   const inner = evalNode(node.operand, rng, innerCtx, env);
 
   mergeContext(ctx, innerCtx);
@@ -600,8 +618,12 @@ function evalUnaryOp(node: UnaryOpNode, rng: RNG, ctx: EvalContext, env: EvalEnv
   };
 }
 
+//
+// * Groups and functions
+//
+
 function evalGrouped(node: GroupedNode, rng: RNG, ctx: EvalContext, env: EvalEnv): EvalResult {
-  const innerCtx: EvalContext = { rolls: [], expressionParts: [], renderedParts: [] };
+  const innerCtx = createContext();
   const inner = evalNode(node.expression, rng, innerCtx, env);
 
   mergeContext(ctx, innerCtx);
@@ -632,7 +654,7 @@ function evalGroup(node: GroupNode, rng: RNG, ctx: EvalContext, env: EvalEnv): E
   let total = 0;
 
   for (const expr of node.expressions) {
-    const subCtx: EvalContext = { rolls: [], expressionParts: [], renderedParts: [] };
+    const subCtx = createContext();
     const sub = evalNode(expr, rng, subCtx, env);
     mergeContext(ctx, subCtx);
     subExprs.push(subCtx.expressionParts.join(''));
@@ -659,7 +681,7 @@ function evalFunctionCall(
   const argResults: EvalResult[] = [];
 
   for (const arg of node.args) {
-    const argCtx: EvalContext = { rolls: [], expressionParts: [], renderedParts: [] };
+    const argCtx = createContext();
     argResults.push(evalNode(arg, rng, argCtx, env));
     argCtxs.push(argCtx);
   }
@@ -734,7 +756,7 @@ function extremumOf(values: number[], kind: 'max' | 'min'): number {
 
 function requireUnaryArg(name: string, values: number[]): number {
   const [x] = values;
-  if (x === undefined) {
+  if (x == null) {
     // ? Unreachable: parser validates arity before evaluation. Defensive for
     // `noNonNullAssertion`.
     throw new EvaluatorError(
@@ -746,6 +768,20 @@ function requireUnaryArg(name: string, values: number[]): number {
   return x;
 }
 
+//
+// * Keep/drop modifiers
+//
+
+/** Notation spelling of each keep/drop combination. */
+const MODIFIER_CODES = {
+  keep: { highest: 'kh', lowest: 'kl' },
+  drop: { highest: 'dh', lowest: 'dl' },
+} as const;
+
+function modifierCode(kind: ModifierSpec['kind'], selector: ModifierSpec['selector']): string {
+  return MODIFIER_CODES[kind][selector];
+}
+
 /**
  * Walks a nested ModifierNode chain, collecting specs outermost-first,
  * then reverses to notation order (innermost-first).
@@ -755,12 +791,12 @@ function flattenModifierChain(
   rng: RNG,
   ctx: EvalContext,
   env: EvalEnv,
-): { specs: ModifierSpec[]; baseTarget: ASTNode } {
-  const specs: ModifierSpec[] = [];
+): { specs: ModifierChainEntry[]; baseTarget: ASTNode } {
+  const specs: ModifierChainEntry[] = [];
   let current: ASTNode = node;
 
   while (isModifier(current)) {
-    const countCtx: EvalContext = { rolls: [], expressionParts: [], renderedParts: [] };
+    const countCtx = createContext();
     const modCount = evalNode(current.count, rng, countCtx, env).total;
     mergeMetaRolls(ctx, countCtx);
 
@@ -772,16 +808,12 @@ function flattenModifierChain(
       );
     }
 
-    const code =
-      current.modifier === 'keep'
-        ? current.selector === 'highest'
-          ? 'kh'
-          : 'kl'
-        : current.selector === 'highest'
-          ? 'dh'
-          : 'dl';
-
-    specs.push({ modifier: current.modifier, selector: current.selector, count: modCount, code });
+    specs.push({
+      kind: current.modifier,
+      selector: current.selector,
+      count: modCount,
+      code: modifierCode(current.modifier, current.selector),
+    });
     current = current.target;
   }
 
@@ -792,8 +824,8 @@ function flattenModifierChain(
 /**
  * Applies a single modifier spec to a dice pool.
  */
-function applyModifierSpec(dice: DieResult[], spec: ModifierSpec): DieResult[] {
-  if (spec.modifier === 'keep') {
+function applyModifierSpec(dice: DieResult[], spec: ModifierChainEntry): DieResult[] {
+  if (spec.kind === 'keep') {
     return spec.selector === 'highest'
       ? applyKeepHighest(dice, spec.count)
       : applyKeepLowest(dice, spec.count);
@@ -812,7 +844,7 @@ function applyModifierSpec(dice: DieResult[], spec: ModifierSpec): DieResult[] {
  * appliers still work on copies internally (each spec must see the
  * unmodified pool), only the merged outcome is written back.
  */
-function mergeDropSets(baseDice: DieResult[], specs: ModifierSpec[]): DieResult[] {
+function mergeDropSets(baseDice: DieResult[], specs: ModifierChainEntry[]): DieResult[] {
   const droppedIndices = new Set<number>();
 
   for (const spec of specs) {
@@ -825,13 +857,33 @@ function mergeDropSets(baseDice: DieResult[], specs: ModifierSpec[]): DieResult[
   }
 
   baseDice.forEach((die, index) => {
-    die.modifiers = droppedIndices.has(index)
-      ? [...die.modifiers.filter((m) => m !== 'kept' && m !== 'dropped'), 'dropped']
-      : [...die.modifiers.filter((m) => m !== 'dropped' && m !== 'kept'), 'kept'];
+    die.modifiers = rewriteFlags(
+      die.modifiers,
+      SELECTION_FLAGS,
+      droppedIndices.has(index) ? 'dropped' : 'kept',
+    );
   });
 
   return baseDice;
 }
+
+//
+// * Explode and reroll
+//
+
+/** Notation marker for each explode variant. */
+const EXPLODE_MARKERS: Record<ExplodeNode['variant'], string> = {
+  standard: '!',
+  compound: '!!',
+  penetrating: '!p',
+};
+
+/** Pool transform for each explode variant. */
+const EXPLODE_APPLIERS: Record<ExplodeNode['variant'], typeof applyStandardExplode> = {
+  standard: applyStandardExplode,
+  compound: applyCompoundExplode,
+  penetrating: applyPenetratingExplode,
+};
 
 /**
  * Builds the notation string for an explode modifier, e.g. `!`, `!!>=3`, `!p>5`.
@@ -841,19 +893,19 @@ function formatExplodeCode(
   threshold: ComparePoint | undefined,
   thresholdValue: number | undefined,
 ): string {
-  const marker = variant === 'standard' ? '!' : variant === 'compound' ? '!!' : '!p';
+  const marker = EXPLODE_MARKERS[variant];
   if (threshold == null || thresholdValue == null) return marker;
   return `${marker}${threshold.operator}${thresholdValue}`;
 }
 
 function evalExplode(node: ExplodeNode, rng: RNG, ctx: EvalContext, env: EvalEnv): EvalResult {
-  const targetCtx: EvalContext = { rolls: [], expressionParts: [], renderedParts: [] };
+  const targetCtx = createContext();
   const target = evalNode(node.target, rng, targetCtx, env);
   const targetExpr = targetCtx.expressionParts.join('');
 
   let thresholdValue: number | undefined;
   if (node.threshold != null) {
-    const thresholdCtx: EvalContext = { rolls: [], expressionParts: [], renderedParts: [] };
+    const thresholdCtx = createContext();
     thresholdValue = evalNode(node.threshold.value, rng, thresholdCtx, env).total;
     mergeMetaRolls(ctx, thresholdCtx);
   }
@@ -868,7 +920,7 @@ function evalExplode(node: ExplodeNode, rng: RNG, ctx: EvalContext, env: EvalEnv
       total,
       ...partSpan(node),
     };
-    if (node.threshold != null && thresholdValue !== undefined) {
+    if (node.threshold != null && thresholdValue != null) {
       part.threshold = { operator: node.threshold.operator, value: thresholdValue };
     }
     return part;
@@ -883,12 +935,7 @@ function evalExplode(node: ExplodeNode, rng: RNG, ctx: EvalContext, env: EvalEnv
 
   const shouldExplode = buildShouldExplode(node.threshold?.operator, thresholdValue);
 
-  const expanded =
-    node.variant === 'standard'
-      ? applyStandardExplode(targetCtx.rolls, shouldExplode, rng, env)
-      : node.variant === 'compound'
-        ? applyCompoundExplode(targetCtx.rolls, shouldExplode, rng, env)
-        : applyPenetratingExplode(targetCtx.rolls, shouldExplode, rng, env);
+  const expanded = EXPLODE_APPLIERS[node.variant](targetCtx.rolls, shouldExplode, rng, env);
 
   appendAll(ctx.rolls, expanded);
   ctx.expressionParts.push(`${targetExpr}${code}`);
@@ -902,11 +949,11 @@ function evalExplode(node: ExplodeNode, rng: RNG, ctx: EvalContext, env: EvalEnv
 }
 
 function evalReroll(node: RerollNode, rng: RNG, ctx: EvalContext, env: EvalEnv): EvalResult {
-  const targetCtx: EvalContext = { rolls: [], expressionParts: [], renderedParts: [] };
+  const targetCtx = createContext();
   const target = evalNode(node.target, rng, targetCtx, env);
   const targetExpr = targetCtx.expressionParts.join('');
 
-  const thresholdCtx: EvalContext = { rolls: [], expressionParts: [], renderedParts: [] };
+  const thresholdCtx = createContext();
   const thresholdValue = evalNode(node.condition.value, rng, thresholdCtx, env).total;
   mergeMetaRolls(ctx, thresholdCtx);
 
@@ -956,6 +1003,10 @@ function evalReroll(node: RerollNode, rng: RNG, ctx: EvalContext, env: EvalEnv):
   };
 }
 
+//
+// * Sort and crit thresholds
+//
+
 /**
  * Evaluates a sort modifier. Purely visual — sorts the dice produced by
  * `node.target` in ascending or descending order of `result` without
@@ -969,7 +1020,7 @@ function evalReroll(node: RerollNode, rng: RNG, ctx: EvalContext, env: EvalEnv):
  * per-sub-roll sorting (Stage 3 spec §3 "Group interaction") is implemented.
  */
 function evalSort(node: SortNode, rng: RNG, ctx: EvalContext, env: EvalEnv): EvalResult {
-  const targetCtx: EvalContext = { rolls: [], expressionParts: [], renderedParts: [] };
+  const targetCtx = createContext();
   const target = evalNode(node.target, rng, targetCtx, env);
 
   const sortedRolls = sortDice(targetCtx.rolls, node.order);
@@ -1017,7 +1068,7 @@ function evalCritThreshold(
   ctx: EvalContext,
   env: EvalEnv,
 ): EvalResult {
-  const targetCtx: EvalContext = { rolls: [], expressionParts: [], renderedParts: [] };
+  const targetCtx = createContext();
   const target = evalNode(node.target, rng, targetCtx, env);
 
   const successResolved = node.successThresholds.map((t) => resolveCritThreshold(t, rng, ctx, env));
@@ -1063,7 +1114,7 @@ function resolveCritThreshold(
   env: EvalEnv,
 ): ResolvedCritThreshold {
   if (threshold === 'default') return 'default';
-  const thresholdCtx: EvalContext = { rolls: [], expressionParts: [], renderedParts: [] };
+  const thresholdCtx = createContext();
   const resolved = evalNode(threshold.value, rng, thresholdCtx, env).total;
   mergeMetaRolls(ctx, thresholdCtx);
   if (!Number.isFinite(resolved)) {
@@ -1087,7 +1138,7 @@ function evalModifier(node: ModifierNode, rng: RNG, ctx: EvalContext, env: EvalE
     return evalGroupModifier(node, baseTarget, specs, rng, ctx, env);
   }
 
-  const targetCtx: EvalContext = { rolls: [], expressionParts: [], renderedParts: [] };
+  const targetCtx = createContext();
   const target = evalNode(baseTarget, rng, targetCtx, env);
 
   const mergedDice = mergeDropSets(targetCtx.rolls, specs);
@@ -1140,7 +1191,7 @@ function stripInnerMarkers(rendered: string): string {
 function evalGroupModifier(
   node: ModifierNode,
   group: GroupNode,
-  specs: ModifierSpec[],
+  specs: ModifierChainEntry[],
   rng: RNG,
   ctx: EvalContext,
   env: EvalEnv,
@@ -1155,7 +1206,7 @@ function evalGroupModifier(
   };
 
   const subRolls: SubRoll[] = group.expressions.map((expr) => {
-    const subCtx: EvalContext = { rolls: [], expressionParts: [], renderedParts: [] };
+    const subCtx = createContext();
     const sub = evalNode(expr, rng, subCtx, env);
     return {
       subtotal: sub.total,
@@ -1197,12 +1248,7 @@ function evalGroupModifier(
       // must not count dice from a sub-roll that was dropped. Mutated in
       // place — the same objects live in the sub-roll's RollPart.
       for (const die of sub.rolls) {
-        die.modifiers = [
-          ...die.modifiers.filter(
-            (m) => m !== 'kept' && m !== 'dropped' && m !== 'success' && m !== 'failure',
-          ),
-          'dropped',
-        ];
+        die.modifiers = rewriteFlags(die.modifiers, SELECTION_AND_TALLY_FLAGS, 'dropped');
       }
       appendAll(ctx.rolls, sub.rolls);
       outerRendered.push(`~~${stripInnerMarkers(sub.rendered)}~~`);
@@ -1255,6 +1301,10 @@ function evalGroupModifier(
   };
 }
 
+//
+// * Success counting
+//
+
 function resolveThreshold(
   value: ASTNode,
   rng: RNG,
@@ -1262,7 +1312,7 @@ function resolveThreshold(
   env: EvalEnv,
   role: 'threshold' | 'fail threshold',
 ): number {
-  const thresholdCtx: EvalContext = { rolls: [], expressionParts: [], renderedParts: [] };
+  const thresholdCtx = createContext();
   const resolved = evalNode(value, rng, thresholdCtx, env).total;
   mergeMetaRolls(ctx, thresholdCtx);
 
@@ -1296,7 +1346,7 @@ function evalSuccessCount(
   //   set before any early return so empty pools still populate successes/failures.
   env.hasSuccessCount = true;
 
-  const targetCtx: EvalContext = { rolls: [], expressionParts: [], renderedParts: [] };
+  const targetCtx = createContext();
   const target = evalNode(node.target, rng, targetCtx, env);
   const targetExpr = targetCtx.expressionParts.join('');
 
@@ -1357,6 +1407,10 @@ function evalSuccessCount(
   };
 }
 
+//
+// * Versus
+//
+
 /**
  * Extracts the "natural" d20 value from a roll-side dice pool. Returns the
  * single value when exactly one primary kept d20 is present; otherwise
@@ -1378,7 +1432,7 @@ function extractNatural(rolls: DieResult[]): number | undefined {
     (d) =>
       d.sides === 20 &&
       !d.modifiers.includes('dropped') &&
-      !(d.modifiers.includes('exploded') && d.initialResult === undefined),
+      !(d.modifiers.includes('exploded') && d.initialResult == null),
   );
   if (primaries.length !== 1) return undefined;
   const die = primaries[0];
@@ -1422,13 +1476,13 @@ function evalVersus(node: VersusNode, rng: RNG, ctx: EvalContext, env: EvalEnv):
 
   env.insideVersus = true;
   try {
-    const rollCtx: EvalContext = { rolls: [], expressionParts: [], renderedParts: [] };
+    const rollCtx = createContext();
     const rollResult = evalNode(node.roll, rng, rollCtx, env);
     // ? Extract natural from rollCtx directly — the roll-side pool is isolated
     //   here, so no index slicing on the merged parent pool is needed.
     const natural = extractNatural(rollCtx.rolls);
 
-    const dcCtx: EvalContext = { rolls: [], expressionParts: [], renderedParts: [] };
+    const dcCtx = createContext();
     const dcResult = evalNode(node.dc, rng, dcCtx, env);
 
     const degree = calculateDegree(rollResult.total, dcResult.total, natural);
@@ -1461,6 +1515,10 @@ function evalVersus(node: VersusNode, rng: RNG, ctx: EvalContext, env: EvalEnv):
   }
 }
 
+//
+// * Entry point
+//
+
 /**
  * Evaluates a parsed AST and returns the roll result.
  *
@@ -1478,24 +1536,17 @@ function evalVersus(node: VersusNode, rng: RNG, ctx: EvalContext, env: EvalEnv):
  * ```
  */
 export function evaluate(ast: ASTNode, rng: RNG, options: EvaluateOptions = {}): RollResult {
-  const maxDice =
-    options.maxDice != null && Number.isFinite(options.maxDice) && options.maxDice > 0
-      ? Math.floor(options.maxDice)
-      : DEFAULT_MAX_DICE;
-
-  const maxExplodeIterations =
-    options.maxExplodeIterations != null &&
-    Number.isFinite(options.maxExplodeIterations) &&
-    options.maxExplodeIterations >= 0
-      ? Math.floor(options.maxExplodeIterations)
-      : DEFAULT_MAX_EXPLODE_ITERATIONS;
-
-  const maxRerollIterations =
-    options.maxRerollIterations != null &&
-    Number.isFinite(options.maxRerollIterations) &&
-    options.maxRerollIterations >= 0
-      ? Math.floor(options.maxRerollIterations)
-      : DEFAULT_MAX_REROLL_ITERATIONS;
+  const maxDice = clampLimit(options.maxDice, DEFAULT_MAX_DICE, SMALLEST_POSITIVE);
+  const maxExplodeIterations = clampLimit(
+    options.maxExplodeIterations,
+    DEFAULT_MAX_EXPLODE_ITERATIONS,
+    0,
+  );
+  const maxRerollIterations = clampLimit(
+    options.maxRerollIterations,
+    DEFAULT_MAX_REROLL_ITERATIONS,
+    0,
+  );
 
   const context = options.context ?? {};
   const onMissingVariable = options.onMissingVariable ?? 'throw';
@@ -1510,11 +1561,7 @@ export function evaluate(ast: ASTNode, rng: RNG, options: EvaluateOptions = {}):
     context,
     onMissingVariable,
   };
-  const ctx: EvalContext = {
-    rolls: [],
-    expressionParts: [],
-    renderedParts: [],
-  };
+  const ctx = createContext();
 
   const { total, part } = evalNode(ast, rng, ctx, env);
 
@@ -1545,7 +1592,7 @@ export function evaluate(ast: ASTNode, rng: RNG, options: EvaluateOptions = {}):
     parts: part,
     ...(env.hasSuccessCount ? countTaggedDice(ctx.rolls) : {}),
     ...(versus ? { degree: versus.degree } : {}),
-    ...(versus?.natural !== undefined ? { natural: versus.natural } : {}),
+    ...(versus?.natural != null ? { natural: versus.natural } : {}),
   };
 }
 

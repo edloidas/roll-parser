@@ -12,8 +12,10 @@
 import { EvaluatorError } from '../../errors.js';
 import type { RNG } from '../../rng/types.js';
 import type { CompareOp, DieResult } from '../../types.js';
-import type { EvalEnv } from '../env.js';
+import { createDieResult, createFateDieResult } from '../die.js';
+import { chargeDie, type EvalEnv } from '../env.js';
 import { matchesCondition } from './compare.js';
+import { REROLL_SLOT_FLAGS, rewriteFlags } from './flags.js';
 
 /** Default maximum reroll iterations per die. */
 export const DEFAULT_MAX_REROLL_ITERATIONS = 1_000;
@@ -23,34 +25,11 @@ export const DEFAULT_MAX_REROLL_ITERATIONS = 1_000;
  * dice limit. Fate dice (sides === 0) re-roll on the {-1, 0, +1} range.
  */
 function rollReplacement(sides: number, rng: RNG, env: EvalEnv): DieResult {
-  if (env.totalDiceRolled + 1 > env.maxDice) {
-    throw new EvaluatorError(
-      `Total dice count ${env.totalDiceRolled + 1} exceeds limit of ${env.maxDice}`,
-      'DICE_LIMIT_EXCEEDED',
-      'Reroll',
-    );
-  }
-  env.totalDiceRolled += 1;
+  chargeDie(env, 'Reroll');
 
-  if (sides === 0) {
-    const result = rng.nextInt(-1, 1);
-    return {
-      sides: 0,
-      result,
-      modifiers: [],
-      critical: false,
-      fumble: false,
-    };
-  }
+  if (sides === 0) return createFateDieResult(rng.nextInt(-1, 1), []);
 
-  const result = rng.nextInt(1, sides);
-  return {
-    sides,
-    result,
-    modifiers: [],
-    critical: result === sides && sides > 1,
-    fumble: result === 1 && sides > 1,
-  };
+  return createDieResult(sides, rng.nextInt(1, sides), []);
 }
 
 function rerollLimitError(maxIterations: number): EvaluatorError {
@@ -67,15 +46,6 @@ function rerollLimitError(maxIterations: number): EvaluatorError {
  */
 function canReroll(die: DieResult): boolean {
   return !die.modifiers.includes('dropped');
-}
-
-/**
- * Returns the die's modifiers with any "slot" flags removed. Slot flags
- * (`kept`, `dropped`, `rerolled`) are controlled by the surrounding logic
- * and should be reassigned each pass.
- */
-function stripSlotFlags(modifiers: DieResult['modifiers']): DieResult['modifiers'] {
-  return modifiers.filter((m) => m !== 'kept' && m !== 'dropped' && m !== 'rerolled');
 }
 
 /**
@@ -111,14 +81,14 @@ export function applyRecursiveReroll(
         throw rerollLimitError(env.maxRerollIterations);
       }
 
-      current.modifiers = [...stripSlotFlags(current.modifiers), 'rerolled', 'dropped'];
+      current.modifiers = rewriteFlags(current.modifiers, REROLL_SLOT_FLAGS, 'rerolled', 'dropped');
       result.push(current);
 
       current = rollReplacement(current.sides, rng, env);
       iterations += 1;
     }
 
-    current.modifiers = [...stripSlotFlags(current.modifiers), 'kept'];
+    current.modifiers = rewriteFlags(current.modifiers, REROLL_SLOT_FLAGS, 'kept');
     result.push(current);
   }
 
@@ -147,16 +117,16 @@ export function applyRerollOnce(
 
     // ? Mutate flags in place — see `applyRecursiveReroll`.
     if (!matchesCondition(original.result, operator, value)) {
-      original.modifiers = [...stripSlotFlags(original.modifiers), 'kept'];
+      original.modifiers = rewriteFlags(original.modifiers, REROLL_SLOT_FLAGS, 'kept');
       result.push(original);
       continue;
     }
 
-    original.modifiers = [...stripSlotFlags(original.modifiers), 'rerolled', 'dropped'];
+    original.modifiers = rewriteFlags(original.modifiers, REROLL_SLOT_FLAGS, 'rerolled', 'dropped');
     result.push(original);
 
     const replacement = rollReplacement(original.sides, rng, env);
-    replacement.modifiers = [...stripSlotFlags(replacement.modifiers), 'kept'];
+    replacement.modifiers = rewriteFlags(replacement.modifiers, REROLL_SLOT_FLAGS, 'kept');
     result.push(replacement);
   }
 

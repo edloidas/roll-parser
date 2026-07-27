@@ -121,7 +121,7 @@ export class Lexer {
       return this.scanNumber();
     }
 
-    // * Identifiers (d, kh, kl, dh, dl, r, ro, f, vs, floor, ceil, ...)
+    // * Identifiers
     if (this.isAlpha(char)) {
       return this.scanIdentifier();
     }

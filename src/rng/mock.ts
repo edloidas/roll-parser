@@ -45,7 +45,7 @@ export function createMockRng(values: number[]): RNG {
 
   const getNext = (): number => {
     const value = values[index];
-    if (value === undefined) {
+    if (value == null) {
       throw new MockRNGExhaustedError(index);
     }
     index++;

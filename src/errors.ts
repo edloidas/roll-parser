@@ -106,7 +106,7 @@ export class EvaluatorError extends RollParserError {
   ) {
     super(message, code, options);
     this.name = 'EvaluatorError';
-    this.nodeType = nodeType ?? undefined;
+    this.nodeType = nodeType;
   }
 
   /**
@@ -130,7 +130,7 @@ export class EvaluatorError extends RollParserError {
    * @internal Called only by `evalNode`; not part of the public API.
    */
   stampSpan(start: number, end: number | undefined): void {
-    if (this.#start !== undefined) return;
+    if (this.#start != null) return;
     this.#start = start;
     this.#end = end;
   }

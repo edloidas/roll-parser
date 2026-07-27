@@ -80,10 +80,6 @@ const options = {
   timeout: 5000,
 } satisfies RequestOptions;
 
-// Use `Maybe<T>` for nullish values
-type Maybe<T> = T | null | undefined;
-function findUser(id: string): Maybe<User> { /* ... */ }
-
 // Prefer `undefined` over `null` for unset values
 const activeId: string | undefined = undefined;
 ```
