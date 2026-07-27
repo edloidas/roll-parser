@@ -11,37 +11,73 @@ import type { RNG } from './rng/types.js';
 import type { EvaluationLimits, RollResult } from './types.js';
 
 /**
- * Options for the roll function.
+ * Everything {@link roll} accepts on top of the shared {@link EvaluationLimits}:
+ * a randomness source, given either as a ready-made {@link RNG} or as a seed.
+ *
+ * @category Core
+ *
+ * @example
+ * ```typescript
+ * import { roll, SeededRNG } from 'roll-parser';
+ *
+ * roll('4d6', { seed: 'character-1' });     // reproducible
+ * roll('4d6', { rng: new SeededRNG(42) });  // rng wins over seed
+ * roll('1d20+@str', { context: { str: 4 } });
+ * ```
  */
 export type RollOptions = EvaluationLimits & {
-  /** Custom RNG instance (takes precedence over seed) */
+  /**
+   * Randomness source. Takes precedence over `seed` — when both are given,
+   * `seed` is ignored.
+   */
   rng?: RNG;
-  /** Seed for deterministic rolls (ignored if rng provided) */
+  /**
+   * Seed for a fresh `SeededRNG`. Equal seeds replay the same die sequence for
+   * the same notation. Ignored when `rng` is set.
+   */
   seed?: string | number;
 };
 
 /**
- * Parses and evaluates a dice notation string.
+ * Parses and evaluates a dice notation string in one call — the main entry
+ * point of the library.
  *
- * @param notation - Dice notation (e.g., "2d6+3", "4d6kh3")
- * @param options - Optional configuration (RNG or seed)
- * @returns Complete roll result with total and metadata
+ * Equivalent to `evaluate(parse(notation), rng, { notation })`. Each call
+ * builds a fresh `SeededRNG` unless `options.rng` is supplied, so reuse
+ * {@link parse} + {@link evaluate} directly when rolling the same notation in
+ * a loop.
+ *
+ * @param notation - Dice notation, e.g. `'2d6+3'` or `'4d6kh3'`
+ * @param options - RNG or seed, plus the shared {@link EvaluationLimits}
+ * @returns Complete {@link RollResult} with total, per-die results and the
+ *   structured `parts` tree
+ * @throws {LexerError} On an invalid character
+ * @throws {ParseError} On invalid syntax
+ * @throws {EvaluatorError} On a limit breach or an impossible expression
  *
  * @example
  * ```typescript
+ * import { roll } from 'roll-parser';
+ *
  * // Random roll
- * const result = roll('2d6+3');
- * console.log(result.total); // 5-15
+ * roll('2d6+3').total; // 5..15
  *
- * // Seeded for reproducibility
- * const r1 = roll('4d6', { seed: 'test' });
- * const r2 = roll('4d6', { seed: 'test' });
- * r1.total === r2.total; // true
- *
- * // Custom RNG for testing
- * const result = roll('1d20', { rng: createMockRng([15]) });
- * result.total; // 15
+ * // Seeded — same seed, same sequence
+ * roll('2d6+3', { seed: 'demo' }).rendered; // '2d6[2, 6] + 3 = 11'
+ * roll('2d6+3', { seed: 'demo' }).total; // 11
  * ```
+ *
+ * @example Deterministic tests with the testing mock
+ * ```typescript
+ * import { roll } from 'roll-parser';
+ * import { createMockRng } from 'roll-parser/testing';
+ *
+ * const result = roll('4d6kh3', { rng: createMockRng([3, 6, 2, 5]) });
+ * result.total; // 14
+ * result.rendered; // '4d6[3, 6, ~~2~~, 5] = 14'
+ * ```
+ *
+ * @category Core
  */
 export function roll(notation: string, options: RollOptions = {}): RollResult {
   // ? `limits` is exactly `EvaluationLimits`, so it forwards wholesale — an

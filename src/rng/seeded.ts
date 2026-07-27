@@ -35,18 +35,39 @@ const SPLITMIX_MULTIPLIER_2 = 0xc2b2ae35;
 const DJB2_SEED = 5381;
 
 /**
- * Seedable pseudo-random number generator using xorshift128.
+ * Seedable pseudo-random number generator using xorshift128. The default
+ * randomness source — `roll(notation)` builds one per call, and
+ * `roll(notation, { seed })` builds one from your seed.
  *
- * Produces reproducible sequences from identical seeds.
- * Period: 2^128 - 1
+ * Period 2^128 - 1. String seeds are hashed (djb2), numeric seeds are
+ * coerced to uint32, and an omitted seed mixes `Date.now()` with
+ * `Math.random()`. The first 20 draws are discarded so low bits decorrelate
+ * from the seed expansion.
+ *
+ * Reproducibility guarantee: within one released version, the same seed and
+ * the same notation always produce the same dice. The sequence is *not*
+ * cryptographically secure and is not guaranteed stable across major
+ * versions — do not persist rolls by re-deriving them from a seed, persist
+ * the {@link RollResult}.
  *
  * @example
  * ```typescript
+ * import { SeededRNG, roll } from 'roll-parser';
+ *
  * // Same seed = same sequence
- * const rng1 = new SeededRNG('test-seed');
- * const rng2 = new SeededRNG('test-seed');
- * rng1.nextInt(1, 6) === rng2.nextInt(1, 6); // true
+ * const a = new SeededRNG('test-seed');
+ * const b = new SeededRNG('test-seed');
+ * a.nextInt(1, 6) === b.nextInt(1, 6); // true
+ *
+ * // An injected instance keeps advancing across rolls; `{ seed }` restarts
+ * // the stream on every call.
+ * const rng = new SeededRNG('demo');
+ * roll('1d20', { rng }).total; // 12
+ * roll('1d20', { rng }).total; // 14 — the stream moved on
+ * roll('1d20', { seed: 'demo' }).total; // 12, every single time
  * ```
+ *
+ * @category RNG
  */
 export class SeededRNG implements RNG {
   private s0: number;
@@ -127,11 +148,47 @@ export class SeededRNG implements RNG {
     return this.s0;
   }
 
+  /**
+   * Returns a float in `[0, 1)`, derived from one uint32 draw. Resolution is
+   * 2^-32, not the full 2^-53 a double can hold.
+   *
+   * Not used by the evaluator — dice go through {@link nextInt}.
+   *
+   * @returns A float in `[0, 1)`
+   */
   next(): number {
     // Convert uint32 to [0, 1) float
     return this.nextUint32() / UINT32_SPACE;
   }
 
+  /**
+   * Returns an integer in the inclusive range `[min, max]`, uniformly
+   * distributed — rejection sampling removes the modulo bias a plain
+   * `% range` would introduce.
+   *
+   * Bounds handling, in order:
+   * - `min > max` is normalized by swapping, so `nextInt(6, 1)` behaves as
+   *   `nextInt(1, 6)`. (The mock RNG throws instead; see {@link RNG.nextInt}.)
+   * - `min === max` returns that value without consuming a draw.
+   * - Ranges wider than 2^32 use two draws composed into a 53-bit value.
+   * - Ranges wider than 2^53 cannot be sampled exactly and throw a
+   *   `RangeError` rather than silently skewing.
+   *
+   * @param min - Lower bound, inclusive
+   * @param max - Upper bound, inclusive
+   * @returns An integer in `[min, max]`
+   * @throws {RangeError} If `max - min + 1` exceeds 2^53
+   *
+   * @example
+   * ```typescript
+   * import { SeededRNG } from 'roll-parser';
+   *
+   * const rng = new SeededRNG('demo');
+   * rng.nextInt(1, 6); // 1..6
+   * rng.nextInt(3, 3); // 3, always
+   * rng.nextInt(1, Number.MAX_SAFE_INTEGER); // fine — two-draw path
+   * ```
+   */
   nextInt(min: number, max: number): number {
     // Handle inverted bounds
     const lo = min > max ? max : min;

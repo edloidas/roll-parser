@@ -9,6 +9,8 @@
  *
  * Grouped semantically. Numeric values are stable identifiers — the specific
  * numbers don't matter, but they must be unique.
+ *
+ * @category AST
  */
 export enum TokenType {
   //
@@ -169,7 +171,26 @@ export enum TokenType {
 }
 
 /**
- * A token produced by the lexer.
+ * A token produced by {@link lex}: what it is, the text it came from, and
+ * where in the input that text sits.
+ *
+ * `position`/`end` are a half-open range, so `input.slice(position, end)`
+ * recovers the original source text — useful for syntax highlighting, where
+ * `value` alone is lossy.
+ *
+ * @example
+ * ```typescript
+ * import { lex, TokenType } from 'roll-parser';
+ *
+ * const input = '4D6KH3';
+ * const tokens = lex(input);
+ * tokens[1]; // { type: TokenType.DICE, value: 'd', position: 1, end: 2 }
+ * tokens[3].type === TokenType.KEEP_HIGH; // true
+ * input.slice(tokens[3].position, tokens[3].end); // 'KH' — original casing
+ * tokens[3].value; // 'kh' — normalized
+ * ```
+ *
+ * @category AST
  */
 export type Token = {
   /** The type of this token */

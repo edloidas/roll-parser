@@ -17,7 +17,17 @@ import { chargeDie, type EvalEnv } from '../env.js';
 import { matchesCondition } from './compare.js';
 import { REROLL_SLOT_FLAGS, rewriteFlags } from './flags.js';
 
-/** Default maximum reroll iterations per die. */
+/**
+ * Default value of `EvaluationLimits.maxRerollIterations`: how many times a
+ * single die may be re-rolled by `r` before `REROLL_LIMIT_EXCEEDED` is
+ * thrown.
+ *
+ * Per die, not per pool — it bounds notations like `1d1r<2`, whose reroll
+ * condition can never stop matching. `ro` re-rolls exactly once and is
+ * unaffected.
+ *
+ * @category Limits
+ */
 export const DEFAULT_MAX_REROLL_ITERATIONS = 1_000;
 
 /**

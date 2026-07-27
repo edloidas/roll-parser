@@ -61,6 +61,30 @@ const ROLL_PARSER_ERROR_CODES = [
  * `INVALID_MODIFIER_COUNT`, `EXPLODE_LIMIT_EXCEEDED`, `REROLL_LIMIT_EXCEEDED`,
  * `INVALID_THRESHOLD`, `NESTED_VERSUS`, `UNKNOWN_FUNCTION`, `UNDEFINED_VARIABLE`,
  * `INVALID_VARIABLE_VALUE`, `NON_FINITE_RESULT`
+ *
+ * The union is closed and stable: codes are only ever added in a minor
+ * release, so `switch` statements over it can stay exhaustive.
+ *
+ * @example
+ * ```typescript
+ * import { isRollParserError, roll, type RollParserErrorCode } from 'roll-parser';
+ *
+ * const MESSAGES: Partial<Record<RollParserErrorCode, string>> = {
+ *   DICE_LIMIT_EXCEEDED: 'That is too many dice.',
+ *   DIVISION_BY_ZERO: 'Cannot divide by zero.',
+ *   UNEXPECTED_CHARACTER: 'That is not valid dice notation.',
+ * };
+ *
+ * try {
+ *   roll(userInput);
+ * } catch (error) {
+ *   if (isRollParserError(error)) {
+ *     reply(MESSAGES[error.code] ?? error.message);
+ *   }
+ * }
+ * ```
+ *
+ * @category Errors
  */
 export type RollParserErrorCode = (typeof ROLL_PARSER_ERROR_CODES)[number];
 
@@ -72,9 +96,31 @@ export type RollParserErrorCode = (typeof ROLL_PARSER_ERROR_CODES)[number];
  * extend this class.
  *
  * Error messages never embed the source position — every subclass reports it
- * through structured fields instead, readable uniformly via `getErrorSpan`.
+ * through structured fields instead, readable uniformly via
+ * {@link getErrorSpan}. Prefer {@link isRollParserError} over `instanceof`:
+ * it also matches errors that crossed a realm boundary.
+ *
+ * @example
+ * ```typescript
+ * import { roll, RollParserError } from 'roll-parser';
+ *
+ * try {
+ *   roll('1d6/0');
+ * } catch (error) {
+ *   const typed = error as RollParserError;
+ *   typed.name; // 'EvaluatorError'
+ *   typed.code; // 'DIVISION_BY_ZERO'
+ *   typed.message; // 'Division by zero'
+ * }
+ * ```
+ *
+ * @category Errors
  */
 export class RollParserError extends Error {
+  /**
+   * Stable programmatic identifier for the failure. Branch on this rather
+   * than on `message`, which is free to change between releases.
+   */
   readonly code: RollParserErrorCode;
 
   constructor(message: string, code: RollParserErrorCode, options?: ErrorOptions) {
@@ -91,8 +137,31 @@ export class RollParserError extends Error {
  * implementations can throw it without importing back into the evaluator —
  * that value-level round trip was a genuine ESM cycle. `evaluator.ts`
  * re-exports the class for existing importers.
+ *
+ * Unlike `LexerError` / `ParseError` — which point at a single offset — an
+ * `EvaluatorError` carries a full `start`/`end` span covering the failing
+ * sub-expression, because by evaluation time the AST knows its own extent.
+ *
+ * @example
+ * ```typescript
+ * import { getErrorSpan, roll } from 'roll-parser';
+ *
+ * try {
+ *   roll('2d6+1d0+3');
+ * } catch (error) {
+ *   (error as Error).name; // 'EvaluatorError'
+ *   getErrorSpan(error); // { start: 4, end: 7 } — the '1d0' sub-expression
+ * }
+ * ```
+ *
+ * @category Errors
  */
 export class EvaluatorError extends RollParserError {
+  /**
+   * `ASTNode.type` of the node that raised the error (`'Dice'`, `'BinaryOp'`,
+   * …). `undefined` for failures raised outside a node context, such as the
+   * whole-expression dice budget.
+   */
   readonly nodeType: ASTNode['type'] | undefined;
 
   #start: number | undefined;
@@ -140,6 +209,8 @@ export class EvaluatorError extends RollParserError {
  * Source span of an error, in UTF-16 code units into the original notation.
  * `start` is inclusive; `end` is exclusive and present only when the error
  * carries a full span (evaluator errors) rather than a single offset.
+ *
+ * @category Errors
  */
 export type ErrorSpan = {
   start: number;
@@ -149,8 +220,31 @@ export type ErrorSpan = {
 const VALID_CODES: Set<string> = new Set<string>(ROLL_PARSER_ERROR_CODES);
 
 /**
- * Type guard for roll-parser errors. Checks `instanceof` first, then
- * falls back to duck-typing for cross-realm safety.
+ * Type guard for roll-parser errors. Checks `instanceof` first, then falls
+ * back to duck-typing — an `Error` whose `code` is a known
+ * {@link RollParserErrorCode} passes even if it crossed a realm boundary
+ * (worker, iframe, vm context) and so failed `instanceof`.
+ *
+ * Use it as the outer filter in every `catch`: anything it rejects is a bug
+ * in your code or the library, not a bad notation, and should be rethrown.
+ *
+ * @param value - The caught value, of unknown type
+ * @returns `true` when `value` is a roll-parser error
+ *
+ * @example
+ * ```typescript
+ * import { isRollParserError, roll } from 'roll-parser';
+ *
+ * try {
+ *   roll('2d6+&');
+ * } catch (error) {
+ *   if (!isRollParserError(error)) throw error;
+ *   error.code; // 'UNEXPECTED_CHARACTER'
+ *   error.message; // "Unexpected character: '&'"
+ * }
+ * ```
+ *
+ * @category Errors
  */
 export function isRollParserError(value: unknown): value is RollParserError {
   if (value instanceof RollParserError) return true;
@@ -172,14 +266,42 @@ function isOffset(value: unknown): value is number {
  * roll-parser errors, or that carry no usable offset (an `EvaluatorError`
  * raised on a hand-built AST, for instance).
  *
- * @example
+ * @param error - The caught value, of unknown type
+ * @returns The span, or `undefined` when none is available
+ *
+ * @example Rendering a caret, the way the CLI does
  * ```typescript
- * try {
- *   roll('2d6+&');
- * } catch (error) {
- *   const span = getErrorSpan(error); // { start: 4 }
+ * import { getErrorSpan, isRollParserError, roll } from 'roll-parser';
+ *
+ * function explain(notation: string): string | undefined {
+ *   try {
+ *     roll(notation);
+ *     return undefined;
+ *   } catch (error) {
+ *     if (!isRollParserError(error)) throw error;
+ *     const span = getErrorSpan(error);
+ *     if (span == null) return error.message;
+ *     const width = (span.end ?? span.start + 1) - span.start;
+ *     return [
+ *       error.message,
+ *       notation,
+ *       ' '.repeat(span.start) + '^'.repeat(width),
+ *     ].join('\n');
+ *   }
  * }
+ *
+ * explain('2d6+&');
+ * // Unexpected character: '&'
+ * // 2d6+&
+ * //     ^
+ *
+ * explain('2d6+1d0+3');
+ * // Invalid dice sides: 0
+ * // 2d6+1d0+3
+ * //     ^^^
  * ```
+ *
+ * @category Errors
  */
 export function getErrorSpan(error: unknown): ErrorSpan | undefined {
   if (!isRollParserError(error)) return undefined;

@@ -19,6 +19,46 @@
  * implementations differ, and each difference is load-bearing — see
  * {@link nextInt}. Evaluator code never inverts its bounds, so callers should
  * treat inverted bounds as a programming error rather than an API.
+ *
+ * The evaluator only ever calls `nextInt`, once per die, left to right;
+ * `next` exists for implementations that want a float source of their own.
+ * Two shipped implementations satisfy the interface — {@link SeededRNG} and
+ * the mock from `roll-parser/testing` — and anything structurally compatible
+ * works, so a crypto-backed or table-driven generator drops straight in.
+ *
+ * @example A crypto-backed RNG
+ * ```typescript
+ * import { roll, type RNG } from 'roll-parser';
+ *
+ * const cryptoRng: RNG = {
+ *   next: () => crypto.getRandomValues(new Uint32Array(1))[0]! / 2 ** 32,
+ *   nextInt: (min, max) => min + Math.floor(cryptoRng.next() * (max - min + 1)),
+ * };
+ *
+ * roll('4d6kh3', { rng: cryptoRng }).total; // 3..18
+ * ```
+ *
+ * @example Wrapping an RNG to log every draw
+ * ```typescript
+ * import { SeededRNG, roll, type RNG } from 'roll-parser';
+ *
+ * function withLog(inner: RNG, log: number[]): RNG {
+ *   return {
+ *     next: () => inner.next(),
+ *     nextInt: (min, max) => {
+ *       const value = inner.nextInt(min, max);
+ *       log.push(value);
+ *       return value;
+ *     },
+ *   };
+ * }
+ *
+ * const draws: number[] = [];
+ * roll('4d6kh3', { rng: withLog(new SeededRNG('demo'), draws) });
+ * draws; // [2, 6, 1, 1] — every face, including the dropped one
+ * ```
+ *
+ * @category RNG
  */
 export type RNG = {
   /**

@@ -80,5 +80,22 @@ export type {
 } from './types.js';
 export { DegreeOfSuccess } from './types.js';
 
-/** Installed roll-parser version, taken from the package manifest. */
+/**
+ * Installed roll-parser version, read from the package manifest at build time
+ * — the exact string in `package.json`, so pre-releases keep their suffix
+ * (`'3.0.0-beta.0'`).
+ *
+ * Useful in bug reports and for feature-gating against a minimum version. The
+ * CLI prints it for `--version` and in the `--help` header.
+ *
+ * @example
+ * ```typescript
+ * import { VERSION } from 'roll-parser';
+ *
+ * VERSION; // '3.0.0-beta.0'
+ * VERSION.startsWith('3.'); // true
+ * ```
+ *
+ * @category Core
+ */
 export const VERSION: string = version;
