@@ -8,19 +8,23 @@ concurrency:
   group: release
   cancel-in-progress: true
 
+# Read-only by default; each job widens only what it needs. `id-token: write`
+# lives on `publish` (npm Trusted Publishing) and `contents: write` on
+# `release` (creating the GitHub Release), so neither holds the other's rights.
 permissions:
-  contents: write
-  id-token: write
+  contents: read
 
 jobs:
   precheck:
     name: Verify tag is on master
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     outputs:
       allowed: ${{ steps.contains.outputs.allowed }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
 
@@ -43,26 +47,31 @@ jobs:
     needs: precheck
     if: needs.precheck.outputs.allowed == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      prerelease: ${{ steps.disttag.outputs.prerelease }}
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
 
       - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          bun-version: '1.3.10'
+          bun-version-file: .bun-version
 
       - name: Setup Node.js (for npm CLI + OIDC .npmrc wiring)
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '24'
           registry-url: 'https://registry.npmjs.org'
 
       - name: Cache Bun dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ~/.bun/install/cache
           key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
@@ -98,44 +107,48 @@ jobs:
           fi
           echo "Dist-tag: $TAG"
 
-      - name: Build & validate
-        run: bun run release:dry
-
-      - name: Publish to npm
-        # Uses npm CLI (not bun) because Bun does not yet support OIDC
-        # Trusted Publishing (oven-sh/bun#15601). Provenance attestations are
-        # generated automatically by npm under Trusted Publishing — no flag needed.
+      # The full `release:dry` gate (check, build, check:package, tests) runs
+      # here through the `prepublishOnly` hook, which npm fires before packing.
+      # There is deliberately no separate step for it: one invocation covers CI
+      # and manual publishes alike, and two would double an eight-minute gate.
+      #
+      # Uses npm CLI (not bun) because Bun does not yet support OIDC Trusted
+      # Publishing (oven-sh/bun#15601). Provenance attestations are generated
+      # automatically by npm under Trusted Publishing — the `id-token: write`
+      # permission above is what enables them, so no `--provenance` flag.
+      - name: Build, validate, and publish to npm
         run: npm publish --tag "${{ steps.disttag.outputs.tag }}"
 
+  release:
+    name: Create GitHub Release
+    needs: [precheck, publish]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+
+      # No `bun install`: `check-changelog.ts` only reads CHANGELOG.md and
+      # package.json, so the release body needs no dependency tree.
       - name: Extract CHANGELOG section for release body
         shell: bash
         run: |
-          V="${GITHUB_REF_NAME#v}"
-          awk -v prefix="## [$V]" '
-            substr($0, 1, length(prefix)) == prefix { found=1; next }
-            found && /^## \[/ { exit }
-            found && /^\[[^]]+\]: / { exit }
-            found { lines[++n] = $0 }
-            END {
-              start = 1
-              while (start <= n && lines[start] ~ /^[[:space:]]*$/) start++
-              end = n
-              while (end >= start && lines[end] ~ /^[[:space:]]*$/) end--
-              for (i = start; i <= end; i++) print lines[i]
-            }
-          ' CHANGELOG.md > release-body.md
-          if [ ! -s release-body.md ]; then
-            echo "::error::Empty CHANGELOG section for $V — aborting"
-            exit 1
-          fi
+          bun run check:changelog "${GITHUB_REF_NAME#v}" --extract > release-body.md
           echo "::group::Release body"
           cat release-body.md
           echo "::endgroup::"
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           name: ${{ github.ref_name }}
           tag_name: ${{ github.ref_name }}
-          prerelease: ${{ steps.disttag.outputs.prerelease == 'true' }}
+          prerelease: ${{ needs.publish.outputs.prerelease == 'true' }}
           body_path: release-body.md

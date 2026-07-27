@@ -1,0 +1,15 @@
+version: 2
+
+updates:
+  # Actions are SHA-pinned for supply-chain safety, which makes them invisible
+  # to any "is there a newer vX" signal. Dependabot rewrites the SHA and the
+  # trailing `# vX.Y.Z` comment together, so the pins stay current without
+  # anyone re-resolving them by hand.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci
+    labels:
+      - improvement
