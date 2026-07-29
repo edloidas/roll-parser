@@ -13,11 +13,15 @@ bun validate    # Full pre-release gate: check + build + check:package + test:ci
 Demo site (`site/`, deployed to Cloudflare Pages by `.github/workflows/deploy-site.yml`):
 
 ```bash
-bun site:dev     # Bun HTML dev server with HMR — no TypeDoc, so /docs/ is absent
+bun site:dev     # Bun HTML dev server — no TypeDoc, so /docs/ is absent
 bun site:build   # Full static build into site/dist/, including the TypeDoc reference
 bun site:check   # Verify site/dist/ — asset references resolve, no dev paths leaked
 bun site:preview # site:build, then serve site/dist/ locally with host-style routing
 ```
+
+The site consumes the built package (`site/src` imports `'roll-parser'`, which
+resolves to `dist/` via the self-reference) — site HTML/CSS/TS edits hot-reload
+under `site:dev`, but library `src/` edits need a `bun run build` to show up.
 
 A pre-commit hook auto-fixes staged `.ts`/`.tsx` files (nano-staged runs
 `biome check --write` on them, then re-stages). It installs automatically on
@@ -26,11 +30,14 @@ Commits with unfixable lint errors are blocked.
 
 ## Constraints
 
-- Runtime: Bun — never use npm, yarn, or pnpm
+- Runtime: Bun — never use npm, yarn, or pnpm (the `node-smoke` CI job is the one place npm runs, to test the packed tarball the way consumers install it)
 - Target: ES2022, TypeScript only
 - Library + CLI, ESM-only compiled JS (Node ≥22.12 consumes via `import` or `require(esm)` — 22.12 is where `require(esm)` is unflagged)
-- Relative imports in `src/` carry explicit `.js` extensions — required for nodenext-safe `.d.ts` output (verified by `bun run check:package`)
-- Do not pass `--sourcemap` with `--outfile` to `bun build` — Bun 1.3.x silently writes nothing; use `--outdir` (+ `--entry-naming` for the CLI)
+- `dist/` is a per-file `tsc` emit (`tsconfig.build.json`), not a bundle — JS, `.d.ts`, and both map kinds come from one compiler pass; `bun build` is not used for the package. Do not reintroduce a bundler: Bun ≤1.3.11 emits broken output for pure re-export entrypoints (e.g. `src/testing.ts`) and `--target browser` silently stubs `node:` builtins instead of erroring
+- Relative imports in `src/` carry explicit `.js` extensions — enforced by `moduleResolution: nodenext` at typecheck time
+- Library code must stay environment-neutral: no Node/Bun globals or `node:` imports outside `src/cli/` — enforced by Biome `noNodejsModules`, `types: []` in `tsconfig.build.json`, and the `browser-smoke` CI job
+- `src/version.ts` is generated from `package.json` by `bun run generate:version` — never edit it by hand; `check:version` and the `index.test.ts` drift test gate the sync
+- In `scripts/build-site.ts`, do not pass `sourcemap` with a single `outfile` to `Bun.build` — Bun 1.3.x silently writes nothing; use `outdir`
 - TypeDoc lives in the `scripts/docs` workspace, not the root, and is invoked from
   `scripts/docs/node_modules/.bin/typedoc`. TypeDoc 0.28.x peers at TypeScript
   `<=6.0.x` and throws on the root `typescript@7`, so that workspace nests a
@@ -94,5 +101,5 @@ Types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `perf`, `bui
 
 Use the `/npm-release` skill. Project-specific conventions the skill must honor:
 
-- **Dedicated release commit**: bump `package.json`, commit as `chore: release v<version>`, then tag that commit. Never tag a pre-existing unrelated commit — if the version already matches the target, stop and ask before proceeding.
+- **Dedicated release commit**: bump `package.json`, run `bun run generate:version` and include the regenerated `src/version.ts` in the same commit, commit as `chore: release v<version>`, then tag that commit. Never tag a pre-existing unrelated commit — if the version already matches the target, stop and ask before proceeding. (`check:version` fails the release if `src/version.ts` is stale.)
 - **CHANGELOG gate**: update `CHANGELOG.md` via the local `release-changelog` skill before bumping — `bun run release:dry` fails at `check:changelog` without it.

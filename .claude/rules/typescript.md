@@ -124,9 +124,10 @@ function updateEntity<T extends { id: string }>(entity: T, updates: Partial<T>):
 export { RollParser, DiceRoller };
 
 // Use `import type` for type-only imports (required by verbatimModuleSyntax)
-import type { RollResult, DiceConfig } from '../types';
+import type { RollResult, DiceConfig } from '../types.js';
 
-// Use path aliases for imports outside the current directory
-import { createMockRng } from '@/rng/mock';
-import { utils } from './utils'; // Same directory: relative paths are fine
+// Relative imports only, always with the explicit `.js` extension —
+// `moduleResolution: nodenext` rejects extensionless specifiers
+import { createMockRng } from '../rng/mock.js';
+import { utils } from './utils.js';
 ```

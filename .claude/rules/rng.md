@@ -76,7 +76,7 @@ Crit threshold resolves to `>1`; all four dice qualify as critical successes. To
 ```typescript
 import { describe, it, expect } from 'bun:test';
 // Internal tests use relative imports:
-import { createMockRng } from '@/rng/mock';
+import { createMockRng } from '../rng/mock.js';
 // npm consumers use: import { createMockRng } from 'roll-parser/testing';
 
 describe('roll', () => {
