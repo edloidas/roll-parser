@@ -7,7 +7,7 @@
  * @module reference
  */
 
-import { isRollParserError, roll, VERSION } from '../../src/index.js';
+import { isRollParserError, roll, VERSION } from 'roll-parser';
 import { initTrayToggle, renderTray } from './dice.js';
 import { renderErrorSlot, renderResultPanel } from './render.js';
 import { initTheme } from './theme.js';
