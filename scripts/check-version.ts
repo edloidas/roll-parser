@@ -5,8 +5,9 @@ const pkgVersion = pkg.version;
 
 // The generated src/version.ts must always match package.json — it is what
 // the published library actually exports as VERSION.
-const versionSource = await Bun.file(new URL('../src/version.ts', import.meta.url)).text();
-const srcVersion = versionSource.match(/^export const version = '(.+)';$/m)?.[1];
+const versionFile = Bun.file(new URL('../src/version.ts', import.meta.url));
+const versionSource = (await versionFile.exists()) ? await versionFile.text() : '';
+const srcVersion = versionSource.match(/^export const version = '(.+)';\r?$/m)?.[1];
 
 if (srcVersion !== pkgVersion) {
   console.error(

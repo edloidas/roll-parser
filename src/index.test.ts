@@ -66,7 +66,7 @@ describe('public API surface', () => {
     expect(Object.keys(api).sort()).toEqual([...VALUE_EXPORTS].sort());
   });
 
-  // ! Drift guard for the generated `src/version.ts` — a package.json bump
+  // ? Drift guard for the generated `src/version.ts` — a package.json bump
   //   without `bun run generate:version` must fail here, in CI, not at release.
   test('VERSION matches the package manifest', () => {
     expect(api.VERSION).toBe(pkg.version);
