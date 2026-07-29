@@ -5,7 +5,7 @@
  * @module dice
  */
 
-import type { DieResult } from '../../src/index.js';
+import type { DieResult } from 'roll-parser';
 
 /** Maximum dice drawn in the tray before collapsing into a `+N` overflow chip. */
 export const MAX_TRAY_DICE = 6;

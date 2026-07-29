@@ -12,7 +12,7 @@ import {
   type RollParserError,
   type RollPart,
   type RollResult,
-} from '../../src/index.js';
+} from 'roll-parser';
 import { dieStates, dieTitle } from './dice.js';
 
 /** Above this die count the breakdown is skipped — itemizing is pointless noise. */
