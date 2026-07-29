@@ -57,6 +57,7 @@
     "check": "bun typecheck && biome check .",
     "check:fix": "bun typecheck && biome check --write .",
     "check:version": "bun scripts/check-version.ts",
+    "generate:version": "bun scripts/generate-version.ts",
     "check:changelog": "bun scripts/check-changelog.ts",
     "clean": "rm -rf dist coverage",
     "build": "bun run clean && bun run build:lib && bun run build:testing && bun run build:cli && bun run build:types",
