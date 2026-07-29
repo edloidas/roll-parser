@@ -3,8 +3,6 @@
   "version": "3.0.0-beta.0",
   "description": "High-performance dice notation parser for tabletop RPGs. TypeScript-first, Bun-optimized.",
   "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
   "bin": {
     "roll-parser": "./dist/cli/index.js"
   },
@@ -20,6 +18,8 @@
     },
     "./package.json": "./package.json"
   },
+  "unpkg": "./dist/index.js",
+  "jsdelivr": "./dist/index.js",
   "files": [
     "dist",
     "src",
@@ -29,12 +29,19 @@
   "keywords": [
     "parser",
     "dice",
+    "dice-notation",
+    "dice-roller",
     "roll",
     "rpg",
+    "ttrpg",
     "dnd",
     "d20",
     "pratt-parser",
     "typescript",
+    "esm",
+    "browser",
+    "zero-dependency",
+    "cli",
     "bun"
   ],
   "homepage": "https://github.com/edloidas/roll-parser#readme",
