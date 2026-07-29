@@ -6,7 +6,7 @@
 
 import { bench, do_not_optimize, group, run, summary } from 'mitata';
 import { lex } from '../src/lexer/lexer.js';
-import { BASELINE_ID, BENCH_CASES, warmUpPipeline } from './_cases.js';
+import { BASELINE_ID, BENCH_CASES, primeBenchFn, warmUpPipeline } from './_cases.js';
 
 export function registerLexBenches(): void {
   warmUpPipeline();
@@ -14,8 +14,12 @@ export function registerLexBenches(): void {
   group('lex', () => {
     summary(() => {
       for (const { id, notation } of BENCH_CASES) {
-        bench(id, () => {
-          do_not_optimize(lex(notation));
+        // ? Generator form so `primeBenchFn` runs right before mitata's
+        //   warm-up — see its doc comment for why that is load-bearing.
+        bench(id, function* () {
+          yield primeBenchFn(() => {
+            do_not_optimize(lex(notation));
+          });
         })
           .gc('inner')
           .baseline(id === BASELINE_ID);

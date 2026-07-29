@@ -5,9 +5,14 @@
  *
  * A fresh `SeededRNG` is constructed inside every iteration. That charges each
  * sample a constant ~205 ns (isolated by the `roll` group's injected-RNG
- * variant), but it is the only way to give explode and reroll cases the same
- * RNG stream every iteration — a shared RNG lets them do different amounts of
- * work per sample and the distribution goes multi-modal.
+ * variant), but it is what makes every iteration replay the identical RNG
+ * stream, so even explode and reroll cases do byte-for-byte the same work per
+ * sample.
+ *
+ * Every bench body is handed to `primeBenchFn` before mitata sees it. Without
+ * that this group was the least trustworthy in the suite — `4d6kh3` reported
+ * 42-82 µs against a true 2.3 µs, and `{2d20kh1+5, 3d8!}kh1` swung 1075%
+ * between processes. See `primeBenchFn` for the mechanism (#143).
  *
  * Run with `bun run bench:evaluate`, or as part of `bun run bench`.
  */
@@ -19,6 +24,7 @@ import {
   BENCH_CASES,
   BENCH_SEED,
   getEvaluateOptions,
+  primeBenchFn,
   warmUpPipeline,
 } from './_cases.js';
 
@@ -31,8 +37,10 @@ export function registerEvaluateBenches(): void {
         const ast = parse(benchCase.notation);
         const options = getEvaluateOptions(benchCase);
 
-        bench(benchCase.id, () => {
-          do_not_optimize(evaluate(ast, new SeededRNG(BENCH_SEED), options));
+        bench(benchCase.id, function* () {
+          yield primeBenchFn(() => {
+            do_not_optimize(evaluate(ast, new SeededRNG(BENCH_SEED), options));
+          });
         })
           .gc('inner')
           .baseline(benchCase.id === BASELINE_ID);
@@ -47,9 +55,9 @@ export function registerEvaluateBenches(): void {
       const size = state.get('n');
       const ast = parse(`${size}d6`);
 
-      yield () => {
+      yield primeBenchFn(() => {
         do_not_optimize(evaluate(ast, new SeededRNG(BENCH_SEED), {}));
-      };
+      });
     })
       .range('n', 1, 1000, 10)
       .gc('inner');
@@ -58,9 +66,9 @@ export function registerEvaluateBenches(): void {
       const size = state.get('n');
       const ast = parse(`${size}d6kh${Math.max(1, Math.floor(size / 2))}`);
 
-      yield () => {
+      yield primeBenchFn(() => {
         do_not_optimize(evaluate(ast, new SeededRNG(BENCH_SEED), {}));
-      };
+      });
     })
       .range('n', 1, 1000, 10)
       .gc('inner');

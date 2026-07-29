@@ -29,6 +29,10 @@ export type BenchCase = {
    * Marks cases whose dice count depends on rolled values (explode, reroll).
    * Those must never share an RNG across iterations — the work per iteration
    * would drift with the RNG stream and smear the distribution into modes.
+   *
+   * ? Only `roll (injected RNG)` shares one; every other group reseeds per
+   *   iteration, so this flag is not why those cases used to read multi-modal
+   *   there — see {@link primeBenchFn}.
    */
   variableWork?: boolean;
 };
@@ -91,6 +95,18 @@ export function getRollOptions(benchCase: BenchCase): RollOptions {
 
 const WARMUP_ITERATIONS = 100;
 
+/**
+ * Bounds on the per-bench priming loop. The minimum is what buys JIT tier-up;
+ * the budget stops heavy cases (`1000d6kh500` at ~420 µs/iter) from spending
+ * minutes on it.
+ */
+const PRIME_MIN_ITERATIONS = 64;
+const PRIME_MAX_ITERATIONS = 4096;
+const PRIME_BUDGET_MS = 25;
+
+/** Warm-up calls mitata makes before it commits to a sampling mode. */
+const MITATA_WARMUP_CALLS = 3;
+
 let hasWarmedUp = false;
 
 /**
@@ -112,4 +128,57 @@ export function warmUpPipeline(): void {
       evaluate(ast, new SeededRNG(BENCH_SEED), getEvaluateOptions(benchCase));
     }
   }
+}
+
+/** Runs `benchFn` until the JIT has tiered it up, bounded by time and count. */
+function tierUp(benchFn: () => void): void {
+  const deadline = performance.now() + PRIME_BUDGET_MS;
+
+  for (let iteration = 0; iteration < PRIME_MAX_ITERATIONS; iteration++) {
+    benchFn();
+
+    if (iteration >= PRIME_MIN_ITERATIONS && performance.now() >= deadline) break;
+  }
+}
+
+/**
+ * Tiers a bench body up and pins mitata to batch sampling for it. Every bench
+ * in this suite must go through this.
+ *
+ * mitata picks one of two sampling modes from its first three calls of the
+ * body: if any comes in at or under 65,536 ns it batches 4096 calls per sample,
+ * otherwise it times a single call per sample taken right after a full GC. The
+ * two are not comparable — a single post-GC call on a sub-10 µs body reads
+ * 10-30x its steady-state cost — and those three calls are *cold*, so a body
+ * reads 5-135 µs regardless of what it really costs. Mid-weight cases therefore
+ * picked a mode at random per process: `evaluate('4d6kh3')` reported 42-82 µs
+ * against a true 2.3 µs (below end-to-end `roll('4d6kh3')`, which is
+ * impossible), and `{2d20kh1+5, 3d8!}kh1` swung 1075% across five runs (#143).
+ *
+ * Two things fix that. The body is tiered up first — inside a generator body,
+ * which mitata runs immediately before those calls; {@link warmUpPipeline}
+ * cannot do it, because it warms the *library*, not the per-bench closure
+ * mitata actually times. Then the three warm-up calls are swallowed, so the
+ * mode is always batch, for every case, on every machine. That is the mode the
+ * whole suite was already reporting in but for a handful of heavy cases, and
+ * it is the stabler one even for those: `1000d6kh500` holds a 6% p50 spread
+ * batched against 8-12% single.
+ *
+ * ! Do not "simplify" this to `bench(id, () => …)` or drop the warm-up counter.
+ *   Either change hands the mode decision back to a cold measurement, and the
+ *   multi-modal p50s come back with it.
+ */
+export function primeBenchFn(benchFn: () => void): () => void {
+  tierUp(benchFn);
+
+  let warmUpCallsLeft = MITATA_WARMUP_CALLS;
+
+  return () => {
+    if (warmUpCallsLeft > 0) {
+      warmUpCallsLeft--;
+      return;
+    }
+
+    benchFn();
+  };
 }

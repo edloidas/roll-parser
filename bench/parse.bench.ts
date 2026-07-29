@@ -6,7 +6,7 @@
 
 import { bench, do_not_optimize, group, run, summary } from 'mitata';
 import { parse } from '../src/index.js';
-import { BASELINE_ID, BENCH_CASES, warmUpPipeline } from './_cases.js';
+import { BASELINE_ID, BENCH_CASES, primeBenchFn, warmUpPipeline } from './_cases.js';
 
 export function registerParseBenches(): void {
   warmUpPipeline();
@@ -14,8 +14,12 @@ export function registerParseBenches(): void {
   group('parse', () => {
     summary(() => {
       for (const { id, notation } of BENCH_CASES) {
-        bench(id, () => {
-          do_not_optimize(parse(notation));
+        // ? Generator form so `primeBenchFn` runs right before mitata's
+        //   warm-up — see its doc comment for why that is load-bearing.
+        bench(id, function* () {
+          yield primeBenchFn(() => {
+            do_not_optimize(parse(notation));
+          });
         })
           .gc('inner')
           .baseline(id === BASELINE_ID);
