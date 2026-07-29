@@ -4,6 +4,7 @@ import { join } from 'node:path';
 
 type PackageJson = {
   bin?: Record<string, string>;
+  scripts?: Record<string, string>;
 };
 
 const CLI_BIN = './dist/cli/index.js';
@@ -39,6 +40,11 @@ describe('packaged CLI smoke', () => {
     const pkg = (await Bun.file('package.json').json()) as PackageJson;
     expect(pkg.bin?.['roll-parser']).toBe(CLI_BIN);
     expect(existsSync(join('.', CLI_BIN))).toBe(true);
+
+    // ? tsc does not set the executable bit, so the `build` script must — the
+    //   `beforeAll` chmod above makes the mode assertion below self-fulfilling,
+    //   leaving this contract check as the real regression guard.
+    expect(pkg.scripts?.build).toContain('chmod +x dist/cli/index.js');
   });
 
   test('built CLI keeps node shebang and executable bit', async () => {
@@ -48,6 +54,9 @@ describe('packaged CLI smoke', () => {
 
     expect(text.startsWith('#!/usr/bin/env node\n')).toBe(true);
     expect((stats.mode & 0o111) !== 0).toBe(true);
+
+    const direct = await runCommand([CLI_BIN, '--version']);
+    expect(direct.exitCode).toBe(0);
   });
 
   test('built CLI runs under Node for help and seeded rolls', async () => {
