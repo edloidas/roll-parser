@@ -2,7 +2,10 @@
   "$schema": "https://json.schemastore.org/tsconfig",
   "extends": "../tsconfig.json",
   "compilerOptions": {
-    "lib": ["ES2022", "DOM", "DOM.Iterable"]
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    // Browser-only sources: keep Bun ambient globals out of scope so a stray
+    // `Bun.*`/`process.*` fails to typecheck instead of crashing in the browser.
+    "types": []
   },
   // Only the browser sources — the site build scripts are plain Bun programs and
   // belong to `scripts/tsconfig.json`, which checks all of `scripts/` at once.

@@ -24,9 +24,8 @@ async function runCommand(
   return { stdout, stderr, exitCode };
 }
 
-// ? Mirrors `bun run build` minus `clean` — deleting `coverage/` mid-run from
-//   inside a `bun test --coverage` session is not worth the risk, and stale
-//   dist files are harmless here.
+// ? Mirrors `bun run build` minus `clean` — no need to delete and re-emit the
+//   whole of `dist/` mid-test-run, and stale dist files are harmless here.
 beforeAll(async () => {
   const { stderr, exitCode } = await runCommand(['bunx', 'tsc', '-p', 'tsconfig.build.json']);
   if (exitCode !== 0) {
