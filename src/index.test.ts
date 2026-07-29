@@ -9,7 +9,7 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import { version } from '../package.json';
+import pkg from '../package.json' with { type: 'json' };
 import * as api from './index.js';
 
 /** Runtime values the package promises to export. */
@@ -66,8 +66,10 @@ describe('public API surface', () => {
     expect(Object.keys(api).sort()).toEqual([...VALUE_EXPORTS].sort());
   });
 
+  // ! Drift guard for the generated `src/version.ts` — a package.json bump
+  //   without `bun run generate:version` must fail here, in CI, not at release.
   test('VERSION matches the package manifest', () => {
-    expect(api.VERSION).toBe(version);
+    expect(api.VERSION).toBe(pkg.version);
     expect(api.VERSION).toMatch(/^\d+\.\d+\.\d+/);
   });
 

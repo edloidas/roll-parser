@@ -4,9 +4,7 @@
  * @module roll-parser
  */
 
-// ? Named import — Bun's bundler tree-shakes the JSON module down to the
-//   single used property, so the full manifest is not embedded in dist.
-import { version } from '../package.json';
+import { version } from './version.js';
 
 export type { ErrorSpan, RollParserErrorCode } from './errors.js';
 export { getErrorSpan, isRollParserError, RollParserError } from './errors.js';
@@ -81,9 +79,10 @@ export type {
 export { DegreeOfSuccess } from './types.js';
 
 /**
- * Installed roll-parser version, read from the package manifest at build time
- * — the exact string in `package.json`, so pre-releases keep their suffix
- * (`'3.0.0-beta.0'`).
+ * Installed roll-parser version — the exact string in `package.json`, so
+ * pre-releases keep their suffix (`'3.0.0-beta.0'`). Sourced from the
+ * generated `src/version.ts`, kept in sync with the manifest by
+ * `bun run generate:version` and gated by `check:version` and CI.
  *
  * Useful in bug reports and for feature-gating against a minimum version. The
  * CLI prints it for `--version` and in the `--help` header.
