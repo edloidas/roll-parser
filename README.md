@@ -119,6 +119,27 @@ yarn add roll-parser@next
 unflagged, so CommonJS consumers can still `require('roll-parser')` even though
 the published files are ESM.
 
+For TypeScript consumers, `moduleResolution` must be `bundler`, `node16`, or
+`nodenext` — the package resolves through `exports` only, so the legacy `node10`
+resolution does not find it.
+
+### CDN / browser without a bundler
+
+The published files are environment-neutral ES modules, so they load directly
+in the browser. Use a bundling CDN endpoint — it serves the whole module graph
+as one request:
+
+```html
+<script type="module">
+  import { roll } from 'https://cdn.jsdelivr.net/npm/roll-parser@next/+esm';
+
+  console.log(roll('4d6kh3').total);
+</script>
+```
+
+`https://esm.sh/roll-parser@next` works the same way. Raw file URLs
+(`unpkg.com/roll-parser`) also work but fetch each module separately.
+
 ## Quick start
 
 ```typescript

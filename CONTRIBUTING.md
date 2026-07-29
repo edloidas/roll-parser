@@ -70,7 +70,8 @@ force-push rather than merging a chain of fixups.
 The demo site in `site/` is deployed to Cloudflare Pages.
 
 ```bash
-bun site:dev      # Bun HTML dev server with HMR (no TypeDoc, so /docs/ is absent)
+bun site:dev      # Bun HTML dev server (no TypeDoc, so /docs/ is absent). The site
+                  # consumes built dist/ — rerun `bun run build` to see library edits
 bun site:build    # full static build into site/dist/, including the TypeDoc reference
 bun site:check    # verify site/dist/ — assets resolve, no dev paths leaked
 bun site:preview  # build, then serve site/dist/ with host-style routing

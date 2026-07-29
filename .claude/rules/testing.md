@@ -22,7 +22,7 @@ Use `createMockRng` for all deterministic dice tests. See `rng.md`.
 
 ```typescript
 // Internal tests use relative imports:
-import { createMockRng } from '../rng/mock';
+import { createMockRng } from '../rng/mock.js';
 // npm consumers use: import { createMockRng } from 'roll-parser/testing';
 
 test('keeps highest die from pool', () => {
