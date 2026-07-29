@@ -11,6 +11,17 @@
 
 import { main } from './main.js';
 
+// Minimal host-process surface this entry needs. The library build compiles
+// with no Node/Bun type packages (`types: []` in tsconfig.build.json) so that
+// runtime globals in library code are type errors; this module-scoped declare
+// keeps the one legitimate use local without leaking `process` program-wide.
+declare const process: {
+  argv: string[];
+  exitCode: number | undefined;
+  stdout: { write(text: string): void };
+  stderr: { write(text: string): void };
+};
+
 const exitCode = main({
   argv: process.argv.slice(2),
   stdout: (text) => {

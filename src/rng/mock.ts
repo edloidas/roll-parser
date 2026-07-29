@@ -58,6 +58,11 @@ export class MockRNGExhaustedError extends Error {
  * - `nextInt` rejects a scripted value outside the requested `[min, max]`
  *   with a `RangeError`, so `createMockRng([7])` cannot satisfy a `d6`.
  *
+ * Draw order matters when the notation contains meta-expressions. Keep/drop
+ * counts (`4d6kh(1d2)`) are drawn *before* the pool; threshold expressions
+ * (`4d6cs>(1d2)`) are drawn *after* it. The README's Randomness section has
+ * the full tables.
+ *
  * @param values - Values to return, in draw order (die faces for `nextInt`,
  *   floats in `[0, 1)` for `next`)
  * @returns An `RNG` that replays `values`

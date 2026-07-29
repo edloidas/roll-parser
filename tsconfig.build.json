@@ -2,9 +2,15 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "noEmit": false,
-    "emitDeclarationOnly": true,
     "rootDir": "src",
-    "outDir": "dist"
+    "outDir": "dist",
+    // No Node/Bun type packages in the published build: a `node:` import or a
+    // runtime global in library code must be a type error here, not a silent
+    // environment dependency. `src/cli/index.ts` declares the minimal
+    // `process` surface it needs locally.
+    "types": []
   },
+  // `exclude` does not merge on `extends` — the child replaces the parent's
+  // list wholesale, so `node_modules`/`dist` must be restated to add tests.
   "exclude": ["node_modules", "dist", "**/*.test.ts"]
 }

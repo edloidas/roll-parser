@@ -6,7 +6,7 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "bin": {
-    "roll-parser": "./dist/cli.js"
+    "roll-parser": "./dist/cli/index.js"
   },
   "sideEffects": false,
   "exports": {
@@ -60,11 +60,7 @@
     "check:changelog": "bun scripts/check-changelog.ts",
     "generate:version": "bun scripts/generate-version.ts",
     "clean": "rm -rf dist coverage",
-    "build": "bun run clean && bun run build:lib && bun run build:testing && bun run build:cli && bun run build:types",
-    "build:lib": "bun build src/index.ts --outdir dist --target node --sourcemap=linked",
-    "build:testing": "bun build src/testing.ts --outdir dist --target node --sourcemap=linked",
-    "build:cli": "bun build src/cli/index.ts --outdir dist --entry-naming 'cli.[ext]' --target node --sourcemap=linked",
-    "build:types": "tsc --emitDeclarationOnly -p tsconfig.build.json",
+    "build": "bun run clean && tsc -p tsconfig.build.json && chmod +x dist/cli/index.js",
     "check:package": "attw --pack . --profile esm-only && publint",
     "check:size": "size-limit",
     "bench": "bun run bench/index.bench.ts",

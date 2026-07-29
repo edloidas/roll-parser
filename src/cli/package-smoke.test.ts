@@ -1,12 +1,12 @@
 import { beforeAll, describe, expect, test } from 'bun:test';
-import { existsSync, statSync } from 'node:fs';
+import { chmodSync, existsSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 type PackageJson = {
   bin?: Record<string, string>;
 };
 
-const CLI_BIN = './dist/cli.js';
+const CLI_BIN = './dist/cli/index.js';
 
 async function runCommand(
   command: string[],
@@ -23,11 +23,15 @@ async function runCommand(
   return { stdout, stderr, exitCode };
 }
 
+// ? Mirrors `bun run build` minus `clean` — deleting `coverage/` mid-run from
+//   inside a `bun test --coverage` session is not worth the risk, and stale
+//   dist files are harmless here.
 beforeAll(async () => {
-  const { stderr, exitCode } = await runCommand(['bun', 'run', 'build:cli']);
+  const { stderr, exitCode } = await runCommand(['bunx', 'tsc', '-p', 'tsconfig.build.json']);
   if (exitCode !== 0) {
     throw new Error(`Failed to build packaged CLI smoke target:\n${stderr}`);
   }
+  chmodSync(CLI_BIN, 0o755);
 });
 
 describe('packaged CLI smoke', () => {
