@@ -43,5 +43,27 @@
   },
   "files": {
     "includes": ["src/**/*.ts", "site/src/**/*.ts", "scripts/**/*.ts", "bench/**/*.ts"]
-  }
+  },
+  "overrides": [
+    {
+      "includes": ["src/**"],
+      "linter": {
+        "rules": {
+          "correctness": {
+            "noNodejsModules": "error"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/cli/**"],
+      "linter": {
+        "rules": {
+          "correctness": {
+            "noNodejsModules": "off"
+          }
+        }
+      }
+    }
+  ]
 }

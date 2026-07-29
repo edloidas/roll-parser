@@ -235,13 +235,86 @@ jobs:
       - name: Test CLI verbose
         run: node dist/cli/index.js 4d6kh3 --verbose --seed test
 
+  # Tests the packed tarball, not the working tree: `files` + `exports` + bin
+  # wiring + real Node resolution, across the supported Node range.
   node-smoke:
-    name: Node.js Smoke Test
+    name: Node.js Smoke Test (${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        # Exact `engines` floor first — the require(esm) claim must hold there.
+        # `lts/*` is the current LTS line; 24.x is not listed separately
+        # because it currently is `lts/*`.
+        node-version: ['22.12.0', '22.x', 'lts/*']
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: dist
+          path: dist/
+
+      - name: Pack tarball
+        run: npm pack --pack-destination "$RUNNER_TEMP"
+
+      - name: Install tarball in scratch project
+        run: |
+          mkdir "$RUNNER_TEMP/smoke"
+          cd "$RUNNER_TEMP/smoke"
+          npm init -y > /dev/null
+          npm install --no-audit --no-fund "$RUNNER_TEMP"/roll-parser-*.tgz
+
+      - name: Test ESM import and testing subpath
+        working-directory: ${{ runner.temp }}/smoke
+        run: |
+          node --input-type=module -e "import { roll, VERSION } from 'roll-parser'; import { createMockRng, MockRNGExhaustedError } from 'roll-parser/testing'; const r = roll('4d6kh3', { rng: createMockRng([3, 6, 2, 5]) }); if (r.total !== 14) throw new Error('pinned total ' + r.total); if (typeof MockRNGExhaustedError !== 'function') throw new Error('missing error export'); console.log('ESM OK:', VERSION, r.total)"
+
+      - name: Test require(esm) import
+        # ESM-only package — require() works on Node >=22.12 via require(esm).
+        working-directory: ${{ runner.temp }}/smoke
+        run: |
+          node -e "const { roll } = require('roll-parser'); const { createMockRng } = require('roll-parser/testing'); const r = roll('2d6', { rng: createMockRng([3, 4]) }); if (r.total !== 7) throw new Error('pinned total ' + r.total); console.log('require(esm) OK:', r.total)"
+
+      - name: Test installed bin
+        working-directory: ${{ runner.temp }}/smoke
+        run: ./node_modules/.bin/roll-parser 4d6kh3 --verbose --seed test
+
+  # The neutrality gate Bun's bundler cannot provide: esbuild with
+  # `--platform=browser` hard-errors on any Node builtin import (Bun's
+  # `--target browser` silently stubs them instead), the minified bundle is
+  # grepped for runtime globals, and the result is executed.
+  browser-smoke:
+    name: Browser Smoke Test
     runs-on: ubuntu-latest
     needs: build
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+
+      - name: Cache Bun dependencies
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            bun-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
 
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -257,9 +330,42 @@ jobs:
           name: dist
           path: dist/
 
-      - name: Test require(esm) import
-        # ESM-only package — require() works on Node >=22 via require(esm).
-        run: node -e "const { roll } = require('roll-parser'); const r = roll('2d6'); if (typeof r.total !== 'number') process.exit(1); console.log('require(esm) OK:', r.total)"
+      - name: Assert dist library files carry no host-runtime specifiers
+        run: |
+          if grep -rEl "from '(node|bun):|require\(" dist --include='*.js' | grep -v '^dist/cli/'; then
+            echo 'Found Node/Bun specifiers in library dist files (listed above).'
+            exit 1
+          fi
 
-      - name: Test ESM import
-        run: node --input-type=module -e "import { roll } from 'roll-parser'; const r = roll('2d6'); if (typeof r.total !== 'number') process.exit(1); console.log('ESM OK:', r.total)"
+      - name: Install tarball in scratch project
+        run: |
+          npm pack --pack-destination "$RUNNER_TEMP"
+          mkdir "$RUNNER_TEMP/browser-smoke"
+          cd "$RUNNER_TEMP/browser-smoke"
+          npm init -y > /dev/null
+          npm install --no-audit --no-fund "$RUNNER_TEMP"/roll-parser-*.tgz
+
+      - name: Write browser fixture importing both entry points
+        working-directory: ${{ runner.temp }}/browser-smoke
+        run: |
+          printf '%s\n' \
+            "import { roll, SeededRNG, VERSION } from 'roll-parser';" \
+            "import { createMockRng } from 'roll-parser/testing';" \
+            "const pinned = roll('4d6kh3', { rng: createMockRng([3, 6, 2, 5]) });" \
+            "if (pinned.total !== 14) throw new Error('pinned total ' + pinned.total);" \
+            "const seeded = roll('2d6', { rng: new SeededRNG('ci') });" \
+            "console.log('browser-smoke OK', VERSION, pinned.total, seeded.total);" \
+            > fixture.mjs
+
+      - name: Bundle fixture for the browser
+        run: ./node_modules/.bin/esbuild "$RUNNER_TEMP/browser-smoke/fixture.mjs" --bundle --platform=browser --format=esm --minify --outfile="$RUNNER_TEMP/browser-smoke/bundle.js"
+
+      - name: Assert bundle is free of Node globals
+        run: |
+          if grep -qE "node:|process\.|createRequire" "$RUNNER_TEMP/browser-smoke/bundle.js"; then
+            echo 'Browser bundle references Node runtime internals.'
+            exit 1
+          fi
+
+      - name: Execute browser bundle
+        run: node "$RUNNER_TEMP/browser-smoke/bundle.js"
