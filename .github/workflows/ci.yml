@@ -134,10 +134,10 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      # ! Not a pure test step: `src/cli/package-smoke.test.ts` runs `build:cli`
-      # ! in `beforeAll`, so this job compiles the CLI itself. That is why it
-      # ! needs only `check` — it deliberately does not consume the `build`
-      # ! job's artifact, keeping the two paths independent.
+      # ! Not a pure test step: `src/cli/package-smoke.test.ts` runs the tsc
+      # ! emit in `beforeAll`, so this job compiles the package itself. That is
+      # ! why it needs only `check` — it deliberately does not consume the
+      # ! `build` job's artifact, keeping the two paths independent.
       - name: Run tests with coverage gate
         run: bun test:ci
 
@@ -233,17 +233,24 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      # Run under Node, matching the bin shebang — the artifact download drops
+      # file modes, so the entry is invoked explicitly rather than executed.
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: lts/*
+
       - name: Test CLI help
-        run: bun run dist/cli.js --help
+        run: node dist/cli/index.js --help
 
       - name: Test CLI version
-        run: bun run dist/cli.js --version
+        run: node dist/cli/index.js --version
 
       - name: Test CLI roll
-        run: bun run dist/cli.js 2d6
+        run: node dist/cli/index.js 2d6
 
       - name: Test CLI verbose
-        run: bun run dist/cli.js 4d6kh3 --verbose --seed test
+        run: node dist/cli/index.js 4d6kh3 --verbose --seed test
 
   node-smoke:
     name: Node.js Smoke Test
