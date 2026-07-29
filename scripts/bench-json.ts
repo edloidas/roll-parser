@@ -16,7 +16,7 @@ import { dirname, join, resolve } from 'node:path';
 import { run } from 'mitata';
 import { registerAllBenches } from '../bench/index.bench.js';
 
-type MitataStats = { p50: number; p75: number };
+type MitataStats = { p50: number; p75: number; ticks: number };
 
 type MitataRun = { name: string; stats?: MitataStats };
 
@@ -35,8 +35,23 @@ type BenchmarkRecord = {
 
 const DEFAULT_OUTPUT_PATH = join(import.meta.dir, '..', '.tmp', 'bench-results.json');
 
+/** mitata's batch size — `ticks` is a multiple of it whenever batching kicked in. */
+const MITATA_BATCH_SAMPLES = 4096;
+
 function round(value: number): number {
   return Math.round(value * 100) / 100;
+}
+
+/**
+ * Which sampling mode mitata settled on. `primeBenchFn` pins every bench to
+ * `batch`, so `single` here means that pin broke — the two modes are not
+ * comparable (`single` times one post-GC call per sample and reads 10-30x high
+ * on sub-10 µs work), and a series that changes mode between runs shows a
+ * measurement artefact, not a regression (#143). Recorded in `extra` so the CI
+ * trend artefact carries the evidence.
+ */
+function getSamplingMode(ticks: number): 'batch' | 'single' {
+  return ticks % MITATA_BATCH_SAMPLES === 0 ? 'batch' : 'single';
 }
 
 function toRecords(dump: MitataDump): BenchmarkRecord[] {
@@ -50,14 +65,15 @@ function toRecords(dump: MitataDump): BenchmarkRecord[] {
     for (const trialRun of trial.runs) {
       if (trialRun.stats == null) continue;
 
-      const { p50, p75 } = trialRun.stats;
+      const { p50, p75, ticks } = trialRun.stats;
+      const mode = getSamplingMode(ticks);
 
       records.push({
         name: `${group} / ${trialRun.name}`,
         unit: 'ns',
         value: round(p50),
         range: `± ${round(p75 - p50)} ns`,
-        extra: `group=${group} case=${trialRun.name} p50=${round(p50)}ns p75=${round(p75)}ns`,
+        extra: `group=${group} case=${trialRun.name} p50=${round(p50)}ns p75=${round(p75)}ns mode=${mode}`,
       });
     }
   }

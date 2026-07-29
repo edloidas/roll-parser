@@ -637,10 +637,14 @@ Types resolve under `moduleResolution: node16` / `nodenext`, verified in CI by
 (`.gc('inner')`), averaged over two full `bun run bench:json` passes that agreed
 within 15%. Measured 2026-07-27 on Bun 1.3.11, Intel Xeon @ 2.80 GHz, 4 vCPU
 container. p50 rather than mean, because the mean here is effectively a GC-pause
-histogram and swings ±40% between processes. The `roll` column pays for a fresh
+histogram and swings ±40% between processes. Every bench body is JIT-primed
+before measurement and pinned to mitata's batched sampling mode, so all cases
+are timed the same way — mitata otherwise picks the mode from cold calls and
+mis-times mid-weight cases by 10-30x. The `roll` column pays for a fresh
 `SeededRNG` per call, which an injected RNG avoids. Every roll also builds the
 `parts` tree; there is no opt-out and these numbers include it. A 1000-die pool
-costs roughly 130 µs, while lexing and parsing stay flat at ~0.14 / ~0.36 µs.
+costs roughly 60x a `1d20` (~90 µs here), while lexing and parsing stay flat at
+~0.14 / ~0.36 µs.
 
 Run `bun run bench` for the full suite, or `bench:lex` / `bench:parse` /
 `bench:evaluate` / `bench:roll` for one stage. Bundle size is gated in CI by

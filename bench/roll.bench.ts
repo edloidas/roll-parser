@@ -18,6 +18,7 @@ import {
   BENCH_SEED,
   FIXED_WORK_CASES,
   getRollOptions,
+  primeBenchFn,
   warmUpPipeline,
 } from './_cases.js';
 
@@ -29,8 +30,12 @@ export function registerRollBenches(): void {
       for (const benchCase of BENCH_CASES) {
         const options = { ...getRollOptions(benchCase), seed: BENCH_SEED };
 
-        bench(benchCase.id, () => {
-          do_not_optimize(roll(benchCase.notation, options));
+        // ? Generator form so `primeBenchFn` runs right before mitata's
+        //   warm-up — see its doc comment for why that is load-bearing.
+        bench(benchCase.id, function* () {
+          yield primeBenchFn(() => {
+            do_not_optimize(roll(benchCase.notation, options));
+          });
         })
           .gc('inner')
           .baseline(benchCase.id === BASELINE_ID);
@@ -45,8 +50,10 @@ export function registerRollBenches(): void {
       for (const benchCase of FIXED_WORK_CASES) {
         const options = { ...getRollOptions(benchCase), rng };
 
-        bench(benchCase.id, () => {
-          do_not_optimize(roll(benchCase.notation, options));
+        bench(benchCase.id, function* () {
+          yield primeBenchFn(() => {
+            do_not_optimize(roll(benchCase.notation, options));
+          });
         })
           .gc('inner')
           .baseline(benchCase.id === BASELINE_ID);
