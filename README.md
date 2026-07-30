@@ -683,6 +683,15 @@ Run `bun run bench` for the full suite, or `bench:lex` / `bench:parse` /
 - **Outer parentheses drop when crit thresholds collapse.** `(1d20cs>19)cs=1`
   reports `expression: '1d20cs>19cs=1'` because chained `cs`/`cf` fold into one
   node. It re-parses to the same AST; only the text differs.
+- **Division does not floor.** `7/2` totals `3.5`, not `3` — arithmetic is plain
+  IEEE-754 throughout. Wrap it when you need an integer: `floor(7/2)` totals `3`.
+- **The power operator has no overflow guard.** `2**999` totals `5.357…e+300`.
+  Only a non-finite result throws `NON_FINITE_RESULT`, so finite-but-enormous
+  totals pass through unflagged.
+- **Integer literals above `Number.MAX_SAFE_INTEGER` lose precision.** Totals are
+  JavaScript numbers, so `9007199254740993` evaluates to `9007199254740992`. Dice
+  `sides` past that ceiling are rejected with `INVALID_DICE_SIDES`, but plain
+  literals are not.
 
 ## Contributing
 

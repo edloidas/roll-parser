@@ -12,5 +12,5 @@
   },
   // `exclude` does not merge on `extends` — the child replaces the parent's
   // list wholesale, so `node_modules`/`dist` must be restated to add tests.
-  "exclude": ["node_modules", "dist", "**/*.test.ts"]
+  "exclude": ["node_modules", "dist", "**/*.test.ts", "src/test-helpers.ts"]
 }

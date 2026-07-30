@@ -10,6 +10,7 @@ import type { ASTNode } from '../parser/ast.js';
 import { parse } from '../parser/parser.js';
 import { createMockRng } from '../rng/mock.js';
 import { SeededRNG } from '../rng/seeded.js';
+import { expectRollError } from '../test-helpers.js';
 import type { DieResult } from '../types.js';
 import { DegreeOfSuccess } from '../types.js';
 import type { EvalContext } from './evaluator.js';
@@ -2288,12 +2289,7 @@ describe('evaluate', () => {
         name: 'sqrt',
         args: [{ type: 'Literal' as const, value: 4 }],
       };
-      expect(() => evaluate(ast, createMockRng([]))).toThrow(EvaluatorError);
-      try {
-        evaluate(ast, createMockRng([]));
-      } catch (err) {
-        expect((err as EvaluatorError).code).toBe('UNKNOWN_FUNCTION');
-      }
+      expectRollError(() => evaluate(ast, createMockRng([])), EvaluatorError, 'UNKNOWN_FUNCTION');
     });
   });
 
