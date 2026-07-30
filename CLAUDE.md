@@ -24,9 +24,8 @@ The site consumes the built package (`site/src` imports `'roll-parser'`, which
 resolves to `dist/` via the self-reference) — site HTML/CSS/TS edits hot-reload
 under `site:dev`, but library `src/` edits need a `bun run build` to show up.
 
-A pre-commit hook auto-fixes staged `.ts`/`.tsx` files (nano-staged runs
-`biome check --write` on them, then re-stages). It installs automatically on
-`bun install` — the `prepare` script points `core.hooksPath` at `.githooks/`.
+A pre-commit hook (installed by `bun install` via `prepare` → `core.hooksPath`)
+auto-fixes and re-stages staged `.ts`/`.tsx` files with `biome check --write`.
 Commits with unfixable lint errors are blocked.
 
 ## Constraints
@@ -79,28 +78,27 @@ Types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `perf`, `bui
 
   #### Rationale
   <why this needs to be fixed or implemented>
-
-  <sub>Drafted with AI assistance</sub>
   ```
 
 ### Pull Requests
 
 - **Title**: `<type>: <description> #<number>`
 - **Body**: concise, no emojis, separate all sections with one blank line
+- Multiple issues go on one `Closes` line: `Closes #1 #23 #456`
+- The session link is informational: one `<sub>`-wrapped line, last in the body
+- Never append a second generated footer, `---` rule, or promotional line — the
+  `<sub>` session line is the only attribution. Applies to PRs created from the
+  web too, where these instructions are the only source of truth.
 
   ```
   <summary of changes>
 
-  Closes #<number>
+  Closes #<issue1> #<issue2>
 
-  [Claude Code session](<link>)
-
-  <sub>Drafted with AI assistance</sub>
+  <sub>[Claude Code session](<link>)</sub>
   ```
 
 ## Releasing
-
-Use the `/npm-release` skill. Project-specific conventions the skill must honor:
 
 - **Dedicated release commit**: bump `package.json`, run `bun run generate:version` and include the regenerated `src/version.ts` in the same commit, commit as `chore: release v<version>`, then tag that commit. Never tag a pre-existing unrelated commit — if the version already matches the target, stop and ask before proceeding. (`check:version` fails the release if `src/version.ts` is stale.)
 - **CHANGELOG gate**: update `CHANGELOG.md` via the local `release-changelog` skill before bumping — `bun run release:dry` fails at `check:changelog` without it.
