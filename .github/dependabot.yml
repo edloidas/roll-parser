@@ -20,3 +20,21 @@ updates:
       github-actions:
         patterns:
           - '*'
+
+  # Every npm dependency here is devDependencies-only — the package ships zero
+  # runtime dependencies — so these updates affect the toolchain and the docs
+  # workspace, never a consumer's tree. Without this block nothing watched the
+  # lockfile, which is how a `brace-expansion` advisory reached the build
+  # unnoticed.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore
+    labels:
+      - improvement
+    groups:
+      npm-development:
+        patterns:
+          - '*'

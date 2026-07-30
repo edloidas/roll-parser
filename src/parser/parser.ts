@@ -1298,7 +1298,7 @@ export class Parser {
 /**
  * Parses a dice notation string into an {@link ASTNode} tree, lexing it first.
  *
- * The AST is immutable data, so parse once and {@link evaluate} many times
+ * {@link evaluate} never mutates the AST, so parse once and evaluate many times
  * when rolling the same notation repeatedly — that skips the lexer and parser
  * on every roll after the first. Use `parse` alone to validate notation
  * without consuming randomness.

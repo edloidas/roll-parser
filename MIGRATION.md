@@ -22,18 +22,22 @@ classes. v3 has `roll(notation, options)` for the common path, and
 | `parseAndRollSimple(n)` | removed — simple notation is gone, see below |
 | `parse(n)` → `Roll`/`WodRoll` data object | `parse(n)` → AST (a different, richer shape) |
 | `roll(obj)`, `rollClassic(obj)`, `rollWod(obj)` | `evaluate(parse(n), rng)` |
+| `parseClassicRoll(n)`, `parseWodRoll(n)` | `parse(n)` — one grammar covers both, so there is no per-dialect parser |
+| `parseSimpleRoll(n)` | removed — simple notation is gone, see below |
 | `random(faces)` | `new SeededRNG().nextInt(1, faces)` |
 | `convert(obj)`, `Roll`, `WodRoll`, `Result` | removed — there are no roll-description objects to build or convert |
 
 **Result fields moved.** v2 returned `Result { notation, value, rolls }` where
-`rolls` was a plain `number[]`:
+`rolls` was a plain `number[]`. The v3 snippets below draw from
+`createMockRng` (exported by `roll-parser/testing`) so their numbers are exact
+rather than whatever the dice happened to do:
 
 ```typescript
 // v2
 const res = parseAndRoll('2d10+1'); // { notation: '2d10+1', value: 9, rolls: [2, 6] }
 
-// v3
-const res = roll('2d10+1');
+// v3 — mock RNG so the numbers below are the actual ones, not a lucky roll
+const res = roll('2d10+1', { rng: createMockRng([2, 6]) });
 res.total; // 9          — was `value`
 res.expression; // '2d10 + 1' — was `notation` (normalized form)
 res.notation; // '2d10+1'  — the input string, verbatim
@@ -80,11 +84,18 @@ failures, 0)`, hiding botches below zero. v3 reports the real arithmetic, and
 splits the tally out:
 
 ```typescript
-const pool = roll('4d10>=8f1'); // dice came up 1, 1, 1, 5
+const pool = roll('4d10>=8f1', { rng: createMockRng([1, 1, 1, 5]) });
 pool.total; // -3  — v2 would have reported 0
 pool.successes; // 0
 pool.failures; // 3
 ```
+
+**The CLI takes one notation, not a list.** v2 read every positional argument as
+a separate roll and printed one line each, falling back to `d20` when you passed
+none. v3 joins the positional arguments into a single notation — so `roll-parser
+2d6 + 3` works — and treats a missing notation as a usage error (exit code 2)
+rather than rolling a d20. A v2 invocation like `roll-parser 1d6 1d8` now fails
+to parse; run the CLI twice, or roll `1d6+1d8` if you wanted the sum.
 
 Everything else in v3 is new surface rather than a replacement — the `parts`
 tree, injectable RNGs, source spans, safety limits, and the wider notation set

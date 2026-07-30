@@ -60,8 +60,12 @@
     "access": "public"
   },
   "workspaces": ["scripts/docs"],
+  "//overrides": "brace-expansion <=5.0.7 (GHSA-mh99-v99m-4gvg) reaches the tree through TypeDoc's minimatch. Build-time only, never shipped, but the audit gate should stay clean. Pinned exact: `^5.0.8` resolves to 5.0.9, which minimumReleaseAge still blocks.",
+  "overrides": {
+    "brace-expansion": "5.0.8"
+  },
   "scripts": {
-    "prepare": "git config core.hooksPath .githooks",
+    "prepare": "git rev-parse --git-dir > /dev/null 2>&1 && git config core.hooksPath .githooks || exit 0",
     "typecheck": "tsc --noEmit && bun run build && tsc --noEmit -p site/tsconfig.json && tsc --noEmit -p scripts/tsconfig.json && tsc --noEmit -p bench/tsconfig.json",
     "check": "bun typecheck && biome check .",
     "check:fix": "bun typecheck && biome check --write .",
@@ -86,7 +90,7 @@
     "test:watch": "bun test --watch",
     "test:ci": "bun test --bail --coverage",
     "validate": "bun run check && bun run build && bun run check:package && bun run check:size && bun test:ci",
-    "release:dry": "bun run check:version && bun run check:changelog && bun run check && bun run build && bun run check:package && bun test",
+    "release:dry": "bun run check:version && bun run check:changelog && bun run validate",
     "prepublishOnly": "bun run release:dry"
   },
   "nano-staged": {

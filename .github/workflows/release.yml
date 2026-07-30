@@ -6,7 +6,11 @@ on:
 
 concurrency:
   group: release
-  cancel-in-progress: true
+  # ! Never cancel a release mid-flight. Publishing to npm is irreversible, and
+  #   a second tag arriving between `npm publish` and the GitHub Release step
+  #   would leave a published version with no release notes. Releases still
+  #   serialize on the shared group; they just queue instead of pre-empting.
+  cancel-in-progress: false
 
 # Read-only by default; each job widens only what it needs. `id-token: write`
 # lives on `publish` (npm Trusted Publishing) and `contents: write` on
