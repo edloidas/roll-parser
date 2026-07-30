@@ -138,7 +138,7 @@ as one request:
 ```
 
 `https://esm.sh/roll-parser@next` works the same way. Raw file URLs
-(`unpkg.com/roll-parser`) also work but fetch each module separately.
+(`unpkg.com/roll-parser@next`) also work but fetch each module separately.
 
 ## Quick start
 

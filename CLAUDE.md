@@ -5,9 +5,10 @@ Dice roll notation parser. TypeScript library and CLI. Built with Bun.
 ## Commands
 
 ```bash
-bun check:fix   # Typecheck + biome check --write (lint + format + import sort) — use during iteration
+bun check:fix   # Typecheck + biome check --write (lint + format + import sort) — use during
+                # iteration; the typecheck step rebuilds dist/ as a side effect
 bun test        # Run tests
-bun validate    # Full pre-release gate: check + build + check:package + test:ci
+bun validate    # Full pre-release gate: check + build + check:package + check:size + test:ci
 ```
 
 Demo site (`site/`, deployed to Cloudflare Pages by `.github/workflows/deploy-site.yml`):
@@ -30,7 +31,7 @@ Commits with unfixable lint errors are blocked.
 
 ## Constraints
 
-- Runtime: Bun — never use npm, yarn, or pnpm (the `node-smoke` CI job is the one place npm runs, to test the packed tarball the way consumers install it)
+- Runtime: Bun — never use npm, yarn, or pnpm (the smoke CI jobs, which test the packed tarball the way consumers install it, and the release publish step are the only places npm runs)
 - Target: ES2022, TypeScript only
 - Library + CLI, ESM-only compiled JS (Node ≥22.12 consumes via `import` or `require(esm)` — 22.12 is where `require(esm)` is unflagged)
 - `dist/` is a per-file `tsc` emit (`tsconfig.build.json`), not a bundle — JS, `.d.ts`, and both map kinds come from one compiler pass; `bun build` is not used for the package. Do not reintroduce a bundler: Bun ≤1.3.11 emits broken output for pure re-export entrypoints (e.g. `src/testing.ts`) and `--target browser` silently stubs `node:` builtins instead of erroring
