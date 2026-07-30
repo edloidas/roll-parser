@@ -13,3 +13,10 @@ updates:
       prefix: ci
     labels:
       - improvement
+    # One PR per week covering every action, not one PR per action. Action bumps
+    # are almost always "new runner Node version, same inputs", so they review
+    # and merge as a single unit — and one grouped PR burns one CI run, not N.
+    groups:
+      github-actions:
+        patterns:
+          - '*'
