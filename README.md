@@ -48,7 +48,7 @@ roll('4d6kh3', { rng: createMockRng([3, 6, 2, 5]) }).total; // 14, every run
 
 ## Status
 
-> **v3 is stable.** A complete rewrite of the 2.x line, covered by 1272 tests
+> **v3 is stable.** A complete rewrite of the 2.x line, covered by 1275 tests
 > at 99.9% line coverage. The `latest` tag now resolves to v3.
 >
 > Upgrading from 2.x? The API is not compatible — see
@@ -71,8 +71,8 @@ roll('4d6kh3', { rng: createMockRng([3, 6, 2, 5]) }).total; // 14, every run
 - **Safe on untrusted input.** Dice count, explosion depth, reroll depth, and
   parse depth are all bounded, and every failure is a typed error with a stable
   code and a source span.
-- **Small and fast.** 10.66 kB brotli for the whole library, 4.98 kB for just
-  `parse`, 215 B for the testing entry point. Zero runtime dependencies, zero
+- **Small and fast.** ≈10.9 kB brotli for the whole library, ≈5.1 kB for just
+  `parse`, ≈215 B for the testing entry point. Zero runtime dependencies, zero
   `node:` imports. A `1d20` round trip takes about 1.5 µs.
 
 ## Contents
@@ -341,8 +341,10 @@ renders as `8d6![…]`. Read `result.expression` when you need the modifier back
 
 ## Randomness
 
-Every die is drawn through the `RNG` interface. Nothing in the library calls
-`Math.random()` directly.
+Every die is drawn through the `RNG` interface — no roll path bypasses the RNG
+you chose. `Math.random()` appears in exactly one place: seeding a `SeededRNG`
+when you do not supply a seed. Pass a seed or your own `RNG` and it is never
+reached.
 
 ```typescript
 type RNG = {
@@ -390,7 +392,7 @@ roll('4d6kh3', { rng: cryptoRng });
 
 ### Testing
 
-`roll-parser/testing` is a 215 B entry point holding the mock RNG.
+`roll-parser/testing` is a ≈215 B entry point holding the mock RNG.
 
 ```typescript
 import { createMockRng, MockRNGExhaustedError } from 'roll-parser/testing';
@@ -483,9 +485,11 @@ raises them.
 
 ```typescript
 const span = getErrorSpan(error); // { start } or { start, end }, or undefined
-const width = (span.end ?? span.start + 1) - span.start;
-console.log(notation);
-console.log(' '.repeat(span.start) + '^'.repeat(width));
+if (span != null) {
+  const width = (span.end ?? span.start + 1) - span.start;
+  console.log(notation);
+  console.log(' '.repeat(span.start) + '^'.repeat(width));
+}
 
 // 2d6+&            2d6+1d0+3
 //     ^                ^^^
@@ -627,7 +631,7 @@ precedes them. Errors go to stderr; only the result goes to stdout.
 - **Browsers and bundlers** — the library imports nothing from `node:`, touches
   no `process` or filesystem globals, and is marked `sideEffects: false`, so it
   bundles for the browser and tree-shakes. Importing only `{ parse }` costs
-  4.98 kB brotli against 10.66 kB for the whole surface.
+  ≈5.1 kB brotli against ≈10.9 kB for the whole surface.
 
 Types resolve under `moduleResolution: node16` / `nodenext`, verified in CI by
 `@arethetypeswrong/cli` and `publint`.
@@ -683,6 +687,11 @@ Run `bun run bench` for the full suite, or `bench:lex` / `bench:parse` /
 - **Outer parentheses drop when crit thresholds collapse.** `(1d20cs>19)cs=1`
   reports `expression: '1d20cs>19cs=1'` because chained `cs`/`cf` fold into one
   node. It re-parses to the same AST; only the text differs.
+- **Sorting a multi-sub-roll group is rejected.** `{2d6, 1d8}s` throws
+  `INVALID_SORT_TARGET`. Spec-correct sorting there is hierarchical — dice
+  within each sub-roll, then sub-rolls by total — and the evaluator only
+  flat-sorts, so the syntax is refused rather than shipped wrong. Single
+  sub-roll groups (`{2d6+1d8}s`) still work as the flat-pool escape hatch.
 - **Division does not floor.** `7/2` totals `3.5`, not `3` — arithmetic is plain
   IEEE-754 throughout. Wrap it when you need an integer: `floor(7/2)` totals `3`.
 - **The power operator has no overflow guard.** `2**999` totals `5.357…e+300`.

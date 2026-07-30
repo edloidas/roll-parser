@@ -91,7 +91,7 @@ export { DegreeOfSuccess } from './types.js';
  * ```typescript
  * import { VERSION } from 'roll-parser';
  *
- * VERSION; // '3.0.0-beta.0'
+ * VERSION; // e.g. '3.0.0', or '3.1.0-beta.0' on a pre-release
  * VERSION.startsWith('3.'); // true
  * ```
  *

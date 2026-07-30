@@ -377,13 +377,15 @@ export type RollResult = Readonly<{
   /**
    * Number of dice tagged as success across the whole expression. Present
    * only when a success-counting modifier was used. Independent of `total` —
-   * arithmetic on top of a success count (e.g. `5d6>=5 * 2`) affects `total`
-   * but not `successes`.
+   * arithmetic on top of a success count (e.g. `{5d6>=5}+2`) affects `total`
+   * but not `successes`. Success counts are terminal, so the group braces are
+   * required: `5d6>=5 * 2` is an `INVALID_SUCCESS_COUNT_TARGET` parse error.
    */
   successes?: number;
   /**
    * Number of dice tagged as failure across the whole expression. Present
-   * only when a success-counting modifier with a fail threshold was used.
+   * whenever a success-counting modifier was used — `0` when no failure
+   * threshold was given, since nothing can be tagged as a failure.
    */
   failures?: number;
   /**

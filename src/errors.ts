@@ -62,8 +62,10 @@ const ROLL_PARSER_ERROR_CODES = [
  * `INVALID_THRESHOLD`, `NESTED_VERSUS`, `UNKNOWN_FUNCTION`, `UNDEFINED_VARIABLE`,
  * `INVALID_VARIABLE_VALUE`, `NON_FINITE_RESULT`
  *
- * The union is closed and stable: codes are only ever added in a minor
- * release, so `switch` statements over it can stay exhaustive.
+ * New codes are only ever introduced in a minor release, never a patch. Treat
+ * the union as open when you switch over it: give the switch a `default` arm
+ * rather than relying on exhaustiveness, or a minor upgrade turns a new code
+ * into a silent fall-through.
  *
  * @example
  * ```typescript

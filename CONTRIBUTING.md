@@ -43,7 +43,9 @@ constraints worth calling out:
 - Relative imports inside `src/` carry explicit `.js` extensions — the repo
   typechecks under `moduleResolution: nodenext`, which rejects extensionless
   specifiers outright.
-- Nothing in the library may call `Math.random()` directly, and nothing outside
+- No roll path may call `Math.random()` directly — dice are drawn only through
+  the `RNG` interface. The single permitted use is seeding `SeededRNG` when the
+  caller supplies no seed. Nothing outside
   `src/cli/` may import from `node:` — the library has to stay browser-safe.
 - Every code sample in a JSDoc `@example` or in `README.md` must be executed
   and produce the output it claims.
