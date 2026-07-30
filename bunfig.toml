@@ -1,7 +1,10 @@
 [install]
-auto = "fallback"
+# Never auto-install a missing package at runtime — a release build resolves
+# from the lockfile or fails.
+auto = "disable"
+# Three days. Nothing is exempt: a fast-moving toolchain package is exactly the
+# kind of dependency a compromised publish would target.
 minimumReleaseAge = 259200
-minimumReleaseAgeExcludes = ["@biomejs/biome", "@types/bun", "typescript"]
 
 [test]
 coverageSkipTestFiles = true
