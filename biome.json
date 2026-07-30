@@ -18,10 +18,16 @@
       "preset": "recommended",
       "style": {
         "noNonNullAssertion": "error",
-        "useConst": "error"
+        "useConst": "error",
+        "noNestedTernary": "error",
+        "noDefaultExport": "error",
+        "useImportType": "error",
+        "useConsistentArrayType": { "level": "error", "options": { "syntax": "shorthand" } },
+        "useConsistentTypeDefinitions": { "level": "error", "options": { "style": "type" } }
       },
       "suspicious": {
-        "noExplicitAny": "error"
+        "noExplicitAny": "error",
+        "noDoubleEquals": { "level": "error", "options": { "ignoreNull": true } }
       },
       "complexity": {
         "noForEach": "off"

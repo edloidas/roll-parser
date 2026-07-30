@@ -2350,7 +2350,7 @@ describe('evaluate', () => {
       // d2 rolls 2 → kh2 → keep the two highest of [1, 3, 5, 6] = [5, 6].
       //
       // ? The keep count draws FIRST, before the 4d6 pool — keep/drop is the
-      //   asymmetric case in `.claude/rules/rng.md`: `flattenModifierChain`
+      //   asymmetric case in README, Randomness: `flattenModifierChain`
       //   resolves every modifier argument up front because `evalModifier`
       //   needs the counts to drive selection on the pool it is about to roll.
       //   Threshold-style modifiers (`cs`, `!`, `r`, `>`) post-process an
@@ -3432,7 +3432,7 @@ describe('evaluate', () => {
   });
 
   describe('cross-family modifier combinations (#134)', () => {
-    // Draw order per `.claude/rules/rng.md`: keep/drop counts resolve before
+    // Draw order per README, Randomness: keep/drop counts resolve before
     // the base pool (all literal here, so no meta draws), threshold-style
     // modifiers post-process a pool that already exists. Every sequence below
     // is therefore `pool dice left-to-right, then explosion/reroll follow-ups`.

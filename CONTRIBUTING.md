@@ -22,8 +22,7 @@ bun validate    # full gate: check, build, package checks, size budgets, coverag
 
 Run `bun check:fix` and `bun test` while you work; run `bun validate` before
 opening a pull request. `bun test:ci` adds coverage, gated at 95% lines and
-100% functions per `bunfig.toml` — `.claude/rules/testing.md` restates those
-numbers and must be updated alongside them.
+100% functions per `bunfig.toml`, which is the only place those numbers live.
 
 ## Pre-commit hook
 
@@ -35,10 +34,12 @@ fix blocks the commit.
 
 ## Code conventions
 
-Coding standards live in `.claude/rules/`: `typescript.md` (style, naming,
-types), `comments.md` (the `// !`, `// ?`, `// *`, `// TODO:` prefixes),
-`testing.md`, and `rng.md` (the `RNG` contract and MockRNG draw order). A few
-constraints worth calling out:
+Match the surrounding code. Style, naming, and type conventions are enforced by
+`biome check` rather than written down; what cannot be linted lives in
+`.claude/rules/`: `comments.md` (the `// !`, `// ?`, `// *`, `// TODO:` prefixes
+and their colors), `project-testing.md` (error assertions, the error-code gate,
+CLI test placement), and `rng.md` (the `RNG` contract). A few constraints worth
+calling out:
 
 - Relative imports inside `src/` carry explicit `.js` extensions — the repo
   typechecks under `moduleResolution: nodenext`, which rejects extensionless

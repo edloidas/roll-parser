@@ -8,7 +8,7 @@
  * expression, quadratic keep/drop) shows up as a changed draw count. These
  * assertions are the deterministic half of the regression strategy.
  *
- * Draw order follows `.claude/rules/rng.md`: keep/drop modifier arguments are
+ * Draw order follows README, Randomness: keep/drop modifier arguments are
  * drawn *before* the base pool, threshold-style modifier arguments *after* it.
  *
  * @module evaluator/complexity.test

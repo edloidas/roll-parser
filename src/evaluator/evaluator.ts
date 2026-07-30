@@ -423,7 +423,7 @@ function evalVariable(node: VariableNode, ctx: EvalContext, env: EvalEnv): EvalR
  * A `Literal` operand — the overwhelming majority (`3d6`, `4d6kh3`, `1d20!>18`)
  * — is answered from the node without allocating the throwaway context: a
  * literal draws no RNG, produces no rolls, and cannot throw, so the merge has
- * nothing to carry. Draw order is untouched (see `.claude/rules/rng.md`).
+ * nothing to carry. Draw order is untouched (see README, Randomness).
  */
 function evalMetaOperand(node: ASTNode, rng: RNG, ctx: EvalContext, env: EvalEnv): number {
   if (node.type === 'Literal') return node.value;
@@ -482,7 +482,7 @@ function rollPool(
  * (e.g. `(1+1)d(3*2)`) draw before the pool. For modifier-argument
  * meta-expressions like `4d6kh(1d2)`, `flattenModifierChain` draws the
  * modifier args first, then `evalModifier` calls `evalDice` for the base
- * pool. See `.claude/rules/rng.md` for the full draw-order spec.
+ * pool. See README, Randomness → Draw order, for the full spec.
  */
 function evalDice(node: DiceNode, rng: RNG, ctx: EvalContext, env: EvalEnv): EvalResult {
   const count = evalMetaOperand(node.count, rng, ctx, env);
