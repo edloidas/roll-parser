@@ -5,10 +5,10 @@ Dice notation for tabletop RPGs — parsed, rolled, and handed back as data you 
 </p>
 
 <p align="center">
-  <a href="https://www.npmjs.com/package/roll-parser"><img src="https://img.shields.io/npm/v/roll-parser/next?label=npm%40next&color=cb3837" alt="npm version"></a>
+  <a href="https://www.npmjs.com/package/roll-parser"><img src="https://img.shields.io/npm/v/roll-parser?color=cb3837" alt="npm version"></a>
   <a href="https://github.com/edloidas/roll-parser/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/edloidas/roll-parser/ci.yml?branch=master&label=CI" alt="CI status"></a>
   <a href="LICENSE"><img src="https://img.shields.io/npm/l/roll-parser?color=blue" alt="MIT license"></a>
-  <a href="https://nodejs.org/"><img src="https://img.shields.io/node/v/roll-parser/next?label=node" alt="Node.js >= 22.12"></a>
+  <a href="https://nodejs.org/"><img src="https://img.shields.io/node/v/roll-parser?label=node" alt="Node.js >= 22.12"></a>
   <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-strict-3178c6.svg" alt="TypeScript"></a>
 </p>
 
@@ -48,15 +48,12 @@ roll('4d6kh3', { rng: createMockRng([3, 6, 2, 5]) }).total; // 14, every run
 
 ## Status
 
-> **v3 Beta.** Feature-complete and covered by 1272 tests at 99.9% line
-> coverage, but the surface may still shift before 3.0.0 final.
+> **v3 is stable.** A complete rewrite of the 2.x line, covered by 1272 tests
+> at 99.9% line coverage. The `latest` tag now resolves to v3.
 >
-> ```bash
-> npm install roll-parser@next
-> ```
->
-> A plain `npm install roll-parser` resolves to the 2.x line — a different
-> library with a different API. Pre-releases need `@next`.
+> Upgrading from 2.x? The API is not compatible — see
+> [MIGRATION.md](MIGRATION.md). To stay on the old line, pin
+> `roll-parser@2.3.2`.
 
 ## Why roll-parser
 
@@ -94,25 +91,17 @@ roll('4d6kh3', { rng: createMockRng([3, 6, 2, 5]) }).total; // 14, every run
 [Using the parser directly](#using-the-parser-directly) ·
 [TypeScript](#typescript) · [CLI](#cli) · [Environments](#environments) ·
 [Performance](#performance) · [Known limitations](#known-limitations) ·
-[Related projects](#related-projects) · [Contributing](#contributing) ·
+[Upgrading from v2](MIGRATION.md) · [Contributing](#contributing) ·
 [License](#license)
 
 ## Install
 
 ```bash
-bun add roll-parser@next
+pnpm add roll-parser
 ```
 
 ```bash
-npm install roll-parser@next
-```
-
-```bash
-pnpm add roll-parser@next
-```
-
-```bash
-yarn add roll-parser@next
+bun add roll-parser
 ```
 
 **ESM-only.** Node.js ≥ 22.12 is required — that is where `require(esm)` is
@@ -131,14 +120,14 @@ as one request:
 
 ```html
 <script type="module">
-  import { roll } from 'https://cdn.jsdelivr.net/npm/roll-parser@next/+esm';
+  import { roll } from 'https://cdn.jsdelivr.net/npm/roll-parser/+esm';
 
   console.log(roll('4d6kh3').total);
 </script>
 ```
 
-`https://esm.sh/roll-parser@next` works the same way. Raw file URLs
-(`unpkg.com/roll-parser@next`) also work but fetch each module separately.
+`https://esm.sh/roll-parser` works the same way. Raw file URLs
+(`unpkg.com/roll-parser`) also work but fetch each module separately.
 
 ## Quick start
 
@@ -583,7 +572,7 @@ are camelCase (`'binaryOp'`), `ASTNode` discriminants PascalCase
 ## CLI
 
 ```bash
-npx roll-parser@next 2d6+3
+npx roll-parser 2d6+3
 ```
 
 ```
@@ -695,16 +684,6 @@ Run `bun run bench` for the full suite, or `bench:lex` / `bench:parse` /
   reports `expression: '1d20cs>19cs=1'` because chained `cs`/`cf` fold into one
   node. It re-parses to the same AST; only the text differs.
 
-## Related projects
-
-- [rpg-dice-roller](https://github.com/GreenImp/rpg-dice-roller) — the widest
-  notation coverage in JavaScript, with a large plugin surface.
-- [dice-roller-parser](https://github.com/ThomasHabets/dice-roller-parser) — a
-  PEG-based parser that also exposes a structured result tree.
-- [random-js](https://github.com/ckknight/random-js) — not a dice library, but
-  the reference for well-behaved seeded PRNGs in JS if you want to supply your
-  own `RNG`.
-
 ## Contributing
 
 Bug reports, notation gaps, and pull requests are welcome — open an
@@ -714,4 +693,4 @@ hook, commit conventions, and the release flow.
 
 ## License
 
-[MIT](LICENSE) © [Mikita Taukachou](https://edloidas.com)
+[MIT](LICENSE) © [Mikita Taukachou](https://edloidas.io)
