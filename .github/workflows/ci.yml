@@ -245,9 +245,8 @@ jobs:
       fail-fast: false
       matrix:
         # Exact `engines` floor first — the require(esm) claim must hold there.
-        # `lts/*` is the current LTS line; 24.x is not listed separately
-        # because it currently is `lts/*`.
-        node-version: ['22.12.0', '22.x', 'lts/*']
+        # 24.x is listed explicitly so it keeps coverage after `lts/*` moves on.
+        node-version: ['22.12.0', '22.x', '24.x', 'lts/*']
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -331,8 +330,11 @@ jobs:
           path: dist/
 
       - name: Assert dist library files carry no host-runtime specifiers
+        # The quote-prefixed pattern also catches side-effect and dynamic
+        # imports of builtins, which a `from`-anchored grep would miss.
         run: |
-          if grep -rEl "from '(node|bun):|require\(" dist --include='*.js' | grep -v '^dist/cli/'; then
+          test -d dist
+          if grep -rEl "'(node|bun):|require\(" dist --include='*.js' | grep -v '^dist/cli/'; then
             echo 'Found Node/Bun specifiers in library dist files (listed above).'
             exit 1
           fi
@@ -362,6 +364,7 @@ jobs:
 
       - name: Assert bundle is free of Node globals
         run: |
+          test -f "$RUNNER_TEMP/browser-smoke/bundle.js"
           if grep -qE "node:|process\.|createRequire" "$RUNNER_TEMP/browser-smoke/bundle.js"; then
             echo 'Browser bundle references Node runtime internals.'
             exit 1
