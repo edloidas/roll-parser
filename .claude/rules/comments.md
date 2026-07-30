@@ -1,53 +1,46 @@
-# Commenting Rules
+# Comments
 
-## Special Single-Line Prefixes
+Four single-line prefixes, picked so a comment-highlighter plugin colors each one
+differently. The color is the point — it is what makes the prefix worth using over
+a plain comment. Never combine two prefixes.
 
-- `// ! ` — critical issues (bugs, security risks, breaking changes)
+| Prefix | Color | Use for |
+|--------|-------|---------|
+| `// !` | red | Important enough to stop a reader: bug, security risk, breaking change, sharp edge. |
+| `// *` | green | Section divider, or a header over a multi-line comment. |
+| `// ?` | blue | **Not settled**: a hack, a temporary fix, a guess, something still in doubt. |
+| `// TODO:` | — | Actionable follow-up. Imperative verb, `[#123]` when an issue exists. |
 
-  ```ts
-  // ! Potential race condition if fetch retries here
-  ```
+## `// ?` is for doubt, not for rationale
 
-- `// ? ` — questions, uncertainties, rationale for unusual patterns
+This is the one that gets misused. A finished decision with a non-obvious reason is
+a plain comment. `// ?` means the code is still open — it is a flag to come back to,
+not an explanation.
 
-  ```ts
-  // ? May need to memoize this when the call becomes too heavy
-  ```
+```ts
+// Stable sort — ties resolve by original pool order.
+const sorted = [...dice].sort(byResult);
 
-- `// * ` — logical block dividers in large files (surround with blank comment lines)
+// ? Above Bun 1.3's ~640k argument-list ceiling on Linux — revisit if that lifts.
+const ast = buildLargeAst();
+```
 
-  ```ts
-  //
-  // * Event Handlers
-  //
+If removing the uncertainty would not change the comment, it should not be `// ?`.
 
-  /* ... */
+## `// *` sections
 
-  //
-  // * Validators
-  //
+Wrap in blank `//` lines. Header ≤ 4 words. Never `// ----`, `// ====`, or numbered
+headers.
 
-  /* ... */
-  ```
+```ts
+//
+// * Node dispatch
+//
+```
 
-- `// TODO: ` — actionable future work; start with an imperative verb, reference issue if possible
+## Placement
 
-  ```ts
-  // TODO: [#123] Replace mock with live API
-  ```
-
-> **Rule 1.1** Never combine prefixes (e.g. `// ! TODO`) — choose the one that best conveys intent.
-> **Rule 1.2** Section headers (`// *`) should be concise (≤ 4 words).
-
-## Comment Placement & Density
-
-- Comment only non-obvious logic: algorithms, workarounds, edge cases.
-- Avoid commenting trivial code (obvious mappings, simple getters).
-- Prefer JSDoc/TSDoc for public API functions instead of inline prose.
-- Keep comments inside function bodies minimal — context belongs in tests or docs.
-
-## Maintenance
-
-- Update or delete comments when code changes — stale comments are worse than none.
-- Promote resolved `// TODO:` items to commits and remove the tag.
-- Convert answered `// ?` questions into docs or ADRs once clarified.
+Default to no comment — the name should carry it. Comment the *why* only when it is
+genuinely non-obvious, in 1–2 lines. Never reference the task, PR, or issue that
+prompted the change; that belongs in the commit message. Prefer TSDoc over inline
+prose on anything exported.

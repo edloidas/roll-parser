@@ -7,8 +7,8 @@ minimumReleaseAgeExcludes = ["@biomejs/biome", "@types/bun", "typescript"]
 coverageSkipTestFiles = true
 
 # Enforced only when coverage runs (`bun test --coverage`, `test:ci`) — plain
-# `bun test` stays fast. These are the single source of truth for the numbers;
-# .claude/rules/testing.md restates them and must be updated alongside.
+# `bun test` stays fast. This is the only place the numbers live; CONTRIBUTING.md
+# quotes them but points here.
 [test.coverageThreshold]
 lines = 0.95
 functions = 1.0
