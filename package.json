@@ -24,6 +24,7 @@
     "dist",
     "src",
     "CHANGELOG.md",
+    "MIGRATION.md",
     "!src/**/*.test.ts"
   ],
   "keywords": [
@@ -49,7 +50,7 @@
     "url": "https://github.com/edloidas/roll-parser/issues"
   },
   "license": "MIT",
-  "author": "Mikita Taukachou <edloidas@gmail.com> (https://edloidas.com)",
+  "author": "Mikita Taukachou <edloidas@gmail.com> (https://edloidas.io)",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/edloidas/roll-parser.git"

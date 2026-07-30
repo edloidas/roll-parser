@@ -206,7 +206,8 @@ export function applyCompoundExplode(
 /**
  * Penetrating explode: like standard, but each appended die stores
  * `result = rawRoll - 1`. The explosion predicate runs on the RAW roll
- * (pre-decrement), matching rpg-dice-roller convention.
+ * (pre-decrement), so a max face still chains even though its stored value
+ * is one lower.
  */
 export function applyPenetratingExplode(
   pool: DieResult[],
