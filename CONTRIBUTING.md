@@ -7,10 +7,11 @@ for anything larger than a fix.
 ## Toolchain
 
 **[Bun](https://bun.sh) only.** Do not use npm, yarn, or pnpm in this
-repository. Bun is the test runner (`bun test`), the bundler (`bun build`
-produces `dist/`), the script runner, and the package manager whose lockfile
-(`bun.lock`) is committed. Installing with another manager writes a competing
-lockfile and produces a different dependency tree than CI resolves.
+repository. Bun is the test runner (`bun test`), the script runner, and the
+package manager whose lockfile (`bun.lock`) is committed — `dist/` itself is
+a per-file `tsc` emit via `bun run build`, not a bundle. Installing with
+another manager writes a competing lockfile and produces a different
+dependency tree than CI resolves.
 
 ```bash
 bun install     # also installs the pre-commit hook
@@ -39,9 +40,9 @@ types), `comments.md` (the `// !`, `// ?`, `// *`, `// TODO:` prefixes),
 `testing.md`, and `rng.md` (the `RNG` contract and MockRNG draw order). A few
 constraints worth calling out:
 
-- Relative imports inside `src/` carry explicit `.js` extensions. Without them
-  the emitted `.d.ts` is not resolvable under `moduleResolution: nodenext`,
-  which `bun run check:package` catches.
+- Relative imports inside `src/` carry explicit `.js` extensions — the repo
+  typechecks under `moduleResolution: nodenext`, which rejects extensionless
+  specifiers outright.
 - Nothing in the library may call `Math.random()` directly, and nothing outside
   `src/cli/` may import from `node:` — the library has to stay browser-safe.
 - Every code sample in a JSDoc `@example` or in `README.md` must be executed
@@ -102,8 +103,10 @@ Maintainers only.
    fails without a section for it, and `release:dry` fails at that step.
    Sections are ordered Added, Changed, Deprecated, Removed, Fixed, Security,
    Documentation.
-2. Bump `package.json` and commit it on its own as
-   `chore: release v<version>`. Never tag a pre-existing unrelated commit.
+2. Bump `package.json`, run `bun run generate:version`, and commit both files
+   on their own as `chore: release v<version>` — `check:version` fails the
+   release if `src/version.ts` is stale. Never tag a pre-existing unrelated
+   commit.
 3. Tag that commit `v<version>` and push the tag; `.github/workflows/release.yml`
    takes it from there.
 

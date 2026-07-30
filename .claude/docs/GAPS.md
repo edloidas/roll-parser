@@ -43,18 +43,22 @@ Math is correct; `floor()` is the Stage 2 solution.
 
 ## High — Build/Publish
 
-### 6. Test `.d.ts` files leak into `dist/` *(→ [#22](https://github.com/edloidas/roll-parser/issues/22))*
+### ~~6. Test `.d.ts` files leak into `dist/`~~ *(→ [#22](https://github.com/edloidas/roll-parser/issues/22))* ✓ Resolved
 
 `tsconfig.json` includes `src/**/*.ts` which captures `*.test.ts` files. The
 `build:types` script emits 9 test declaration files + 9 `.d.ts.map` files into
 `dist/`. These ship to npm consumers.
 
-### 7. `files` in `package.json` includes `src` *(→ [#22](https://github.com/edloidas/roll-parser/issues/22))*
+### ~~7. `files` in `package.json` includes `src`~~ *(→ [#22](https://github.com/edloidas/roll-parser/issues/22))* ✓ Resolved
 
 All source files including 9 test files, the mock RNG, and CLI internals ship
 to npm. Unnecessary package bloat.
 
-### 8. ESM build uses `--target bun` *(→ [#22](https://github.com/edloidas/roll-parser/issues/22))*
+> Resolution note: tests are excluded (`!src/**/*.test.ts`), and shipping the
+> rest of `src/` is now a deliberate decision — `declarationMap`/`sourceMap`
+> in `dist/` point at it (see CONTRIBUTING.md).
+
+### ~~8. ESM build uses `--target bun`~~ *(→ [#22](https://github.com/edloidas/roll-parser/issues/22))* ✓ Resolved
 
 `build:esm` uses `bun build ... --target bun` which may emit Bun-specific APIs.
 The ESM entry is exposed via the `"import"` export condition, which Node.js
@@ -170,11 +174,11 @@ Test job now runs in parallel with build (`needs: check` instead of
 A dedicated `node-smoke` job now verifies CJS and ESM import compatibility
 under Node.js LTS. Bun is pinned to `1.3.10` for reproducibility.
 
-### 28. Missing `sideEffects: false` in `package.json` *(→ [#22](https://github.com/edloidas/roll-parser/issues/22))*
+### ~~28. Missing `sideEffects: false` in `package.json`~~ *(→ [#22](https://github.com/edloidas/roll-parser/issues/22))* ✓ Resolved
 
 Tree-shaking-friendly libraries should declare this for bundler optimization.
 
-### 29. `biome.json` has dead `bin/**/*.ts` include path *(→ [#22](https://github.com/edloidas/roll-parser/issues/22))*
+### ~~29. `biome.json` has dead `bin/**/*.ts` include path~~ *(→ [#22](https://github.com/edloidas/roll-parser/issues/22))* ✓ Resolved
 
 The `bin/` directory contains no TypeScript files. The glob matches nothing.
 
@@ -189,13 +193,13 @@ sets `lineWidth: 100`.
 
 Phase markers updated in commit 27d9cb6.
 
-### 32. `tsconfig.json` has confusing `noEmit: true` with `declaration: true` *(→ [#22](https://github.com/edloidas/roll-parser/issues/22))*
+### ~~32. `tsconfig.json` has confusing `noEmit: true` with `declaration: true`~~ *(→ [#22](https://github.com/edloidas/roll-parser/issues/22))* ✓ Resolved
 
 The base config sets both, but `noEmit` prevents declarations from being
 emitted. Only works because `build:types` overrides with `--noEmit false` on
 the CLI. A separate `tsconfig.build.json` would be cleaner.
 
-### 33. No `outDir` in base tsconfig *(→ [#22](https://github.com/edloidas/roll-parser/issues/22))*
+### ~~33. No `outDir` in base tsconfig~~ *(→ [#22](https://github.com/edloidas/roll-parser/issues/22))* ✓ Resolved
 
 If someone runs `tsc` without `--noEmit`, declarations would be emitted into
 the source tree.
@@ -204,7 +208,7 @@ the source tree.
 
 Issue #1 closed.
 
-### 35. `bin` field uses shorthand form *(→ [#22](https://github.com/edloidas/roll-parser/issues/22))*
+### ~~35. `bin` field uses shorthand form~~ *(→ [#22](https://github.com/edloidas/roll-parser/issues/22))* ✓ Resolved
 
 `"bin": "./dist/cli.js"` infers the command name from package name.
 More explicit: `"bin": { "roll-parser": "./dist/cli.js" }`.
