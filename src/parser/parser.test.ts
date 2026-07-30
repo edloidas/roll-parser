@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { lex } from '../lexer/lexer.js';
+import { expectRollError } from '../test-helpers.js';
 import type { ComparePoint } from '../types.js';
 import type {
   ASTNode,
@@ -847,12 +848,7 @@ describe('Parser', () => {
     it('should reject nested explode (1d6!!!): compound then standard', () => {
       // Lexer maximal-munch: `!!!` → EXPLODE_COMPOUND + EXPLODE. The second
       // EXPLODE targets an ExplodeNode, which parseExplode rejects.
-      expect(() => parseAst('1d6!!!')).toThrow(ParseError);
-      try {
-        parseAst('1d6!!!');
-      } catch (err) {
-        expect((err as ParseError).code).toBe('INVALID_EXPLODE_TARGET');
-      }
+      expectRollError(() => parseAst('1d6!!!'), ParseError, 'INVALID_EXPLODE_TARGET');
     });
 
     it('should parse explode-then-keep: 4d6!kh3', () => {
@@ -953,21 +949,11 @@ describe('Parser', () => {
     });
 
     it('should reject bare r without comparison', () => {
-      expect(() => parseAst('2d6r')).toThrow(ParseError);
-      try {
-        parseAst('2d6r');
-      } catch (err) {
-        expect((err as ParseError).code).toBe('EXPECTED_TOKEN');
-      }
+      expectRollError(() => parseAst('2d6r'), ParseError, 'EXPECTED_TOKEN');
     });
 
     it('should reject bare ro without comparison', () => {
-      expect(() => parseAst('2d6ro')).toThrow(ParseError);
-      try {
-        parseAst('2d6ro');
-      } catch (err) {
-        expect((err as ParseError).code).toBe('EXPECTED_TOKEN');
-      }
+      expectRollError(() => parseAst('2d6ro'), ParseError, 'EXPECTED_TOKEN');
     });
 
     it('should parse reroll-then-keep: 2d6r<2kh1', () => {
@@ -1089,21 +1075,11 @@ describe('Parser', () => {
     });
 
     it('should reject outer + on SuccessCount: 5d6>=5+3', () => {
-      expect(() => parseAst('5d6>=5+3')).toThrow(ParseError);
-      try {
-        parseAst('5d6>=5+3');
-      } catch (err) {
-        expect((err as ParseError).code).toBe('INVALID_SUCCESS_COUNT_TARGET');
-      }
+      expectRollError(() => parseAst('5d6>=5+3'), ParseError, 'INVALID_SUCCESS_COUNT_TARGET');
     });
 
     it('should reject outer * on SuccessCount: 5d6>=5 * 2', () => {
-      expect(() => parseAst('5d6>=5 * 2')).toThrow(ParseError);
-      try {
-        parseAst('5d6>=5 * 2');
-      } catch (err) {
-        expect((err as ParseError).code).toBe('INVALID_SUCCESS_COUNT_TARGET');
-      }
+      expectRollError(() => parseAst('5d6>=5 * 2'), ParseError, 'INVALID_SUCCESS_COUNT_TARGET');
     });
 
     it('should wrap keep-highest-then-count: 4d6kh3>=5', () => {
@@ -1167,147 +1143,71 @@ describe('Parser', () => {
     });
 
     it('should reject modifier after success count: 10d10>=6kh5', () => {
-      expect(() => parseAst('10d10>=6kh5')).toThrow(ParseError);
-      try {
-        parseAst('10d10>=6kh5');
-      } catch (err) {
-        expect((err as ParseError).code).toBe('INVALID_SUCCESS_COUNT_TARGET');
-      }
+      expectRollError(() => parseAst('10d10>=6kh5'), ParseError, 'INVALID_SUCCESS_COUNT_TARGET');
     });
 
     it('should reject explode after success count: 10d10>=6!', () => {
-      expect(() => parseAst('10d10>=6!')).toThrow(ParseError);
-      try {
-        parseAst('10d10>=6!');
-      } catch (err) {
-        expect((err as ParseError).code).toBe('INVALID_SUCCESS_COUNT_TARGET');
-      }
+      expectRollError(() => parseAst('10d10>=6!'), ParseError, 'INVALID_SUCCESS_COUNT_TARGET');
     });
 
     it('should reject reroll after success count: 10d10>=6r<3', () => {
-      expect(() => parseAst('10d10>=6r<3')).toThrow(ParseError);
-      try {
-        parseAst('10d10>=6r<3');
-      } catch (err) {
-        expect((err as ParseError).code).toBe('INVALID_SUCCESS_COUNT_TARGET');
-      }
+      expectRollError(() => parseAst('10d10>=6r<3'), ParseError, 'INVALID_SUCCESS_COUNT_TARGET');
     });
 
     it('should reject chained success count: 10d10>=6>=5', () => {
-      expect(() => parseAst('10d10>=6>=5')).toThrow(ParseError);
-      try {
-        parseAst('10d10>=6>=5');
-      } catch (err) {
-        expect((err as ParseError).code).toBe('INVALID_SUCCESS_COUNT_TARGET');
-      }
+      expectRollError(() => parseAst('10d10>=6>=5'), ParseError, 'INVALID_SUCCESS_COUNT_TARGET');
     });
 
     it('should reject non-dice target: 1>=3', () => {
-      expect(() => parseAst('1>=3')).toThrow(ParseError);
-      try {
-        parseAst('1>=3');
-      } catch (err) {
-        expect((err as ParseError).code).toBe('INVALID_SUCCESS_COUNT_TARGET');
-      }
+      expectRollError(() => parseAst('1>=3'), ParseError, 'INVALID_SUCCESS_COUNT_TARGET');
     });
 
     it('should reject parenthesized non-dice target: (1+2)>=3', () => {
-      expect(() => parseAst('(1+2)>=3')).toThrow(ParseError);
-      try {
-        parseAst('(1+2)>=3');
-      } catch (err) {
-        expect((err as ParseError).code).toBe('INVALID_SUCCESS_COUNT_TARGET');
-      }
+      expectRollError(() => parseAst('(1+2)>=3'), ParseError, 'INVALID_SUCCESS_COUNT_TARGET');
     });
 
     it('should reject non-pool arithmetic target: (1d6+2)>=3', () => {
-      expect(() => parseAst('(1d6+2)>=3')).toThrow(ParseError);
-      try {
-        parseAst('(1d6+2)>=3');
-      } catch (err) {
-        expect((err as ParseError).code).toBe('INVALID_SUCCESS_COUNT_TARGET');
-      }
+      expectRollError(() => parseAst('(1d6+2)>=3'), ParseError, 'INVALID_SUCCESS_COUNT_TARGET');
     });
 
     it('should reject non-pool multiplication target: (1d6*2)>=10', () => {
-      expect(() => parseAst('(1d6*2)>=10')).toThrow(ParseError);
-      try {
-        parseAst('(1d6*2)>=10');
-      } catch (err) {
-        expect((err as ParseError).code).toBe('INVALID_SUCCESS_COUNT_TARGET');
-      }
+      expectRollError(() => parseAst('(1d6*2)>=10'), ParseError, 'INVALID_SUCCESS_COUNT_TARGET');
     });
 
     it('should reject versus inside success-count target: (1d20 vs 15)>=1', () => {
-      expect(() => parseAst('(1d20 vs 15)>=1')).toThrow(ParseError);
-      try {
-        parseAst('(1d20 vs 15)>=1');
-      } catch (err) {
-        expect((err as ParseError).code).toBe('INVALID_SUCCESS_COUNT_TARGET');
-      }
+      expectRollError(
+        () => parseAst('(1d20 vs 15)>=1'),
+        ParseError,
+        'INVALID_SUCCESS_COUNT_TARGET',
+      );
     });
 
     it('should reject XdY+N>T (BP keeps arithmetic ahead of compare): 5d6+2>4', () => {
-      expect(() => parseAst('5d6+2>4')).toThrow(ParseError);
-      try {
-        parseAst('5d6+2>4');
-      } catch (err) {
-        expect((err as ParseError).code).toBe('INVALID_SUCCESS_COUNT_TARGET');
-      }
+      expectRollError(() => parseAst('5d6+2>4'), ParseError, 'INVALID_SUCCESS_COUNT_TARGET');
     });
 
     it('should reject XdY+N>=T: 5d6+2>=4', () => {
-      expect(() => parseAst('5d6+2>=4')).toThrow(ParseError);
-      try {
-        parseAst('5d6+2>=4');
-      } catch (err) {
-        expect((err as ParseError).code).toBe('INVALID_SUCCESS_COUNT_TARGET');
-      }
+      expectRollError(() => parseAst('5d6+2>=4'), ParseError, 'INVALID_SUCCESS_COUNT_TARGET');
     });
 
     it('should reject binary wrapping on success count: 2 * (1d6>=5)', () => {
-      expect(() => parseAst('2 * (1d6>=5)')).toThrow(ParseError);
-      try {
-        parseAst('2 * (1d6>=5)');
-      } catch (err) {
-        expect((err as ParseError).code).toBe('INVALID_SUCCESS_COUNT_TARGET');
-      }
+      expectRollError(() => parseAst('2 * (1d6>=5)'), ParseError, 'INVALID_SUCCESS_COUNT_TARGET');
     });
 
     it('should reject parenthesized + on success count: (1d6>=5) + 3', () => {
-      expect(() => parseAst('(1d6>=5) + 3')).toThrow(ParseError);
-      try {
-        parseAst('(1d6>=5) + 3');
-      } catch (err) {
-        expect((err as ParseError).code).toBe('INVALID_SUCCESS_COUNT_TARGET');
-      }
+      expectRollError(() => parseAst('(1d6>=5) + 3'), ParseError, 'INVALID_SUCCESS_COUNT_TARGET');
     });
 
     it('should reject success count inside function arg: max(1d6>=5, 2)', () => {
-      expect(() => parseAst('max(1d6>=5, 2)')).toThrow(ParseError);
-      try {
-        parseAst('max(1d6>=5, 2)');
-      } catch (err) {
-        expect((err as ParseError).code).toBe('INVALID_SUCCESS_COUNT_TARGET');
-      }
+      expectRollError(() => parseAst('max(1d6>=5, 2)'), ParseError, 'INVALID_SUCCESS_COUNT_TARGET');
     });
 
     it('should reject success count as vs roll side: 10d10>=6 vs 8', () => {
-      expect(() => parseAst('10d10>=6 vs 8')).toThrow(ParseError);
-      try {
-        parseAst('10d10>=6 vs 8');
-      } catch (err) {
-        expect((err as ParseError).code).toBe('INVALID_SUCCESS_COUNT_TARGET');
-      }
+      expectRollError(() => parseAst('10d10>=6 vs 8'), ParseError, 'INVALID_SUCCESS_COUNT_TARGET');
     });
 
     it('should reject unary minus on success count: -(1d6>=5)', () => {
-      expect(() => parseAst('-(1d6>=5)')).toThrow(ParseError);
-      try {
-        parseAst('-(1d6>=5)');
-      } catch (err) {
-        expect((err as ParseError).code).toBe('INVALID_SUCCESS_COUNT_TARGET');
-      }
+      expectRollError(() => parseAst('-(1d6>=5)'), ParseError, 'INVALID_SUCCESS_COUNT_TARGET');
     });
 
     it('should still parse plain pool success count: 5d6>=5', () => {
@@ -1324,93 +1224,47 @@ describe('Parser', () => {
     // (Explode / Reroll). Wrapping in parens used to bypass the #51 guards.
 
     it('should reject SuccessCount as keep-modifier count: 4d6kh(3d6>=3)', () => {
-      expect(() => parseAst('4d6kh(3d6>=3)')).toThrow(ParseError);
-      try {
-        parseAst('4d6kh(3d6>=3)');
-      } catch (err) {
-        expect((err as ParseError).code).toBe('INVALID_SUCCESS_COUNT_TARGET');
-      }
+      expectRollError(() => parseAst('4d6kh(3d6>=3)'), ParseError, 'INVALID_SUCCESS_COUNT_TARGET');
     });
 
     it('should reject SuccessCount as prefix dice sides: d(1d6>=3)', () => {
-      expect(() => parseAst('d(1d6>=3)')).toThrow(ParseError);
-      try {
-        parseAst('d(1d6>=3)');
-      } catch (err) {
-        expect((err as ParseError).code).toBe('INVALID_SUCCESS_COUNT_TARGET');
-      }
+      expectRollError(() => parseAst('d(1d6>=3)'), ParseError, 'INVALID_SUCCESS_COUNT_TARGET');
     });
 
     it('should reject SuccessCount as infix dice sides: 4d(1d6>=3)', () => {
-      expect(() => parseAst('4d(1d6>=3)')).toThrow(ParseError);
-      try {
-        parseAst('4d(1d6>=3)');
-      } catch (err) {
-        expect((err as ParseError).code).toBe('INVALID_SUCCESS_COUNT_TARGET');
-      }
+      expectRollError(() => parseAst('4d(1d6>=3)'), ParseError, 'INVALID_SUCCESS_COUNT_TARGET');
     });
 
     it('should reject SuccessCount as infix dice count: (1d6>=3)d6', () => {
-      expect(() => parseAst('(1d6>=3)d6')).toThrow(ParseError);
-      try {
-        parseAst('(1d6>=3)d6');
-      } catch (err) {
-        expect((err as ParseError).code).toBe('INVALID_SUCCESS_COUNT_TARGET');
-      }
+      expectRollError(() => parseAst('(1d6>=3)d6'), ParseError, 'INVALID_SUCCESS_COUNT_TARGET');
     });
 
     it('should reject SuccessCount as percentile dice count: (1d6>=3)d%', () => {
-      expect(() => parseAst('(1d6>=3)d%')).toThrow(ParseError);
-      try {
-        parseAst('(1d6>=3)d%');
-      } catch (err) {
-        expect((err as ParseError).code).toBe('INVALID_SUCCESS_COUNT_TARGET');
-      }
+      expectRollError(() => parseAst('(1d6>=3)d%'), ParseError, 'INVALID_SUCCESS_COUNT_TARGET');
     });
 
     it('should reject SuccessCount as Fate dice count: (1d6>=3)dF', () => {
-      expect(() => parseAst('(1d6>=3)dF')).toThrow(ParseError);
-      try {
-        parseAst('(1d6>=3)dF');
-      } catch (err) {
-        expect((err as ParseError).code).toBe('INVALID_SUCCESS_COUNT_TARGET');
-      }
+      expectRollError(() => parseAst('(1d6>=3)dF'), ParseError, 'INVALID_SUCCESS_COUNT_TARGET');
     });
 
     it('should reject SuccessCount as threshold value: 5d10>=(1d6>=3)', () => {
-      expect(() => parseAst('5d10>=(1d6>=3)')).toThrow(ParseError);
-      try {
-        parseAst('5d10>=(1d6>=3)');
-      } catch (err) {
-        expect((err as ParseError).code).toBe('INVALID_SUCCESS_COUNT_TARGET');
-      }
+      expectRollError(() => parseAst('5d10>=(1d6>=3)'), ParseError, 'INVALID_SUCCESS_COUNT_TARGET');
     });
 
     it('should reject SuccessCount as bare fN value: 5d10>=6f(1d6>=3)', () => {
-      expect(() => parseAst('5d10>=6f(1d6>=3)')).toThrow(ParseError);
-      try {
-        parseAst('5d10>=6f(1d6>=3)');
-      } catch (err) {
-        expect((err as ParseError).code).toBe('INVALID_SUCCESS_COUNT_TARGET');
-      }
+      expectRollError(
+        () => parseAst('5d10>=6f(1d6>=3)'),
+        ParseError,
+        'INVALID_SUCCESS_COUNT_TARGET',
+      );
     });
 
     it('should reject SuccessCount as explode compare-point value: 1d6!>=(1d6>=3)', () => {
-      expect(() => parseAst('1d6!>=(1d6>=3)')).toThrow(ParseError);
-      try {
-        parseAst('1d6!>=(1d6>=3)');
-      } catch (err) {
-        expect((err as ParseError).code).toBe('INVALID_SUCCESS_COUNT_TARGET');
-      }
+      expectRollError(() => parseAst('1d6!>=(1d6>=3)'), ParseError, 'INVALID_SUCCESS_COUNT_TARGET');
     });
 
     it('should reject SuccessCount as reroll compare-point value: 1d6r<=(1d6>=3)', () => {
-      expect(() => parseAst('1d6r<=(1d6>=3)')).toThrow(ParseError);
-      try {
-        parseAst('1d6r<=(1d6>=3)');
-      } catch (err) {
-        expect((err as ParseError).code).toBe('INVALID_SUCCESS_COUNT_TARGET');
-      }
+      expectRollError(() => parseAst('1d6r<=(1d6>=3)'), ParseError, 'INVALID_SUCCESS_COUNT_TARGET');
     });
   });
 
@@ -1421,93 +1275,43 @@ describe('Parser', () => {
     // `mergeMetaRolls` sites.
 
     it('should reject Versus as keep-modifier count: 4d6kh(1d20 vs 10)', () => {
-      expect(() => parseAst('4d6kh(1d20 vs 10)')).toThrow(ParseError);
-      try {
-        parseAst('4d6kh(1d20 vs 10)');
-      } catch (err) {
-        expect((err as ParseError).code).toBe('NESTED_VERSUS');
-      }
+      expectRollError(() => parseAst('4d6kh(1d20 vs 10)'), ParseError, 'NESTED_VERSUS');
     });
 
     it('should reject Versus as prefix dice sides: d(1d20 vs 10)', () => {
-      expect(() => parseAst('d(1d20 vs 10)')).toThrow(ParseError);
-      try {
-        parseAst('d(1d20 vs 10)');
-      } catch (err) {
-        expect((err as ParseError).code).toBe('NESTED_VERSUS');
-      }
+      expectRollError(() => parseAst('d(1d20 vs 10)'), ParseError, 'NESTED_VERSUS');
     });
 
     it('should reject Versus as infix dice sides: 4d(1d20 vs 10)', () => {
-      expect(() => parseAst('4d(1d20 vs 10)')).toThrow(ParseError);
-      try {
-        parseAst('4d(1d20 vs 10)');
-      } catch (err) {
-        expect((err as ParseError).code).toBe('NESTED_VERSUS');
-      }
+      expectRollError(() => parseAst('4d(1d20 vs 10)'), ParseError, 'NESTED_VERSUS');
     });
 
     it('should reject Versus as infix dice count: (1d20 vs 10)d6', () => {
-      expect(() => parseAst('(1d20 vs 10)d6')).toThrow(ParseError);
-      try {
-        parseAst('(1d20 vs 10)d6');
-      } catch (err) {
-        expect((err as ParseError).code).toBe('NESTED_VERSUS');
-      }
+      expectRollError(() => parseAst('(1d20 vs 10)d6'), ParseError, 'NESTED_VERSUS');
     });
 
     it('should reject Versus as percentile dice count: (1d20 vs 10)d%', () => {
-      expect(() => parseAst('(1d20 vs 10)d%')).toThrow(ParseError);
-      try {
-        parseAst('(1d20 vs 10)d%');
-      } catch (err) {
-        expect((err as ParseError).code).toBe('NESTED_VERSUS');
-      }
+      expectRollError(() => parseAst('(1d20 vs 10)d%'), ParseError, 'NESTED_VERSUS');
     });
 
     it('should reject Versus as Fate dice count: (1d20 vs 10)dF', () => {
-      expect(() => parseAst('(1d20 vs 10)dF')).toThrow(ParseError);
-      try {
-        parseAst('(1d20 vs 10)dF');
-      } catch (err) {
-        expect((err as ParseError).code).toBe('NESTED_VERSUS');
-      }
+      expectRollError(() => parseAst('(1d20 vs 10)dF'), ParseError, 'NESTED_VERSUS');
     });
 
     it('should reject Versus as threshold value: 5d10>=(1d20 vs 10)', () => {
-      expect(() => parseAst('5d10>=(1d20 vs 10)')).toThrow(ParseError);
-      try {
-        parseAst('5d10>=(1d20 vs 10)');
-      } catch (err) {
-        expect((err as ParseError).code).toBe('NESTED_VERSUS');
-      }
+      expectRollError(() => parseAst('5d10>=(1d20 vs 10)'), ParseError, 'NESTED_VERSUS');
     });
 
     it('should reject Versus as bare fN value: 5d10>=6f(1d20 vs 10)', () => {
-      expect(() => parseAst('5d10>=6f(1d20 vs 10)')).toThrow(ParseError);
-      try {
-        parseAst('5d10>=6f(1d20 vs 10)');
-      } catch (err) {
-        expect((err as ParseError).code).toBe('NESTED_VERSUS');
-      }
+      expectRollError(() => parseAst('5d10>=6f(1d20 vs 10)'), ParseError, 'NESTED_VERSUS');
     });
 
     it('should reject Versus as explode compare-point value: 1d6!>=(1d20 vs 10)', () => {
-      expect(() => parseAst('1d6!>=(1d20 vs 10)')).toThrow(ParseError);
-      try {
-        parseAst('1d6!>=(1d20 vs 10)');
-      } catch (err) {
-        expect((err as ParseError).code).toBe('NESTED_VERSUS');
-      }
+      expectRollError(() => parseAst('1d6!>=(1d20 vs 10)'), ParseError, 'NESTED_VERSUS');
     });
 
     it('should reject Versus as reroll compare-point value: 1d6r<=(1d20 vs 10)', () => {
-      expect(() => parseAst('1d6r<=(1d20 vs 10)')).toThrow(ParseError);
-      try {
-        parseAst('1d6r<=(1d20 vs 10)');
-      } catch (err) {
-        expect((err as ParseError).code).toBe('NESTED_VERSUS');
-      }
+      expectRollError(() => parseAst('1d6r<=(1d20 vs 10)'), ParseError, 'NESTED_VERSUS');
     });
 
     // #109 — single-sub-roll Group passthrough makes Versus reachable past
@@ -1517,21 +1321,11 @@ describe('Parser', () => {
       // ? `kh{...}` is not valid syntax — `kh` requires parens, not braces.
       //   `kh({...})` is the actual bypass route: parens around a single-sub
       //   Group around Versus. The new deep-walk catches it.
-      expect(() => parseAst('4d6kh({1d20 vs 10})')).toThrow(ParseError);
-      try {
-        parseAst('4d6kh({1d20 vs 10})');
-      } catch (err) {
-        expect((err as ParseError).code).toBe('NESTED_VERSUS');
-      }
+      expectRollError(() => parseAst('4d6kh({1d20 vs 10})'), ParseError, 'NESTED_VERSUS');
     });
 
     it('should reject Versus inside single-sub group as success-count threshold: 5d10>={1d20 vs 10}', () => {
-      expect(() => parseAst('5d10>={1d20 vs 10}')).toThrow(ParseError);
-      try {
-        parseAst('5d10>={1d20 vs 10}');
-      } catch (err) {
-        expect((err as ParseError).code).toBe('NESTED_VERSUS');
-      }
+      expectRollError(() => parseAst('5d10>={1d20 vs 10}'), ParseError, 'NESTED_VERSUS');
     });
 
     it('should reject Versus inside single-sub group as kh target: {1d20 vs 15}kh1', () => {
@@ -1540,12 +1334,7 @@ describe('Parser', () => {
       //   `containsDicePool` (deep walk recurses into Versus.roll/dc), so the
       //   reject was the only thing standing between user input and a
       //   silently-dropped `degree`/`natural`.
-      expect(() => parseAst('{1d20 vs 15}kh1')).toThrow(ParseError);
-      try {
-        parseAst('{1d20 vs 15}kh1');
-      } catch (err) {
-        expect((err as ParseError).code).toBe('NESTED_VERSUS');
-      }
+      expectRollError(() => parseAst('{1d20 vs 15}kh1'), ParseError, 'NESTED_VERSUS');
     });
 
     it('should reject Versus buried in unary inside single-sub group as kh target: {-(1d20 vs 15)}kh1', () => {
@@ -1553,12 +1342,7 @@ describe('Parser', () => {
     });
 
     it('should reject Versus inside single-sub group as sort target: {1d20 vs 15}s', () => {
-      expect(() => parseAst('{1d20 vs 15}s')).toThrow(ParseError);
-      try {
-        parseAst('{1d20 vs 15}s');
-      } catch (err) {
-        expect((err as ParseError).code).toBe('NESTED_VERSUS');
-      }
+      expectRollError(() => parseAst('{1d20 vs 15}s'), ParseError, 'NESTED_VERSUS');
     });
 
     it('should accept Versus inside single-sub group as arithmetic operand: {1d20 vs 15}+5', () => {
@@ -1575,160 +1359,75 @@ describe('Parser', () => {
 
     describe('keep/drop reject non-pool targets', () => {
       it('should reject (1d6+5)kh1', () => {
-        expect(() => parseAst('(1d6+5)kh1')).toThrow(ParseError);
-        try {
-          parseAst('(1d6+5)kh1');
-        } catch (err) {
-          expect((err as ParseError).code).toBe('INVALID_MODIFIER_TARGET');
-        }
+        expectRollError(() => parseAst('(1d6+5)kh1'), ParseError, 'INVALID_MODIFIER_TARGET');
       });
 
       it('should reject floor(1d6/2)kh1', () => {
-        expect(() => parseAst('floor(1d6/2)kh1')).toThrow(ParseError);
-        try {
-          parseAst('floor(1d6/2)kh1');
-        } catch (err) {
-          expect((err as ParseError).code).toBe('INVALID_MODIFIER_TARGET');
-        }
+        expectRollError(() => parseAst('floor(1d6/2)kh1'), ParseError, 'INVALID_MODIFIER_TARGET');
       });
 
       it('should reject 4d6+2kh3 (modifier binds to literal 2)', () => {
-        expect(() => parseAst('4d6+2kh3')).toThrow(ParseError);
-        try {
-          parseAst('4d6+2kh3');
-        } catch (err) {
-          expect((err as ParseError).code).toBe('INVALID_MODIFIER_TARGET');
-        }
+        expectRollError(() => parseAst('4d6+2kh3'), ParseError, 'INVALID_MODIFIER_TARGET');
       });
 
       it('should reject (1+2)dl1', () => {
-        expect(() => parseAst('(1+2)dl1')).toThrow(ParseError);
-        try {
-          parseAst('(1+2)dl1');
-        } catch (err) {
-          expect((err as ParseError).code).toBe('INVALID_MODIFIER_TARGET');
-        }
+        expectRollError(() => parseAst('(1+2)dl1'), ParseError, 'INVALID_MODIFIER_TARGET');
       });
     });
 
     describe('explode rejects non-pool targets', () => {
       it('should reject (1d6+5)!', () => {
-        expect(() => parseAst('(1d6+5)!')).toThrow(ParseError);
-        try {
-          parseAst('(1d6+5)!');
-        } catch (err) {
-          expect((err as ParseError).code).toBe('INVALID_EXPLODE_TARGET');
-        }
+        expectRollError(() => parseAst('(1d6+5)!'), ParseError, 'INVALID_EXPLODE_TARGET');
       });
 
       it('should reject (1d6+5)!!', () => {
-        expect(() => parseAst('(1d6+5)!!')).toThrow(ParseError);
-        try {
-          parseAst('(1d6+5)!!');
-        } catch (err) {
-          expect((err as ParseError).code).toBe('INVALID_EXPLODE_TARGET');
-        }
+        expectRollError(() => parseAst('(1d6+5)!!'), ParseError, 'INVALID_EXPLODE_TARGET');
       });
 
       it('should reject (1d6+5)!p', () => {
-        expect(() => parseAst('(1d6+5)!p')).toThrow(ParseError);
-        try {
-          parseAst('(1d6+5)!p');
-        } catch (err) {
-          expect((err as ParseError).code).toBe('INVALID_EXPLODE_TARGET');
-        }
+        expectRollError(() => parseAst('(1d6+5)!p'), ParseError, 'INVALID_EXPLODE_TARGET');
       });
 
       it('should reject floor(1d6/2)!', () => {
-        expect(() => parseAst('floor(1d6/2)!')).toThrow(ParseError);
-        try {
-          parseAst('floor(1d6/2)!');
-        } catch (err) {
-          expect((err as ParseError).code).toBe('INVALID_EXPLODE_TARGET');
-        }
+        expectRollError(() => parseAst('floor(1d6/2)!'), ParseError, 'INVALID_EXPLODE_TARGET');
       });
 
       it('should reject (4d6+1d4)! (sum of pools is not a single pool)', () => {
-        expect(() => parseAst('(4d6+1d4)!')).toThrow(ParseError);
-        try {
-          parseAst('(4d6+1d4)!');
-        } catch (err) {
-          expect((err as ParseError).code).toBe('INVALID_EXPLODE_TARGET');
-        }
+        expectRollError(() => parseAst('(4d6+1d4)!'), ParseError, 'INVALID_EXPLODE_TARGET');
       });
     });
 
     describe('explode rejects Fate dice pools', () => {
       it('should reject 4dF!', () => {
-        expect(() => parseAst('4dF!')).toThrow(ParseError);
-        try {
-          parseAst('4dF!');
-        } catch (err) {
-          expect((err as ParseError).code).toBe('INVALID_EXPLODE_TARGET');
-        }
+        expectRollError(() => parseAst('4dF!'), ParseError, 'INVALID_EXPLODE_TARGET');
       });
 
       it('should reject 4dF!>0', () => {
-        expect(() => parseAst('4dF!>0')).toThrow(ParseError);
-        try {
-          parseAst('4dF!>0');
-        } catch (err) {
-          expect((err as ParseError).code).toBe('INVALID_EXPLODE_TARGET');
-        }
+        expectRollError(() => parseAst('4dF!>0'), ParseError, 'INVALID_EXPLODE_TARGET');
       });
 
       it('should reject 4dF!!', () => {
-        expect(() => parseAst('4dF!!')).toThrow(ParseError);
-        try {
-          parseAst('4dF!!');
-        } catch (err) {
-          expect((err as ParseError).code).toBe('INVALID_EXPLODE_TARGET');
-        }
+        expectRollError(() => parseAst('4dF!!'), ParseError, 'INVALID_EXPLODE_TARGET');
       });
 
       it('should reject 4dF!!>0', () => {
-        expect(() => parseAst('4dF!!>0')).toThrow(ParseError);
-        try {
-          parseAst('4dF!!>0');
-        } catch (err) {
-          expect((err as ParseError).code).toBe('INVALID_EXPLODE_TARGET');
-        }
+        expectRollError(() => parseAst('4dF!!>0'), ParseError, 'INVALID_EXPLODE_TARGET');
       });
 
       it('should reject 4dF!p', () => {
-        expect(() => parseAst('4dF!p')).toThrow(ParseError);
-        try {
-          parseAst('4dF!p');
-        } catch (err) {
-          expect((err as ParseError).code).toBe('INVALID_EXPLODE_TARGET');
-        }
+        expectRollError(() => parseAst('4dF!p'), ParseError, 'INVALID_EXPLODE_TARGET');
       });
 
       it('should reject 4dF!p>0', () => {
-        expect(() => parseAst('4dF!p>0')).toThrow(ParseError);
-        try {
-          parseAst('4dF!p>0');
-        } catch (err) {
-          expect((err as ParseError).code).toBe('INVALID_EXPLODE_TARGET');
-        }
+        expectRollError(() => parseAst('4dF!p>0'), ParseError, 'INVALID_EXPLODE_TARGET');
       });
 
       it('should reject (4dF)!', () => {
-        expect(() => parseAst('(4dF)!')).toThrow(ParseError);
-        try {
-          parseAst('(4dF)!');
-        } catch (err) {
-          expect((err as ParseError).code).toBe('INVALID_EXPLODE_TARGET');
-        }
+        expectRollError(() => parseAst('(4dF)!'), ParseError, 'INVALID_EXPLODE_TARGET');
       });
 
       it('should reject Fate pool wrapped in a chained pool modifier (4dFr=-1)!', () => {
-        expect(() => parseAst('(4dFr=-1)!')).toThrow(ParseError);
-        try {
-          parseAst('(4dFr=-1)!');
-        } catch (err) {
-          expect((err as ParseError).code).toBe('INVALID_EXPLODE_TARGET');
-        }
+        expectRollError(() => parseAst('(4dFr=-1)!'), ParseError, 'INVALID_EXPLODE_TARGET');
       });
 
       it('should carry a descriptive message mentioning Fate dice', () => {
@@ -1742,21 +1441,11 @@ describe('Parser', () => {
 
     describe('reroll rejects non-pool targets', () => {
       it('should reject (1d6+5)r<3', () => {
-        expect(() => parseAst('(1d6+5)r<3')).toThrow(ParseError);
-        try {
-          parseAst('(1d6+5)r<3');
-        } catch (err) {
-          expect((err as ParseError).code).toBe('INVALID_REROLL_TARGET');
-        }
+        expectRollError(() => parseAst('(1d6+5)r<3'), ParseError, 'INVALID_REROLL_TARGET');
       });
 
       it('should reject floor(1d6/2)ro<3', () => {
-        expect(() => parseAst('floor(1d6/2)ro<3')).toThrow(ParseError);
-        try {
-          parseAst('floor(1d6/2)ro<3');
-        } catch (err) {
-          expect((err as ParseError).code).toBe('INVALID_REROLL_TARGET');
-        }
+        expectRollError(() => parseAst('floor(1d6/2)ro<3'), ParseError, 'INVALID_REROLL_TARGET');
       });
     });
 
@@ -1866,32 +1555,17 @@ describe('Parser', () => {
     });
 
     it('should reject chained versus: 1d20 vs 15 vs 20', () => {
-      expect(() => parseAst('1d20 vs 15 vs 20')).toThrow(ParseError);
-      try {
-        parseAst('1d20 vs 15 vs 20');
-      } catch (err) {
-        expect((err as ParseError).code).toBe('NESTED_VERSUS');
-      }
+      expectRollError(() => parseAst('1d20 vs 15 vs 20'), ParseError, 'NESTED_VERSUS');
     });
 
     it('should reject chained versus with modifiers: 1d20+5 vs 15 vs 20', () => {
-      expect(() => parseAst('1d20+5 vs 15 vs 20')).toThrow(ParseError);
-      try {
-        parseAst('1d20+5 vs 15 vs 20');
-      } catch (err) {
-        expect((err as ParseError).code).toBe('NESTED_VERSUS');
-      }
+      expectRollError(() => parseAst('1d20+5 vs 15 vs 20'), ParseError, 'NESTED_VERSUS');
     });
 
     it('should reject paren-wrapped chained versus at parse: (1d20 vs 15) vs 10', () => {
       // Chain guard unwraps `Grouped`, so parens do not bypass the parse-time
       // check. Previously parsed and threw at eval via `mergeContext`.
-      expect(() => parseAst('(1d20 vs 15) vs 10')).toThrow(ParseError);
-      try {
-        parseAst('(1d20 vs 15) vs 10');
-      } catch (err) {
-        expect((err as ParseError).code).toBe('NESTED_VERSUS');
-      }
+      expectRollError(() => parseAst('(1d20 vs 15) vs 10'), ParseError, 'NESTED_VERSUS');
     });
   });
 
@@ -1967,39 +1641,19 @@ describe('Parser', () => {
     });
 
     it('should throw INVALID_FUNCTION_ARITY for zero args: floor()', () => {
-      expect(() => parseAst('floor()')).toThrow(ParseError);
-      try {
-        parseAst('floor()');
-      } catch (err) {
-        expect((err as ParseError).code).toBe('INVALID_FUNCTION_ARITY');
-      }
+      expectRollError(() => parseAst('floor()'), ParseError, 'INVALID_FUNCTION_ARITY');
     });
 
     it('should throw INVALID_FUNCTION_ARITY for too many args: floor(1, 2)', () => {
-      expect(() => parseAst('floor(1, 2)')).toThrow(ParseError);
-      try {
-        parseAst('floor(1, 2)');
-      } catch (err) {
-        expect((err as ParseError).code).toBe('INVALID_FUNCTION_ARITY');
-      }
+      expectRollError(() => parseAst('floor(1, 2)'), ParseError, 'INVALID_FUNCTION_ARITY');
     });
 
     it('should throw INVALID_FUNCTION_ARITY when max has only 1 arg: max(1d6)', () => {
-      expect(() => parseAst('max(1d6)')).toThrow(ParseError);
-      try {
-        parseAst('max(1d6)');
-      } catch (err) {
-        expect((err as ParseError).code).toBe('INVALID_FUNCTION_ARITY');
-      }
+      expectRollError(() => parseAst('max(1d6)'), ParseError, 'INVALID_FUNCTION_ARITY');
     });
 
     it('should throw EXPECTED_TOKEN when function has no parens: floor + 3', () => {
-      expect(() => parseAst('floor + 3')).toThrow(ParseError);
-      try {
-        parseAst('floor + 3');
-      } catch (err) {
-        expect((err as ParseError).code).toBe('EXPECTED_TOKEN');
-      }
+      expectRollError(() => parseAst('floor + 3'), ParseError, 'EXPECTED_TOKEN');
     });
   });
 

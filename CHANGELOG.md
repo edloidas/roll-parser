@@ -48,6 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - README section on loading the package from a CDN without a bundler, and the minimum TypeScript `moduleResolution` the `exports`-only manifest requires ([#125](https://github.com/edloidas/roll-parser/issues/125))
 - `MIGRATION.md`, a v2→v3 upgrade guide shipped in the published tarball: the packaging change, a mapping table from the thirteen 2.x entry points to `roll`/`parse`/`evaluate`, the `value`→`total` and `number[]`→`DieResult[]` result-shape moves, throwing instead of returning `null`, the two notation forms that do not carry over (simple notation, and WoD `>N` now meaning `>=N`), and pool totals no longer clamping at zero
 - README install instructions narrowed to `pnpm` and `bun`; the `npm`/`yarn` fences are gone, `npx roll-parser` stays for one-off CLI use. The **Related projects** section was removed
+- Three previously undocumented limitations added to the README: division does not floor (`7/2` totals `3.5`), the power operator has no overflow guard (`2**999` totals `5.357…e+300`, since only non-finite totals throw), and integer literals above `Number.MAX_SAFE_INTEGER` lose precision ([#153](https://github.com/edloidas/roll-parser/issues/153))
 
 ## [3.0.0-beta.0] - 2026-07-07
 
