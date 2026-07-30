@@ -500,9 +500,9 @@ export class Parser {
   }
 
   private parseGroup(startToken: Token): GroupNode {
-    // ? `LBRACE`/`RBRACE`/`COMMA` all have `getLeftBp === -1`, so inner
-    //   `parseExpression(0)` calls terminate at the first `,` or `}` without
-    //   competing with modifier/arithmetic BPs.
+    // `LBRACE`/`RBRACE`/`COMMA` all have `getLeftBp === -1`, so inner
+    // `parseExpression(0)` calls terminate at the first `,` or `}` without
+    // competing with modifier/arithmetic BPs.
     if (this.peek().type === TokenType.RBRACE) {
       throw new ParseError('Empty group', 'UNEXPECTED_TOKEN', startToken.position, startToken);
     }
@@ -632,10 +632,10 @@ export class Parser {
   }
 
   private rejectSuccessCountTarget(target: ASTNode, token: Token): void {
-    // ? Narrow unwrap: only `Grouped`. A `SuccessCount` cannot live inside
-    //   `Modifier`/`Sort`/`CritThreshold` because each of those parsers calls
-    //   this same reject on their target before constructing the wrapper —
-    //   so widening the set here would never match.
+    // Narrow unwrap: only `Grouped`. A `SuccessCount` cannot live inside
+    // `Modifier`/`Sort`/`CritThreshold` because each of those parsers calls
+    // this same reject on their target before constructing the wrapper —
+    // so widening the set here would never match.
     const node = unwrapTransparent(target, ['Grouped']);
     if (isSuccessCount(node)) {
       throw new ParseError(
@@ -687,14 +687,14 @@ export class Parser {
   }
 
   private rejectVersusTarget(target: ASTNode, token: Token): void {
-    // ? Versus produces a PF2e degree outcome — a terminal scalar, not a
-    //   valid input to dice count/sides/thresholds. Symmetric with
-    //   `rejectSuccessCountTarget`; wrappers like `floor(vs)+0` still
-    //   propagate `versusMetadata` via `mergeContext`, so this only blocks
-    //   `mergeMetaRolls` sites where metadata would silently vanish.
-    // ? Narrow unwrap: only `Grouped`. `Modifier`/`Sort`/`CritThreshold`
-    //   cannot wrap a `Versus` because `containsDicePool` does not recurse
-    //   into `Versus`, so each of those parsers rejects the wrap upstream.
+    // Versus produces a PF2e degree outcome — a terminal scalar, not a
+    // valid input to dice count/sides/thresholds. Symmetric with
+    // `rejectSuccessCountTarget`; wrappers like `floor(vs)+0` still
+    // propagate `versusMetadata` via `mergeContext`, so this only blocks
+    // `mergeMetaRolls` sites where metadata would silently vanish.
+    // Narrow unwrap: only `Grouped`. `Modifier`/`Sort`/`CritThreshold`
+    // cannot wrap a `Versus` because `containsDicePool` does not recurse
+    // into `Versus`, so each of those parsers rejects the wrap upstream.
     const node = unwrapTransparent(target, ['Grouped']);
     if (node.type === 'Versus') {
       throw new ParseError(
@@ -806,8 +806,8 @@ export class Parser {
       );
     }
 
-    // ? Reject nested explodes (e.g., `1d6!!!`) — a second explode token atop
-    //   an ExplodeNode has no meaningful semantics and is rejected per spec.
+    // Reject nested explodes (e.g., `1d6!!!`) — a second explode token atop
+    // an ExplodeNode has no meaningful semantics and is rejected per spec.
     if (target.type === 'Explode') {
       throw new ParseError(
         `Cannot chain explode modifiers`,
@@ -916,9 +916,9 @@ export class Parser {
 
     const order: SortNode['order'] = token.type === TokenType.SORT_ASC ? 'ascending' : 'descending';
 
-    // ? Chained sorts (`4d6ss`, `4d6sasd`) are allowed — sort is idempotent
-    //   when repeated in the same direction; a later `sd` after `s` just
-    //   overrides the order since both pass over the same pool.
+    // Chained sorts (`4d6ss`, `4d6sasd`) are allowed — sort is idempotent
+    // when repeated in the same direction; a later `sd` after `s` just
+    // overrides the order since both pass over the same pool.
     return {
       type: 'Sort',
       order,
@@ -978,18 +978,18 @@ export class Parser {
       : 'default';
     const end = threshold === 'default' ? token.end : (threshold.value.end ?? token.end);
 
-    // ? Unwrap parens so `(1d20cs>19)cs=1` chains into the inner node. Without
-    //   unwrapping, the outer `cs` would create a second CritThresholdNode
-    //   wrapping the Grouped — the collapse-into-single-node design decision
-    //   from STAGE3.md §"CritThreshold Collects Multiple Thresholds" would
-    //   be subtly broken for any user who parenthesizes the chain.
+    // Unwrap parens so `(1d20cs>19)cs=1` chains into the inner node. Without
+    // unwrapping, the outer `cs` would create a second CritThresholdNode
+    // wrapping the Grouped — the collapse-into-single-node design decision
+    // from STAGE3.md §"CritThreshold Collects Multiple Thresholds" would
+    // be subtly broken for any user who parenthesizes the chain.
     let chainTarget: ASTNode = target;
     while (chainTarget.type === 'Grouped') {
       chainTarget = chainTarget.expression;
     }
     if (isCritThreshold(chainTarget)) {
-      // ? Rebuilt rather than mutated — `NodeSpan` is readonly, and the
-      //   discarded `Grouped` wrapper must not keep a stale `end`.
+      // Rebuilt rather than mutated — `NodeSpan` is readonly, and the
+      // discarded `Grouped` wrapper must not keep a stale `end`.
       const isSuccess = token.type === TokenType.CRIT_SUCCESS;
       return {
         ...chainTarget,
@@ -1030,7 +1030,7 @@ export class Parser {
     }
 
     const operator = this.getCompareOp(token);
-    // ? Threshold binding: `BP.DICE_LEFT` — see `parseComparePoint` JSDoc.
+    // Threshold binding: `BP.DICE_LEFT` — see `parseComparePoint` JSDoc.
     const value = this.parseExpression(BP.DICE_LEFT);
     this.rejectSuccessCountTarget(value, token);
     this.rejectVersusTarget(value, token);
@@ -1058,7 +1058,7 @@ export class Parser {
   private parseFailThreshold(token: Token): ComparePoint {
     if (this.isComparePointAhead()) return this.parseComparePoint();
 
-    // ? Same threshold binding as `parseComparePoint` (BP.DICE_LEFT).
+    // Same threshold binding as `parseComparePoint` (BP.DICE_LEFT).
     const failValue = this.parseExpression(BP.DICE_LEFT);
     this.rejectSuccessCountTarget(failValue, token);
     this.rejectVersusTarget(failValue, token);
@@ -1069,10 +1069,10 @@ export class Parser {
   private parseVersus(left: ASTNode, token: Token): VersusNode {
     this.rejectSuccessCountTarget(left, token);
 
-    // ? Chained `a vs b vs c` has no semantics — a degree is a scalar, not a
-    //   comparable. Unwrap `Grouped` so `(a vs b) vs c` rejects at parse
-    //   time like the bare form; paren-nested DC (`a vs (b vs c)`) is still
-    //   caught by the evaluator via `mergeContext`.
+    // Chained `a vs b vs c` has no semantics — a degree is a scalar, not a
+    // comparable. Unwrap `Grouped` so `(a vs b) vs c` rejects at parse
+    // time like the bare form; paren-nested DC (`a vs (b vs c)`) is still
+    // caught by the evaluator via `mergeContext`.
     let leftChain: ASTNode = left;
     while (leftChain.type === 'Grouped') {
       leftChain = leftChain.expression;

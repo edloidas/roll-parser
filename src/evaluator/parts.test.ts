@@ -96,9 +96,9 @@ describe('RollResult.parts', () => {
           type: 'dice',
           count: 4,
           sides: 6,
-          // ? Dice part total (16) is the pre-modifier pool sum; the flags
-          //   reflect post-modifier state via shared references. Recursive
-          //   total consistency is deliberately not contractual.
+          // Dice part total (16) is the pre-modifier pool sum; the flags
+          // reflect post-modifier state via shared references. Recursive
+          // total consistency is deliberately not contractual.
           rolls: [
             { sides: 6, result: 3, modifiers: ['kept'], critical: false, fumble: false },
             { sides: 6, result: 6, modifiers: ['kept'], critical: true, fumble: false },
@@ -401,8 +401,8 @@ describe('RollResult.parts', () => {
       '10d10>=6f1',
     ];
 
-    // ? The fixed-seed loop this used to run is subsumed: the fast-check
-    //   property draws from the same `NOTATIONS` list over 300 runs.
+    // The fixed-seed loop this used to run is subsumed: the fast-check
+    // property draws from the same `NOTATIONS` list over 300 runs.
     test('parts.total === result.total holds under fast-check', () => {
       fc.assert(
         fc.property(

@@ -62,8 +62,8 @@ export class LexerError extends RollParserError {
 // * Character codes
 //
 
-// ? Range tests compare code units rather than strings: `char.toLowerCase()`
-//   per character allocated a string on the hottest loop in the lexer.
+// Range tests compare code units rather than strings: `char.toLowerCase()`
+// per character allocated a string on the hottest loop in the lexer.
 const CHAR_DIGIT_0 = 48;
 const CHAR_DIGIT_9 = 57;
 const CHAR_UPPER_A = 65;
@@ -236,9 +236,9 @@ export class Lexer {
     }
   }
 
-  // ? Scanners record a start offset and slice once at the end rather than
-  //   accumulating `value += this.advance()` — one string per token instead
-  //   of one per character. `scanAt` already used this idiom.
+  // Scanners record a start offset and slice once at the end rather than
+  // accumulating `value += this.advance()` — one string per token instead
+  // of one per character. `scanAt` already used this idiom.
   private scanNumber(): Token {
     const startPos = this.pos;
 
@@ -370,8 +370,8 @@ export class Lexer {
     return this.pos >= this.input.length;
   }
 
-  // ? `NaN` from an empty `peek()` fails every comparison, so end-of-input
-  //   still reads as "not a digit / not alpha" without an extra guard.
+  // `NaN` from an empty `peek()` fails every comparison, so end-of-input
+  // still reads as "not a digit / not alpha" without an extra guard.
   private isDigit(char: string): boolean {
     const code = char.charCodeAt(0);
     return code >= CHAR_DIGIT_0 && code <= CHAR_DIGIT_9;
@@ -397,8 +397,8 @@ export class Lexer {
     return char === ' ' || char === '\t' || char === '\n' || char === '\r';
   }
 
-  // ? Both factories run after the token's characters were consumed, so
-  //   `this.pos` is the exclusive end offset.
+  // Both factories run after the token's characters were consumed, so
+  // `this.pos` is the exclusive end offset.
   private createToken(type: TokenType, value: string): Token {
     return { type, value, position: this.pos, end: this.pos };
   }

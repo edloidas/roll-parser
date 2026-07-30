@@ -24,8 +24,8 @@ export function createDieResult(
   result: number,
   modifiers: DieModifier[],
 ): DieResult {
-  // ? `sides > 1` guards both flags — a d1 always rolls 1, so it is neither
-  //   an exceptional max (critical) nor an exceptional min (fumble).
+  // `sides > 1` guards both flags — a d1 always rolls 1, so it is neither
+  // an exceptional max (critical) nor an exceptional min (fumble).
   return {
     sides,
     result,

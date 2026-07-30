@@ -82,9 +82,9 @@ describe('property-based invariants', () => {
       );
     });
 
-    // ? `0dX` and `Nd1` are removed: both are the `[N, N*X]` bound above with
-    //   the interval collapsed to a point, and `evaluator.test.ts` already
-    //   pins the degenerate pools exactly.
+    // `0dX` and `Nd1` are removed: both are the `[N, N*X]` bound above with
+    // the interval collapsed to a point, and `evaluator.test.ts` already
+    // pins the degenerate pools exactly.
   });
 
   describe('modifier invariants', () => {
@@ -206,11 +206,11 @@ describe('property-based invariants', () => {
   });
 
   describe('arithmetic invariants', () => {
-    // ? Commutativity of `+`/`*` and the `+0`/`*1` identities are removed:
-    //   over literal operands they restate IEEE-754 arithmetic, not this
-    //   library's behavior. What they did incidentally exercise — signed
-    //   literals in either operand position — is pinned exactly by
-    //   `signed literal operands` in `parser.test.ts`.
+    // Commutativity of `+`/`*` and the `+0`/`*1` identities are removed:
+    // over literal operands they restate IEEE-754 arithmetic, not this
+    // library's behavior. What they did incidentally exercise — signed
+    // literals in either operand position — is pinned exactly by
+    // `signed literal operands` in `parser.test.ts`.
     test('unary minus equivalent to subtraction from zero', () => {
       fc.assert(
         fc.property(
@@ -254,8 +254,8 @@ describe('property-based invariants', () => {
           fc.integer({ min: 1, max: 6 }),
           seedArb,
           (shapeIdx, count, sides, lit, seed) => {
-            // ? `kh{L}` needs a selector < count; clamp to keep the notation
-            //   legal across all shape generators.
+            // `kh{L}` needs a selector < count; clamp to keep the notation
+            // legal across all shape generators.
             const keep = Math.min(lit, count);
             const notation = (shapes[shapeIdx] ?? '')
               .replaceAll('{C}', String(count))
@@ -356,9 +356,9 @@ describe('property-based invariants', () => {
       );
     });
 
-    // ? Non-negativity of a chained keep/drop total is removed: every die
-    //   face is >= 1 and the modifiers only ever remove dice, so the sum of a
-    //   kept subset cannot be negative regardless of what the evaluator does.
+    // Non-negativity of a chained keep/drop total is removed: every die
+    // face is >= 1 and the modifiers only ever remove dice, so the sum of a
+    // kept subset cannot be negative regardless of what the evaluator does.
     test('chained modifier order does not affect total (commutativity)', () => {
       fc.assert(
         fc.property(
@@ -380,10 +380,10 @@ describe('property-based invariants', () => {
       );
     });
 
-    // ? Pool length under chained keep/drop is removed: `rolls array length
-    //   matches dice count` above already states it, and keep/drop provably
-    //   never adds or removes entries — it only sets the `dropped` flag, which
-    //   `chained kh+dl total <= single kh total` covers.
+    // Pool length under chained keep/drop is removed: `rolls array length
+    // matches dice count` above already states it, and keep/drop provably
+    // never adds or removes entries — it only sets the `dropped` flag, which
+    // `chained kh+dl total <= single kh total` covers.
   });
 
   describe('seeded reproducibility', () => {

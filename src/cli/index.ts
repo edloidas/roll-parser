@@ -32,6 +32,6 @@ const exitCode = main({
   },
 });
 
-// ? Left unset on success — assigning 0 would override an exit code a
-//   surrounding runtime hook may already have set.
+// Left unset on success — assigning 0 would override an exit code a
+// surrounding runtime hook may already have set.
 if (exitCode !== 0) process.exitCode = exitCode;

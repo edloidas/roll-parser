@@ -50,9 +50,9 @@ const VALUE_EXPORTS = [
   'roll',
 ] as const;
 
-// ? Re-bound through a plain record so the loop below reads properties off an
-//   ordinary object — indexing a namespace import directly defeats tree shaking
-//   and trips `noDynamicNamespaceImportAccess`.
+// Re-bound through a plain record so the loop below reads properties off an
+// ordinary object — indexing a namespace import directly defeats tree shaking
+// and trips `noDynamicNamespaceImportAccess`.
 const surface: Record<string, unknown> = api;
 
 describe('public API surface', () => {
@@ -66,8 +66,8 @@ describe('public API surface', () => {
     expect(Object.keys(api).sort()).toEqual([...VALUE_EXPORTS].sort());
   });
 
-  // ? Drift guard for the generated `src/version.ts` — a package.json bump
-  //   without `bun run generate:version` must fail here, in CI, not at release.
+  // Drift guard for the generated `src/version.ts` — a package.json bump
+  // without `bun run generate:version` must fail here, in CI, not at release.
   test('VERSION matches the package manifest', () => {
     expect(api.VERSION).toBe(pkg.version);
     expect(api.VERSION).toMatch(/^\d+\.\d+\.\d+/);

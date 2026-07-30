@@ -84,8 +84,8 @@ export function applyRecursiveReroll(
     let current = original;
     let iterations = 0;
 
-    // ? Mutate flags in place — the same DieResult objects are shared with
-    //   the RollPart tree, and both views must reflect reroll state.
+    // Mutate flags in place — the same DieResult objects are shared with
+    // the RollPart tree, and both views must reflect reroll state.
     while (matchesCondition(current.result, operator, value)) {
       if (iterations >= env.maxRerollIterations) {
         throw rerollLimitError(env.maxRerollIterations);
@@ -125,7 +125,7 @@ export function applyRerollOnce(
       continue;
     }
 
-    // ? Mutate flags in place — see `applyRecursiveReroll`.
+    // Mutate flags in place — see `applyRecursiveReroll`.
     if (!matchesCondition(original.result, operator, value)) {
       original.modifiers = rewriteFlags(original.modifiers, REROLL_SLOT_FLAGS, 'kept');
       result.push(original);

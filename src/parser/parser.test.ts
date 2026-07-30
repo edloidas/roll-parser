@@ -1092,9 +1092,9 @@ describe('Parser', () => {
     });
 
     it('should bind compare to explode threshold, not success count: 10d10!>=6', () => {
-      // ? Explode greedily consumes a trailing ComparePoint as its own
-      //   threshold, so `10d10!>=6` means "explode on >=6", not "explode
-      //   then count successes". Disambiguate with parentheses.
+      // Explode greedily consumes a trailing ComparePoint as its own
+      // threshold, so `10d10!>=6` means "explode on >=6", not "explode
+      // then count successes". Disambiguate with parentheses.
       expect(parseAst('10d10!>=6')).toEqual(
         explode('standard', dice(literal(10), literal(10)), cp('>=', literal(6))),
       );
@@ -1318,9 +1318,9 @@ describe('Parser', () => {
     // the shallow rejectVersusTarget check. Each meta-expression site needs
     // a `{...}`-form rejection to mirror the existing parens-form coverage.
     it('should reject Versus inside parens-wrapped single-sub group as keep-modifier count: 4d6kh({1d20 vs 10})', () => {
-      // ? `kh{...}` is not valid syntax — `kh` requires parens, not braces.
-      //   `kh({...})` is the actual bypass route: parens around a single-sub
-      //   Group around Versus. The new deep-walk catches it.
+      // `kh{...}` is not valid syntax — `kh` requires parens, not braces.
+      // `kh({...})` is the actual bypass route: parens around a single-sub
+      // Group around Versus. The new deep-walk catches it.
       expectRollError(() => parseAst('4d6kh({1d20 vs 10})'), ParseError, 'NESTED_VERSUS');
     });
 
@@ -1346,9 +1346,9 @@ describe('Parser', () => {
     });
 
     it('should accept Versus inside single-sub group as arithmetic operand: {1d20 vs 15}+5', () => {
-      // ? BinaryOp uses `mergeContext`, which propagates `versusMetadata`.
-      //   Not a meta-expression site — explicitly distinguished from the
-      //   modifier/sort/cs cases above.
+      // BinaryOp uses `mergeContext`, which propagates `versusMetadata`.
+      // Not a meta-expression site — explicitly distinguished from the
+      // modifier/sort/cs cases above.
       expect(() => parseAst('{1d20 vs 15}+5')).not.toThrow();
     });
   });
@@ -1973,8 +1973,8 @@ describe('Parser', () => {
       });
 
       it('should chain keep/drop over sort (modifier outer)', () => {
-        // ? `sdl` as one identifier maxes-munches to an unknown keyword in
-        //   the lexer; whitespace separates the two modifiers cleanly.
+        // `sdl` as one identifier maxes-munches to an unknown keyword in
+        // the lexer; whitespace separates the two modifiers cleanly.
         expect(parseAst('4d6s dl1')).toEqual(
           modifier('drop', 'lowest', literal(1), sort('ascending', dice(literal(4), literal(6)))),
         );
@@ -1987,8 +1987,8 @@ describe('Parser', () => {
       });
 
       it('should allow double sort (idempotent chain)', () => {
-        // ? Maximal-munch lexing treats `ss` / `ssd` as a single identifier,
-        //   so chained sorts need whitespace between the keywords.
+        // Maximal-munch lexing treats `ss` / `ssd` as a single identifier,
+        // so chained sorts need whitespace between the keywords.
         expect(parseAst('4d6s s')).toEqual(
           sort('ascending', sort('ascending', dice(literal(4), literal(6)))),
         );
@@ -2175,25 +2175,25 @@ describe('Parser', () => {
       });
 
       it('should chain cs over sort', () => {
-        // ? `4d6scs` maxes-munches to an unknown `scs` identifier in the
-        //   lexer — whitespace separates the two keywords cleanly, same
-        //   as the `4d6s dl1` pattern used by sort tests.
+        // `4d6scs` maxes-munches to an unknown `scs` identifier in the
+        // lexer — whitespace separates the two keywords cleanly, same
+        // as the `4d6s dl1` pattern used by sort tests.
         expect(parseAst('4d6s cs>4')).toEqual(
           critThreshold([cp('>', literal(4))], [], sort('ascending', dice(literal(4), literal(6)))),
         );
       });
 
       it('should chain sort over cs (sort outer)', () => {
-        // ? `cs` and `s` cannot be lexed together as one identifier — the
-        //   intervening `>value` breaks maximal munch. No whitespace needed.
+        // `cs` and `s` cannot be lexed together as one identifier — the
+        // intervening `>value` breaks maximal munch. No whitespace needed.
         expect(parseAst('4d6cs>4 s')).toEqual(
           sort('ascending', critThreshold([cp('>', literal(4))], [], dice(literal(4), literal(6)))),
         );
       });
 
       it('should collapse chain through parens', () => {
-        // ? `(1d20cs>19)cs=1` must collapse into one CritThresholdNode, not
-        //   double-wrap through the Grouped node.
+        // `(1d20cs>19)cs=1` must collapse into one CritThresholdNode, not
+        // double-wrap through the Grouped node.
         expect(parseAst('(1d20cs>19)cs=1')).toEqual(
           critThreshold(
             [cp('>', literal(19)), cp('=', literal(1))],
@@ -2283,8 +2283,8 @@ describe('Parser', () => {
       });
 
       it('should reject cs on arithmetic-wrapped pool', () => {
-        // ? Mirrors explode/reroll — cs/cf is "bare dice only". `(1d6+2d8)` is
-        //   an arithmetic wrapper, not a dice pool in the shallow sense.
+        // Mirrors explode/reroll — cs/cf is "bare dice only". `(1d6+2d8)` is
+        // an arithmetic wrapper, not a dice pool in the shallow sense.
         expect(() => parseAst('(1d6+2d8)cs>5')).toThrow(ParseError);
         try {
           parseAst('(1d6+2d8)cs>5');
@@ -2338,9 +2338,9 @@ describe('Parser', () => {
       });
 
       it('should reject cs on a parens-wrapped modifier-wrapped multi-sub-roll group', () => {
-        // ? Acceptance criterion 5 from #97 — Grouped wrapper around the
-        //   Modifier(Group([...])) chain still resolves to a Group via the
-        //   shared unwrap.
+        // Acceptance criterion 5 from #97 — Grouped wrapper around the
+        // Modifier(Group([...])) chain still resolves to a Group via the
+        // shared unwrap.
         expect(() => parseAst('({1d20, 1d20}kh1)cs>18')).toThrow(ParseError);
         try {
           parseAst('({1d20, 1d20}kh1)cs>18');
@@ -2429,9 +2429,9 @@ describe('Parser', () => {
       });
 
       it('should reject bare cf chained after custom cs on Fate pool', () => {
-        // ? `containsFatePool` recurses through `CritThreshold`, so the bare
-        //   `cf` is caught even when the target is already a wrapping crit
-        //   threshold node from a custom success threshold.
+        // `containsFatePool` recurses through `CritThreshold`, so the bare
+        // `cf` is caught even when the target is already a wrapping crit
+        // threshold node from a custom success threshold.
         expect(() => parseAst('4dFcs>0cf')).toThrow(ParseError);
         try {
           parseAst('4dFcs>0cf');
