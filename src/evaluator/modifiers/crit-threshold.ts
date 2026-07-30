@@ -48,7 +48,7 @@ function matchesCrit(threshold: ResolvedCritThreshold, die: DieResult): boolean 
 
 function matchesFumble(threshold: ResolvedCritThreshold, die: DieResult): boolean {
   if (threshold === 'default') {
-    // ? Mirrors `createDieResult` — a d1 always rolls 1, never a fumble.
+    // Mirrors `createDieResult` — a d1 always rolls 1, never a fumble.
     return die.result === 1 && die.sides > 1;
   }
   return matchesCondition(die.result, threshold.operator, threshold.value);

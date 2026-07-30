@@ -60,9 +60,9 @@ import {
 import { sortDice } from './modifiers/sort.js';
 import { countSuccesses } from './modifiers/success-count.js';
 
-// ? Re-exported for existing importers — the class moved to `errors.ts` so
-//   `modifiers/explode.ts` and `modifiers/reroll.ts` can throw it without an
-//   ESM value cycle back into this module.
+// Re-exported for existing importers — the class moved to `errors.ts` so
+// `modifiers/explode.ts` and `modifiers/reroll.ts` can throw it without an
+// ESM value cycle back into this module.
 export { EvaluatorError };
 
 //
@@ -205,9 +205,9 @@ function toPublicSpecs(specs: ModifierChainEntry[]): ModifierSpec[] {
  * `RollResult.rolls` for audit, not for display.
  */
 function renderDice(dice: DieResult[]): string {
-  // ? Single pass building one string. The filter + map + join form allocated
-  //   two intermediate arrays plus a string per die on the hottest path in
-  //   the evaluator.
+  // Single pass building one string. The filter + map + join form allocated
+  // two intermediate arrays plus a string per die on the hottest path in
+  // the evaluator.
   let rendered = '[';
   let isFirst = true;
 
@@ -505,8 +505,8 @@ function evalDice(node: DiceNode, rng: RNG, ctx: EvalContext, env: EvalEnv): Eva
   const { total, rolls } = rollPool(
     count,
     `${count}d${sides}`,
-    // ? Fresh `['kept']` per die — `success-count` appends tally flags in
-    //   place, so a shared literal would tag the whole pool at once.
+    // Fresh `['kept']` per die — `success-count` appends tally flags in
+    // place, so a shared literal would tag the whole pool at once.
     () => createDieResult(sides, rng.nextInt(1, sides), ['kept']),
     ctx,
   );
@@ -705,8 +705,8 @@ function evalGroup(node: GroupNode, rng: RNG, ctx: EvalContext, env: EvalEnv): E
   ctx.expressionParts.push(`{${subExprs.join(', ')}}`);
   ctx.renderedParts.push(`{${subRendered.join(', ')}}`);
 
-  // ? No `keptIndices` — bare groups (and single-sub passthroughs) perform
-  //   no sub-roll selection; only `evalGroupModifier` sets it.
+  // No `keptIndices` — bare groups (and single-sub passthroughs) perform
+  // no sub-roll selection; only `evalGroupModifier` sets it.
   return { total, part: { type: 'group', parts: subParts, total, ...partSpan(node) } };
 }
 
@@ -759,9 +759,9 @@ function applyFunction(name: string, values: number[]): number {
     case 'ceil':
       return Math.ceil(requireUnaryArg(name, values));
     case 'round':
-      // ? Delegates to `Math.round`, which rounds half-values toward +∞
-      //   (IEEE-754 half-up). So `round(2.5) === 3` but `round(-2.5) === -2`,
-      //   not `-3`. Users needing symmetric rounding must compose via `floor`.
+      // Delegates to `Math.round`, which rounds half-values toward +∞
+      // (IEEE-754 half-up). So `round(2.5) === 3` but `round(-2.5) === -2`,
+      // not `-3`. Users needing symmetric rounding must compose via `floor`.
       return Math.round(requireUnaryArg(name, values));
     case 'abs':
       return Math.abs(requireUnaryArg(name, values));
@@ -881,8 +881,8 @@ function mergeDropSets(baseDice: DieResult[], specs: ModifierChainEntry[]): DieR
     const marker = droppedMask[index] === 1 ? 'dropped' : 'kept';
     const { modifiers } = die;
 
-    // ? Already exactly this slot flag — `rewriteFlags` would rebuild an
-    //   identical single-element array. Fresh pool dice hit this every time.
+    // Already exactly this slot flag — `rewriteFlags` would rebuild an
+    // identical single-element array. Fresh pool dice hit this every time.
     if (modifiers.length === 1 && modifiers[0] === marker) continue;
 
     die.modifiers = rewriteFlags(modifiers, SELECTION_FLAGS, marker);
@@ -961,9 +961,9 @@ function evalExplode(node: ExplodeNode, rng: RNG, ctx: EvalContext, env: EvalEnv
 
   appendAll(ctx.rolls, expanded);
   ctx.expressionParts.push(`${targetExpr}${code}`);
-  // ? Include the explode code in rendered output so readers can attribute
-  //   the extra dice. Modifier rendering (kh/dl) skips its code because
-  //   dropped dice are visible; explosion-origin is otherwise invisible.
+  // Include the explode code in rendered output so readers can attribute
+  // the extra dice. Modifier rendering (kh/dl) skips its code because
+  // dropped dice are visible; explosion-origin is otherwise invisible.
   ctx.renderedParts.push(`${targetExpr}${code}${renderDice(expanded)}`);
 
   const total = sumKeptDice(expanded);
@@ -1237,9 +1237,9 @@ function evalGroupModifier(
     };
   });
 
-  // ? Synthetic dice carry `sides = 0` as a sentinel — they're never
-  //   surfaced in `ctx.rolls`, only used as input to `mergeDropSets`. Any
-  //   `critical`/`fumble` flags would be meaningless for a subtotal.
+  // Synthetic dice carry `sides = 0` as a sentinel — they're never
+  // surfaced in `ctx.rolls`, only used as input to `mergeDropSets`. Any
+  // `critical`/`fumble` flags would be meaningless for a subtotal.
   const syntheticDice: DieResult[] = subRolls.map((sub) => ({
     sides: 0,
     result: sub.subtotal,
@@ -1291,9 +1291,9 @@ function evalGroupModifier(
   const modifierCodes = specs.map((s) => `${s.code}${s.count}`).join('');
 
   ctx.expressionParts.push(`{${subExprStrs.join(', ')}}${modifierCodes}`);
-  // ? Mirror `evalModifier`'s flat-pool rendering: modifier codes live in
-  //   `expressionParts` only — the per-sub strikethrough already signals
-  //   which sub-rolls were kept vs dropped.
+  // Mirror `evalModifier`'s flat-pool rendering: modifier codes live in
+  // `expressionParts` only — the per-sub strikethrough already signals
+  // which sub-rolls were kept vs dropped.
   ctx.renderedParts.push(`{${outerRendered.join(', ')}}`);
 
   // ? `keptIndices` lives on the inner `group` part (it describes sub-roll
@@ -1359,8 +1359,8 @@ function evalSuccessCount(
   ctx: EvalContext,
   env: EvalEnv,
 ): EvalResult {
-  // ? Flag tracks syntactic presence of success-count notation, not pool size —
-  //   set before any early return so empty pools still populate successes/failures.
+  // Flag tracks syntactic presence of success-count notation, not pool size —
+  // set before any early return so empty pools still populate successes/failures.
   env.hasSuccessCount = true;
 
   const targetCtx = createContext();
@@ -1495,8 +1495,8 @@ function evalVersus(node: VersusNode, rng: RNG, ctx: EvalContext, env: EvalEnv):
   try {
     const rollCtx = createContext();
     const rollResult = evalNode(node.roll, rng, rollCtx, env);
-    // ? Extract natural from rollCtx directly — the roll-side pool is isolated
-    //   here, so no index slicing on the merged parent pool is needed.
+    // Extract natural from rollCtx directly — the roll-side pool is isolated
+    // here, so no index slicing on the merged parent pool is needed.
     const natural = extractNatural(rollCtx.rolls);
 
     const dcCtx = createContext();
@@ -1610,13 +1610,13 @@ export function evaluate(ast: ASTNode, rng: RNG, options: EvaluateOptions = {}):
   }
 
   const expression = ctx.expressionParts.join('');
-  // ? Versus replaces the numeric total with the degree label in the rendered
-  //   form; `RollResult.total` remains the numeric roll total.
+  // Versus replaces the numeric total with the degree label in the rendered
+  // form; `RollResult.total` remains the numeric roll total.
   const trailing = ctx.versusMetadata ? degreeLabel(ctx.versusMetadata.degree) : String(total);
   const rendered = `${ctx.renderedParts.join('')} = ${trailing}`;
 
-  // ? `RollResult` is `Readonly`, so the optional fields are folded in via
-  //   conditional spreads instead of post-construction assignment.
+  // `RollResult` is `Readonly`, so the optional fields are folded in via
+  // conditional spreads instead of post-construction assignment.
   const versus = ctx.versusMetadata;
 
   return {

@@ -191,8 +191,8 @@ export function applyCompoundExplode(
 
     if (!exploded) continue;
 
-    // ? `critical` and `fumble` keep referring to the original triggering
-    //   roll — after compounding the `result` is a sum.
+    // `critical` and `fumble` keep referring to the original triggering
+    // roll — after compounding the `result` is a sum.
     original.initialResult = original.result;
     original.result = accumulated;
     if (!original.modifiers.includes('exploded')) {

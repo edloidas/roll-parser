@@ -266,8 +266,8 @@ describe('cli main', () => {
 
   describe('non-library failures', () => {
     test('a plain Error from the output sink propagates instead of exiting 1', () => {
-      // ? `stdout` is written inside `main`'s try/catch, so a throwing sink is
-      //   the one seam that reaches the non-RollParserError re-raise branch.
+      // `stdout` is written inside `main`'s try/catch, so a throwing sink is
+      // the one seam that reaches the non-RollParserError re-raise branch.
       expect(() =>
         main({
           argv: ['2d6', '--seed', 'test'],

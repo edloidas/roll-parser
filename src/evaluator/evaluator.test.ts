@@ -2349,12 +2349,12 @@ describe('evaluate', () => {
     test('computed modifier count (kh) preserves meta die', () => {
       // d2 rolls 2 → kh2 → keep the two highest of [1, 3, 5, 6] = [5, 6].
       //
-      // ? The keep count draws FIRST, before the 4d6 pool — keep/drop is the
-      //   asymmetric case in README, Randomness: `flattenModifierChain`
-      //   resolves every modifier argument up front because `evalModifier`
-      //   needs the counts to drive selection on the pool it is about to roll.
-      //   Threshold-style modifiers (`cs`, `!`, `r`, `>`) post-process an
-      //   existing pool, so their metas draw last.
+      // The keep count draws FIRST, before the 4d6 pool — keep/drop is the
+      // asymmetric case in README, Randomness: `flattenModifierChain`
+      // resolves every modifier argument up front because `evalModifier`
+      // needs the counts to drive selection on the pool it is about to roll.
+      // Threshold-style modifiers (`cs`, `!`, `r`, `>`) post-process an
+      // existing pool, so their metas draw last.
       const ast = parse('4d6kh(1d2)');
       const rng = createMockRng([2, 1, 3, 5, 6]);
       const result = evaluate(ast, rng);
@@ -3254,8 +3254,8 @@ describe('evaluate', () => {
     });
 
     test('renders expression with default-sentinel codes', () => {
-      // ? `cscf` lexed as one unknown identifier; whitespace separates the
-      //   two bare modifiers.
+      // `cscf` lexed as one unknown identifier; whitespace separates the
+      // two bare modifiers.
       const ast = parse('1d20cs cf');
       const rng = createMockRng([10]);
       const result = evaluate(ast, rng);

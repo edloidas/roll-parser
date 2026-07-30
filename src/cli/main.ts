@@ -66,8 +66,8 @@ export function writeErrorContext(notation: string, error: unknown, write: Write
   if (span == null) return;
   if (notation.includes('\n') || span.start > notation.length) return;
 
-  // ? Indent by code points, not UTF-16 units — astral characters (e.g. '🎲')
-  //   occupy two units but print as one column, which shifts the caret right.
+  // Indent by code points, not UTF-16 units — astral characters (e.g. '🎲')
+  // occupy two units but print as one column, which shifts the caret right.
   const column = [...notation.slice(0, span.start)].length;
 
   write(`  ${notation}\n`);
