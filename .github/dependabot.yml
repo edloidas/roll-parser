@@ -21,12 +21,16 @@ updates:
         patterns:
           - '*'
 
-  # Every npm dependency here is devDependencies-only — the package ships zero
+  # Every dependency here is devDependencies-only — the package ships zero
   # runtime dependencies — so these updates affect the toolchain and the docs
   # workspace, never a consumer's tree. Without this block nothing watched the
   # lockfile, which is how a `brace-expansion` advisory reached the build
   # unnoticed.
-  - package-ecosystem: npm
+  #
+  # ! Must be `bun`, not `npm`. The npm updater rewrites `package.json` and
+  # ! leaves `bun.lock` untouched, so every PR it opened landed with a stale
+  # ! lockfile and died on CI's `bun install --frozen-lockfile`.
+  - package-ecosystem: bun
     directory: /
     schedule:
       interval: weekly
@@ -34,6 +38,11 @@ updates:
       prefix: chore
     labels:
       - improvement
+    # Mirrors `minimumReleaseAge` in bunfig.toml. Without it Dependabot can
+    # propose a version Bun then refuses to resolve, which puts the PR back in
+    # the stale-lockfile state this block exists to avoid.
+    cooldown:
+      default-days: 3
     groups:
       npm-development:
         patterns:
