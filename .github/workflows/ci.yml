@@ -338,6 +338,25 @@ jobs:
         working-directory: ${{ runner.temp }}/smoke
         run: ./node_modules/.bin/roll-parser 4d6kh3 --verbose --seed test
 
+  # Stable fan-in for branch protection. The matrix legs bake their values into
+  # the check name, so any matrix change orphans required checks configured
+  # against the old names and the PR waits forever on checks that will never
+  # report. Protection should require this one name instead of the legs.
+  node-smoke-gate:
+    name: Node.js Smoke Test
+    runs-on: ubuntu-latest
+    needs: node-smoke
+    # `always()` because a plain `needs` would leave this job skipped when a
+    # leg fails, and branch protection treats skipped as passing. A `skipped`
+    # result still passes here on purpose: it only occurs when the `check`
+    # gate cascade-skips same-repo PR events (the push run carries the real
+    # verdict) or when an upstream required job already failed the run.
+    if: always()
+    steps:
+      - name: Fail if any smoke leg failed
+        if: contains(fromJSON('["failure", "cancelled"]'), needs.node-smoke.result)
+        run: exit 1
+
   # The neutrality gate Bun's bundler cannot provide: esbuild with
   # `--platform=browser` hard-errors on any Node builtin import (Bun's
   # `--target browser` silently stubs them instead), the minified bundle is
