@@ -19,32 +19,34 @@ permissions:
   contents: read
 
 jobs:
+  # ! Fails the whole workflow on an ineligible tag — a red run, not a silent
+  # ! green skip. Every downstream job `needs` this one.
   precheck:
     name: Verify tag is on master
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    outputs:
-      allowed: ${{ steps.contains.outputs.allowed }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          # All branch refs, so `--contains` sees every branch.
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Check if tag commit is on master or a version branch
-        id: contains
+      - name: Fail unless tag commit is on master or a version branch
         shell: bash
         run: |
-          git fetch --quiet origin '+refs/heads/*:refs/remotes/origin/*' || true
           contains="$(git branch -r --contains "${GITHUB_SHA}" | sed 's/^[ *]*//')"
+          if [ -z "${contains}" ]; then
+            echo "::error::Could not resolve any branch containing ${GITHUB_SHA} — refusing to release."
+            exit 1
+          fi
           echo "Branches containing the tag commit:"
           echo "${contains}"
-          if echo "${contains}" | grep -Eq '^origin/(master|[0-9]+\.[0-9]+)$'; then
-            echo "allowed=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "allowed=false" >> "$GITHUB_OUTPUT"
+          if ! echo "${contains}" | grep -Eq '^origin/(master|[0-9]+\.[0-9]+)$'; then
+            echo "::error::Tag ${GITHUB_REF_NAME} points at a commit that is not on master or a version branch — refusing to release."
+            exit 1
           fi
 
   # Runs the entire toolchain — compiler, linter, tests, size checks — but
@@ -54,7 +56,6 @@ jobs:
   validate:
     name: Validate & Pack
     needs: precheck
-    if: needs.precheck.outputs.allowed == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -115,6 +116,16 @@ jobs:
       - name: Run release gate
         run: bun run release:dry
 
+      # Pin the npm that packs the tarball — without this, `npm pack` runs on
+      # whatever npm the ubuntu-latest image ships that week.
+      - name: Setup Node.js (pinned npm for packing)
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          # ! No package-lock.json in this repo — setup-node's npm auto-cache
+          # ! (on by default since v5) hard-fails when it cannot find one.
+          package-manager-cache: false
+
       # `--ignore-scripts` so packing stays inert; `release:dry` above already
       # ran everything a lifecycle hook would have.
       - name: Pack tarball
@@ -128,13 +139,112 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
+  # Exercises the exact artifact `publish` uploads. ci.yml smokes a freshly
+  # packed dist/, but `test:ci` inside `release:dry` rebuilds dist/ along the
+  # way — so without this job, the bytes that ship are never installed or
+  # executed anywhere. Installs the uploaded tarball in a scratch project and
+  # runs the ESM, require(esm), CLI, and browser checks against it. Holds no
+  # credentials, so a full dev-dependency install (for the pinned esbuild) is
+  # safe here.
+  smoke:
+    name: Smoke Exact Tarball
+    needs: validate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+
+      - name: Cache Bun dependencies
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            bun-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          # Exact `engines` floor — the require(esm) claim must hold here.
+          node-version: '22.12.0'
+          # ! No package-lock.json in this repo — setup-node's npm auto-cache
+          # ! (on by default since v5) hard-fails when it cannot find one.
+          package-manager-cache: false
+
+      - name: Download tarball
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: npm-tarball
+          path: ${{ runner.temp }}
+
+      - name: Install tarball in scratch project
+        run: |
+          mkdir "$RUNNER_TEMP/smoke"
+          cd "$RUNNER_TEMP/smoke"
+          npm init -y > /dev/null
+          npm install --no-audit --no-fund "$RUNNER_TEMP"/roll-parser-*.tgz
+
+      - name: Test ESM import and testing subpath
+        working-directory: ${{ runner.temp }}/smoke
+        run: |
+          node --input-type=module -e "import { roll, VERSION } from 'roll-parser'; import { createMockRng, MockRNGExhaustedError } from 'roll-parser/testing'; const r = roll('4d6kh3', { rng: createMockRng([3, 6, 2, 5]) }); if (r.total !== 14) throw new Error('pinned total ' + r.total); if (typeof MockRNGExhaustedError !== 'function') throw new Error('missing error export'); console.log('ESM OK:', VERSION, r.total)"
+
+      - name: Test require(esm) import
+        # ESM-only package — require() works on Node >=22.12 via require(esm).
+        working-directory: ${{ runner.temp }}/smoke
+        run: |
+          node -e "const { roll } = require('roll-parser'); const { createMockRng } = require('roll-parser/testing'); const r = roll('2d6', { rng: createMockRng([3, 4]) }); if (r.total !== 7) throw new Error('pinned total ' + r.total); console.log('require(esm) OK:', r.total)"
+
+      - name: Test installed bin
+        working-directory: ${{ runner.temp }}/smoke
+        run: ./node_modules/.bin/roll-parser 4d6kh3 --verbose --seed test
+
+      - name: Write browser fixture importing both entry points
+        working-directory: ${{ runner.temp }}/smoke
+        run: |
+          printf '%s\n' \
+            "import { roll, SeededRNG, VERSION } from 'roll-parser';" \
+            "import { createMockRng } from 'roll-parser/testing';" \
+            "const pinned = roll('4d6kh3', { rng: createMockRng([3, 6, 2, 5]) });" \
+            "if (pinned.total !== 14) throw new Error('pinned total ' + pinned.total);" \
+            "const seeded = roll('2d6', { rng: new SeededRNG('release') });" \
+            "console.log('browser-smoke OK', VERSION, pinned.total, seeded.total);" \
+            > fixture.mjs
+
+      - name: Bundle fixture for the browser
+        # Repo esbuild (lockfile-pinned), resolving against the installed
+        # tarball — `--platform=browser` hard-errors on any Node builtin.
+        run: ./node_modules/.bin/esbuild "$RUNNER_TEMP/smoke/fixture.mjs" --bundle --platform=browser --format=esm --minify --outfile="$RUNNER_TEMP/smoke/bundle.js"
+
+      - name: Assert bundle is free of Node globals
+        run: |
+          test -f "$RUNNER_TEMP/smoke/bundle.js"
+          if grep -qE "node:|process\.|createRequire" "$RUNNER_TEMP/smoke/bundle.js"; then
+            echo 'Browser bundle references Node runtime internals.'
+            exit 1
+          fi
+
+      - name: Execute browser bundle
+        run: node "$RUNNER_TEMP/smoke/bundle.js"
+
   # Deliberately minimal: no checkout, no dependency install, no cache — the
   # only thing that runs next to the OIDC publishing identity is npm itself,
-  # publishing the exact tarball `validate` produced.
+  # publishing the exact tarball `validate` produced and `smoke` verified.
   publish:
     name: Publish to npm
-    needs: [precheck, validate]
-    if: needs.precheck.outputs.allowed == 'true'
+    needs: [precheck, validate, smoke]
     runs-on: ubuntu-latest
     permissions:
       id-token: write

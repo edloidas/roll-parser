@@ -1,9 +1,11 @@
 name: Deploy Site
 
 # Push-only, mirroring ci.yml: every branch push builds and verifies the site,
-# then publishes it. `master` lands on production (the project's configured
-# production branch); every other branch gets its own Cloudflare preview URL,
-# which is the whole point of hosting here rather than on GitHub Pages.
+# but only `master` publishes, through the `cloudflare-production` environment
+# that holds the Cloudflare credentials. Branch previews were dropped
+# deliberately — a push-event workflow executes the workflow file from the
+# pushed ref, so any branch that could reach the credentials could deploy
+# anywhere. Use `bun site:preview` locally instead.
 on:
   push:
     branches: ['**']
@@ -17,17 +19,9 @@ permissions:
   contents: read
 
 jobs:
-  deploy:
-    name: Build & Deploy
+  build:
+    name: Build Site
     runs-on: ubuntu-latest
-    # The `secrets` context cannot be read from a step-level `if`, so surface
-    # credential presence as a job-level value the conditions below can test.
-    # Forks never receive the secrets, so IS_UPSTREAM separates "expected to
-    # publish" from "expected to build only" — missing credentials are a hard
-    # failure here and a clean skip on forks.
-    env:
-      HAS_CLOUDFLARE_CREDENTIALS: ${{ secrets.CLOUDFLARE_API_TOKEN != '' && secrets.CLOUDFLARE_ACCOUNT_ID != '' }}
-      IS_UPSTREAM: ${{ github.repository == 'edloidas/roll-parser' }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -56,16 +50,55 @@ jobs:
       - name: Verify built site
         run: bun run site:check
 
-      # ! Guard against a silent green run: on this repo the credentials are
-      # ! expected, so their absence is a misconfiguration, not a skip.
+      - name: Upload built site
+        if: github.ref == 'refs/heads/master'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: site-dist
+          path: site/dist/
+          retention-days: 1
+          if-no-files-found: error
+
+  deploy:
+    name: Deploy to Cloudflare Pages
+    needs: build
+    if: github.ref == 'refs/heads/master' && github.repository == 'edloidas/roll-parser'
+    runs-on: ubuntu-latest
+    environment:
+      name: cloudflare-production
+      url: https://roll-parser.edloidas.io/
+    # The `secrets` context cannot be read from a step-level `if`, so surface
+    # credential presence as a job-level value the guard below can test. This
+    # job only runs on upstream master, where the environment is expected to
+    # hold the credentials — their absence is a misconfiguration, not a skip.
+    env:
+      HAS_CLOUDFLARE_CREDENTIALS: ${{ secrets.CLOUDFLARE_API_TOKEN != '' && secrets.CLOUDFLARE_ACCOUNT_ID != '' }}
+    steps:
       - name: Require Cloudflare credentials
-        if: env.IS_UPSTREAM == 'true' && env.HAS_CLOUDFLARE_CREDENTIALS != 'true'
+        if: env.HAS_CLOUDFLARE_CREDENTIALS != 'true'
         run: |
-          echo '::error::Missing CLOUDFLARE_API_TOKEN and/or CLOUDFLARE_ACCOUNT_ID repository secrets — the site was built but cannot be published.'
+          echo '::error::Missing CLOUDFLARE_API_TOKEN and/or CLOUDFLARE_ACCOUNT_ID in the cloudflare-production environment — the site was built but cannot be published.'
           exit 1
 
+      # Checkout only for the commit-message metadata wrangler attaches to the
+      # deployment; the deployed files come from the build artifact.
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+
+      - name: Download built site
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: site-dist
+          path: site/dist/
+
       - name: Deploy to Cloudflare Pages
-        if: env.HAS_CLOUDFLARE_CREDENTIALS == 'true'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -88,14 +121,4 @@ jobs:
             echo "### Site deployed"
             echo
             grep -oE 'https://[a-z0-9.-]+\.pages\.dev' "${log}" | sort -u | sed 's/^/- /'
-          } >> "${GITHUB_STEP_SUMMARY}"
-
-      - name: Report skipped deploy
-        if: env.IS_UPSTREAM != 'true' && env.HAS_CLOUDFLARE_CREDENTIALS != 'true'
-        run: |
-          {
-            echo "### Site built but not deployed"
-            echo
-            echo 'Forks do not receive the Cloudflare credentials, so this run'
-            echo 'verified the site without publishing it.'
           } >> "${GITHUB_STEP_SUMMARY}"
