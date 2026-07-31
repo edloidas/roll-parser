@@ -31,6 +31,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Check if tag commit is on master or a version branch
         id: contains
@@ -46,37 +47,31 @@ jobs:
             echo "allowed=false" >> "$GITHUB_OUTPUT"
           fi
 
-  publish:
-    name: Publish to npm
+  # Runs the entire toolchain — compiler, linter, tests, size checks — but
+  # holds nothing beyond a read token. Its single product is the tarball the
+  # `publish` job uploads verbatim, so no dev dependency ever executes while
+  # the npm publishing identity is available.
+  validate:
+    name: Validate & Pack
     needs: precheck
     if: needs.precheck.outputs.allowed == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write
     outputs:
+      tag: ${{ steps.disttag.outputs.tag }}
       prerelease: ${{ steps.disttag.outputs.prerelease }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0
+          persist-credentials: false
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version-file: .bun-version
-
-      - name: Setup Node.js (for npm CLI + OIDC .npmrc wiring)
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: '24'
-          registry-url: 'https://registry.npmjs.org'
-          # ! No package-lock.json in this repo — setup-node's npm auto-cache
-          # ! (on by default since v5) hard-fails when it cannot find one. The
-          # ! Bun cache below is what actually speeds this job up.
-          package-manager-cache: false
 
       - name: Cache Bun dependencies
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -115,21 +110,62 @@ jobs:
           fi
           echo "Dist-tag: $TAG"
 
-      # The full `release:dry` gate (check, build, check:package, tests) runs
-      # here through the `prepublishOnly` hook, which npm fires before packing.
-      # There is deliberately no separate step for it: one invocation covers CI
-      # and manual publishes alike, and two would double an eight-minute gate.
-      #
+      # The same gate `prepublishOnly` runs on a manual publish: check, build,
+      # package checks, size budgets, coverage, audit.
+      - name: Run release gate
+        run: bun run release:dry
+
+      # `--ignore-scripts` so packing stays inert; `release:dry` above already
+      # ran everything a lifecycle hook would have.
+      - name: Pack tarball
+        run: npm pack --ignore-scripts --pack-destination "$RUNNER_TEMP"
+
+      - name: Upload tarball
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: npm-tarball
+          path: ${{ runner.temp }}/roll-parser-*.tgz
+          retention-days: 1
+          if-no-files-found: error
+
+  # Deliberately minimal: no checkout, no dependency install, no cache — the
+  # only thing that runs next to the OIDC publishing identity is npm itself,
+  # publishing the exact tarball `validate` produced.
+  publish:
+    name: Publish to npm
+    needs: [precheck, validate]
+    if: needs.precheck.outputs.allowed == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+
+    steps:
+      - name: Setup Node.js (for npm CLI + OIDC .npmrc wiring)
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+          # ! No package-lock.json in this repo — setup-node's npm auto-cache
+          # ! (on by default since v5) hard-fails when it cannot find one.
+          package-manager-cache: false
+
+      - name: Download tarball
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: npm-tarball
+
       # Uses npm CLI (not bun) because Bun does not yet support OIDC Trusted
       # Publishing (oven-sh/bun#15601). Provenance attestations are generated
       # automatically by npm under Trusted Publishing — the `id-token: write`
       # permission above is what enables them, so no `--provenance` flag.
-      - name: Build, validate, and publish to npm
-        run: npm publish --tag "${{ steps.disttag.outputs.tag }}"
+      # Tarball publishes never run lifecycle scripts; `--ignore-scripts`
+      # pins that down explicitly.
+      - name: Publish tarball to npm
+        run: npm publish roll-parser-*.tgz --ignore-scripts --tag "${{ needs.validate.outputs.tag }}"
 
   release:
     name: Create GitHub Release
-    needs: [precheck, publish]
+    needs: [precheck, validate, publish]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -137,6 +173,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
@@ -158,5 +196,5 @@ jobs:
         with:
           name: ${{ github.ref_name }}
           tag_name: ${{ github.ref_name }}
-          prerelease: ${{ needs.publish.outputs.prerelease == 'true' }}
+          prerelease: ${{ needs.validate.outputs.prerelease == 'true' }}
           body_path: release-body.md

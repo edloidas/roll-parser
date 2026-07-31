@@ -139,9 +139,10 @@ export type ModifierNode = NodeSpan & {
  * Wraps a dice expression with a standard, compounding, or penetrating
  * explosion. An absent `threshold` means "explode on the die's maximum face".
  *
- * Thresholds accept any comparator, including `!=T` for the Storyteller
- * "10-again" rule. Per-die explosion count is capped by
- * `EvaluationLimits.maxExplodeIterations`.
+ * Thresholds accept any comparator. In notation like `1d10!=10` (the
+ * Storyteller "10-again" rule) the `!` is the explode marker and `=10` the
+ * equality threshold — there is no `!=` comparator. Per-die explosion count
+ * is capped by `EvaluationLimits.maxExplodeIterations`.
  *
  * @category AST
  */

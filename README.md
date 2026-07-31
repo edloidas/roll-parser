@@ -48,8 +48,9 @@ roll('4d6kh3', { rng: createMockRng([3, 6, 2, 5]) }).total; // 14, every run
 
 ## Status
 
-> **v3 is stable.** A complete rewrite of the 2.x line, covered by 1275 tests
-> at 99.9% line coverage. The `latest` tag now resolves to v3.
+> **v3 is the current major line** — this source tree is v3, a complete
+> rewrite of 2.x covered by 1,200+ tests at 99.9% line coverage. The version
+> badge above reflects what npm serves right now.
 >
 > Upgrading from 2.x? The API is not compatible — see
 > [MIGRATION.md](MIGRATION.md). To stay on the old line, pin
@@ -85,7 +86,7 @@ roll('4d6kh3', { rng: createMockRng([3, 6, 2, 5]) }).total; // 14, every run
 [Working with results](#working-with-results) ([RollResult](#rollresult),
 [parts tree](#the-parts-tree), [rendering](#rendering)) ·
 [Randomness](#randomness) ([seeded](#seeded-rolls), [custom](#custom-rngs),
-[testing](#testing)) · [Error handling](#error-handling)
+[testing](#testing)) · [Options](#options) · [Error handling](#error-handling)
 ([classes](#error-classes), [codes](#error-codes), [spans](#source-spans)) ·
 [Safety limits](#safety-limits) ·
 [Using the parser directly](#using-the-parser-directly) ·
@@ -95,6 +96,10 @@ roll('4d6kh3', { rng: createMockRng([3, 6, 2, 5]) }).total; // 14, every run
 [License](#license)
 
 ## Install
+
+```bash
+npm install roll-parser
+```
 
 ```bash
 pnpm add roll-parser
@@ -428,6 +433,28 @@ rules cover meta-expressions:
 | 2–5 | `4d6` pool → `5, 3, 4, 6` | 5 | `1d2`, the crit threshold → `1` |
 | | total `6` — the highest die | | total `18`, all four dice crit against `>1` |
 
+## Options
+
+Everything `roll()` accepts, in one place. `evaluate()` takes the same
+options minus `rng`/`seed` (it receives the RNG directly) plus `notation`.
+
+| Option | Default | Effect |
+|--------|---------|--------|
+| `rng` | fresh `SeededRNG` | Randomness source. Wins over `seed` when both are given |
+| `seed` | random | Seeds the per-call `SeededRNG`. Ignored when `rng` is set |
+| `context` | `{}` | Values for `@name` / `@{name}` variable references |
+| `onMissingVariable` | `'throw'` | A variable absent from `context` throws `UNDEFINED_VARIABLE`; `'zero'` substitutes `0` instead |
+| `maxDice` | `10_000` | [Safety limit](#safety-limits): total dice per expression |
+| `maxExplodeIterations` | `1_000` | [Safety limit](#safety-limits): explosions per die |
+| `maxRerollIterations` | `1_000` | [Safety limit](#safety-limits): recursive rerolls per die |
+
+```typescript
+import { roll } from 'roll-parser';
+
+roll('1d20+@prof', { context: { prof: 3 }, seed: 'demo' }).total; // 15
+roll('1d20+@prof', { onMissingVariable: 'zero', seed: 'demo' }).total; // 12
+```
+
 ## Error handling
 
 Every failure extends `RollParserError` and carries a stable `code`. Use
@@ -624,8 +651,9 @@ precedes them. Errors go to stderr; only the result goes to stdout.
 
 ## Environments
 
-- **Node.js ≥ 22.12** — the floor for unflagged `require(esm)`. ESM `import`
-  works on any modern release.
+- **Node.js ≥ 22.12** — the supported floor, where `require(esm)` is
+  unflagged. Older releases may manage a plain ESM `import`, but they are
+  untested and unsupported.
 - **Bun** — the development runtime; the library and CLI are built and tested
   with it.
 - **Browsers and bundlers** — the library imports nothing from `node:`, touches

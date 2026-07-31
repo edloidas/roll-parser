@@ -37,6 +37,10 @@ export function registerEvaluateBenches(): void {
         const ast = parse(benchCase.notation);
         const options = getEvaluateOptions(benchCase);
 
+        // Each sample charges `SeededRNG` construction alongside evaluation.
+        // Deliberate: `roll()` builds one RNG per call, so this is the shipped
+        // hot path — and renaming or splitting the series now would orphan the
+        // gh-pages trend history.
         bench(benchCase.id, function* () {
           yield primeBenchFn(() => {
             do_not_optimize(evaluate(ast, new SeededRNG(BENCH_SEED), options));

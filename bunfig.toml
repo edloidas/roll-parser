@@ -13,5 +13,5 @@ coverageSkipTestFiles = true
 # `bun test` stays fast. This is the only place the numbers live; CONTRIBUTING.md
 # quotes them but points here.
 [test.coverageThreshold]
-lines = 0.95
+lines = 0.98
 functions = 1.0

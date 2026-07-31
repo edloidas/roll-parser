@@ -31,6 +31,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
@@ -72,7 +74,11 @@ jobs:
           # inspects for the deployment's commit metadata.
           log="${RUNNER_TEMP}/deploy.log"
 
-          bunx wrangler@4 pages deploy site/dist \
+          # ! Exact pin, not `wrangler@4`: a floating major would resolve to
+          # ! whatever the registry serves at deploy time, during the one step
+          # ! that holds the Cloudflare credentials. Published versions are
+          # ! immutable; bump this deliberately.
+          bunx wrangler@4.116.0 pages deploy site/dist \
             --project-name roll-parser \
             --branch "${GITHUB_REF_NAME}" \
             --commit-hash "${GITHUB_SHA}" \

@@ -16,12 +16,12 @@ dependency tree than CI resolves.
 ```bash
 bun install     # also installs the pre-commit hook
 bun check:fix   # typecheck + biome check --write (lint, format, import sort)
-bun test        # 1272 tests, ~2s
+bun test        # full suite, ~2s
 bun validate    # full gate: check, build, package checks, size budgets, coverage
 ```
 
 Run `bun check:fix` and `bun test` while you work; run `bun validate` before
-opening a pull request. `bun test:ci` adds coverage, gated at 95% lines and
+opening a pull request. `bun test:ci` adds coverage, gated at 98% lines and
 100% functions per `bunfig.toml`, which is the only place those numbers live.
 
 ## Pre-commit hook
