@@ -18,7 +18,6 @@
   },
   "hideGenerator": true,
   "treatWarningsAsErrors": true,
-  "intentionallyNotExported": ["ROLL_PARSER_ERROR_CODES", "RollPartBase"],
   "customCss": "site/typedoc.css",
   "customJs": "site/typedoc.js",
   "navigationLinks": {

@@ -7,7 +7,12 @@
 import { version } from './version.js';
 
 export type { ErrorSpan, RollParserErrorCode } from './errors.js';
-export { getErrorSpan, isRollParserError, RollParserError } from './errors.js';
+export {
+  getErrorSpan,
+  isRollParserError,
+  ROLL_PARSER_ERROR_CODES,
+  RollParserError,
+} from './errors.js';
 export {
   DEFAULT_MAX_DICE,
   DEFAULT_MAX_EXPLODE_ITERATIONS,
@@ -73,6 +78,7 @@ export type {
   ResolvedComparePoint,
   ResolvedCritThreshold,
   RollPart,
+  RollPartBase,
   RollPartType,
   RollResult,
 } from './types.js';

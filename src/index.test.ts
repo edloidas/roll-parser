@@ -22,6 +22,7 @@ const VALUE_EXPORTS = [
   'LexerError',
   'MAX_PARSE_DEPTH',
   'ParseError',
+  'ROLL_PARSER_ERROR_CODES',
   'RollParserError',
   'SeededRNG',
   'TokenType',

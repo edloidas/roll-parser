@@ -60,7 +60,7 @@ export type ResolvedCritThreshold = ResolvedComparePoint | 'default';
  * | `'kept'` | Counted toward the total. Every non-dropped die carries it. | plain |
  * | `'dropped'` | Excluded from the total by `kh`/`kl`/`dh`/`dl` or group selection. | `~~n~~` |
  * | `'exploded'` | Produced by, or the trigger of, an explosion (`!`, `!!`, `!p`). | plain |
- * | `'rerolled'` | The die was re-rolled by `r` / `ro`; the value shown is the final one. | plain |
+ * | `'rerolled'` | A discarded intermediate from `r` / `ro`, always paired with `'dropped'` — the replacement die carries no tag. | `~~n~~` (via `'dropped'`) |
  * | `'success'` | Met a success-count threshold (`>=6`). | `**n**` |
  * | `'failure'` | Met a failure threshold (`f1`). | `__n__` |
  * | `'meta'` | Rolled by a meta-expression rather than by the visible pool. | not shown |
@@ -179,11 +179,16 @@ export type ModifierSpec = {
 };
 
 /**
- * Fields shared by every RollPart variant. `start`/`end` mirror the source
- * span of the AST node the part was evaluated from — present whenever the
- * AST came from `parse()`, absent on hand-built ASTs.
+ * Fields shared by every {@link RollPart} variant. `start`/`end` mirror the
+ * source span of the AST node the part was evaluated from — present whenever
+ * the AST came from `parse()`, absent on hand-built ASTs.
+ *
+ * Useful for code that walks the parts tree generically: any part can be
+ * narrowed to this shape without switching on `type` first.
+ *
+ * @category Results
  */
-type RollPartBase = {
+export type RollPartBase = {
   /** Sub-total this part contributed to its parent. */
   total: number;
   start?: number;
@@ -458,8 +463,9 @@ export type EvaluationLimits = {
  */
 export type EvaluateOptions = EvaluationLimits & {
   /**
-   * Original notation string, echoed back as `RollResult.notation`. Defaults
-   * to the empty string when omitted — {@link roll} always forwards it.
+   * Original notation string, echoed back as `RollResult.notation`. When
+   * omitted, falls back to the normalized `expression` reconstructed from the
+   * AST — {@link roll} always forwards the string the caller typed.
    */
   notation?: string;
 };

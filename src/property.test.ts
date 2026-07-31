@@ -10,15 +10,17 @@
  *
  * The global seed is deliberately not pinned: a fixed seed turns these into
  * 100–500 fixed cases and quietly stops exploring. On failure, fast-check
- * prints the counterexample plus a line of the form
- * `seed=<n>, path="<p>"` — re-run that exact case with
- * `bun test src/property.test.ts -- --seed=<n>` in mind, or paste the seed and
- * path into the failing `fc.assert` call's options
+ * prints the counterexample plus a line of the form `seed=<n>, path="<p>"` —
+ * paste both into the failing `fc.assert` call's options
  * (`{ numRuns: …, seed: <n>, path: '<p>' }`) to replay it deterministically.
+ * Every property threads a generated roll seed into `roll()`, so the replay
+ * reproduces the dice, not just the notation. (Bun's own `--seed` flag
+ * shuffles test order; it does not configure fast-check.)
  */
 
 import { describe, test } from 'bun:test';
 import fc from 'fast-check';
+import { isRollParserError } from './errors.js';
 import { roll } from './roll.js';
 
 /**
@@ -36,8 +38,9 @@ describe('property-based invariants', () => {
         fc.property(
           fc.integer({ min: 1, max: 20 }),
           fc.integer({ min: 1, max: 100 }),
-          (count, sides) => {
-            const result = roll(`${count}d${sides}`);
+          seedArb,
+          (count, sides, seed) => {
+            const result = roll(`${count}d${sides}`, { seed });
             return result.total >= count && result.total <= count * sides;
           },
         ),
@@ -47,8 +50,8 @@ describe('property-based invariants', () => {
 
     test('Nd% total is always in valid range [N, N*100]', () => {
       fc.assert(
-        fc.property(fc.integer({ min: 1, max: 10 }), (count) => {
-          const result = roll(`${count}d%`);
+        fc.property(fc.integer({ min: 1, max: 10 }), seedArb, (count, seed) => {
+          const result = roll(`${count}d%`, { seed });
           return (
             result.total >= count &&
             result.total <= count * 100 &&
@@ -62,8 +65,8 @@ describe('property-based invariants', () => {
 
     test('NdF total is always an integer in [-N, +N]', () => {
       fc.assert(
-        fc.property(fc.integer({ min: 0, max: 20 }), (count) => {
-          const result = roll(`${count}dF`);
+        fc.property(fc.integer({ min: 0, max: 20 }), seedArb, (count, seed) => {
+          const result = roll(`${count}dF`, { seed });
           return (
             Number.isInteger(result.total) &&
             result.total >= -count &&
@@ -94,9 +97,10 @@ describe('property-based invariants', () => {
           fc.integer({ min: 1, max: 10 }),
           fc.integer({ min: 1, max: 20 }),
           fc.integer({ min: 1, max: 10 }),
-          (count, sides, keep) => {
+          seedArb,
+          (count, sides, keep, seed) => {
             const keepN = Math.min(keep, count);
-            const result = roll(`${count}d${sides}kh${keepN}`);
+            const result = roll(`${count}d${sides}kh${keepN}`, { seed });
             const keptCount = result.rolls.filter((r) => !r.modifiers.includes('dropped')).length;
             return keptCount === keepN;
           },
@@ -111,9 +115,10 @@ describe('property-based invariants', () => {
           fc.integer({ min: 1, max: 10 }),
           fc.integer({ min: 1, max: 20 }),
           fc.integer({ min: 1, max: 10 }),
-          (count, sides, keep) => {
+          seedArb,
+          (count, sides, keep, seed) => {
             const keepN = Math.min(keep, count);
-            const result = roll(`${count}d${sides}kl${keepN}`);
+            const result = roll(`${count}d${sides}kl${keepN}`, { seed });
             const keptCount = result.rolls.filter((r) => !r.modifiers.includes('dropped')).length;
             return keptCount === keepN;
           },
@@ -128,9 +133,10 @@ describe('property-based invariants', () => {
           fc.integer({ min: 1, max: 10 }),
           fc.integer({ min: 1, max: 20 }),
           fc.integer({ min: 1, max: 10 }),
-          (count, sides, drop) => {
+          seedArb,
+          (count, sides, drop, seed) => {
             const dropN = Math.min(drop, count);
-            const result = roll(`${count}d${sides}dl${dropN}`);
+            const result = roll(`${count}d${sides}dl${dropN}`, { seed });
             const droppedCount = result.rolls.filter((r) => r.modifiers.includes('dropped')).length;
             return droppedCount === dropN;
           },
@@ -145,8 +151,9 @@ describe('property-based invariants', () => {
           fc.integer({ min: 1, max: 20 }),
           fc.integer({ min: 2, max: 20 }),
           fc.integer({ min: 1, max: 20 }),
-          (count, sides, threshold) => {
-            const result = roll(`${count}d${sides}>=${threshold}f1`);
+          seedArb,
+          (count, sides, threshold, seed) => {
+            const result = roll(`${count}d${sides}>=${threshold}f1`, { seed });
             const successes = result.successes ?? 0;
             const failures = result.failures ?? 0;
             return (
@@ -280,8 +287,9 @@ describe('property-based invariants', () => {
         fc.property(
           fc.integer({ min: 0, max: 20 }),
           fc.integer({ min: 1, max: 20 }),
-          (count, sides) => {
-            const result = roll(`${count}d${sides}`);
+          seedArb,
+          (count, sides, seed) => {
+            const result = roll(`${count}d${sides}`, { seed });
             return result.rolls.length === count;
           },
         ),
@@ -294,8 +302,9 @@ describe('property-based invariants', () => {
         fc.property(
           fc.integer({ min: 1, max: 10 }),
           fc.integer({ min: 1, max: 100 }),
-          (count, sides) => {
-            const result = roll(`${count}d${sides}`);
+          seedArb,
+          (count, sides, seed) => {
+            const result = roll(`${count}d${sides}`, { seed });
             return result.rolls.every(
               (r) => r.result >= 1 && r.result <= sides && r.sides === sides,
             );
@@ -310,8 +319,9 @@ describe('property-based invariants', () => {
         fc.property(
           fc.integer({ min: 1, max: 10 }),
           fc.integer({ min: 2, max: 20 }),
-          (count, sides) => {
-            const result = roll(`${count}d${sides}`);
+          seedArb,
+          (count, sides, seed) => {
+            const result = roll(`${count}d${sides}`, { seed });
             return result.rolls.every((r) => r.critical === (r.result === sides));
           },
         ),
@@ -324,8 +334,9 @@ describe('property-based invariants', () => {
         fc.property(
           fc.integer({ min: 1, max: 10 }),
           fc.integer({ min: 2, max: 20 }),
-          (count, sides) => {
-            const result = roll(`${count}d${sides}`);
+          seedArb,
+          (count, sides, seed) => {
+            const result = roll(`${count}d${sides}`, { seed });
             return result.rolls.every((r) => r.fumble === (r.result === 1));
           },
         ),
@@ -418,8 +429,9 @@ describe('property-based invariants', () => {
         fc.property(
           fc.integer({ min: 1, max: 5 }),
           fc.integer({ min: 2, max: 20 }),
-          (count, sides) => {
-            const result = roll(`${count}d${sides}!`);
+          seedArb,
+          (count, sides, seed) => {
+            const result = roll(`${count}d${sides}!`, { seed });
             // Minimum: every original die rolled 1 → total >= count.
             return result.total >= count && result.rolls.length >= count;
           },
@@ -820,6 +832,37 @@ describe('property-based invariants', () => {
           },
         ),
         { numRuns: 100 },
+      );
+    });
+  });
+
+  describe('malformed input robustness', () => {
+    /** Either a successful roll or a typed error — never a raw crash. */
+    function rollsOrThrowsTyped(input: string, seed: number): boolean {
+      try {
+        roll(input, { seed });
+        return true;
+      } catch (error) {
+        return isRollParserError(error);
+      }
+    }
+
+    // Strings over the notation alphabet reach far deeper lexer/parser states
+    // than arbitrary Unicode: near-valid modifiers, dangling comparators,
+    // unbalanced groups, huge digit runs.
+    const notationChars = fc.constantFrom(...'0123456789dDkKhHlLfFsSrRoOcCpP!<>=%+-*/(){},@ .');
+
+    test('roll() on notation-alphabet strings never escapes the typed-error contract', () => {
+      fc.assert(
+        fc.property(fc.string({ unit: notationChars, maxLength: 64 }), seedArb, rollsOrThrowsTyped),
+        { numRuns: 1000 },
+      );
+    });
+
+    test('roll() on arbitrary Unicode strings never escapes the typed-error contract', () => {
+      fc.assert(
+        fc.property(fc.string({ unit: 'binary', maxLength: 64 }), seedArb, rollsOrThrowsTyped),
+        { numRuns: 500 },
       );
     });
   });

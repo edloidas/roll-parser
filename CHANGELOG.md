@@ -20,6 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `unpkg` and `jsdelivr` manifest fields pointing at `dist/index.js`, so the ESM build loads straight from a CDN without a bundler ([#125](https://github.com/edloidas/roll-parser/issues/125))
 - Release integrity gates in CI: `node-smoke` installs the actual `npm pack` tarball into a scratch project and exercises both entry points plus the `roll-parser` bin across Node 22.12.0, 22.x, 24.x, and `lts/*`; a new `browser-smoke` job bundles both entries with esbuild `--platform=browser`, hard-failing on any Node builtin, then executes the bundle. Every action is SHA-pinned, the Bun version has a single `.bun-version` pin, and Dependabot groups action bumps into one weekly PR ([#126](https://github.com/edloidas/roll-parser/issues/126), [#149](https://github.com/edloidas/roll-parser/issues/149))
 - Environment-neutrality is now enforced rather than assumed: Biome `noNodejsModules` on library sources (exempting `src/cli/`), a `types: []` typecheck pass, and a CI assertion that no shipped library file carries a `node:`, `bun:`, or `require` specifier ([#126](https://github.com/edloidas/roll-parser/issues/126))
+- Root exports for `ROLL_PARSER_ERROR_CODES` — the readonly tuple behind `RollParserErrorCode`, usable for runtime validation — and `RollPartBase`, the shared `total`/`start`/`end` contract of every `RollPart` variant. Both now render in the API reference instead of being suppressed ([#155](https://github.com/edloidas/roll-parser/issues/155))
+- `SECURITY.md` with a private vulnerability disclosure route ([#155](https://github.com/edloidas/roll-parser/issues/155))
+- Committed golden `SeededRNG` sequences pin the seed → dice mapping the README promises stable within a version, and malformed-input fuzz properties assert every rejection is a typed `RollParserError` ([#155](https://github.com/edloidas/roll-parser/issues/155))
 
 ### Changed
 
@@ -33,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dice `sides` above `Number.MAX_SAFE_INTEGER` raise a typed `INVALID_DICE_SIDES` instead of a bare `RangeError` escaping from `SeededRNG.nextInt`, closing the last hole in the `isRollParserError` contract ([#128](https://github.com/edloidas/roll-parser/issues/128))
 - performance: evaluator hot path is 1.4–1.9x faster — `100d6` 23.9 µs to 12.8 µs, `1000d6` 224 µs to 148 µs p50 — by giving literal meta-operands a fast path, stamping `'kept'` at die construction instead of cloning a pass over the pool, and dropping redundant walks ([#132](https://github.com/edloidas/roll-parser/issues/132))
 - performance: lexer is 1.5–2.6x faster from charCode dispatch and slice capture, one string per token instead of one per character ([#133](https://github.com/edloidas/roll-parser/issues/133))
+- Release and CI trust boundaries tightened: npm publishing is split into an unprivileged validate-and-pack job and a minimal OIDC job that publishes the pre-built tarball with no checkout or dependency install; benchmark trend publishing moved to a default-branch-only job so branch runs hold no write token; CI validates fork pull requests; Wrangler is pinned exactly during credentialed site deploys; `release:dry` gains a `bun audit` gate ([#155](https://github.com/edloidas/roll-parser/issues/155))
 
 ### Fixed
 
@@ -47,7 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `CONTRIBUTING.md` covering the Bun-only toolchain and why, the pre-commit hook, Conventional Commits, the `scripts/docs` TypeScript pin, why `files` ships `src/`, and the release flow ([#139](https://github.com/edloidas/roll-parser/issues/139))
 - README section on loading the package from a CDN without a bundler, and the minimum TypeScript `moduleResolution` the `exports`-only manifest requires ([#125](https://github.com/edloidas/roll-parser/issues/125))
 - `MIGRATION.md`, a v2→v3 upgrade guide shipped in the published tarball: the packaging change, a mapping table from the thirteen 2.x entry points to `roll`/`parse`/`evaluate`, the `value`→`total` and `number[]`→`DieResult[]` result-shape moves, throwing instead of returning `null`, the two notation forms that do not carry over (simple notation, and WoD `>N` now meaning `>=N`), and pool totals no longer clamping at zero
-- README install instructions narrowed to `pnpm` and `bun`; the `npm`/`yarn` fences are gone, `npx roll-parser` stays for one-off CLI use. The **Related projects** section was removed
+- README install instructions cover `npm`, `pnpm`, and `bun`; the `yarn` fence is gone, `npx roll-parser` stays for one-off CLI use. The **Related projects** section was removed
 - Three previously undocumented limitations added to the README: division does not floor (`7/2` totals `3.5`), the power operator has no overflow guard (`2**999` totals `5.357…e+300`, since only non-finite totals throw), and integer literals above `Number.MAX_SAFE_INTEGER` lose precision ([#153](https://github.com/edloidas/roll-parser/issues/153))
 
 ## [3.0.0-beta.0] - 2026-07-07

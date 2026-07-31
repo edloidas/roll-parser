@@ -7,11 +7,24 @@
 import type { ASTNode } from './parser/ast.js';
 
 /**
- * All known roll-parser error codes. Single source of truth — the
- * `RollParserErrorCode` type and the runtime `VALID_CODES` set are
- * both derived from this array.
+ * Every roll-parser error code, as a readonly tuple. Single source of truth —
+ * the {@link RollParserErrorCode} union is derived from it, and it is the
+ * runtime counterpart for the type: validating an untrusted string, driving an
+ * exhaustive UI (a message-catalog completeness check, a settings list), or
+ * iterating the codes in tests.
+ *
+ * @example
+ * ```typescript
+ * import { ROLL_PARSER_ERROR_CODES, type RollParserErrorCode } from 'roll-parser';
+ *
+ * function isKnownCode(value: string): value is RollParserErrorCode {
+ *   return (ROLL_PARSER_ERROR_CODES as readonly string[]).includes(value);
+ * }
+ * ```
+ *
+ * @category Errors
  */
-const ROLL_PARSER_ERROR_CODES = [
+export const ROLL_PARSER_ERROR_CODES = [
   'UNEXPECTED_CHARACTER',
   'UNEXPECTED_IDENTIFIER',
   'UNEXPECTED_TOKEN',
@@ -46,7 +59,8 @@ const ROLL_PARSER_ERROR_CODES = [
 
 /**
  * Programmatic identifier carried by every roll-parser error, grouped by the
- * stage that raises it.
+ * stage that raises it. The runtime list behind this union is exported as
+ * {@link ROLL_PARSER_ERROR_CODES}.
  *
  * Lexer: `UNEXPECTED_CHARACTER`, `UNEXPECTED_IDENTIFIER`
  *

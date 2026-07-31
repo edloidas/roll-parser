@@ -67,7 +67,8 @@ export class ParseError extends RollParserError {
   readonly position: number;
   /**
    * The token the parser was looking at. `undefined` when the failure is not
-   * anchored to a token — currently only `MAX_DEPTH_EXCEEDED`.
+   * anchored to a token — currently only `UNEXPECTED_END`, raised when the
+   * input stops short.
    */
   readonly token: Token | undefined;
 
