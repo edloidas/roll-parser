@@ -106,11 +106,17 @@ function parseExpected(comment: string): { value: unknown } | null {
 
 type DocImport = { specifier: string; names: string[] };
 
+// Assertion metadata is passed to the compiled block as a table and referenced by
+// index, so no documented value is ever escaped into generated source.
+type DocCase =
+  | { kind: 'value'; line: number; source: string; expected: unknown }
+  | { kind: 'throws'; line: number; source: string; code: string | null };
+
 type CompiledBlock = {
   block: DocBlock;
   imports: DocImport[];
   code: string;
-  assertions: number;
+  cases: DocCase[];
 };
 
 const IMPORT_RE = /^import\s+(type\s+)?\{([^}]+)\}\s+from\s+'([^']+)';\s*$/;
@@ -123,21 +129,11 @@ const THROWS_CODE_RE = /'([A-Z0-9_]+)'/;
 const NON_EXPRESSION_RE =
   /^(?:const|let|var|import|export|type|function|class|return|throw)\b|^[})\]]/;
 
-function assertCall(
-  indent: string,
-  line: number,
-  source: string,
-  expr: string,
-  tail: string,
-): string {
-  return `${indent}__assert(${line}, ${JSON.stringify(source)}, () => (${expr}), ${tail});`;
-}
-
 // One output line per input line, so failure messages keep the documented line numbers.
 function compileBlock(block: DocBlock): CompiledBlock {
   const imports: DocImport[] = [];
   const out: string[] = [];
-  let assertions = 0;
+  const cases: DocCase[] = [];
 
   for (let i = 0; i < block.lines.length; i++) {
     const line = block.lines[i] ?? '';
@@ -164,17 +160,26 @@ function compileBlock(block: DocBlock): CompiledBlock {
       const [, indent = '', expr = '', comment = ''] = trailing;
       if (!NON_EXPRESSION_RE.test(expr)) {
         if (THROWS_RE.test(comment.trim())) {
-          const code = comment.match(THROWS_CODE_RE)?.[1] ?? null;
-          out.push(
-            `${indent}__throws(${lineNo}, ${JSON.stringify(line.trim())}, () => (${expr}), ${JSON.stringify(code)});`,
-          );
-          assertions++;
+          const index =
+            cases.push({
+              kind: 'throws',
+              line: lineNo,
+              source: line.trim(),
+              code: comment.match(THROWS_CODE_RE)?.[1] ?? null,
+            }) - 1;
+          out.push(`${indent}__throws(${index}, () => (${expr}));`);
           continue;
         }
         const expected = parseExpected(comment);
         if (expected) {
-          out.push(assertCall(indent, lineNo, line.trim(), expr, JSON.stringify(expected.value)));
-          assertions++;
+          const index =
+            cases.push({
+              kind: 'value',
+              line: lineNo,
+              source: line.trim(),
+              expected: expected.value,
+            }) - 1;
+          out.push(`${indent}__assert(${index}, () => (${expr}));`);
           continue;
         }
       }
@@ -188,9 +193,14 @@ function compileBlock(block: DocBlock): CompiledBlock {
       const [, indent = '', expr = ''] = bare;
       const expected = NON_EXPRESSION_RE.test(expr) ? null : parseExpected(nextComment[1] ?? '');
       if (expected) {
-        const source = `${line.trim()} ${(block.lines[i + 1] ?? '').trim()}`;
-        out.push(assertCall(indent, lineNo, source, expr, JSON.stringify(expected.value)));
-        assertions++;
+        const index =
+          cases.push({
+            kind: 'value',
+            line: lineNo,
+            source: `${line.trim()} ${(block.lines[i + 1] ?? '').trim()}`,
+            expected: expected.value,
+          }) - 1;
+        out.push(`${indent}__assert(${index}, () => (${expr}));`);
         continue;
       }
     }
@@ -198,15 +208,15 @@ function compileBlock(block: DocBlock): CompiledBlock {
     out.push(line);
   }
 
-  return { block, imports, code: out.join('\n'), assertions };
+  return { block, imports, code: out.join('\n'), cases };
 }
 
 //
 // * Execution
 //
 
-type AssertFn = (line: number, source: string, actual: () => unknown, expected: unknown) => void;
-type ThrowsFn = (line: number, source: string, run: () => unknown, code: string | null) => void;
+type AssertFn = (index: number, actual: () => unknown) => void;
+type ThrowsFn = (index: number, run: () => unknown) => void;
 
 const transpiler = new Bun.Transpiler({ loader: 'ts' });
 
@@ -244,8 +254,22 @@ beforeAll(async () => {
   };
 });
 
-function makeAssert(file: string): AssertFn {
-  return (line, source, actual, expected) => {
+function lookupCase<K extends DocCase['kind']>(
+  file: string,
+  cases: DocCase[],
+  index: number,
+  kind: K,
+): Extract<DocCase, { kind: K }> {
+  const entry = cases[index];
+  if (entry?.kind !== kind) {
+    throw new Error(`${file} — compiled ${kind} case ${index} is missing or misaligned`);
+  }
+  return entry as Extract<DocCase, { kind: K }>;
+}
+
+function makeAssert(file: string, cases: DocCase[]): AssertFn {
+  return (index, actual) => {
+    const { line, source, expected } = lookupCase(file, cases, index, 'value');
     const value = actual();
     if (!Bun.deepEquals(value, expected, true)) {
       throw new Error(
@@ -258,8 +282,9 @@ function makeAssert(file: string): AssertFn {
   };
 }
 
-function makeThrows(file: string): ThrowsFn {
-  return (line, source, run, code) => {
+function makeThrows(file: string, cases: DocCase[]): ThrowsFn {
+  return (index, run) => {
+    const { line, source, code } = lookupCase(file, cases, index, 'throws');
     try {
       run();
     } catch (caught) {
@@ -276,7 +301,7 @@ function makeThrows(file: string): ThrowsFn {
 }
 
 async function runBlock(compiled: CompiledBlock): Promise<void> {
-  const { block, imports, code } = compiled;
+  const { block, imports, code, cases } = compiled;
 
   for (const imp of imports) {
     const ns = namespaces[imp.specifier];
@@ -307,7 +332,7 @@ async function runBlock(compiled: CompiledBlock): Promise<void> {
     throwsArg: ThrowsFn,
   ) => Promise<unknown>;
 
-  await factory(scope, makeAssert(block.file), makeThrows(block.file));
+  await factory(scope, makeAssert(block.file, cases), makeThrows(block.file, cases));
 }
 
 //
@@ -341,11 +366,38 @@ for (const { file, compiled, skipped } of corpus) {
 describe('doc example corpus', () => {
   test('extraction still finds the fenced blocks', () => {
     const blocks = corpus.flatMap((entry) => entry.compiled);
-    const assertions = blocks.reduce((sum, entry) => sum + entry.assertions, 0);
+    const assertions = blocks.reduce((sum, entry) => sum + entry.cases.length, 0);
     // Floors, not exact counts — they catch a fence-language or convention
     // change that silently stops extraction, without rotting on every edit.
     expect(blocks.length).toBeGreaterThanOrEqual(12);
     expect(assertions).toBeGreaterThanOrEqual(15);
+  });
+
+  // No doc block currently mixes both assertion kinds, so nothing else pins the
+  // compile-time case indices to the ones the generated code looks up at runtime.
+  describe('a block mixing value and throw assertions', () => {
+    const KEEP_HIGHEST = "roll('4d6kh3', { rng: createMockRng([3, 6, 2, 5]) }).total; // 14";
+    const OVER_LIMIT = "roll('99999d6', { maxDice: 100 }); // throws, code 'DICE_LIMIT_EXCEEDED'";
+    const PLAIN_POOL = "roll('2d6', { rng: createMockRng([2, 6]) }).total; // 8";
+    const compile = (blockLines: string[]): CompiledBlock =>
+      compileBlock({ file: 'synthetic.md', fenceLine: 10, lines: blockLines, skip: false });
+
+    test('keeps every case aligned with its documented line', async () => {
+      const compiled = compile([KEEP_HIGHEST, OVER_LIMIT, PLAIN_POOL]);
+      expect(compiled.cases).toEqual([
+        { kind: 'value', line: 11, source: KEEP_HIGHEST, expected: 14 },
+        { kind: 'throws', line: 12, source: OVER_LIMIT, code: 'DICE_LIMIT_EXCEEDED' },
+        { kind: 'value', line: 13, source: PLAIN_POOL, expected: 8 },
+      ]);
+      await runBlock(compiled);
+    });
+
+    test('reports the trailing assertion against its own line when it fails', async () => {
+      const falsified = [KEEP_HIGHEST, OVER_LIMIT, PLAIN_POOL.replace('// 8', '// 9')];
+      await expect(runBlock(compile(falsified))).rejects.toThrow(
+        /synthetic\.md:13 documents an output the code does not produce/,
+      );
+    });
   });
 
   test('the trailing-comment convention parses the shapes the docs use', () => {
