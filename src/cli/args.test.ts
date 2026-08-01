@@ -326,7 +326,7 @@ describe('parseArgs', () => {
       expect(result).toEqual({ ok: false, error: 'Unknown option: --unknown' });
     });
 
-    // The `-x` short-flag case lives in `notation parsing`, where it sits next
-    // to the negative-notation cases it draws the boundary against.
+    // The `-x` short-flag case sits in `notation parsing`, next to the
+    // negative-notation cases it draws the boundary against.
   });
 });

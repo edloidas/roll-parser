@@ -3,7 +3,7 @@
  *
  * Deep-equal "snapshot" tests pin exact part trees for representative
  * notations under deterministic mock RNGs; the rest assert the contractual
- * invariants from STAGE3.md §5.
+ * invariants directly.
  *
  * The snapshots compare span-stripped trees. Spans are a separate contract
  * with a separate failure mode — a one-character shift in the lexer would
@@ -96,9 +96,9 @@ describe('RollResult.parts', () => {
           type: 'dice',
           count: 4,
           sides: 6,
-          // Dice part total (16) is the pre-modifier pool sum; the flags
-          // reflect post-modifier state via shared references. Recursive
-          // total consistency is deliberately not contractual.
+          // The dice part total is the pre-modifier pool sum while the flags are
+          // post-modifier via shared refs — recursive total consistency is
+          // deliberately not contractual.
           rolls: [
             { sides: 6, result: 3, modifiers: ['kept'], critical: false, fumble: false },
             { sides: 6, result: 6, modifiers: ['kept'], critical: true, fumble: false },
@@ -213,10 +213,8 @@ describe('RollResult.parts', () => {
   });
 
   describe('source spans', () => {
-    // One home for the span contract: every part's `[start, end)` must slice
-    // the notation back to exactly the source text that produced it. The
-    // structural snapshots above are span-stripped, so a lexer offset shift
-    // fails here and nowhere else.
+    // The span contract: every part's `[start, end)` must slice the notation back
+    // to exactly the source text that produced it.
     const SPAN_CASES: [notation: string, draws: number[], expected: string[]][] = [
       [
         '4d6kh3 + floor(1d10/2)',
@@ -401,8 +399,6 @@ describe('RollResult.parts', () => {
       '10d10>=6f1',
     ];
 
-    // The fixed-seed loop this used to run is subsumed: the fast-check
-    // property draws from the same `NOTATIONS` list over 300 runs.
     test('parts.total === result.total holds under fast-check', () => {
       fc.assert(
         fc.property(
@@ -457,7 +453,7 @@ describe('RollResult.parts', () => {
       if (result.parts.type !== 'reroll' || result.parts.target.type !== 'dice') {
         throw new Error('unexpected parts shape');
       }
-      // The original die 1 was rerolled — its shared object carries the flags.
+      // Die 0 rolled a 1 and was rerolled; its shared object carries both flags.
       expect(result.parts.target.rolls[0]?.modifiers).toEqual(['rerolled', 'dropped']);
       expect(result.rolls[0]).toBe(
         result.parts.target.rolls[0] as NonNullable<(typeof result.rolls)[number]>,
@@ -467,8 +463,7 @@ describe('RollResult.parts', () => {
 
   describe('group keptIndices', () => {
     test('accurate for kh/kl/dh/dl', () => {
-      const cases: [string, number[], number[]][] = [
-        // notation, mock draws, expected keptIndices
+      const cases: [notation: string, draws: number[], expected: number[]][] = [
         ['{1d6, 1d8, 1d10}kh1', [2, 7, 5], [1]],
         ['{1d6, 1d8, 1d10}kl1', [2, 7, 5], [0]],
         ['{1d6, 1d8, 1d10}dh1', [2, 7, 5], [0, 2]],

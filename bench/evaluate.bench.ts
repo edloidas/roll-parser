@@ -44,10 +44,8 @@ export function registerEvaluateBenches(): number {
         const ast = parse(benchCase.notation);
         const options = getEvaluateOptions(benchCase);
 
-        // Each sample charges `SeededRNG` construction alongside evaluation.
-        // Deliberate: `roll()` builds one RNG per call, so this is the shipped
-        // hot path — and renaming or splitting the series now would orphan the
-        // gh-pages trend history.
+        // Charging `SeededRNG` construction per sample matches `roll()`, the shipped
+        // hot path; renaming or splitting the series would orphan the trend history.
         bench(benchCase.id, function* () {
           yield primeBenchFn(() => {
             do_not_optimize(evaluate(ast, new SeededRNG(BENCH_SEED), options));
@@ -59,8 +57,8 @@ export function registerEvaluateBenches(): number {
     });
   });
 
-  // ? Tripwire for accidental O(n²) work in pool handling — keep/drop sorts the
-  //   pool, so `kh(n/2)` is the shape most likely to regress super-linearly.
+  // Tripwire for accidental O(n²) work in pool handling — keep/drop sorts the pool,
+  // so `kh(n/2)` is the shape most likely to regress super-linearly.
   group('evaluate — pool scaling', () => {
     bench('$nd6', function* (state: { get(name: string): number }) {
       const size = state.get('n');

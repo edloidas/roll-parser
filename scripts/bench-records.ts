@@ -76,8 +76,8 @@ export function toRecords(dump: MitataDump): RecordsResult {
   const seen = new Set<string>();
 
   for (const trial of dump.benchmarks) {
-    // ? `trial.group` is an index into `layout`; `summary()` nests a collection
-    //   that inherits its parent group's name, so this stays the group label.
+    // `trial.group` indexes `layout`; `summary()` nests a collection that inherits
+    // its parent group's name, so this stays the group label.
     const group = dump.layout[trial.group]?.name;
     const groupLabel = isNonEmptyName(group) ? group : `#${trial.group}`;
 

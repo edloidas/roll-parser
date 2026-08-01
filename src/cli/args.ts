@@ -98,9 +98,8 @@ export function parseArgs(argv: string[]): ParseArgsResult {
     } else if (arg === '--json') {
       json = true;
     } else if (arg === '--seed') {
-      // Any non-empty next argument counts, matching `--seed=<value>` — a
-      // seed is an opaque string, so `--seed -abc` is a valid seed, not a
-      // missing value. Genuinely ambiguous cases are what `--` is for.
+      // A seed is an opaque string, so any non-empty next argument counts:
+      // `--seed -abc` is a valid seed, not a missing value.
       const next = argv[i + 1];
       if (next == null || next === '') {
         return { ok: false, error: 'Missing value for --seed' };
@@ -122,9 +121,8 @@ export function parseArgs(argv: string[]): ParseArgsResult {
     }
   }
 
-  // Positional arguments are joined, not treated as separate rolls — a shell
-  // splits `roll-parser 2d6 + 3` into three words and the user means one
-  // expression. Changing this would break every unquoted spaced notation.
+  // Joined, not separate rolls — a shell splits `roll-parser 2d6 + 3` into three
+  // words and the user means one expression.
   const notation = positional.length > 0 ? positional.join(' ') : undefined;
 
   return { ok: true, args: { ...BASE_ARGS, notation, verbose, json, seed } };

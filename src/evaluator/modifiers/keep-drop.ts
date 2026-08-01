@@ -61,8 +61,7 @@ export function markDroppedIndices(
     return;
   }
 
-  // Stable sort — ties resolve by original pool order, matching the
-  // `slice(0, count)` selection this replaced.
+  // Stable sort — ties resolve by original pool order.
   eligible.sort(
     selector === 'highest' ? (a, b) => b.result - a.result : (a, b) => a.result - b.result,
   );

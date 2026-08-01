@@ -205,7 +205,7 @@ async function copyLink(): Promise<void> {
   try {
     await navigator.clipboard.writeText(url);
   } catch {
-    // ? Clipboard API can reject on insecure/denied contexts — fall back to select.
+    // Clipboard API rejects on insecure or permission-denied contexts.
     input.focus();
   }
 

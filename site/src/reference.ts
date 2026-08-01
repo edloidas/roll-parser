@@ -245,9 +245,8 @@ function mount(): void {
 
   guide.addEventListener('click', (event) => {
     const target = event.target as HTMLElement;
-    // Let the playground link navigate, and the overflow chip unfold its tray,
-    // instead of rolling. Neither stops propagation — the delegated tray
-    // toggle on `document` still sees the chip click.
+    // Let the playground link navigate and the overflow chip unfold its tray instead
+    // of rolling — neither stops propagation, so the delegated tray toggle still fires.
     if (target.closest('.widget-open') != null) return;
     if (target.closest('button.die-overflow') != null) return;
 

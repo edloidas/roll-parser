@@ -351,7 +351,7 @@ describe('evaluate', () => {
       const rng = createMockRng([4]);
       const result = evaluate(ast, rng);
 
-      expect(result.total).toBe(10); // 4 + (2 * 3) = 10
+      expect(result.total).toBe(10);
     });
 
     test('parenthesized expression', () => {
@@ -359,7 +359,7 @@ describe('evaluate', () => {
       const rng = createMockRng([3]);
       const result = evaluate(ast, rng);
 
-      expect(result.total).toBe(8); // (3 + 1) * 2 = 8
+      expect(result.total).toBe(8);
     });
   });
 
@@ -403,7 +403,7 @@ describe('evaluate', () => {
       const ast = parse('floor((1d20+5)/2)');
       const result = evaluate(ast, createMockRng([10]));
 
-      expect(result.total).toBe(7); // floor((10+5)/2) = floor(7.5)
+      expect(result.total).toBe(7); // (10 + 5) / 2 = 7.5
       expect(result.expression).toBe('floor((1d20 + 5) / 2)');
     });
 
@@ -442,7 +442,7 @@ describe('evaluate', () => {
       const rng = createMockRng([1]);
       const result = evaluate(ast, rng);
 
-      expect(result.total).toBe(-4); // 1 - 5 = -4, NOT 0!
+      expect(result.total).toBe(-4); // no clamping: 1 - 5 = -4
     });
 
     test('unary minus on dice', () => {
@@ -489,7 +489,7 @@ describe('evaluate', () => {
       const rng = createMockRng([3, 5, 2, 6]);
       const result = evaluate(ast, rng);
 
-      expect(result.total).toBe(14); // 5 + 3 + 6 = 14
+      expect(result.total).toBe(14);
       expect(result.rolls.filter((r) => r.modifiers.includes('dropped'))).toHaveLength(1);
     });
   });
@@ -512,7 +512,7 @@ describe('evaluate', () => {
       const rng = createMockRng([4, 2, 5, 3]);
       const result = evaluate(ast, rng);
 
-      expect(result.total).toBe(12); // 4 + 5 + 3 = 12
+      expect(result.total).toBe(12);
       expect(getDie(result.rolls, 1).modifiers).toContain('dropped');
     });
   });
@@ -523,7 +523,7 @@ describe('evaluate', () => {
       const rng = createMockRng([4, 2, 6, 3]);
       const result = evaluate(ast, rng);
 
-      expect(result.total).toBe(9); // 4 + 2 + 3 = 9
+      expect(result.total).toBe(9);
       expect(getDie(result.rolls, 2).modifiers).toContain('dropped');
     });
   });
@@ -601,12 +601,11 @@ describe('evaluate', () => {
     });
 
     test('same modifier twice does not stack (dl1dl1 ≠ dl2)', () => {
-      // Each dl1 independently drops the same lowest die
+      // [3,1,4,2]: each dl1 independently drops idx1 → union {1} → total 9
       const ast = parse('4d6dl1dl1');
       const rng = createMockRng([3, 1, 4, 2]);
       const result = evaluate(ast, rng);
 
-      // Both dl1s drop idx1 (value 1), union = {1}, total = 9
       expect(result.total).toBe(9);
       expect(result.rolls.filter((r) => r.modifiers.includes('dropped'))).toHaveLength(1);
     });
@@ -660,7 +659,7 @@ describe('evaluate', () => {
       const rng = createMockRng([5, 5, 2]);
       const result = evaluate(ast, rng);
 
-      expect(result.total).toBe(7); // 5 + 2
+      expect(result.total).toBe(7);
       expect(getDie(result.rolls, 0).modifiers).toContain('dropped');
       expect(getDie(result.rolls, 1).modifiers).toContain('kept');
       expect(getDie(result.rolls, 2).modifiers).toContain('kept');
@@ -671,7 +670,7 @@ describe('evaluate', () => {
       const rng = createMockRng([4, 2, 2]);
       const result = evaluate(ast, rng);
 
-      expect(result.total).toBe(6); // 4 + 2
+      expect(result.total).toBe(6);
       expect(getDie(result.rolls, 0).modifiers).toContain('kept');
       expect(getDie(result.rolls, 1).modifiers).toContain('dropped');
       expect(getDie(result.rolls, 2).modifiers).toContain('kept');
@@ -700,8 +699,8 @@ describe('evaluate', () => {
     });
 
     test('dl1 skips rerolled intermediates', () => {
-      // Die 0: 1 (r<2 matches) → 4. Die 1: 3. Final pool [4, 3] — the
-      // intermediate 1 stays dropped and must not absorb the dl1.
+      // Die 0: 1 (r<2) → 4. Die 1: 3. The dropped intermediate 1 must not
+      // absorb the dl1.
       const ast = parse('2d6r<2dl1');
       const rng = createMockRng([1, 3, 4]);
       const result = evaluate(ast, rng);
@@ -713,8 +712,7 @@ describe('evaluate', () => {
     });
 
     test('computed kl count skips the meta die', () => {
-      // Meta d2 → 1, pool [15, 7]. kl1 keeps 7 — the meta die's 1 is not
-      // eligible to win lowest.
+      // Meta d2 → 1, pool [15, 7]. kl1 keeps 7 — the meta die's 1 cannot win lowest.
       const ast = parse('2d20kl(1d2)');
       const rng = createMockRng([1, 15, 7]);
       const result = evaluate(ast, rng);
@@ -728,9 +726,8 @@ describe('evaluate', () => {
     });
 
     test("kh1 skips a preceding chain's losers", () => {
-      // Parse: Modifier(kh1, Reroll(r>6, Modifier(dh1, Dice))). dh1 drops
-      // the 5; the no-op reroll splits the chains, so kh1 sees it already
-      // dropped and must keep the 2 instead.
+      // Parse: Modifier(kh1, Reroll(r>6, Modifier(dh1, Dice))). The no-op reroll
+      // splits the chains, so kh1 sees dh1's 5 already dropped and keeps the 2.
       const ast = parse('2d6dh1r>6kh1');
       const rng = createMockRng([5, 2]);
       const result = evaluate(ast, rng);
@@ -761,8 +758,8 @@ describe('evaluate', () => {
     });
 
     test('evaluator errors carry the span of the failing sub-expression', () => {
-      // `1d0` sits at offsets 4..7 inside `2d6+1d0+3` — the innermost node
-      // that failed, not the whole expression.
+      // `1d0` sits at offsets 4..7 — the span is the innermost failing node,
+      // not the whole expression.
       const error = expectRollError(
         () => evaluate(parse('2d6+1d0+3'), createMockRng([1, 1])),
         EvaluatorError,
@@ -997,10 +994,8 @@ describe('evaluate', () => {
     });
 
     test('invalid maxDice falls back to DEFAULT_MAX_DICE', () => {
-      // Roll DEFAULT_MAX_DICE+1 dice with invalid maxDice values and assert the
-      // resulting error message references DEFAULT_MAX_DICE — proves the
-      // fallback used the documented default and not Infinity (would not throw)
-      // or some other value (different limit in the message).
+      // The thrown limit pins the fallback: Infinity would not throw at all,
+      // any other value would report a different limit.
       const overCount = DEFAULT_MAX_DICE + 1;
       const ast = parse(`${overCount}d6`);
       const expectedMsg = `Total dice count ${overCount} exceeds limit of ${DEFAULT_MAX_DICE}`;
@@ -1014,7 +1009,6 @@ describe('evaluate', () => {
       const ast = parse('3d6');
       const rng = createMockRng([1, 2, 3]);
 
-      // maxDice: 2.9 → floor → 2, so 3d6 should throw
       expect(() => evaluate(ast, rng, { maxDice: 2.9 })).toThrow(EvaluatorError);
     });
 
@@ -1067,8 +1061,7 @@ describe('evaluate', () => {
 
       test('multi-die pool explodes independently (explosion interleaved with originals)', () => {
         // RNG [6, 3, 2]: initial pool [6, 3]. Die 0 (=6) explodes → 2.
-        // Final pool order: [6, 2, 3] — explosions appended right after their
-        // triggering die.
+        // Final pool [6, 2, 3] — explosions are appended right after their trigger.
         const ast = parse('2d6!');
         const rng = createMockRng([6, 3, 2]);
         const result = evaluate(ast, rng);
@@ -1213,9 +1206,8 @@ describe('evaluate', () => {
 
     describe('modifier chain interaction', () => {
       test('4d6!kh3 explodes first, then keeps highest 3', () => {
-        // RNG: 4 dice then one explosion. [6, 3, 1, 4, 2]:
-        //   initial pool [6, 3, 1, 4]; 6 triggers explosion → [6, 3, 1, 4, 2]
-        //   kh3 keeps top 3 by result: 6, 4, 3 → total 13
+        // [6, 3, 1, 4, 2]: pool [6, 3, 1, 4], the 6 explodes → 2.
+        // kh3 then keeps 6, 4, 3 → total 13.
         const ast = parse('4d6!kh3');
         const rng = createMockRng([6, 3, 1, 4, 2]);
         const result = evaluate(ast, rng);
@@ -1225,24 +1217,19 @@ describe('evaluate', () => {
       });
 
       test('4d6kh3! keeps highest 3 first, then explodes only kept dice', () => {
-        // RNG: 4 dice. Initial [6, 3, 1, 4]. kh3 keeps 6,4,3 and drops 1.
-        // Explode only kept dice with max = 6 → kept die rolling 6 explodes.
-        // Next RNG value consumed is the explosion roll.
+        // [6, 3, 1, 4, 2]: kh3 keeps 6, 4, 3 and drops the 1. Only kept dice
+        // explode, so the 6 draws the 2 → 6+2+4+3 = 15 over 5 pool entries.
         const ast = parse('4d6kh3!');
         const rng = createMockRng([6, 3, 1, 4, 2]);
         const result = evaluate(ast, rng);
 
-        // Kept dice: 6 (then +2 exploded), 4, 3 = 6 + 2 + 4 + 3 = 15
-        // Dropped: 1
         expect(result.total).toBe(15);
-        // Pool: 4 original + 1 explosion = 5, but 1 is marked dropped.
         expect(result.rolls).toHaveLength(5);
       });
 
       test('explosion counts against global maxDice', () => {
-        // 2d6! with all sixes would grow unboundedly. maxDice=4 lets the
-        // initial 2 rolls plus 2 explosions occur before the next explosion
-        // would exceed the cap.
+        // maxDice=4 covers the 2 initial rolls plus 2 explosions; the next
+        // explosion trips the cap.
         const ast = parse('2d6!');
         const rng = createMockRng([6, 6, 6, 6, 6, 6]);
 
@@ -1306,8 +1293,8 @@ describe('evaluate', () => {
     describe('recursive reroll (r)', () => {
       test('single match re-rolls until condition fails', () => {
         const ast = parse('2d6r<2');
-        // RNG: die 0 rolls 1, die 1 rolls 5, die 0 re-rolls 3.
-        // Pool ordering: intermediate + final for die 0 first, then die 1.
+        // Draws: die 0 rolls 1, die 1 rolls 5, then die 0 re-rolls 3. Pool order
+        // is die 0's intermediate + final first, then die 1.
         const rng = createMockRng([1, 5, 3]);
         const result = evaluate(ast, rng);
 
@@ -1373,9 +1360,8 @@ describe('evaluate', () => {
         const rng = createMockRng([-1, 0, 1, -1, 0, 0]);
         const result = evaluate(ast, rng);
 
-        expect(result.total).toBe(1); // 0 + 0 + 1 + 0
+        expect(result.total).toBe(1);
 
-        // Two intermediate rerolled -1s should appear in rolls.
         const rerolled = result.rolls.filter((d) => d.modifiers.includes('rerolled'));
         expect(rerolled).toHaveLength(2);
         expect(rerolled.every((d) => d.result === -1)).toBe(true);
@@ -1408,7 +1394,7 @@ describe('evaluate', () => {
         const rng = createMockRng([2, 5, 1]);
         const result = evaluate(ast, rng);
 
-        expect(result.total).toBe(6); // 1 + 5
+        expect(result.total).toBe(6);
         expect(result.rolls).toHaveLength(3);
         expect(getDie(result.rolls, 0).result).toBe(2);
         expect(getDie(result.rolls, 0).modifiers).toEqual(['rerolled', 'dropped']);
@@ -1440,8 +1426,8 @@ describe('evaluate', () => {
 
     describe('modifier chain interactions', () => {
       test('reroll then keep highest: intermediate high roll does not win kh', () => {
-        // `2d6r>4kh1` — die 0 rolls 6 (>4, rerolled → 2), die 1 rolls 3.
-        // Final pool is [2, 3]. kh1 should pick 3, not the rerolled 6.
+        // [6, 3, 2]: die 0's 6 rerolls → 2, die 1 rolls 3. Final pool [2, 3] —
+        // kh1 picks 3, not the rerolled 6.
         const ast = parse('2d6r>4kh1');
         const rng = createMockRng([6, 3, 2]);
         const result = evaluate(ast, rng);
@@ -1450,8 +1436,8 @@ describe('evaluate', () => {
       });
 
       test('reroll then keep-2 skips the intermediate in the sorted path', () => {
-        // Die 0: 1 (r<2 matches) → 4. Dice 1-2: 5, 3. kh2 sorts [4, 5, 3]
-        // and keeps 5 + 4 — the dropped intermediate 1 is never eligible.
+        // Die 0: 1 (r<2) → 4. Dice 1-2: 5, 3. kh2 keeps 5 + 4 — the dropped
+        // intermediate 1 is never eligible.
         const ast = parse('3d6r<2kh2');
         const rng = createMockRng([1, 5, 3, 4]);
         const result = evaluate(ast, rng);
@@ -1470,10 +1456,9 @@ describe('evaluate', () => {
       });
 
       test('keep highest then reroll only runs on the survivor', () => {
-        // Parse: Reroll(r<2, Modifier(kh1, Dice)). kh1 keeps higher, reroll
-        // only touches the kept die.
+        // Parse: Reroll(r<2, Modifier(kh1, Dice)) — the reroll only touches kh1's
+        // survivor. [5, 1]: kh1 keeps the 5, which does not match r<2.
         const ast = parse('2d6kh1r<2');
-        // Rolls: 5, 1. kh1 keeps 5 (index 0); 1 is dropped. Reroll on 5 — no match.
         const rng = createMockRng([5, 1]);
         const result = evaluate(ast, rng);
 
@@ -1481,20 +1466,18 @@ describe('evaluate', () => {
       });
 
       test('chained reroll-once then recursive: 2d6ro<2r<3', () => {
-        // Parse: Reroll(r<3, Reroll(ro<2, Dice)).
-        // Die 0: 1 (ro<2 matches) → 2. Then outer r<3: 2 matches → 5 (stop).
-        // Die 1: 4. ro<2 no match (kept → 4). Outer r<3: 4 no match.
+        // Parse: Reroll(r<3, Reroll(ro<2, Dice)). [1, 4, 2, 5]: die 0 goes
+        // 1 →(ro<2) 2 →(r<3) 5; die 1 stays 4.
         const ast = parse('2d6ro<2r<3');
         const rng = createMockRng([1, 4, 2, 5]);
         const result = evaluate(ast, rng);
 
-        expect(result.total).toBe(9); // 5 + 4
+        expect(result.total).toBe(9);
       });
 
       test('dropped target: pre-dropped die is not rerolled', () => {
-        // `2d6dl1r<5` — dl1 drops the lowest; reroll leaves it alone.
-        // Rolls: 3, 5. dl1 drops 3. Reroll(r<5) on [3(dropped), 5(kept)] —
-        // only 5 is eligible, 5 is not <5 → no reroll.
+        // [3, 5]: dl1 drops the 3, so only the kept 5 is reroll-eligible and
+        // 5 is not <5 → no reroll.
         const ast = parse('2d6dl1r<5');
         const rng = createMockRng([3, 5]);
         const result = evaluate(ast, rng);
@@ -1503,13 +1486,12 @@ describe('evaluate', () => {
       });
 
       test('reroll then explode preserves modifier semantics', () => {
-        // `2d6r<2!` — reroll first, then explode.
         const ast = parse('2d6r<2!');
-        // Die 0: 1 → 3. Die 1: 6 (triggers explode) → 2.
+        // [1, 6, 3, 2]: die 0's 1 rerolls → 3, die 1's 6 explodes → 2.
         const rng = createMockRng([1, 6, 3, 2]);
         const result = evaluate(ast, rng);
 
-        expect(result.total).toBe(11); // 3 + 6 + 2
+        expect(result.total).toBe(11);
       });
     });
 
@@ -1538,7 +1520,7 @@ describe('evaluate', () => {
         const rng = createMockRng([1, 4, 3]);
         const result = evaluate(ast, rng);
 
-        expect(result.total).toBe(12); // 3 + 4 + 5
+        expect(result.total).toBe(12); // 3 (reroll of the 1, drawn last) + 4 + 5
       });
 
       test('reroll Fate dice without negative: 4dFr=1', () => {
@@ -1547,7 +1529,7 @@ describe('evaluate', () => {
         const rng = createMockRng([1, -1, 0, 1, 0, -1]);
         const result = evaluate(ast, rng);
 
-        expect(result.total).toBe(-2); // 0 + -1 + 0 + -1
+        expect(result.total).toBe(-2);
       });
     });
   });
@@ -1602,7 +1584,7 @@ describe('evaluate', () => {
       const result = evaluate(ast, rng);
 
       // The 3 matches both >=3 and =3, but success wins.
-      expect(result.successes).toBe(2); // 3, 5
+      expect(result.successes).toBe(2);
       expect(result.failures).toBe(0);
       expect(result.total).toBe(2);
       expect(getDie(result.rolls, 0).modifiers).toContain('success');
@@ -1624,7 +1606,7 @@ describe('evaluate', () => {
       const rng = createMockRng([1, 5, 6, 6, 3]);
       const result = evaluate(ast, rng);
 
-      expect(result.successes).toBe(2); // two 6s
+      expect(result.successes).toBe(2);
       expect(result.total).toBe(2);
     });
 
@@ -1641,10 +1623,10 @@ describe('evaluate', () => {
       const rng = createMockRng([1, 5, 6, 3]);
       const result = evaluate(ast, rng);
 
-      expect(result.successes).toBe(2); // 5 and 6 among kept {5,6,3}
+      expect(result.successes).toBe(2); // kept {5, 6, 3} → 5 and 6 pass >=5
       expect(result.total).toBe(2);
       expect(result.rolls).toHaveLength(4);
-      // The dropped die must not be tagged with success/failure.
+
       const dropped = result.rolls.find((d) => d.modifiers.includes('dropped'));
       expect(dropped).toBeDefined();
       expect(dropped?.modifiers.includes('success')).toBe(false);
@@ -1661,7 +1643,6 @@ describe('evaluate', () => {
       expect(result.successes).toBe(2);
       expect(result.total).toBe(2);
 
-      // Intermediate rerolls are 'dropped' and must not carry success/failure.
       const intermediates = result.rolls.filter((d) => d.modifiers.includes('rerolled'));
       expect(intermediates.length).toBe(2);
       for (const d of intermediates) {
@@ -1682,12 +1663,11 @@ describe('evaluate', () => {
 
     test('Fate dice + success count with negative fail — 4dF>=1f-1', () => {
       const ast = parse('4dF>=1f-1');
-      // Rolls: [1, 0, -1, 1]
       const rng = createMockRng([1, 0, -1, 1]);
       const result = evaluate(ast, rng);
 
-      expect(result.successes).toBe(2); // two +1s
-      expect(result.failures).toBe(1); // one -1
+      expect(result.successes).toBe(2);
+      expect(result.failures).toBe(1);
       expect(result.total).toBe(1);
     });
 
@@ -1696,7 +1676,7 @@ describe('evaluate', () => {
       const rng = createMockRng([4, 5, 6]);
       const result = evaluate(ast, rng);
 
-      expect(result.successes).toBe(2); // 5, 6
+      expect(result.successes).toBe(2);
     });
 
     test('success/failure fields absent when no success count used', () => {
@@ -1873,7 +1853,6 @@ describe('evaluate', () => {
     });
 
     test('Failure boundary: 1d20 vs 15 roll=5 (total=5 > dc-10=5 is false)', () => {
-      // total > dc-10 → 5 > 5 is false → CriticalFailure
       const ast = parse('1d20 vs 15');
       const rng = createMockRng([5]);
       const result = evaluate(ast, rng);
@@ -1976,7 +1955,7 @@ describe('evaluate', () => {
       const rng = createMockRng([6, 10]);
       const result = evaluate(ast, rng);
 
-      // total=16, dc=25: 16 < 25 and 16 > 15 → Failure
+      // 16 < 25 but 16 > dc-10 → Failure
       expect(result.total).toBe(16);
       expect(result.natural).toBeUndefined();
       expect(result.degree).toBe(DegreeOfSuccess.Failure);
@@ -1989,7 +1968,7 @@ describe('evaluate', () => {
 
       expect(result.total).toBe(30);
       expect(result.natural).toBeUndefined();
-      // Base: 30 ≥ 25+10=35? no; 30 ≥ 25? yes → Success (no upgrade, natural undefined)
+      // 30 < dc+10 but ≥ dc → Success; an undefined natural blocks any upgrade.
       expect(result.degree).toBe(DegreeOfSuccess.Success);
     });
 
@@ -1998,22 +1977,21 @@ describe('evaluate', () => {
       const rng = createMockRng([15, 10]);
       const result = evaluate(ast, rng);
 
-      // roll total = 15, dc total = 10 + 10 = 20 → 15 < 20 → Failure
+      // dc side draws second: 10 + 10 = 20 → 15 < 20 → Failure
       expect(result.total).toBe(15);
       expect(result.natural).toBe(15);
       expect(result.degree).toBe(DegreeOfSuccess.Failure);
     });
 
     test('Contested check: DC dice do not count as natural d20 source', () => {
-      // Roll-side has no d20; DC-side has a d20 that rolls 20 — must not
-      // influence natural extraction.
+      // The DC-side d20 rolls 20 and must not become the natural.
       const ast = parse('1d6+10 vs 1d20');
       const rng = createMockRng([3, 20]);
       const result = evaluate(ast, rng);
 
       expect(result.total).toBe(13);
       expect(result.natural).toBeUndefined();
-      // total=13, dc=20 → 13 < 20 but 13 > 10 → Failure
+      // 13 < 20 but 13 > dc-10 → Failure
       expect(result.degree).toBe(DegreeOfSuccess.Failure);
     });
 
@@ -2060,17 +2038,17 @@ describe('evaluate', () => {
     });
 
     test('Paren-nested versus throws NESTED_VERSUS at eval time', () => {
-      // Parser allows this (left of `vs` is a literal, not Versus); evaluator
-      // rejects during dc-side evaluation.
+      // The parser allows this — the left of the inner `vs` is a literal, not a
+      // Versus node — so the rejection lands during dc-side evaluation.
       const ast = parse('1d20 vs (5 vs 3)');
 
       expectRollError(() => evaluate(ast, createMockRng([15])), EvaluatorError, 'NESTED_VERSUS');
     });
 
     test('Sibling versus in arithmetic throw NESTED_VERSUS at merge', () => {
-      // `(a vs b) + (c vs d)` — two independent checks collide on one
-      // `RollResult`. There is no semantics for combining two degrees, so the
-      // merge rejects the ambiguity rather than silently dropping one side.
+      // Two independent checks collide on one `RollResult`. There is no semantics
+      // for combining degrees, so the merge rejects rather than silently dropping
+      // one side.
       const ast = parse('(1d20 vs 15) + (1d20 vs 20)');
       const rng = createMockRng([12, 18]);
 
@@ -2102,7 +2080,7 @@ describe('evaluate', () => {
       const rng = createMockRng([12]);
       const result = evaluate(ast, rng);
 
-      // 1d20+5=17 vs DC=20 → 17 < 20 and 17 > dc-10=10 → Failure.
+      // 17 < 20 but 17 > dc-10 → Failure.
       expect(result.degree).toBe(DegreeOfSuccess.Failure);
       expect(result.natural).toBe(12);
     });
@@ -2181,9 +2159,8 @@ describe('evaluate', () => {
     });
 
     test('Meta-d20 on count side: (1d20)d20!! vs 30 — meta d20 filtered from natural', () => {
-      // Draw order: meta count `(1d20)` → 1 (stamped 'dropped'), then outer
-      // `1d20!!` rolls [20, 20, 5] and compound-explodes to 45.
-      // `extractNatural` must skip the meta d20 and use the outer pool's 20.
+      // Draw order: meta count `(1d20)` → 1 ('dropped'), then the outer pool
+      // [20, 20, 5] compounds to 45. `extractNatural` must skip the meta d20.
       const ast = parse('(1d20)d20!! vs 30');
       const rng = createMockRng([1, 20, 20, 5]);
       const result = evaluate(ast, rng);
@@ -2194,10 +2171,9 @@ describe('evaluate', () => {
     });
 
     test('Meta-d20 on sides: 1d(1d20) vs 15 — meta d20 filtered from natural', () => {
-      // Draw order: meta sides `(1d20)` → 20 (stamped 'dropped'), then outer
-      // `1d20` rolls 3. If `extractNatural` leaked the meta d20, two kept
-      // d20s would render natural undefined (ambiguous); correct behavior
-      // returns the outer result (3).
+      // Draw order: meta sides `(1d20)` → 20 ('dropped'), then the outer d20
+      // rolls 3. A leaked meta d20 would make natural ambiguous (undefined)
+      // instead of 3.
       const ast = parse('1d(1d20) vs 15');
       const rng = createMockRng([20, 3]);
       const result = evaluate(ast, rng);
@@ -2208,8 +2184,8 @@ describe('evaluate', () => {
     });
 
     test('Standard explode nat-20: 1d20! vs 35 rolls=[20,5] → natural=20, upgrade CriticalFailure→Failure', () => {
-      // The explosion continuation die is not a primary d20 — the natural
-      // comes from the original die, matching the compound (`!!`) behavior.
+      // A continuation die is not a primary d20 — the natural comes from the
+      // original die, matching `!!`.
       const ast = parse('1d20! vs 35');
       const rng = createMockRng([20, 5]);
       const result = evaluate(ast, rng);
@@ -2372,7 +2348,8 @@ describe('evaluate', () => {
     });
 
     test('evaluator throws UNKNOWN_FUNCTION for unregistered name (defensive)', () => {
-      // Build an AST directly — bypass the parser so we can test the defensive branch.
+      // Hand-built AST — the parser rejects unknown names, so this branch is
+      // otherwise unreachable.
       const ast = {
         type: 'FunctionCall' as const,
         name: 'sqrt',
@@ -2436,14 +2413,10 @@ describe('evaluate', () => {
     });
 
     test('computed modifier count (kh) preserves meta die', () => {
-      // d2 rolls 2 → kh2 → keep the two highest of [1, 3, 5, 6] = [5, 6].
-      //
-      // The keep count draws FIRST, before the 4d6 pool — keep/drop is the
-      // asymmetric case in README, Randomness: `flattenModifierChain`
-      // resolves every modifier argument up front because `evalModifier`
-      // needs the counts to drive selection on the pool it is about to roll.
-      // Threshold-style modifiers (`cs`, `!`, `r`, `>`) post-process an
-      // existing pool, so their metas draw last.
+      // d2 → 2, so kh2 keeps the two highest of [1, 3, 5, 6].
+      // The keep count draws BEFORE the pool: `flattenModifierChain` resolves
+      // modifier arguments up front because selection needs the counts. Threshold
+      // modifiers post-process an existing pool and draw last (README → Randomness).
       const ast = parse('4d6kh(1d2)');
       const rng = createMockRng([2, 1, 3, 5, 6]);
       const result = evaluate(ast, rng);
@@ -2551,8 +2524,8 @@ describe('evaluate', () => {
     });
 
     test('meta dice count against maxDice (budget enforced)', () => {
-      // The meta d4 plus the 2d6 it sizes cost three dice against the budget:
-      // exactly 3 fits, and 2 must throw — otherwise the meta die would be free.
+      // The meta d4 counts against the budget with the 2d6 it sizes: 3 fits,
+      // 2 must throw — otherwise the meta die would be free.
       const result = evaluate(parse('(1d4)d6'), createMockRng([2, 3, 5]), { maxDice: 3 });
 
       expect(result.rolls).toHaveLength(3);
@@ -2566,10 +2539,8 @@ describe('evaluate', () => {
     });
 
     test('mergeMetaRolls strips success/failure modifiers (#69)', () => {
-      // Defense-in-depth: parser rejects SuccessCount in meta positions, but
-      // if a die ever arrives with `'success'`/`'failure'` tags inside a meta
-      // sub-context, mergeMetaRolls must drop those tags so they cannot reach
-      // the top-level successes/failures scan.
+      // Defense-in-depth: the parser rejects SuccessCount in meta positions, but a
+      // stray `'success'`/`'failure'` tag must not reach the top-level scan.
       const source: EvalContext = {
         rolls: [
           { result: 6, sides: 10, modifiers: ['kept', 'success'], critical: false, fumble: false },
@@ -2828,8 +2799,8 @@ describe('evaluate', () => {
     describe('flat-pool mode (single sub-roll with keep/drop)', () => {
       test('{4d10+5d6}kh2 keeps 2 highest across combined 9-die pool', () => {
         const ast = parse('{4d10+5d6}kh2');
-        // 4 d10 draws: [10, 9, 8, 7], 5 d6 draws: [6, 5, 4, 3, 2]
-        // Combined sorted: 10, 9, 8, 7, 6, 5, 4, 3, 2 — kh2 keeps [10, 9]
+        // 4d10 draws [10, 9, 8, 7], 5d6 draws [6, 5, 4, 3, 2] — kh2 across the
+        // flat pool keeps [10, 9].
         const rng = createMockRng([10, 9, 8, 7, 6, 5, 4, 3, 2]);
         const result = evaluate(ast, rng);
 
@@ -2853,10 +2824,8 @@ describe('evaluate', () => {
     describe('sub-roll mode (multi sub-roll with keep/drop)', () => {
       test('{4d6+2d8, 3d20+3, 5d10+1}kh1 keeps highest subtotal', () => {
         const ast = parse('{4d6+2d8, 3d20+3, 5d10+1}kh1');
-        // Sub 1: 4d6 = [1,1,1,1]=4, 2d8 = [1,1]=2 → 6
-        // Sub 2: 3d20 = [5,5,5]=15 → 15+3=18
-        // Sub 3: 5d10 = [1,1,1,1,1]=5 → 5+1=6
-        // Subtotals: [6, 18, 6] — kh1 picks 18
+        // Subtotals: 4d6[1,1,1,1] + 2d8[1,1] = 6; 3d20[5,5,5] + 3 = 18;
+        // 5d10[1,1,1,1,1] + 1 = 6 — kh1 picks 18.
         const rng = createMockRng([1, 1, 1, 1, 1, 1, 5, 5, 5, 1, 1, 1, 1, 1]);
         const result = evaluate(ast, rng);
 
@@ -2880,9 +2849,8 @@ describe('evaluate', () => {
 
       test('dropped sub-roll success tags are stripped from successes count', () => {
         const ast = parse('{2d6>=4, 2d6>=4}kh1');
-        // Sub 1: [5, 5] → 2 successes, subtotal 2. Sub 2: [4, 1] → 1 success,
-        // subtotal 1. kh1 keeps sub 1 — the dropped sub-roll's success must
-        // not leak into RollResult.successes.
+        // Subtotals: sub 1 [5, 5] → 2 successes; sub 2 [4, 1] → 1. kh1 keeps sub 1 —
+        // the dropped sub-roll's success must not leak into `successes`.
         const rng = createMockRng([5, 5, 4, 1]);
         const result = evaluate(ast, rng);
 
@@ -2956,8 +2924,7 @@ describe('evaluate', () => {
 
       test('RNG draw order is left-to-right across sub-expressions', () => {
         const ast = parse('{1d6, 2d8}kh1');
-        // Expected draws: 1d6 first, then 2d8 left-to-right.
-        // Subtotals: [3, 5+6]=[3, 11] — kh1 picks sub 2
+        // Draws left-to-right: 1d6, then 2d8. Subtotals [3, 11] — kh1 picks sub 2.
         const rng = createMockRng([3, 5, 6]);
         const result = evaluate(ast, rng);
 
@@ -2989,9 +2956,8 @@ describe('evaluate', () => {
       });
 
       test('two kept versus sub-rolls still throw NESTED_VERSUS', () => {
-        // kh2 on a 3-sub group keeps subs 0 and 1 (subtotals 18, 6 — sub 2 d4=4
-        // dropped). Both kept subs carry versus metadata, so propagation must
-        // collide via the NESTED_VERSUS guard.
+        // Subtotals [18, 6, 4] — kh2 keeps subs 0 and 1, and both carry versus
+        // metadata, so propagation collides on the NESTED_VERSUS guard.
         const ast = parse('{1d20 vs 15, 1d6 vs 10, 1d4}kh2');
         const rng = createMockRng([18, 6, 4]);
 
@@ -3005,7 +2971,7 @@ describe('evaluate', () => {
         const rng = createMockRng([4, 3]);
         const result = evaluate(ast, rng);
 
-        // Subtotals: [4, 3] — kh1 picks 4. 2 * 4 = 8.
+        // Subtotals: [4, 3] — kh1 picks 4, doubled to 8.
         expect(result.total).toBe(8);
       });
 
@@ -3022,7 +2988,7 @@ describe('evaluate', () => {
         const rng = createMockRng([3, 4, 5]);
         const result = evaluate(ast, rng);
 
-        // Subtotals: [3, 9]. kh1 picks 9. Negate: -9.
+        // Subtotals: [3, 9] — kh1 picks 9, negated to -9.
         expect(result.total).toBe(-9);
       });
     });
@@ -3072,8 +3038,8 @@ describe('evaluate', () => {
     });
 
     test('sort preserves dropped-die flag after keep/drop', () => {
-      // 4d6dl1: drop lowest (2). Kept: [5, 6, 3]. Total: 14.
-      // Sort ascending: [2 dropped, 3, 5, 6]. Total unchanged.
+      // dl1 drops the 2; sorting reorders to [2, 3, 5, 6] without moving the flag
+      // or changing the total.
       const ast = parse('4d6dl1s');
       const rng = createMockRng([5, 2, 6, 3]);
       const result = evaluate(ast, rng);
@@ -3086,8 +3052,7 @@ describe('evaluate', () => {
     });
 
     test('sort after explode reorders the expanded pool', () => {
-      // 4d6!: rolls [6, 2, 3, 5], explode the 6 → rolls 4. Pool: [6, 2, 3, 5, 4]. Total 20.
-      // Sort ascending: [2, 3, 4, 5, 6].
+      // [6, 2, 3, 5]: the 6 explodes → 4, so the sorted pool spans 5 dice.
       const ast = parse('4d6!s');
       const rng = createMockRng([6, 2, 3, 5, 4]);
       const result = evaluate(ast, rng);
@@ -3125,7 +3090,6 @@ describe('evaluate', () => {
     });
 
     test('sort with Fate dice pool', () => {
-      // 4dF → [1, -1, 0, 1]. Sort descending: [1, 1, 0, -1]. Total: 1+(-1)+0+1 = 1.
       const ast = parse('4dFsd');
       const rng = createMockRng([1, -1, 0, 1]);
       const result = evaluate(ast, rng);
@@ -3135,8 +3099,7 @@ describe('evaluate', () => {
     });
 
     test('sort on arithmetic-wrapped pool mixes all dice flat', () => {
-      // (1d6+2d8)s: 1d6=4, 2d8=[5, 2]. Flat pool [4, 5, 2]. Sort asc: [2, 4, 5].
-      // Total is preserved: 4 + (5+2) = 11.
+      // 1d6=4 and 2d8=[5, 2] sort as one flat pool; the total still sums per operand.
       const ast = parse('(1d6+2d8)s');
       const rng = createMockRng([4, 5, 2]);
       const result = evaluate(ast, rng);
@@ -3205,7 +3168,7 @@ describe('evaluate', () => {
       const result = evaluate(ast, rng);
 
       expect(result.total).toBe(38);
-      // Independent overrides — cs side untouched, so the natural 20 keeps
+      // Independent overrides — the cs side is untouched, so the natural 20 keeps
       // its default critical.
       expect(result.rolls.map((d) => d.critical)).toEqual([true, false, false, false]);
       expect(result.rolls.map((d) => d.fumble)).toEqual([false, true, true, false]);
@@ -3274,33 +3237,28 @@ describe('evaluate', () => {
       const rng = createMockRng([20, 18, 5, 19]);
       const result = evaluate(ast, rng);
 
-      // Drop lowest (5). Kept: [20, 18, 19]. Total: 57.
       expect(result.total).toBe(57);
       const dropped = result.rolls.find((d) => d.modifiers.includes('dropped'));
       expect(dropped?.result).toBe(5);
       expect(dropped?.critical).toBe(false);
-      // All kept dice satisfy cs>17, so they're flagged.
+
       const kept = result.rolls.filter((d) => !d.modifiers.includes('dropped'));
       expect(kept.map((d) => d.critical)).toEqual([true, true, true]);
     });
 
     test('cs flags entire expanded explode pool; explosion trigger uses raw face', () => {
-      // 1d6!: rolls [6, 4], explode 6 → rolls another [4]. Pool [6, 4]? Let
-      // me trace: standard-explode re-rolls 6, gets 4, appends. Pool: [6, 4].
-      // Actually mock [6, 4] → rng.nextInt: first draw 6 (pool die), second
-      // draw 4 (explosion). Pool: [6, 4]. Total 10.
+      // [6, 4]: the first draw is the pool die, the second its explosion → pool
+      // [6, 4]. `cs` flags the appended die too, not just the original.
       const ast = parse('1d6!cs>3');
       const rng = createMockRng([6, 4]);
       const result = evaluate(ast, rng);
 
       expect(result.total).toBe(10);
-      // Both dice have result > 3, so both flagged critical.
       expect(result.rolls.every((d) => d.critical === true)).toBe(true);
     });
 
     test('cs with custom threshold does not suppress explode on natural max', () => {
-      // 1d6!cs<1 — no explosion trigger change; the 6 still explodes even
-      // though cs<1 never matches (all critical cleared).
+      // cs<1 never matches, yet the 6 still explodes — cs does not move the trigger.
       const ast = parse('1d6!cs<1');
       const rng = createMockRng([6, 4]);
       const result = evaluate(ast, rng);
@@ -3315,7 +3273,6 @@ describe('evaluate', () => {
       const result = evaluate(ast, rng);
 
       expect(result.total).toBe(16);
-      // Sorted: [2, 3, 5, 6]. cs>4 flags 5 and 6.
       expect(result.rolls.map((d) => d.result)).toEqual([2, 3, 5, 6]);
       expect(result.rolls.map((d) => d.critical)).toEqual([false, false, true, true]);
     });
@@ -3331,8 +3288,8 @@ describe('evaluate', () => {
     });
 
     test('renders expression with default-sentinel codes', () => {
-      // `cscf` lexed as one unknown identifier; whitespace separates the
-      // two bare modifiers.
+      // `cscf` would lex as one unknown identifier — whitespace is what separates
+      // the two bare modifiers.
       const ast = parse('1d20cs cf');
       const rng = createMockRng([10]);
       const result = evaluate(ast, rng);
@@ -3342,8 +3299,8 @@ describe('evaluate', () => {
     });
 
     test('renders expression with mixed defaults and compare points', () => {
-      // Bare `cs` + `cf<3` + `cs=10`. Rendered order: all success thresholds
-      // first, then all fail thresholds — so "cscs=10cf<3".
+      // Rendered order is all success thresholds first, then all fail thresholds —
+      // input `cs` + `cf<3` + `cs=10` comes back as `cscs=10cf<3`.
       const ast = parse('1d20cs cf<3cs=10');
       const rng = createMockRng([10]);
       const result = evaluate(ast, rng);
@@ -3357,22 +3314,20 @@ describe('evaluate', () => {
       const result = evaluate(ast, rng);
 
       expect(result.total).toBe(62);
-      // >= 19 flags 20 and 19.
       expect(result.rolls.map((d) => d.critical)).toEqual([true, true, false, false]);
     });
 
     test('RNG-consuming cs threshold draws pool first, then meta — 4d20cs>=(1d2+17)', () => {
-      // Pins the documented draw order: `evalCritThreshold` evaluates the
-      // 4d20 pool before resolving the threshold meta-expression. RNG order:
-      // pool dice [20, 19, 18, 5] → 1d2 threshold die [2]. Threshold = 19.
+      // Pins the documented draw order: `evalCritThreshold` rolls the 4d20 pool
+      // [20, 19, 18, 5] before resolving the 1d2 threshold meta [2] → 19.
       const ast = parse('4d20cs>=(1d2+17)');
       const rng = createMockRng([20, 19, 18, 5, 2]);
       const result = evaluate(ast, rng);
 
       expect(result.total).toBe(62);
 
-      // Meta die pushed before pool in result.rolls — same shape as the
-      // SuccessCount meta-threshold test above.
+      // The meta die is pushed before the pool in `result.rolls` even though it
+      // drew last.
       const meta = getDie(result.rolls, 0);
       expect(meta.sides).toBe(2);
       expect(meta.result).toBe(2);
@@ -3387,8 +3342,8 @@ describe('evaluate', () => {
     });
 
     test('RNG-consuming cs threshold sanity variant — 4d20cs>=(1d4)', () => {
-      // Distinct sequence to avoid coincidence with the test above.
-      // RNG order: pool [15, 12, 10, 4] → 1d4 threshold [3]. Threshold = 3.
+      // Distinct sequence, so a coincidence cannot carry the test above.
+      // Draws: pool [15, 12, 10, 4] → 1d4 threshold [3] → threshold 3.
       const ast = parse('4d20cs>=(1d4)');
       const rng = createMockRng([15, 12, 10, 4, 3]);
       const result = evaluate(ast, rng);
@@ -3403,13 +3358,12 @@ describe('evaluate', () => {
 
       const pool = result.rolls.slice(1);
       expect(pool.map((d) => d.result)).toEqual([15, 12, 10, 4]);
-      // >= 3 flags all four.
       expect(pool.map((d) => d.critical)).toEqual([true, true, true, true]);
     });
 
     test('RNG-consuming cf threshold draws pool first, then meta — 4d20cf<=(1d3)', () => {
-      // Mirrors the cs draw-order pin for cf. RNG order: pool [20, 2, 1, 15]
-      // → 1d3 threshold [2]. Threshold = 2.
+      // Mirrors the cs draw-order pin for cf: pool [20, 2, 1, 15] → 1d3
+      // threshold [2] → threshold 2.
       const ast = parse('4d20cf<=(1d3)');
       const rng = createMockRng([20, 2, 1, 15, 2]);
       const result = evaluate(ast, rng);
@@ -3424,12 +3378,10 @@ describe('evaluate', () => {
 
       const pool = result.rolls.slice(1);
       expect(pool.map((d) => d.result)).toEqual([20, 2, 1, 15]);
-      // <= 2 flags 2 and 1 as fumble.
       expect(pool.map((d) => d.fumble)).toEqual([false, true, true, false]);
     });
 
     test('cs on Fate dice overrides the always-false defaults', () => {
-      // 4dF: [1, -1, 0, 1]. cs>0 flags both 1s as critical.
       const ast = parse('4dFcs>0');
       const rng = createMockRng([1, -1, 0, 1]);
       const result = evaluate(ast, rng);
@@ -3440,16 +3392,13 @@ describe('evaluate', () => {
     });
 
     test('SuccessCount wrapping CritThreshold leaves success tags independent of crit flags', () => {
-      // 10d10cs>8>=6 — crit flagged for result > 8; success for >= 6.
       const ast = parse('10d10cs>8>=6');
       const rng = createMockRng([10, 9, 8, 7, 6, 5, 4, 3, 2, 1]);
       const result = evaluate(ast, rng);
 
-      // Successes (>= 6): 10, 9, 8, 7, 6 → 5 successes.
       expect(result.successes).toBe(5);
-      // Critical (> 8): 10, 9 → 2 critical dice.
       expect(result.rolls.filter((d) => d.critical).length).toBe(2);
-      // Total is the success count (5) since SuccessCount transforms the pool.
+      // The total is the success count, not the sum — SuccessCount transforms the pool.
       expect(result.total).toBe(5);
     });
 
@@ -3458,23 +3407,21 @@ describe('evaluate', () => {
       const rng = createMockRng([1]);
       const result = evaluate(ast, rng);
 
-      // Both thresholds apply: >19 false for 1, =1 true for 1 → critical.
+      // Both thresholds survive the collapse: >19 misses the 1, =1 matches it.
       expect(getDie(result.rolls, 0).critical).toBe(true);
       expect(result.expression).toBe('1d20cs>19cs=1');
     });
 
     test('single-sub-roll group passthrough — {1d20}kh1cs>18 matches 1d20kh1cs>18', () => {
-      // Stage 3 single-sub-roll passthrough: `{1d20}` is the documented
-      // flat-pool escape hatch and must produce the same total and per-die
-      // critical/fumble flags as the unwrapped form under the same RNG.
+      // `{1d20}` is the documented flat-pool escape hatch — under the same RNG it
+      // must match the unwrapped form die-for-die.
       const grouped = evaluate(parse('{1d20}kh1cs>18'), createMockRng([20]));
       const flat = evaluate(parse('1d20kh1cs>18'), createMockRng([20]));
 
       expect(grouped.total).toBe(flat.total);
       expect(grouped.rolls).toEqual(flat.rolls);
-      // ! The notation MUST round-trip — braces survive in `expression`,
-      //   so the user's input is preserved verbatim. A future renderer
-      //   refactor that strips braces would silently regress this.
+      // ! Braces must survive in `expression` — a renderer that strips them would
+      // ! silently rewrite the user's notation.
       expect(grouped.expression).toBe('{1d20}kh1cs>18');
       expect(flat.expression).toBe('1d20kh1cs>18');
     });
@@ -3509,10 +3456,9 @@ describe('evaluate', () => {
   });
 
   describe('cross-family modifier combinations (#134)', () => {
-    // Draw order per README, Randomness: keep/drop counts resolve before
-    // the base pool (all literal here, so no meta draws), threshold-style
-    // modifiers post-process a pool that already exists. Every sequence below
-    // is therefore `pool dice left-to-right, then explosion/reroll follow-ups`.
+    // Draw order per README → Randomness: keep/drop counts resolve before the pool
+    // (all literal here), threshold modifiers post-process it. Every sequence below
+    // is therefore pool left-to-right, then explosion/reroll follow-ups.
 
     test('4d6!!kh3 compounds first, then keeps the highest three', () => {
       // Draws: 4d6 pool [6, 3, 2, 5], then die 1 compounds on its 6 → 4.
@@ -3529,9 +3475,8 @@ describe('evaluate', () => {
     });
 
     test('4d6!pkh3 keeps the highest three of the penetrated pool', () => {
-      // Draws: 4d6 pool [6, 3, 2, 5], then die 1 penetrates on its 6 → raw 4,
-      // stored as 3. The appended die sits directly after its originator, so
-      // the pool becomes [6, 3, 3, 2, 5] before kh3 selects.
+      // Draws: 4d6 pool [6, 3, 2, 5], then die 1 penetrates on its 6 → raw 4 stored
+      // as 3, appended right after its originator → [6, 3, 3, 2, 5] before kh3.
       const result = evaluate(parse('4d6!pkh3'), createMockRng([6, 3, 2, 5, 4]));
 
       expect(result.rolls).toHaveLength(5);
@@ -3558,25 +3503,23 @@ describe('evaluate', () => {
     });
 
     test('4d6cf<2r<3 flags fumbles before the reroll replaces the die', () => {
-      // Draws: 4d6 pool [1, 5, 2, 4], then one replacement per matching die —
-      // 6 for the 1, 3 for the 2. `cf<2` is the inner modifier, so the flag
-      // lands on the original die even though the reroll then drops it.
+      // Draws: 4d6 pool [1, 5, 2, 4], then one replacement per match — 6 for the 1,
+      // 3 for the 2. `cf<2` is the inner modifier, so the flag lands on the original
+      // die even though the reroll then drops it.
       const result = evaluate(parse('4d6cf<2r<3'), createMockRng([1, 5, 2, 4, 6, 3]));
 
       expect(result.rolls).toHaveLength(6);
       expect(getDie(result.rolls, 0).fumble).toBe(true);
       expect(getDie(result.rolls, 0).modifiers).toEqual(['rerolled', 'dropped']);
-      // The replacement dice were rolled after `cf` ran, so they keep the
-      // default fumble rule (`result === 1`).
+      // Replacements roll after `cf` ran, so they keep the default rule (result === 1).
       expect(getDie(result.rolls, 1).fumble).toBe(false);
       expect(result.total).toBe(6 + 5 + 3 + 4);
       expect(result.rendered).toBe('4d6cf<2r<3[~~1~~, 6, 5, ~~2~~, 3, 4] = 18');
     });
 
     test('6d6!!>=8 binds the comparison to the explode, not to success counting', () => {
-      // `>=8` is unreachable on a d6, so nothing compounds and the result is a
-      // plain sum — `successes` stays undefined, proving this is not a
-      // SuccessCount node.
+      // `>=8` is unreachable on a d6: nothing compounds and `successes` stays
+      // undefined, proving the comparison bound to the explode, not SuccessCount.
       const result = evaluate(parse('6d6!!>=8'), createMockRng([6, 3, 2, 5, 4, 6]));
 
       expect(result.rolls).toHaveLength(6);
@@ -3625,8 +3568,7 @@ describe('evaluate', () => {
     });
 
     test('a penetrating chain just under the cap completes', () => {
-      // Three explosions then a non-matching roll: raw 6,6,6,2 → stored
-      // 6 + 5 + 5 + 1.
+      // Three explosions then a non-matching roll: raw 6,6,6,2 → stored 6+5+5+1.
       const result = evaluate(parse('1d6!p'), createMockRng([6, 6, 6, 2]), {
         maxExplodeIterations: 3,
       });
@@ -3636,9 +3578,8 @@ describe('evaluate', () => {
     });
 
     test('a Fate pool reaching the explode evaluator never rolls a zero-sided die', () => {
-      // ? Hand-built AST — `parseExplode` rejects `2dF!` with
-      //   INVALID_EXPLODE_TARGET, so `canExplode`'s `sides < 1` guard is only
-      //   reachable from a tree the parser cannot produce.
+      // Hand-built AST — `parseExplode` rejects `2dF!` with INVALID_EXPLODE_TARGET,
+      // so `canExplode`'s `sides < 1` guard is unreachable from parser output.
       const ast: ASTNode = {
         type: 'Explode',
         variant: 'standard',
@@ -3653,9 +3594,9 @@ describe('evaluate', () => {
   });
 
   describe('error contract escapes (#128)', () => {
-    // ? Above the engine's argument-list ceiling (~640k in Bun 1.3 on Linux),
-    //   which is where `push(...array)` and `Math.max(...array)` used to blow
-    //   the stack with a bare `RangeError`.
+    // ? Above Bun 1.3's ~640k argument-list ceiling on Linux — where
+    // ? `push(...array)` and `Math.max(...array)` used to blow the stack with a
+    // ? bare `RangeError`.
     const OVER_SPREAD_LIMIT = 700_000;
 
     test('sides beyond the safe-integer ceiling raise a typed error', () => {
@@ -3702,8 +3643,8 @@ describe('evaluate', () => {
     });
 
     test('max/min past the spread limit fold instead of overflowing the stack', () => {
-      // ? Hand-built AST — the equivalent notation is a multi-megabyte string
-      //   whose lexing dominates the runtime without testing anything extra.
+      // Hand-built AST — the equivalent notation is a multi-megabyte string whose
+      // lexing would dominate the runtime.
       const args: ASTNode[] = Array.from({ length: OVER_SPREAD_LIMIT }, (_, i) => ({
         type: 'Literal',
         value: i % 97,
@@ -3718,8 +3659,8 @@ describe('evaluate', () => {
     });
 
     test('max propagates NaN the way Math.max does', () => {
-      // `10**400` overflows to Infinity, so `Infinity - Infinity` is NaN — the
-      // fold must keep poisoning the total so NON_FINITE_RESULT still fires.
+      // `10**400` overflows to Infinity, so `Infinity - Infinity` is NaN — the fold
+      // must keep propagating it so NON_FINITE_RESULT still fires.
       const error = captureError(() =>
         evaluate(parse('max(10**400-10**400, 1)'), createMockRng([])),
       );

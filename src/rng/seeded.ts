@@ -76,7 +76,6 @@ export class SeededRNG implements RNG {
   private s3: number;
 
   constructor(seed?: string | number) {
-    // Initialize state to zero, will be set by initState
     this.s0 = 0;
     this.s1 = 0;
     this.s2 = 0;
@@ -84,7 +83,6 @@ export class SeededRNG implements RNG {
 
     this.initState(seed);
 
-    // Warm-up: discard the first draws for better initial distribution
     for (let i = 0; i < WARMUP_DRAWS; i++) {
       this.nextUint32();
     }
@@ -93,7 +91,7 @@ export class SeededRNG implements RNG {
   private initState(seed?: string | number): void {
     const numSeed = this.toNumericSeed(seed);
 
-    // Split seed into 4 state values using splitmix32
+    // splitmix32 expansion into four state words.
     let s = numSeed;
     const state: number[] = [];
 
@@ -110,7 +108,7 @@ export class SeededRNG implements RNG {
     this.s2 = state[2] ?? 0;
     this.s3 = state[3] ?? 0;
 
-    // Ensure non-zero state (xorshift requires at least one non-zero)
+    // All-zero is a fixed point for xorshift — at least one word must be non-zero.
     if (this.s0 === 0 && this.s1 === 0 && this.s2 === 0 && this.s3 === 0) {
       this.s0 = 1;
     }
@@ -124,7 +122,7 @@ export class SeededRNG implements RNG {
   }
 
   private hashString(str: string): number {
-    // djb2 hash algorithm
+    // djb2 — `hash * 33 + c`, held in uint32 by the `>>> 0`.
     let hash = DJB2_SEED;
     for (let i = 0; i < str.length; i++) {
       hash = ((hash << 5) + hash + str.charCodeAt(i)) >>> 0;
@@ -133,7 +131,7 @@ export class SeededRNG implements RNG {
   }
 
   private nextUint32(): number {
-    // xorshift128 algorithm
+    // xorshift128 — the 11/8/19 shift triple is part of the algorithm, not a tunable.
     let t = this.s3;
     const s = this.s0;
 
@@ -157,7 +155,6 @@ export class SeededRNG implements RNG {
    * @returns A float in `[0, 1)`
    */
   next(): number {
-    // Convert uint32 to [0, 1) float
     return this.nextUint32() / UINT32_SPACE;
   }
 
@@ -190,13 +187,11 @@ export class SeededRNG implements RNG {
    * ```
    */
   nextInt(min: number, max: number): number {
-    // Handle inverted bounds
     const lo = min > max ? max : min;
     const hi = min > max ? min : max;
 
     const range = hi - lo + 1;
 
-    // Single value case
     if (range <= 1) {
       return lo;
     }
@@ -207,8 +202,8 @@ export class SeededRNG implements RNG {
       return lo + this.nextBoundedWide(range);
     }
 
-    // Rejection sampling for unbiased distribution
-    // Avoids modulo bias by rejecting values that would cause uneven distribution
+    // Rejection sampling: discard the leading `[0, threshold)` values so the
+    // accepted zone `[threshold, 2^32)` is an exact multiple of `range`.
     const threshold = (UINT32_SPACE - range) % range;
     let value: number;
     do {
@@ -229,8 +224,7 @@ export class SeededRNG implements RNG {
       throw new RangeError(`nextInt range ${range} exceeds 2^53 and cannot be sampled exactly`);
     }
 
-    // Largest multiple of `range` below 2^53 — values at or above it are
-    // rejected to avoid modulo bias.
+    // Largest multiple of `range` below 2^53 — values at or above it would bias the modulo.
     const limit = Math.floor(MAX_EXACT_INT / range) * range;
     let value: number;
     do {

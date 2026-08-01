@@ -65,7 +65,6 @@ describe('Lexer', () => {
     });
 
     it('should throw for trailing dot not followed by digit', () => {
-      // '1.' followed by something that is not a digit should error
       expect(() => lex('1.+2')).toThrow(LexerError);
     });
 
@@ -532,11 +531,8 @@ describe('Lexer', () => {
     });
 
     it('should not confuse function names with dice/modifiers', () => {
-      // 'd' alone is still DICE
       expect(lex('d')[0]?.type).toBe(TokenType.DICE);
-      // 'k' alone is still KEEP_HIGH
       expect(lex('k')[0]?.type).toBe(TokenType.KEEP_HIGH);
-      // 'kh' is still KEEP_HIGH
       expect(lex('kh')[0]?.type).toBe(TokenType.KEEP_HIGH);
     });
   });
@@ -680,8 +676,7 @@ describe('Lexer', () => {
           type: TokenType.AT,
           value: 'Strength Modifier-1',
           position: 0,
-          // Braced form consumes `@{...}` — end covers the braces, not just
-          // the captured name.
+          // `end` covers the whole `@{...}` span, not just the captured name.
           end: 22,
         });
       });
@@ -768,8 +763,8 @@ describe('Lexer', () => {
     });
 
     it('covers consumed input where value differs from source', () => {
-      // dF normalizes to 'df'; @{..} strips braces from value — end must
-      // still cover the consumed source characters.
+      // `dF` normalizes to 'df' and `@{..}` drops the braces from `value` — `end`
+      // still spans every consumed character.
       expect(lex('4DF')[1]).toEqual({
         type: TokenType.DICE_FATE,
         value: 'df',
@@ -847,9 +842,9 @@ describe('Lexer', () => {
   });
 
   describe('unicode and whitespace boundaries', () => {
-    // These pin the lexer's *current* behavior. Only ASCII space, tab, CR and
-    // LF are whitespace; everything else that looks blank or numeric to a
-    // human is an unexpected character with a code-point-accurate position.
+    // Characterization tests: only ASCII space, tab, CR and LF are whitespace —
+    // anything else that looks blank or numeric to a human is an unexpected
+    // character, reported at a code-point-accurate position.
 
     it('should reject a no-break space as an unexpected character', () => {
       const error = expectRollError(() => lex('2d6 +3'), LexerError, 'UNEXPECTED_CHARACTER');
@@ -907,8 +902,8 @@ describe('Lexer', () => {
     });
 
     it('should reject a bare @ followed by a non-ASCII name', () => {
-      // The bare form is `[A-Za-z_][A-Za-z0-9_]*` only — `@力` reads as an
-      // empty variable name rather than a unicode identifier.
+      // The bare form is `[A-Za-z_][A-Za-z0-9_]*`, so `@力` reads as an empty name
+      // rather than a unicode identifier.
       const error = expectRollError(() => lex('@力'), LexerError, 'UNEXPECTED_CHARACTER');
 
       expect(error.message).toContain('Empty @ variable name');

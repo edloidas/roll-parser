@@ -29,7 +29,7 @@ async function main(): Promise<void> {
   let dump = '';
 
   // ! `debug` and `samples` must stay disabled — mitata's default JSON dump
-  //   embeds every raw sample and is ~23 MB for this suite.
+  // ! embeds every raw sample and is ~23 MB for this suite.
   await run({
     format: { json: { debug: false, samples: false } },
     print: (chunk: string) => {
@@ -50,8 +50,9 @@ async function main(): Promise<void> {
   }
 
   // ! Never write a partial series: the CI trend compares against whatever
-  //   landed last, so a shrunk or corrupt export reads as a phantom regression
-  //   on every later run (#157).
+  // ! landed last, so a shrunk export reads as a phantom regression on every
+  // ! later run, and a renamed or duplicated record keeps the count valid while
+  // ! the real series stalls.
   if (failures.length > 0) {
     console.error('bench-json: refusing to write a partial or corrupt export');
 

@@ -11,10 +11,8 @@
 
 import { main } from './main.js';
 
-// Minimal host-process surface this entry needs. The library build compiles
-// with no Node/Bun type packages (`types: []` in tsconfig.build.json) so that
-// runtime globals in library code are type errors; this module-scoped declare
-// keeps the one legitimate use local without leaking `process` program-wide.
+// Declared locally because the library build sets `types: []` — runtime globals
+// are type errors everywhere, and this is the one place `process` is legitimate.
 declare const process: {
   argv: string[];
   exitCode: number | undefined;
@@ -32,6 +30,6 @@ const exitCode = main({
   },
 });
 
-// Left unset on success — assigning 0 would override an exit code a
-// surrounding runtime hook may already have set.
+// Left unset on success — assigning 0 would clobber an exit code a surrounding
+// runtime hook may already have set.
 if (exitCode !== 0) process.exitCode = exitCode;

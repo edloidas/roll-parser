@@ -34,13 +34,12 @@ describe('roll() integration', () => {
     });
 
     test('complex expression', () => {
-      // (1d6+1)*2 with roll of 4 → (4+1)*2 = 10
       const result = roll('(1d6+1)*2', { rng: createMockRng([4]) });
       expect(result.total).toBe(10);
     });
 
     test('multiple dice groups', () => {
-      // 2d6+1d4 with rolls [3, 5] and [2] → 8 + 2 = 10
+      // [3, 5] fills the 2d6, [2] the 1d4 → 8 + 2 = 10.
       const result = roll('2d6+1d4', { rng: createMockRng([3, 5, 2]) });
       expect(result.total).toBe(10);
       expect(result.rolls).toHaveLength(3);
@@ -48,9 +47,8 @@ describe('roll() integration', () => {
   });
 
   describe('modifiers', () => {
-    // Per-modifier selection semantics are pinned once in
-    // `evaluator/evaluator.test.ts`. All this file owes is proof that `roll()`
-    // forwards the notation to the same evaluator and surfaces its flags.
+    // Selection semantics are pinned in `evaluator/evaluator.test.ts`; this file
+    // only owes proof that `roll()` reaches that evaluator and surfaces its flags.
     test('roll() wires keep/drop through to the evaluator', () => {
       // Rolls: [3, 1, 4, 2] → keep [3, 4, 2] = 9, drop the 1.
       const result = roll('4d6kh3', { rng: createMockRng([3, 1, 4, 2]) });
@@ -145,8 +143,8 @@ describe('roll() integration', () => {
     });
 
     test('ten fixed seeds decorrelate into at least five distinct d100 totals', () => {
-      // Deterministic, not statistical: the seeds are fixed, so this is a
-      // pinned property of `SeededRNG`'s seed hashing, not a sampling claim.
+      // Deterministic, not statistical: the seeds are fixed, so this pins
+      // `SeededRNG`'s seed hashing rather than making a sampling claim.
       const results = new Set<number>();
       for (let i = 0; i < 10; i++) {
         results.add(roll('1d100', { seed: `seed-${i}` }).total);
@@ -158,7 +156,6 @@ describe('roll() integration', () => {
     test('string and numeric seeds work', () => {
       const r1 = roll('3d6', { seed: 'hello' });
       const r2 = roll('3d6', { seed: 42 });
-      // Both should produce valid results
       expect(r1.total).toBeGreaterThanOrEqual(3);
       expect(r1.total).toBeLessThanOrEqual(18);
       expect(r2.total).toBeGreaterThanOrEqual(3);
@@ -168,13 +165,11 @@ describe('roll() integration', () => {
 
   describe('PRD 3.7 regression: negative numbers', () => {
     test('negative result is NOT clamped to zero', () => {
-      // Roll 1 on d4, subtract 5 → -4 (NOT 0)
       const result = roll('1d4-5', { rng: createMockRng([1]) });
       expect(result.total).toBe(-4);
     });
 
     test('unary minus on dice', () => {
-      // -1d4 with roll of 3 → -3
       const result = roll('-1d4', { rng: createMockRng([3]) });
       expect(result.total).toBe(-3);
     });
@@ -206,32 +201,29 @@ describe('roll() integration', () => {
     });
 
     test('computed dice count', () => {
-      // (1+1)d6 → 2d6
       const result = roll('(1+1)d6', { rng: createMockRng([3, 4]) });
       expect(result.total).toBe(7);
       expect(result.rolls).toHaveLength(2);
     });
 
     test('computed sides', () => {
-      // 2d(3*2) → 2d6
       const result = roll('2d(3*2)', { rng: createMockRng([3, 4]) });
       expect(result.total).toBe(7);
     });
 
     test('deeply nested expression', () => {
-      // ((1+1)d(2*3))kh2 → 2d6kh2
       const result = roll('((1+1)d(2*3))kh2', { rng: createMockRng([3, 5]) });
       expect(result.total).toBe(8);
     });
 
     test('power operator right-associativity', () => {
-      // 2**3**2 = 2^(3^2) = 2^9 = 512
+      // 2^(3^2) = 512, not (2^3)^2 = 64.
       const result = roll('2**3**2', {});
       expect(result.total).toBe(512);
     });
 
     test('operator precedence', () => {
-      // 1+2*3 = 1 + 6 = 7 (not 9)
+      // 1 + (2*3) = 7, not (1+2)*3 = 9.
       const result = roll('1+2*3', {});
       expect(result.total).toBe(7);
     });
@@ -373,8 +365,8 @@ describe('roll() integration', () => {
     });
 
     test('chained modifiers apply independently to full pool', () => {
-      // Each modifier sees the full original pool; drop sets are merged via union
-      // dl1 drops {idx1}, kh3 drops {idx1} → union {1} → total 9
+      // Each modifier sees the full pool and the drop sets are unioned:
+      // [3,1,4,2] → dl1 drops {1}, kh3 drops {1} → union {1} → total 9.
       const result = roll('4d6dl1kh3', { rng: createMockRng([3, 1, 4, 2]) });
       expect(result.total).toBe(9);
     });
@@ -709,7 +701,7 @@ describe('roll() integration', () => {
     });
 
     test('flat-pool: {4d6+2d8}kh3 keeps 3 highest across combined pool', () => {
-      // 4d6: [6, 6, 6, 1], 2d8: [8, 1]. Combined [6, 6, 6, 1, 8, 1]. kh3 → 8+6+6 = 20
+      // 4d6 [6,6,6,1] and 2d8 [8,1] merge into one pool; kh3 → 8+6+6 = 20.
       const result = roll('{4d6+2d8}kh3', { rng: createMockRng([6, 6, 6, 1, 8, 1]) });
 
       expect(result.total).toBe(20);
