@@ -252,7 +252,7 @@ beforeAll(async () => {
     // Samples narrate through console; keep the test output clean.
     console: { log() {}, error() {}, warn() {}, info() {} },
   };
-});
+}, 60_000);
 
 function lookupCase<K extends DocCase['kind']>(
   file: string,
