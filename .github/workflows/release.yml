@@ -239,6 +239,32 @@ jobs:
       - name: Execute browser bundle
         run: node "$RUNNER_TEMP/smoke/bundle.js"
 
+      # The Node-22.12 steps above are done proving the engines floor; the
+      # browser leg needs lts/* so `node run.ts` gets native type stripping.
+      - name: Setup Node.js (lts for the browser harness)
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: lts/*
+          # ! No package-lock.json in this repo — setup-node's npm auto-cache
+          # ! (on by default since v5) hard-fails when it cannot find one.
+          package-manager-cache: false
+
+      - name: Resolve Playwright version
+        id: playwright-version
+        run: echo "version=$(node -p "require('./scripts/browser-smoke/node_modules/playwright/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
+
+      - name: Install Chromium
+        run: ./scripts/browser-smoke/node_modules/.bin/playwright install --with-deps chromium
+
+      - name: Execute bundle in headless Chromium
+        run: node scripts/browser-smoke/run.ts "$RUNNER_TEMP/smoke/bundle.js"
+
   # Deliberately minimal: no checkout, no dependency install, no cache — the
   # only thing that runs next to the OIDC publishing identity is npm itself,
   # publishing the exact tarball `validate` produced and `smoke` verified.
