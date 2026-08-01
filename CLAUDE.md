@@ -2,6 +2,11 @@
 
 Dice roll notation parser. TypeScript library and CLI. Built with Bun.
 
+## Rules
+
+Also read `.claude/rules/` (same files via `.agents/rules/`): `comments.md`,
+`project-testing.md`, `rng.md`.
+
 ## Commands
 
 ```bash
