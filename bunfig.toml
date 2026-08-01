@@ -8,6 +8,10 @@ minimumReleaseAge = 259200
 
 [test]
 coverageSkipTestFiles = true
+# `readme.test.ts` imports the built package in-process (the self-reference),
+# which would otherwise pull every `dist/` file into the coverage report and
+# double-count the library against the thresholds below.
+coveragePathIgnorePatterns = ["dist/**"]
 
 # Enforced only when coverage runs (`bun test --coverage`, `test:ci`) — plain
 # `bun test` stays fast. This is the only place the numbers live; CONTRIBUTING.md

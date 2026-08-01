@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { ParseError } from './parser/parser.js';
-import { expectRollError } from './test-helpers.js';
+import { buildDist, expectRollError } from './test-helpers.js';
 
 describe('expectRollError', () => {
   const throwParseError = () => {
@@ -29,5 +29,13 @@ describe('expectRollError', () => {
         'UNEXPECTED_TOKEN',
       ),
     ).toThrow('Expected ParseError');
+  });
+});
+
+describe('buildDist', () => {
+  it('fails when the build command exits non-zero', async () => {
+    await expect(buildDist(['bun', '-e', 'process.exit(1)'])).rejects.toThrow(
+      'Failed to rebuild dist/ for tests',
+    );
   });
 });
