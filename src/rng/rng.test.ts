@@ -677,6 +677,14 @@ describe('SeededRNG golden sequences', () => {
   // so it resamples with probability ~9.3e-10. `reject` draws from range 2^31 + 1
   // instead, where the single acceptance zone rejects ~50% of draws, so every
   // committed vector below crosses the resample loop at least once.
+  //
+  // The two-draw path has its own resample loop, and neither `wide` nor `safe`
+  // can reach it: at range 2^40 the limit lands on exactly 2^53 while a composed
+  // value tops out at 2^53 - 1, and at range 2^53 - 1 only that single value is
+  // rejected. `wideReject` draws from range 2^52 + 1, where the limit is 2^52 + 1
+  // and half of all composed values reject. Accepted values there are below the
+  // range, so `value % range` is the identity — these vectors pin the composed
+  // 53-bit value itself, shift and floor included.
   type GoldenVector = {
     seed: string | number;
     d6: number[];
@@ -685,6 +693,7 @@ describe('SeededRNG golden sequences', () => {
     reject: number[];
     wide: number[];
     safe: number[];
+    wideReject: number[];
   };
 
   const GOLDEN: Record<string, GoldenVector> = {
@@ -696,6 +705,10 @@ describe('SeededRNG golden sequences', () => {
       reject: [1580259507, 1575359871, 937607533, 764651437, 1684383620, 919775968],
       wide: [116343422147, 497157168388],
       safe: [7817644016909507, 693189482667268],
+      wideReject: [
+        693189482667267, 3176157146446936, 1976673980336290, 452448453243508, 3559839886915177,
+        3389932715744099,
+      ],
     },
     'negative seed -1': {
       seed: -1,
@@ -705,6 +718,10 @@ describe('SeededRNG golden sequences', () => {
       reject: [1073777196, 314478049, 217376083, 994101032, 1576508477, 1979849872],
       wide: [74183759826, 672876460720],
       safe: [6755473624815570, 4959470317730480],
+      wideReject: [
+        858771368500583, 3629814480836450, 2927187252872228, 149226975691410, 726649644946738,
+        821976373484351,
+      ],
     },
     'floating-point seed 1.9': {
       seed: 1.9,
@@ -714,6 +731,10 @@ describe('SeededRNG golden sequences', () => {
       reject: [91116933, 1549476208, 258777668, 580183402, 1882066922, 950266993],
       wide: [870549654886, 430271753621],
       safe: [4694685688630630, 7753086759202197],
+      wideReject: [
+        4234367612857021, 2533288020562588, 664005297178049, 2995030272424407, 4034260740604407,
+        1786175373830498,
+      ],
     },
     // NaN and Infinity coerce to the same state; the equivalence is pinned in
     // the reproducibility block above, so one vector covers all three.
@@ -725,6 +746,10 @@ describe('SeededRNG golden sequences', () => {
       reject: [1935942952, 1487510830, 1149919853, 150393330, 187493854, 512190569],
       wide: [970750698613, 308149120133],
       safe: [682667959919733, 547864939752581],
+      wideReject: [
+        682667959919732, 547864939752580, 3181159321247450, 989889649796509, 3425408250135640,
+        313620509887739,
+      ],
     },
     'numeric seed above 2^32': {
       seed: 2 ** 32 + 5,
@@ -734,6 +759,10 @@ describe('SeededRNG golden sequences', () => {
       reject: [297114123, 1592645242, 1672827471, 1836300427, 605900959, 1596757657],
       wide: [596162786996, 861340885102],
       safe: [1542111464928948, 30548154835054],
+      wideReject: [
+        1542111464928947, 30548154835053, 623843339908028, 3838626888410514, 2321470321548071,
+        380896102335477,
+      ],
     },
     'string seed': {
       seed: 'test-seed',
@@ -743,6 +772,10 @@ describe('SeededRNG golden sequences', () => {
       reject: [985910170, 1877358680, 1380869456, 546779057, 351015751, 1399582936],
       wide: [116392385324, 521626891297],
       safe: [2261811810720556, 6571203114480673],
+      wideReject: [
+        2261811810720555, 674166147513543, 2669292741643437, 447046198381004, 4098452652892475,
+        1452428429935220,
+      ],
     },
     'empty string seed': {
       seed: '',
@@ -752,6 +785,10 @@ describe('SeededRNG golden sequences', () => {
       reject: [1857383634, 1032979856, 1977533166, 1348229753, 1402352419, 794292105],
       wide: [745620877889, 1074860331813],
       safe: [8398815433830977, 4330951650513701],
+      wideReject: [
+        4330951650513700, 1022413303583623, 65650428611467, 2489004198038576, 2696923828270536,
+        4263514600660599,
+      ],
     },
     'unicode string seed': {
       seed: '🎲✨',
@@ -761,6 +798,10 @@ describe('SeededRNG golden sequences', () => {
       reject: [763100762, 1627261331, 964817632, 690224875, 1399340448, 1339929417],
       wide: [120906428288, 988545271715],
       safe: [4311305998937984, 2559552103106467],
+      wideReject: [
+        4311305998937983, 2559552103106466, 1249296834506575, 2094143232225342, 4483399072716490,
+        3310697982638483,
+      ],
     },
   };
 
@@ -781,6 +822,9 @@ describe('SeededRNG golden sequences', () => {
       expect(
         draws(new SeededRNG(v.seed), v.safe.length, (r) => r.nextInt(1, Number.MAX_SAFE_INTEGER)),
       ).toEqual(v.safe);
+      expect(
+        draws(new SeededRNG(v.seed), v.wideReject.length, (r) => r.nextInt(0, 2 ** 52)),
+      ).toEqual(v.wideReject);
     });
   }
 });
