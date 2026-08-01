@@ -33,7 +33,7 @@ updates:
   - package-ecosystem: bun
     directory: /
     schedule:
-      interval: weekly
+      interval: monthly
     commit-message:
       prefix: chore
     labels:
