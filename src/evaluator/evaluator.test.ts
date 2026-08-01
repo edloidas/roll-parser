@@ -642,6 +642,115 @@ describe('evaluate', () => {
     });
   });
 
+  describe('single keep/drop selection (count 1)', () => {
+    test('kh1 tie keeps the first occurrence of the highest', () => {
+      const ast = parse('3d6kh1');
+      const rng = createMockRng([5, 5, 2]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(5);
+      expect(getDie(result.rolls, 0).modifiers).toContain('kept');
+      expect(getDie(result.rolls, 1).modifiers).toContain('dropped');
+      expect(getDie(result.rolls, 2).modifiers).toContain('dropped');
+    });
+
+    test('kl1 tie keeps the first occurrence of the lowest', () => {
+      const ast = parse('3d6kl1');
+      const rng = createMockRng([4, 2, 2]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(2);
+      expect(getDie(result.rolls, 0).modifiers).toContain('dropped');
+      expect(getDie(result.rolls, 1).modifiers).toContain('kept');
+      expect(getDie(result.rolls, 2).modifiers).toContain('dropped');
+    });
+
+    test('dh1 tie drops the first occurrence of the highest', () => {
+      const ast = parse('3d6dh1');
+      const rng = createMockRng([5, 5, 2]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(7); // 5 + 2
+      expect(getDie(result.rolls, 0).modifiers).toContain('dropped');
+      expect(getDie(result.rolls, 1).modifiers).toContain('kept');
+      expect(getDie(result.rolls, 2).modifiers).toContain('kept');
+    });
+
+    test('dl1 tie drops the first occurrence of the lowest', () => {
+      const ast = parse('3d6dl1');
+      const rng = createMockRng([4, 2, 2]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(6); // 4 + 2
+      expect(getDie(result.rolls, 0).modifiers).toContain('kept');
+      expect(getDie(result.rolls, 1).modifiers).toContain('dropped');
+      expect(getDie(result.rolls, 2).modifiers).toContain('kept');
+    });
+
+    test('all-tied pool selects exactly one die', () => {
+      const kh = evaluate(parse('3d6kh1'), createMockRng([4, 4, 4]));
+      expect(kh.total).toBe(4);
+      expect(getDie(kh.rolls, 0).modifiers).toContain('kept');
+      expect(kh.rolls.filter((r) => r.modifiers.includes('dropped'))).toHaveLength(2);
+
+      const dl = evaluate(parse('3d6dl1'), createMockRng([4, 4, 4]));
+      expect(dl.total).toBe(8);
+      expect(getDie(dl.rolls, 0).modifiers).toContain('dropped');
+      expect(dl.rolls.filter((r) => r.modifiers.includes('dropped'))).toHaveLength(1);
+    });
+
+    test('kh1kl1 chain unions both drop sets on the shared mask', () => {
+      // [7,15]: kh1 drops idx0; kl1 drops idx1 and must not clear kh1's mark.
+      const ast = parse('2d20kh1kl1');
+      const rng = createMockRng([7, 15]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(0);
+      expect(result.rolls.every((r) => r.modifiers.includes('dropped'))).toBe(true);
+    });
+
+    test('dl1 skips rerolled intermediates', () => {
+      // Die 0: 1 (r<2 matches) → 4. Die 1: 3. Final pool [4, 3] — the
+      // intermediate 1 stays dropped and must not absorb the dl1.
+      const ast = parse('2d6r<2dl1');
+      const rng = createMockRng([1, 3, 4]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(4);
+      expect(getDie(result.rolls, 0).modifiers).toEqual(['rerolled', 'dropped']);
+      expect(getDie(result.rolls, 1).modifiers).toContain('kept');
+      expect(getDie(result.rolls, 2).modifiers).toContain('dropped');
+    });
+
+    test('computed kl count skips the meta die', () => {
+      // Meta d2 → 1, pool [15, 7]. kl1 keeps 7 — the meta die's 1 is not
+      // eligible to win lowest.
+      const ast = parse('2d20kl(1d2)');
+      const rng = createMockRng([1, 15, 7]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(7);
+      const metaDie = getDie(result.rolls, 0);
+      expect(metaDie.modifiers).toContain('meta');
+      expect(metaDie.modifiers).toContain('dropped');
+      expect(getDie(result.rolls, 1).modifiers).toContain('dropped');
+      expect(getDie(result.rolls, 2).modifiers).toContain('kept');
+    });
+
+    test("kh1 skips a preceding chain's losers", () => {
+      // Parse: Modifier(kh1, Reroll(r>6, Modifier(dh1, Dice))). dh1 drops
+      // the 5; the no-op reroll splits the chains, so kh1 sees it already
+      // dropped and must keep the 2 instead.
+      const ast = parse('2d6dh1r>6kh1');
+      const rng = createMockRng([5, 2]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(2);
+      expect(getDie(result.rolls, 0).modifiers).toContain('dropped');
+      expect(getDie(result.rolls, 1).modifiers).toContain('kept');
+    });
+  });
+
   describe('critical and fumble detection', () => {
     test('detects critical (max value)', () => {
       const ast = parse('1d20');
@@ -1357,6 +1466,17 @@ describe('evaluate', () => {
         const result = evaluate(ast, rng);
 
         expect(result.total).toBe(3);
+      });
+
+      test('reroll then keep-2 skips the intermediate in the sorted path', () => {
+        // Die 0: 1 (r<2 matches) → 4. Dice 1-2: 5, 3. kh2 sorts [4, 5, 3]
+        // and keeps 5 + 4 — the dropped intermediate 1 is never eligible.
+        const ast = parse('3d6r<2kh2');
+        const rng = createMockRng([1, 5, 3, 4]);
+        const result = evaluate(ast, rng);
+
+        expect(result.total).toBe(9);
+        expect(getDie(result.rolls, 0).modifiers).toEqual(['rerolled', 'dropped']);
       });
 
       test('reroll then keep highest: 2d6r<2kh1', () => {
