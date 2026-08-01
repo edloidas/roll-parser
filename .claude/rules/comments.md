@@ -26,14 +26,6 @@ warning.
 const sides = die.sides;
 ```
 
-Wrong — line two loses the color, and line three reads as part of the warning:
-
-```ts
-// ! Fate dice use `sides === 0` as a sentinel.
-//   A renderer that reads it as a real side count emits `d0`.
-// Unrelated note.
-```
-
 ## `// ?` is for doubt, not for rationale
 
 This is the one that gets misused. A finished decision with a non-obvious reason is

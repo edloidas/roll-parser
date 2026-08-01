@@ -35,6 +35,8 @@ const DOCS_DIR = join(DIST_DIR, DOCS_DIR_NAME);
 async function build(): Promise<void> {
   await rm(DIST_DIR, { recursive: true, force: true });
 
+  // ! Do not pass `sourcemap` together with a single `outfile` here —
+  // ! Bun 1.3.x silently writes nothing. Keep `outdir`.
   const output = await Bun.build({
     entrypoints: SCRIPT_ENTRYPOINTS.map((name) => join(SRC_DIR, name)),
     outdir: ASSETS_DIR,

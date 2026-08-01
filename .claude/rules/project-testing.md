@@ -2,10 +2,8 @@
 
 Bun's test runner. Structure, `createMockRng` usage, fast-check conventions, and
 co-location are all evident from the existing suites — match them. The coverage
-floor lives in `bunfig.toml`, not here.
-
-What follows is not inferable from reading the code, because the code only shows
-the positive case.
+floor lives in `bunfig.toml` — note it is **100% functions** / 98% lines: any
+new function, exported or not, needs a test or `test:ci` fails.
 
 ## Error assertions
 
@@ -31,6 +29,15 @@ the published `files`. Anything added there stays excluded from both.
 `Record<RollParserErrorCode, CodeCase>` annotation. That annotation is the
 completeness gate — adding a code without a case is a type error. Do not loosen
 it to a partial or an index signature.
+
+## Doc examples are tests
+
+`src/readme.test.ts` executes every `typescript` fence in `README.md` and
+`MIGRATION.md` against the built package and asserts the values their trailing
+comments claim (`expr; // 11`, `expr; // throws '…'`, or a lone `// <literal>`
+on the next line). Editing a doc example edits a test — when one fails, fix the
+doc, not the test. Opt a block out with `<!-- readme-test: skip -->` directly
+above the fence.
 
 ## CLI tests
 

@@ -4,59 +4,45 @@ Dice roll notation parser. TypeScript library and CLI. Built with Bun.
 
 ## Rules
 
-Also read `.claude/rules/` (same files via `.agents/rules/`): `comments.md`,
-`project-testing.md`, `rng.md`.
+Also read files under `.claude/rules/`.
+`AGENTS.md` → `CLAUDE.md` and `.agents/rules` → `.claude/rules` are symlinks —
+edit the `.claude/` originals, never replace a symlink with a real file.
 
 ## Commands
 
 ```bash
 bun check:fix   # Typecheck + biome check --write (lint + format + import sort) — use during
                 # iteration; the typecheck step rebuilds dist/ as a side effect
-bun test        # Run tests
+bun test        # Run tests — not read-only: some suites rebuild dist/ in-process
 bun validate    # Full pre-release gate: check + build + check:package + check:size + test:ci
 ```
 
-Demo site (`site/`, deployed to Cloudflare Pages by `.github/workflows/deploy-site.yml`):
+Demo site (`site/`, Cloudflare Pages): `site:dev` (no TypeDoc, so `/docs/` is
+absent), `site:build`, `site:check`, `site:preview`. `site/src` imports
+`'roll-parser'`, which resolves to the built `dist/` — library `src/` edits
+need `bun run build` to show up; site files hot-reload.
 
-```bash
-bun site:dev     # Bun HTML dev server — no TypeDoc, so /docs/ is absent
-bun site:build   # Full static build into site/dist/, including the TypeDoc reference
-bun site:check   # Verify site/dist/ — asset references resolve, no dev paths leaked
-bun site:preview # site:build, then serve site/dist/ locally with host-style routing
-```
-
-The site consumes the built package (`site/src` imports `'roll-parser'`, which
-resolves to `dist/` via the self-reference) — site HTML/CSS/TS edits hot-reload
-under `site:dev`, but library `src/` edits need a `bun run build` to show up.
-
-A pre-commit hook (installed by `bun install` via `prepare` → `core.hooksPath`)
-auto-fixes and re-stages staged `.ts`/`.tsx` files with `biome check --write`.
-Commits with unfixable lint errors are blocked.
+`bun install` installs a pre-commit hook that auto-fixes staged `.ts`/`.tsx`
+with `biome check --write` and blocks commits on unfixable lint errors.
 
 ## Constraints
 
-- Runtime: Bun — never use npm, yarn, or pnpm (the smoke CI jobs, which test the packed tarball the way consumers install it, and the release publish step are the only places npm runs)
-- Target: ES2022, TypeScript only
-- Library + CLI, ESM-only compiled JS (Node ≥22.12 consumes via `import` or `require(esm)` — 22.12 is where `require(esm)` is unflagged)
-- `dist/` is a per-file `tsc` emit, not a bundle, and it takes **two** passes: `tsconfig.build.json` emits comment-free JS + `.js.map` (`removeComments`, declarations off), then `tsconfig.build.types.json` emits `.d.ts` + `.d.ts.map` with TSDoc intact (`emitDeclarationOnly`). One pass cannot do both — under TypeScript 7 `removeComments` strips TSDoc from `.d.ts` too, killing editor hovers. Keep both map kinds. `bun build` is not used for the package. Do not reintroduce a bundler: Bun ≤1.3.11 emits broken output for pure re-export entrypoints (e.g. `src/testing.ts`) and `--target browser` silently stubs `node:` builtins instead of erroring
+- Runtime: Bun — never use npm, yarn, or pnpm (npm appears only in the smoke CI jobs and the release publish step). `bunfig.toml` pins `minimumReleaseAge` to 3 days — `bun add` of a freshly published version silently resolves to an older one
+- Library + CLI, ESM-only compiled JS (Node ≥22.12 — first version with unflagged `require(esm)`)
+- `dist/` is a per-file `tsc` emit, never a bundle, in **two** passes: comment-free JS + `.js.map`, then `.d.ts` + `.d.ts.map` with TSDoc intact — one pass cannot do both under TS7 (rationale in the `tsconfig.build*.json` comments). Keep both map kinds. Do not reintroduce a bundler: Bun ≤1.3.11 breaks pure re-export entrypoints (e.g. `src/testing.ts`) and `--target browser` silently stubs `node:` builtins instead of erroring
+- Byte budgets are a release gate (`check:size`): 12 kB `index.js`, 5.5 kB `{ parse }`, 11.5 kB `{ roll }`, 250 B `testing.js` — see `size-limit` in `package.json` before adding surface area
+- `files` ships `src/` deliberately: `.d.ts.map` points consumer go-to-definition at the real sources. Removing it breaks nothing visibly — the jumps just die
 - Relative imports in `src/` carry explicit `.js` extensions — enforced by `moduleResolution: nodenext` at typecheck time
 - Library code must stay environment-neutral: no Node/Bun globals or `node:` imports outside `src/cli/` — enforced by Biome `noNodejsModules`, `types: []` in `tsconfig.build.json`, and the `browser-smoke` CI job
 - `src/version.ts` is generated from `package.json` by `bun run generate:version` — never edit it by hand; `check:version` and the `index.test.ts` drift test gate the sync
-- In `scripts/build-site.ts`, do not pass `sourcemap` with a single `outfile` to `Bun.build` — Bun 1.3.x silently writes nothing; use `outdir`
-- TypeDoc lives in the `scripts/docs` workspace, not the root, and is invoked from
-  `scripts/docs/node_modules/.bin/typedoc`. TypeDoc 0.28.x peers at TypeScript
-  `<=6.0.x` and throws on the root `typescript@7`, so that workspace nests a
-  `typescript@6` for it to resolve. Do not "simplify" it back to the root — the
-  root install would hand TypeDoc TypeScript 7 and `site:build` would fail. Fold
-  it back only once TypeDoc 1.0 ships TypeScript 7 support.
+- TypeDoc runs from `scripts/docs/node_modules/.bin/typedoc`, not the root: 0.28.x peers at TypeScript `<=6` and throws on the root `typescript@7`, so that workspace nests its own `typescript@6`. Do not fold it back into the root until TypeDoc 1.0 ships TS7 support (full rationale in `scripts/docs/package.json`)
 
 ## Ad-hoc scripts
 
-For one-off verification or sanity checks, create the file with the `Write` tool,
-then run it with `bun run <file>` and delete it with `rm <file>`. Do NOT use shell
-heredocs (`cat > file << 'EOF' ... EOF`) — braces, quotes, or `$` inside a heredoc
-trigger Claude Code's expansion-obfuscation guard and force an approval prompt.
-Prefer promoting recurring checks to a real `*.test.ts` file instead of a temp script.
+For one-off checks: create the file with the `Write` tool, run `bun run <file>`,
+delete it with `rm`. Never shell heredocs — braces, quotes, or `$` inside one
+trip Claude Code's expansion-obfuscation guard and force an approval prompt.
+Prefer promoting recurring checks to a real `*.test.ts`.
 
 ## Git & GitHub
 
@@ -73,17 +59,8 @@ Types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `perf`, `bui
 
 ### Issues
 
-- **Title**: `<type>: <description>`
-- Use `epic: <description>` for issues that aggregate sub-issues and describe a long-form implementation plan. Not used in commits.
-- **Body**: concisely explain what and why, skip trivial details
-- **Headers**: use `####` (h4) for short issues (1–2 headers), `###` (h3) when there are 3 or more
-
-  ```
-  <4–8 sentence description: what, what's affected, how to reproduce, impact>
-
-  #### Rationale
-  <why this needs to be fixed or implemented>
-  ```
+- **Title**: `<type>: <description>`; `epic: <description>` for issues that aggregate sub-issues (never used in commits)
+- **Body**: concisely explain what and why, end with a `Rationale` section; headers `####` for short issues (1–2 headers), `###` at 3+
 
 ### Pull Requests
 
@@ -105,5 +82,8 @@ Types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `perf`, `bui
 
 ## Releasing
 
-- **Dedicated release commit**: bump `package.json`, run `bun run generate:version` and include the regenerated `src/version.ts` in the same commit, commit as `chore: release v<version>`, then tag that commit. Never tag a pre-existing unrelated commit — if the version already matches the target, stop and ask before proceeding. (`check:version` fails the release if `src/version.ts` is stale.)
-- **CHANGELOG gate**: update `CHANGELOG.md` via the local `release-changelog` skill before bumping — `bun run release:dry` fails at `check:changelog` without it.
+Order: update `CHANGELOG.md` via the local `release-changelog` skill → bump
+`package.json` → `bun run generate:version` → commit both plus the regenerated
+`src/version.ts` as `chore: release v<version>` → tag that commit. Never tag a
+pre-existing unrelated commit; if the version already matches the target, stop
+and ask. `release:dry` gates on `check:changelog` and `check:version`.
