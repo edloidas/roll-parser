@@ -56,16 +56,6 @@ describe('toRecords', () => {
       expect(records[0]).toMatchObject({ range: '± 0 ns' });
     });
 
-    it('labels a run whose group is absent from the layout as ungrouped', () => {
-      const { records, problems } = toRecords({
-        layout: [],
-        benchmarks: [{ group: 0, runs: [{ name: '1d20', stats: GOOD_STATS }] }],
-      });
-
-      expect(problems).toEqual([]);
-      expect(records[0]).toMatchObject({ name: 'ungrouped / 1d20' });
-    });
-
     it('resolves the group name per trial', () => {
       const { records } = toRecords({
         layout: [{ name: 'lex' }, { name: 'parse' }],
@@ -76,6 +66,19 @@ describe('toRecords', () => {
       });
 
       expect(records.map((record) => record.name)).toEqual(['parse / 1d20', 'lex / 1d20']);
+    });
+
+    it('keeps the same case name under different groups', () => {
+      const { records, problems } = toRecords({
+        layout: [{ name: 'lex' }, { name: 'parse' }],
+        benchmarks: [
+          { group: 0, runs: [{ name: '1d20', stats: GOOD_STATS }] },
+          { group: 1, runs: [{ name: '1d20', stats: GOOD_STATS }] },
+        ],
+      });
+
+      expect(problems).toEqual([]);
+      expect(records.map((record) => record.name)).toEqual(['lex / 1d20', 'parse / 1d20']);
     });
 
     it('returns nothing for an empty dump', () => {
@@ -107,7 +110,71 @@ describe('toRecords', () => {
       const { records, problems } = toRecords(dumpOf('  ', { name: '1d20', stats: GOOD_STATS }));
 
       expect(records).toEqual([]);
-      expect(problems).toEqual(['   / 1d20: group name is empty']);
+      expect(problems).toEqual(['#0 / 1d20: group 0 has no name in the layout']);
+    });
+
+    it('rejects a run whose group is absent from the layout (#191)', () => {
+      const { records, problems } = toRecords({
+        layout: [],
+        benchmarks: [{ group: 0, runs: [{ name: '1d20', stats: GOOD_STATS }] }],
+      });
+
+      expect(records).toEqual([]);
+      expect(problems).toEqual(['#0 / 1d20: group 0 has no name in the layout']);
+    });
+
+    it('rejects a run whose group name is null (#191)', () => {
+      const { records, problems } = toRecords(dumpOf(null, { name: '1d20', stats: GOOD_STATS }));
+
+      expect(records).toEqual([]);
+      expect(problems).toEqual(['#0 / 1d20: group 0 has no name in the layout']);
+    });
+
+    it('reports every run of a trial whose group is unresolvable (#191)', () => {
+      const { records, problems } = toRecords({
+        layout: [{ name: 'lex' }],
+        benchmarks: [
+          { group: 1, runs: [{ name: '1d20', stats: GOOD_STATS }, { name: '3d6' }] },
+          { group: 0, runs: [{ name: '1d20', stats: GOOD_STATS }] },
+        ],
+      });
+
+      expect(records.map((record) => record.name)).toEqual(['lex / 1d20']);
+      expect(problems).toEqual([
+        '#1 / 1d20: group 1 has no name in the layout',
+        '#1 / 3d6: group 1 has no name in the layout',
+      ]);
+    });
+
+    it('rejects a record name duplicated within a trial (#191)', () => {
+      const { records, problems } = toRecords(
+        dumpOf('lex', { name: '1d20', stats: GOOD_STATS }, { name: '1d20', stats: GOOD_STATS }),
+      );
+
+      expect(records.map((record) => record.name)).toEqual(['lex / 1d20']);
+      expect(problems).toEqual(['lex / 1d20: duplicate record name']);
+    });
+
+    it('rejects a record name duplicated across trials (#191)', () => {
+      const { records, problems } = toRecords({
+        layout: [{ name: 'lex' }],
+        benchmarks: [
+          { group: 0, runs: [{ name: '1d20', stats: GOOD_STATS }] },
+          { group: 0, runs: [{ name: '1d20', stats: GOOD_STATS }] },
+        ],
+      });
+
+      expect(records.map((record) => record.name)).toEqual(['lex / 1d20']);
+      expect(problems).toEqual(['lex / 1d20: duplicate record name']);
+    });
+
+    it('claims a name only once a record is emitted (#191)', () => {
+      const { records, problems } = toRecords(
+        dumpOf('lex', { name: '1d20' }, { name: '1d20', stats: GOOD_STATS }),
+      );
+
+      expect(records.map((record) => record.name)).toEqual(['lex / 1d20']);
+      expect(problems).toEqual(['lex / 1d20: missing stats']);
     });
 
     it('reports an empty case name', () => {
