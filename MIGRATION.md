@@ -32,6 +32,7 @@ classes. v3 has `roll(notation, options)` for the common path, and
 `createMockRng` (exported by `roll-parser/testing`) so their numbers are exact
 rather than whatever the dice happened to do:
 
+<!-- readme-test: skip -->
 ```typescript
 // v2
 const res = parseAndRoll('2d10+1'); // { notation: '2d10+1', value: 9, rolls: [2, 6] }
@@ -49,6 +50,7 @@ res.rolls.map((die) => die.result); // [2, 6] — `rolls` is now DieResult[]
 were easy to miss. v3 throws a typed error with a stable `code` and a source
 span:
 
+<!-- readme-test: skip -->
 ```typescript
 // v2
 if (parseAndRoll(input) == null) {

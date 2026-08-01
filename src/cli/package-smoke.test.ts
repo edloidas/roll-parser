@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, test } from 'bun:test';
 import { existsSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { ensureFreshDist } from '../test-helpers.js';
 
 type PackageJson = {
   bin?: Record<string, string>;
@@ -25,14 +26,11 @@ async function runCommand(
 
 // The real `build` script, not a reimplementation of it: the assertions below
 // judge the artifact a consumer installs, including the executable bit that
-// `tsc` alone never sets. Its `clean` step is safe here because this is the
-// only test file that touches `dist/`, and `bun test` runs files sequentially
-// in a single process.
+// `tsc` alone never sets. `ensureFreshDist` is shared with `readme.test.ts`
+// and memoized to one build per test run; its `clean` step is safe because
+// `bun test` runs files sequentially in a single process.
 beforeAll(async () => {
-  const { stderr, exitCode } = await runCommand(['bun', 'run', 'build']);
-  if (exitCode !== 0) {
-    throw new Error(`Failed to build packaged CLI smoke target:\n${stderr}`);
-  }
+  await ensureFreshDist();
 });
 
 describe('packaged CLI smoke', () => {
