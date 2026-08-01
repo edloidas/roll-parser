@@ -1,17 +1,23 @@
 /**
- * Algorithmic complexity guardrails for the evaluator (#131).
+ * RNG draw-consumption and draw-order contracts for the evaluator (#131).
  *
- * Wall-clock benchmarks in `bench/` are too noisy to gate CI — cross-process
- * p50 variance alone is ±5-10%. RNG draw count is not: it is the evaluator's
- * one unbounded resource, it is exactly reproducible, and every algorithmic
- * regression that matters (an extra pass over a pool, a re-rolled meta
- * expression, quadratic keep/drop) shows up as a changed draw count. These
- * assertions are the deterministic half of the regression strategy.
+ * Draw count is the evaluator's one unbounded resource and it is exactly
+ * reproducible, so these assertions pin how many values a notation pulls from
+ * the RNG and in which order. That catches over- and under-consumption — an
+ * extra pass that re-rolls a pool, a meta expression evaluated twice, a
+ * modifier argument drawn on the wrong side of its pool — and it protects every
+ * seeded result the library promises to reproduce.
+ *
+ * These are not complexity guardrails. An implementation can make exactly the
+ * expected draws and still be quadratic in CPU or memory; nothing here would
+ * notice. Wall-clock cost is tracked only by the advisory benchmark trend in
+ * `bench/`, which is too noisy to gate CI — cross-process p50 variance alone is
+ * ±5-10%.
  *
  * Draw order follows README, Randomness: keep/drop modifier arguments are
  * drawn *before* the base pool, threshold-style modifier arguments *after* it.
  *
- * @module evaluator/complexity.test
+ * @module evaluator/draws.test
  */
 
 import { describe, expect, test } from 'bun:test';
@@ -66,7 +72,7 @@ function countDraws(notation: string, values: number[]): { draws: number; rolls:
   return { draws: rng.draws, rolls: result.rolls.length };
 }
 
-describe('evaluator complexity', () => {
+describe('evaluator draw consumption', () => {
   describe('exact draw counts — fixed pools', () => {
     const cases: [notation: string, values: number[], draws: number][] = [
       ['1d20', [13], 1],

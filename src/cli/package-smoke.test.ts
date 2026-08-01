@@ -1,10 +1,9 @@
 import { beforeAll, describe, expect, test } from 'bun:test';
-import { chmodSync, existsSync, statSync } from 'node:fs';
+import { existsSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 type PackageJson = {
   bin?: Record<string, string>;
-  scripts?: Record<string, string>;
 };
 
 const CLI_BIN = './dist/cli/index.js';
@@ -24,16 +23,16 @@ async function runCommand(
   return { stdout, stderr, exitCode };
 }
 
-// ? Mirrors `bun run build` minus `clean` — no need to delete and re-emit the
-//   whole of `dist/` mid-test-run, and stale dist files are harmless here.
+// The real `build` script, not a reimplementation of it: the assertions below
+// judge the artifact a consumer installs, including the executable bit that
+// `tsc` alone never sets. Its `clean` step is safe here because this is the
+// only test file that touches `dist/`, and `bun test` runs files sequentially
+// in a single process.
 beforeAll(async () => {
-  for (const project of ['tsconfig.build.json', 'tsconfig.build.types.json']) {
-    const { stderr, exitCode } = await runCommand(['bunx', 'tsc', '-p', project]);
-    if (exitCode !== 0) {
-      throw new Error(`Failed to build packaged CLI smoke target (${project}):\n${stderr}`);
-    }
+  const { stderr, exitCode } = await runCommand(['bun', 'run', 'build']);
+  if (exitCode !== 0) {
+    throw new Error(`Failed to build packaged CLI smoke target:\n${stderr}`);
   }
-  chmodSync(CLI_BIN, 0o755);
 });
 
 describe('packaged CLI smoke', () => {
@@ -41,11 +40,6 @@ describe('packaged CLI smoke', () => {
     const pkg = (await Bun.file('package.json').json()) as PackageJson;
     expect(pkg.bin?.['roll-parser']).toBe(CLI_BIN);
     expect(existsSync(join('.', CLI_BIN))).toBe(true);
-
-    // ? tsc does not set the executable bit, so the `build` script must — the
-    //   `beforeAll` chmod above makes the mode assertion below self-fulfilling,
-    //   leaving this contract check as the real regression guard.
-    expect(pkg.scripts?.build).toContain('chmod +x dist/cli/index.js');
   });
 
   test('built CLI keeps node shebang and executable bit', async () => {
