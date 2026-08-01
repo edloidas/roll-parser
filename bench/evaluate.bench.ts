@@ -12,7 +12,7 @@
  * Every bench body is handed to `primeBenchFn` before mitata sees it. Without
  * that this group was the least trustworthy in the suite — `4d6kh3` reported
  * 42-82 µs against a true 2.3 µs, and `{2d20kh1+5, 3d8!}kh1` swung 1075%
- * between processes. See `primeBenchFn` for the mechanism (#143).
+ * between processes. See `primeBenchFn` for the mechanism.
  *
  * Run with `bun run bench:evaluate`, or as part of `bun run bench`.
  */

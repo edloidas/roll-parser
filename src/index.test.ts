@@ -1,5 +1,5 @@
 /**
- * Public export-surface tests (#134).
+ * Public export-surface tests.
  *
  * Every other suite imports the implementation modules directly, so nothing
  * used to fail when a barrel export was dropped or misspelled. This file is

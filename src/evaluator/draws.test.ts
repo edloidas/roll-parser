@@ -1,5 +1,5 @@
 /**
- * RNG draw-consumption and draw-order contracts for the evaluator (#131).
+ * RNG draw-consumption and draw-order contracts for the evaluator.
  *
  * Draw count is the evaluator's one unbounded resource and it is exactly
  * reproducible, so these assertions pin how many values a notation pulls from

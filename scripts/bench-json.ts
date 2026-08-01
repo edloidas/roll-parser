@@ -1,6 +1,6 @@
 /**
  * Runs the full bench suite and writes a compact JSON summary for CI trend
- * tracking (#131).
+ * tracking.
  *
  * The output is shaped for `benchmark-action/github-action-benchmark`'s
  * `customSmallerIsBetter` tool: an array of `{ name, unit, value }`. `value` is

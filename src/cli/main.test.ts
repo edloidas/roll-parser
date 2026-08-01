@@ -1,5 +1,5 @@
 /**
- * In-process tests for the CLI command (#134).
+ * In-process tests for the CLI command.
  *
  * The subprocess suite in `cli.test.ts` proves the shebang entry point wires
  * itself to the real process; everything about argument handling, exit codes,

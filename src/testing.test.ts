@@ -1,5 +1,5 @@
 /**
- * Tests for the `roll-parser/testing` entry point (#134).
+ * Tests for the `roll-parser/testing` entry point.
  *
  * `src/testing.ts` re-binds the mock RNG through local consts to work around
  * a Bun bundler bug (see the note in that file). Every other suite imports

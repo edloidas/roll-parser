@@ -17,7 +17,7 @@ import { registerRollBenches } from './roll.bench.js';
  * Returns the number of runs the suite is expected to produce in a mitata
  * dump. `bench:json` cross-checks its record count against this so a run that
  * vanishes from the dump fails the export instead of silently shrinking the CI
- * trend series (#157).
+ * trend series.
  */
 export function registerAllBenches(): number {
   return (

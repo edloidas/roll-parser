@@ -1,6 +1,6 @@
 /**
  * Turns a mitata JSON dump into `customSmallerIsBetter` records for the CI
- * trend job, rejecting anything that would poison the series (#157).
+ * trend job, rejecting anything that would poison the series.
  *
  * Split out of `bench-json.ts` so the conversion is testable without running
  * the bench suite.

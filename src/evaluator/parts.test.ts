@@ -1,5 +1,5 @@
 /**
- * Tests for the structured `RollResult.parts` output (#84).
+ * Tests for the structured `RollResult.parts` output.
  *
  * Deep-equal "snapshot" tests pin exact part trees for representative
  * notations under deterministic mock RNGs; the rest assert the contractual
