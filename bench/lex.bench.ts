@@ -8,7 +8,8 @@ import { bench, do_not_optimize, group, run, summary } from 'mitata';
 import { lex } from '../src/lexer/lexer.js';
 import { BASELINE_ID, BENCH_CASES, primeBenchFn, warmUpPipeline } from './_cases.js';
 
-export function registerLexBenches(): void {
+/** Returns the number of runs this group contributes to a mitata dump. */
+export function registerLexBenches(): number {
   warmUpPipeline();
 
   group('lex', () => {
@@ -26,6 +27,8 @@ export function registerLexBenches(): void {
       }
     });
   });
+
+  return BENCH_CASES.length;
 }
 
 if (import.meta.main) {
