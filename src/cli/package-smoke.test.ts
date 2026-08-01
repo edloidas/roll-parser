@@ -27,9 +27,11 @@ async function runCommand(
 // ? Mirrors `bun run build` minus `clean` — no need to delete and re-emit the
 //   whole of `dist/` mid-test-run, and stale dist files are harmless here.
 beforeAll(async () => {
-  const { stderr, exitCode } = await runCommand(['bunx', 'tsc', '-p', 'tsconfig.build.json']);
-  if (exitCode !== 0) {
-    throw new Error(`Failed to build packaged CLI smoke target:\n${stderr}`);
+  for (const project of ['tsconfig.build.json', 'tsconfig.build.types.json']) {
+    const { stderr, exitCode } = await runCommand(['bunx', 'tsc', '-p', project]);
+    if (exitCode !== 0) {
+      throw new Error(`Failed to build packaged CLI smoke target (${project}):\n${stderr}`);
+    }
   }
   chmodSync(CLI_BIN, 0o755);
 });
@@ -72,5 +74,26 @@ describe('packaged CLI smoke', () => {
     const result = await runCommand(['node', CLI_BIN, '-d6', '--seed', 'test']);
     expect(result.exitCode).toBe(0);
     expect(result.stdout.trim()).toBe('-3');
+  });
+});
+
+describe('two-pass emit', () => {
+  test('strips comments from emitted JS but keeps TSDoc in declarations (#165)', async () => {
+    const js = await Bun.file('./dist/errors.js').text();
+    const declaration = await Bun.file('./dist/errors.d.ts').text();
+
+    // The sourcemap pragma is the only comment tsc emits under `removeComments`.
+    const comments = js.split('\n').filter((line) => line.trimStart().startsWith('//'));
+    expect(js).not.toContain('/*');
+    expect(comments).toEqual(['//# sourceMappingURL=errors.js.map']);
+
+    expect(declaration).toContain('/**');
+    expect(declaration).toContain('@category Errors');
+  });
+
+  test('keeps both map kinds (#165)', () => {
+    for (const map of ['./dist/errors.js.map', './dist/errors.d.ts.map']) {
+      expect(existsSync(map)).toBe(true);
+    }
   });
 });
