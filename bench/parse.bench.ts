@@ -8,7 +8,8 @@ import { bench, do_not_optimize, group, run, summary } from 'mitata';
 import { parse } from '../src/index.js';
 import { BASELINE_ID, BENCH_CASES, primeBenchFn, warmUpPipeline } from './_cases.js';
 
-export function registerParseBenches(): void {
+/** Returns the number of runs this group contributes to a mitata dump. */
+export function registerParseBenches(): number {
   warmUpPipeline();
 
   group('parse', () => {
@@ -26,6 +27,8 @@ export function registerParseBenches(): void {
       }
     });
   });
+
+  return BENCH_CASES.length;
 }
 
 if (import.meta.main) {

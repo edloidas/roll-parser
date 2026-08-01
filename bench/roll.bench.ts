@@ -22,7 +22,8 @@ import {
   warmUpPipeline,
 } from './_cases.js';
 
-export function registerRollBenches(): void {
+/** Returns the number of runs these groups contribute to a mitata dump. */
+export function registerRollBenches(): number {
   warmUpPipeline();
 
   group('roll (seeded)', () => {
@@ -60,6 +61,8 @@ export function registerRollBenches(): void {
       }
     });
   });
+
+  return BENCH_CASES.length + FIXED_WORK_CASES.length;
 }
 
 if (import.meta.main) {

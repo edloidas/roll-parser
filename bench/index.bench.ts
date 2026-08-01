@@ -13,11 +13,19 @@ import { registerLexBenches } from './lex.bench.js';
 import { registerParseBenches } from './parse.bench.js';
 import { registerRollBenches } from './roll.bench.js';
 
-export function registerAllBenches(): void {
-  registerLexBenches();
-  registerParseBenches();
-  registerEvaluateBenches();
-  registerRollBenches();
+/**
+ * Returns the number of runs the suite is expected to produce in a mitata
+ * dump. `bench:json` cross-checks its record count against this so a run that
+ * vanishes from the dump fails the export instead of silently shrinking the CI
+ * trend series (#157).
+ */
+export function registerAllBenches(): number {
+  return (
+    registerLexBenches() +
+    registerParseBenches() +
+    registerEvaluateBenches() +
+    registerRollBenches()
+  );
 }
 
 if (import.meta.main) {

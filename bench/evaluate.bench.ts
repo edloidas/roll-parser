@@ -28,7 +28,14 @@ import {
   warmUpPipeline,
 } from './_cases.js';
 
-export function registerEvaluateBenches(): void {
+/**
+ * `.range('n', 1, 1000, 10)` below expands into one run per value — 1, 10, 100,
+ * 1000. Keep in sync with those calls; `bench:json` fails loudly on a mismatch.
+ */
+const POOL_SCALING_RUNS = 2 * 4;
+
+/** Returns the number of runs these groups contribute to a mitata dump. */
+export function registerEvaluateBenches(): number {
   warmUpPipeline();
 
   group('evaluate', () => {
@@ -77,6 +84,8 @@ export function registerEvaluateBenches(): void {
       .range('n', 1, 1000, 10)
       .gc('inner');
   });
+
+  return BENCH_CASES.length + POOL_SCALING_RUNS;
 }
 
 if (import.meta.main) {
