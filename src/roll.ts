@@ -80,8 +80,7 @@ export type RollOptions = EvaluationLimits & {
  * @category Core
  */
 export function roll(notation: string, options: RollOptions = {}): RollResult {
-  // `limits` is exactly `EvaluationLimits`, so it forwards wholesale — an
-  // explicitly-undefined key is harmless, `evaluate` nullish-checks each one.
+  // Explicitly-undefined limit keys forward harmlessly — `evaluate` nullish-checks each.
   const { rng, seed, ...limits } = options;
 
   return evaluate(parse(notation), rng ?? new SeededRNG(seed), { ...limits, notation });

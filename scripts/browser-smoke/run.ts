@@ -100,8 +100,8 @@ try {
     }
   });
 
-  // A wedged page load would otherwise throw Playwright's own navigation
-  // timeout past the reporting below.
+  // A wedged load would otherwise throw Playwright's navigation timeout past the
+  // reporting below.
   try {
     await page.goto(`http://127.0.0.1:${port}/`, { timeout: TIMEOUT_MS });
   } catch (error) {

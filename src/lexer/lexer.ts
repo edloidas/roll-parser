@@ -62,8 +62,8 @@ export class LexerError extends RollParserError {
 // * Character codes
 //
 
-// Range tests compare code units rather than strings: `char.toLowerCase()`
-// per character allocated a string on the hottest loop in the lexer.
+// Range tests compare code units: `char.toLowerCase()` per character allocated
+// a string on the lexer's hottest loop.
 const CHAR_DIGIT_0 = 48;
 const CHAR_DIGIT_9 = 57;
 const CHAR_UPPER_A = 65;
@@ -154,22 +154,18 @@ export class Lexer {
     const startPos = this.pos;
     const char = this.peek();
 
-    // * Numbers
     if (this.isDigit(char)) {
       return this.scanNumber();
     }
 
-    // * Identifiers
     if (this.isAlpha(char)) {
       return this.scanIdentifier();
     }
 
-    // * Variable reference
     if (char === '@') {
       return this.scanAt();
     }
 
-    // * Operators and punctuation
     this.advance();
 
     switch (char) {
@@ -228,7 +224,9 @@ export class Lexer {
     }
   }
 
+  //
   // * Private helpers
+  //
 
   private skipWhitespace(): void {
     while (!this.isAtEnd() && this.isWhitespace(this.peek())) {
@@ -236,20 +234,17 @@ export class Lexer {
     }
   }
 
-  // Scanners record a start offset and slice once at the end rather than
-  // accumulating `value += this.advance()` — one string per token instead
-  // of one per character. `scanAt` already used this idiom.
+  // Scanners slice once from a recorded start offset rather than accumulating
+  // `value += this.advance()` — one string per token instead of one per character.
   private scanNumber(): Token {
     const startPos = this.pos;
 
-    // Integer part
     while (!this.isAtEnd() && this.isDigit(this.peek())) {
       this.pos++;
     }
 
-    // Decimal part
     if (!this.isAtEnd() && this.peek() === '.' && this.isDigit(this.peekNext())) {
-      this.pos++; // consume '.'
+      this.pos++;
       while (!this.isAtEnd() && this.isDigit(this.peek())) {
         this.pos++;
       }
@@ -318,11 +313,11 @@ export class Lexer {
    */
   private scanAt(): Token {
     const startPos = this.pos;
-    this.advance(); // consume '@'
+    this.advance();
 
     let name: string;
     if (!this.isAtEnd() && this.peek() === '{') {
-      this.advance(); // consume '{'
+      this.advance();
       const nameStart = this.pos;
       while (!this.isAtEnd() && this.peek() !== '}' && this.peek() !== '\n') {
         this.advance();
@@ -331,7 +326,7 @@ export class Lexer {
         throw new LexerError('Unterminated @{...} variable', 'UNEXPECTED_CHARACTER', startPos, '@');
       }
       name = this.input.slice(nameStart, this.pos);
-      this.advance(); // consume '}'
+      this.advance();
     } else {
       const nameStart = this.pos;
       if (this.isAtEnd() || !this.isIdentifierStart(this.peek())) {

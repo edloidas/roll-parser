@@ -65,8 +65,8 @@ describe('RollParserError', () => {
 });
 
 describe('error messages', () => {
-  // Positions are structured data — duplicating them in prose forced UI
-  // consumers to strip the suffix before rendering their own markers.
+  // Positions belong to the structured fields; in prose they force UI consumers
+  // to strip a suffix before rendering their own markers.
   test('lexer messages omit the position', () => {
     const error = captureError(() => lex('2d6+&')) as LexerError;
 
@@ -171,12 +171,11 @@ describe('getErrorSpan', () => {
  */
 type CodeCase = { notation: string; options?: RollOptions } | { ast: ASTNode; why: string };
 
-// ? Deliberately outside the `ASTNode` union. Reaching `evalNode`'s
-//   exhaustiveness default is the whole point, and the parser cannot emit it.
+// Forged node type — the parser cannot emit one, so this is the only path to
+// `evalNode`'s exhaustiveness default.
 const UNKNOWN_NODE = { type: 'Nonesuch' } as unknown as ASTNode;
 
-// ? Same idea one level down: `evalBinary`'s operator switch is exhaustive
-//   over `BinaryOpNode['operator']`, so only a forged operator reaches it.
+// Forged operator — same idea one level down, for `evalBinary`'s switch default.
 const UNKNOWN_OPERATOR_NODE = {
   type: 'BinaryOp',
   operator: '^^',

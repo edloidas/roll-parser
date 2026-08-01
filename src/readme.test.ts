@@ -227,7 +227,7 @@ beforeAll(async () => {
   await ensureFreshDist();
 
   // ! Keep the specifier computed — a literal 'roll-parser' fails `tsc --noEmit`
-  // on a fresh clone, where `dist/` (the self-reference target) does not exist yet.
+  // ! on a fresh clone, where `dist/` (the self-reference target) does not exist yet.
   const packageName = 'roll-parser';
   const api = (await import(packageName)) as Record<string, unknown>;
   const testing = (await import(`${packageName}/testing`)) as Record<string, unknown>;

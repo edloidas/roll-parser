@@ -15,8 +15,7 @@ export function registerLexBenches(): number {
   group('lex', () => {
     summary(() => {
       for (const { id, notation } of BENCH_CASES) {
-        // ? Generator form so `primeBenchFn` runs right before mitata's
-        //   warm-up — see its doc comment for why that is load-bearing.
+        // Generator form so `primeBenchFn` runs right before mitata's warm-up.
         bench(id, function* () {
           yield primeBenchFn(() => {
             do_not_optimize(lex(notation));

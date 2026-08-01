@@ -200,9 +200,8 @@ export function renderDie(die: DieResult, index: number, folded = false): string
   const facets = facetsFor(die.sides);
   const facetGroup = facets !== '' ? `<g class="die-facets">${facets}</g>` : '';
   const classes = ['die', ...dieStates(die), ...(folded ? ['is-folded'] : [])].join(' ');
-  // Folded dice also carry their index within the folded run, so unfolding can
-  // re-base the stagger on `--j`. Keying off `--i` there would delay the first
-  // revealed die by the whole visible row before it even starts.
+  // `--j` is the index within the folded run, so unfolding re-bases the stagger on
+  // it — `--i` would delay the first revealed die by the whole visible row.
   const foldIndex = folded ? `;--j:${index - MAX_TRAY_DICE}` : '';
 
   return [

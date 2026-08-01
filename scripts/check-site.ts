@@ -96,12 +96,12 @@ function extractReferences(html: string): string[] {
 
 function isLocalAsset(reference: string): boolean {
   if (reference === '') return false;
-  // ? Protocol-relative URLs start with `//`, so test them before the leading-slash case.
+  // Protocol-relative URLs start with `//`, so test them before the leading-slash case.
   if (reference.startsWith('//')) return false;
   if (/^[a-z]+:/i.test(reference)) return false;
   if (reference.startsWith('#')) return false;
-  // Root-absolute references belong to `404.html`, which is served at arbitrary
-  // depths and so links to routes rather than to files.
+  // Root-absolute references belong to `404.html`, served at arbitrary depths, so
+  // they name routes rather than files.
   if (reference.startsWith('/')) return false;
 
   const [path] = reference.split(/[?#]/);

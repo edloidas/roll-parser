@@ -31,8 +31,7 @@ export function registerRollBenches(): number {
       for (const benchCase of BENCH_CASES) {
         const options = { ...getRollOptions(benchCase), seed: BENCH_SEED };
 
-        // ? Generator form so `primeBenchFn` runs right before mitata's
-        //   warm-up — see its doc comment for why that is load-bearing.
+        // Generator form so `primeBenchFn` runs right before mitata's warm-up.
         bench(benchCase.id, function* () {
           yield primeBenchFn(() => {
             do_not_optimize(roll(benchCase.notation, options));

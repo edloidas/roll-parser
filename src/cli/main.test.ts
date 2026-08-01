@@ -266,8 +266,8 @@ describe('cli main', () => {
 
   describe('non-library failures', () => {
     test('a plain Error from the output sink propagates instead of exiting 1', () => {
-      // `stdout` is written inside `main`'s try/catch, so a throwing sink is
-      // the one seam that reaches the non-RollParserError re-raise branch.
+      // `stdout` is written inside `main`'s try/catch, so a throwing sink is the
+      // one seam that reaches the non-RollParserError re-raise branch.
       expect(() =>
         main({
           argv: ['2d6', '--seed', 'test'],
@@ -282,8 +282,7 @@ describe('cli main', () => {
 
   describe('writeErrorContext', () => {
     test('counts columns in code points, not UTF-16 units', () => {
-      // `&` sits at UTF-16 offset 6 but visual column 5 — the astral `🎲`
-      // occupies two units and one column.
+      // `&` sits at UTF-16 offset 6 but column 5 — the astral `🎲` is two units, one column.
       expect(run(['@{🎲}+&']).stderr).toContain('  @{🎲}+&\n       ^\n');
     });
 

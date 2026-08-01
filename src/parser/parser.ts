@@ -93,6 +93,7 @@ export class ParseError extends RollParserError {
  *
  * Precedence order (lowest to highest):
  * - Versus (`vs`): 2-3 (lowest — full expressions on both sides)
+ * - Comparison (success-count LED): 8
  * - Addition/subtraction: 10
  * - Multiplication/division/modulo: 20
  * - Unary minus: 25 (binds to complete dice expr: -1d4 = -(1d4))
@@ -101,27 +102,24 @@ export class ParseError extends RollParserError {
  * - Dice: 40-41
  */
 const BP = {
-  // Versus (left-associative, lowest precedence — `1d20+10 vs 25+10` = `(1d20+10) vs (25+10)`)
+  // Lowest, so both sides take a full expression: `1d20+10 vs 25+10` =
+  // `(1d20+10) vs (25+10)`.
   VS_LEFT: 2,
   VS_RIGHT: 3,
-  // Comparison operators used as the success-count LED. Must be below
-  // ADD/MUL so `XdY+N>T` parses as `(XdY+N)>T` and fails the pool-target
-  // guard with a clear error, instead of the `>` stealing `N` from the `+`.
+  // Below ADD/MUL so `XdY+N>T` parses as `(XdY+N)>T` and fails the pool-target
+  // guard with a clear error, instead of `>` stealing `N` from the `+`.
   COMPARE: 8,
-  // Addition/subtraction (left-associative)
   ADD_LEFT: 10,
   ADD_RIGHT: 11,
-  // Multiplication/division/modulo (left-associative)
   MUL_LEFT: 20,
   MUL_RIGHT: 21,
-  // Unary minus: between mul and power so -1d4 = -(1d4) not (-1)d4
+  // Between MUL and POW so `-1d4` = `-(1d4)`, not `(-1)d4`.
   UNARY: 25,
-  // Power (right-associative: left > right)
   POW_LEFT: 31,
   POW_RIGHT: 30,
-  // Postfix modifiers: must be < DICE_RIGHT so they bind to complete dice expr
+  // Must stay below DICE_RIGHT so a postfix modifier binds to the whole dice
+  // expression: `4d6kh3` = `(4d6)kh3`.
   MODIFIER: 35,
-  // Dice operator (highest math precedence)
   DICE_LEFT: 40,
   DICE_RIGHT: 41,
 } as const;
@@ -222,7 +220,6 @@ export class Parser {
 
     const ast = this.parseExpression(0);
 
-    // Ensure we consumed all tokens
     if (this.peek().type !== TokenType.EOF) {
       const token = this.peek();
       throw new ParseError(
@@ -383,7 +380,9 @@ export class Parser {
     }
   }
 
+  //
   // * Node parsers
+  //
 
   /**
    * Zero-width span for synthetic nodes (implicit counts, `d%` sides) that
@@ -415,7 +414,6 @@ export class Parser {
   }
 
   private parsePrefixDice(token: Token): DiceNode {
-    // d20 → Dice(1, 20)
     const sides = this.parseExpression(BP.DICE_RIGHT);
     this.rejectSuccessCountTarget(sides, token);
     this.rejectVersusTarget(sides, token);
@@ -429,7 +427,6 @@ export class Parser {
   }
 
   private parseInfixDice(left: ASTNode, token: Token): DiceNode {
-    // 4d6 → Dice(4, 6)
     this.rejectSuccessCountTarget(left, token);
     this.rejectVersusTarget(left, token);
     this.rejectBareDiceChain(left, token);
@@ -446,7 +443,6 @@ export class Parser {
   }
 
   private parsePrefixDicePercent(token: Token): DiceNode {
-    // d% → Dice(1, 100)
     return {
       type: 'Dice',
       count: Parser.syntheticLiteral(1, token),
@@ -457,7 +453,6 @@ export class Parser {
   }
 
   private parseInfixDicePercent(left: ASTNode, token: Token): DiceNode {
-    // 2d% → Dice(2, 100)
     this.rejectSuccessCountTarget(left, token);
     this.rejectVersusTarget(left, token);
     this.rejectBareDiceChain(left, token);
@@ -471,7 +466,6 @@ export class Parser {
   }
 
   private parsePrefixFateDice(token: Token): FateDiceNode {
-    // dF → FateDice(1)
     return {
       type: 'FateDice',
       count: Parser.syntheticLiteral(1, token),
@@ -481,9 +475,8 @@ export class Parser {
   }
 
   private parseInfixFateDice(left: ASTNode, token: Token): FateDiceNode {
-    // 4dF → FateDice(4). Unlike parseInfixDice, there is no sides sub-parse,
-    // so modifiers (`kh`, `dl`, …) naturally bind at the outer Pratt loop
-    // without BP competition against a right-operand.
+    // No sides sub-parse, unlike `parseInfixDice`, so modifiers (`kh`, `dl`, …)
+    // bind at the outer Pratt loop with no BP competition from a right operand.
     this.rejectSuccessCountTarget(left, token);
     this.rejectVersusTarget(left, token);
     this.rejectBareDiceChain(left, token);
@@ -503,8 +496,8 @@ export class Parser {
 
   private parseGroup(startToken: Token): GroupNode {
     // `LBRACE`/`RBRACE`/`COMMA` all have `getLeftBp === -1`, so inner
-    // `parseExpression(0)` calls terminate at the first `,` or `}` without
-    // competing with modifier/arithmetic BPs.
+    // `parseExpression(0)` calls stop at the first `,` or `}` without competing
+    // with modifier/arithmetic BPs.
     if (this.peek().type === TokenType.RBRACE) {
       throw new ParseError('Empty group', 'UNEXPECTED_TOKEN', startToken.position, startToken);
     }
@@ -534,9 +527,8 @@ export class Parser {
   }
 
   private parseFunctionCall(token: Token): FunctionCallNode {
-    // `FUNCTION` has BP = -1 so callers stop here; `COMMA` and `RPAREN` also
-    // terminate inner `parseExpression(0)` calls, so argument boundaries are
-    // natural.
+    // `FUNCTION`, `COMMA`, and `RPAREN` all sit at BP -1, so argument boundaries
+    // fall out of the inner `parseExpression(0)` calls terminating on their own.
     this.expect(TokenType.LPAREN);
 
     const args: ASTNode[] = [];
@@ -556,9 +548,8 @@ export class Parser {
 
     const arity = FUNCTION_ARITY[token.value];
     if (arity == null) {
-      // ? Unreachable in practice: lexer only emits FUNCTION for registered
-      // names. Kept defensive to keep parser/evaluator error-code contract
-      // symmetrical.
+      // Unreachable: the lexer only emits `FUNCTION` for registered names. Kept
+      // so the parser/evaluator error-code contract stays symmetrical.
       throw new ParseError(
         `Unknown function '${token.value}'`,
         'UNKNOWN_FUNCTION',
@@ -634,10 +625,9 @@ export class Parser {
   }
 
   private rejectSuccessCountTarget(target: ASTNode, token: Token): void {
-    // Narrow unwrap: only `Grouped`. A `SuccessCount` cannot live inside
-    // `Modifier`/`Sort`/`CritThreshold` because each of those parsers calls
-    // this same reject on their target before constructing the wrapper —
-    // so widening the set here would never match.
+    // Narrow unwrap (only `Grouped`): `Modifier`/`Sort`/`CritThreshold` each run
+    // this same reject before building their wrapper, so a `SuccessCount` can
+    // never hide inside one and widening the set would never match.
     const node = unwrapGrouped(target);
     if (isSuccessCount(node)) {
       throw new ParseError(
@@ -657,8 +647,7 @@ export class Parser {
    * cannot smuggle a group past the check (`{1d6}kh1cs>5`, `({1d6})!`,
    * `{1d6}scs>5` all reject the same as `{1d6}!`/`{1d6}cs>5`).
    *
-   * `singleSubRollPasses` opts the caller into the Stage 3 single-sub-roll
-   * passthrough rule (STAGE3.md "Group Semantics: Single vs Multi Sub-Roll"):
+   * `singleSubRollPasses` opts the caller into the single-sub-roll passthrough:
    * a `Group` with one expression is the user's explicit flat-pool escape
    * hatch and is equivalent to its unwrapped form. Currently only
    * `parseCritThreshold` opts in — explode/reroll keep the strict reject so
@@ -675,10 +664,10 @@ export class Parser {
     if (node.type !== 'Group') return;
     if (singleSubRollPasses && node.expressions.length === 1) {
       // ! Deep-walk the inner sub-expression — `unwrapAllTransparent` only peels
-      //   `Grouped`/`Modifier`/`Sort`/`CritThreshold`, so a multi-sub Group
-      //   buried under arithmetic (`{{1d6,2d8}+0}cs>5`), function calls
-      //   (`{abs({1d6,2d8})}cs>5`), or unary ops would otherwise revive the
-      //   exact dropped-die-flag bug from #97.
+      // ! `Grouped`/`Modifier`/`Sort`/`CritThreshold`, so a multi-sub Group
+      // ! buried under arithmetic (`{{1d6,2d8}+0}cs>5`), a function call
+      // ! (`{abs({1d6,2d8})}cs>5`), or a unary op would reach the evaluator and
+      // ! override `critical`/`fumble` on dice from dropped sub-rolls.
       const inner = node.expressions[0];
       if (inner != null && containsMultiSubGroup(inner)) {
         throw new ParseError(`Cannot ${action} a group`, code, token.position, token);
@@ -689,14 +678,12 @@ export class Parser {
   }
 
   private rejectVersusTarget(target: ASTNode, token: Token): void {
-    // Versus produces a PF2e degree outcome — a terminal scalar, not a
-    // valid input to dice count/sides/thresholds. Symmetric with
-    // `rejectSuccessCountTarget`; wrappers like `floor(vs)+0` still
-    // propagate `versusMetadata` via `mergeContext`, so this only blocks
-    // `mergeMetaRolls` sites where metadata would silently vanish.
-    // Narrow unwrap: only `Grouped`. `Modifier`/`Sort`/`CritThreshold`
-    // cannot wrap a `Versus` because `containsDicePool` does not recurse
-    // into `Versus`, so each of those parsers rejects the wrap upstream.
+    // A Versus degree is a terminal scalar, never a valid dice count, sides, or
+    // threshold. Only the `mergeMetaRolls` sites need blocking, where
+    // `versusMetadata` would silently vanish; wrappers like `floor(vs)+0` still
+    // propagate it via `mergeContext`.
+    // Narrow unwrap (only `Grouped`): `containsDicePool` does not recurse into
+    // `Versus`, so `Modifier`/`Sort`/`CritThreshold` reject the wrap upstream.
     const node = unwrapGrouped(target);
     if (node.type === 'Versus') {
       throw new ParseError(
@@ -706,11 +693,11 @@ export class Parser {
         token,
       );
     }
-    // ! Single-sub-roll `Group` passthrough is the new sibling route —
-    //   `containsDicePool` recurses into Group's single sub-expression via
-    //   `deepContainsDicePool`, which traverses Versus's `roll`/`dc`. Deep
-    //   walk for any descendant Versus so `{1d20 vs 15}cs>18`,
-    //   `{1+(1d20 vs 15)}cs>18`, and `4d6>={abs(1d20 vs 15)}` reject too.
+    // ! `containsDicePool` recurses into a single-sub-roll Group via
+    // ! `deepContainsDicePool`, which traverses Versus's `roll`/`dc` — so that
+    // ! route gets a Versus past the shallow guards. Deep-walk for any descendant
+    // ! Versus, or `{1d20 vs 15}cs>18`, `{1+(1d20 vs 15)}cs>18`, and
+    // ! `4d6>={abs(1d20 vs 15)}` would parse while `(1d20 vs 15)cs>18` rejects.
     if (node.type === 'Group' && node.expressions.length === 1) {
       const inner = node.expressions[0];
       if (inner != null && containsVersus(inner)) {
@@ -726,17 +713,14 @@ export class Parser {
 
   private parseModifier(target: ASTNode, token: Token): ModifierNode {
     this.rejectSuccessCountTarget(target, token);
-    // ! Mirror `parseSort`/`parseCritThreshold` — keep/drop applied to a
-    //   Versus target silently drops `degree`/`natural` metadata. Pre-existing
-    //   for `(1d20 vs 15)kh1` (caught upstream by `containsDicePool` with a
-    //   different error code), but the single-sub-roll Group passthrough makes
-    //   `{1d20 vs 15}kh1` reachable past `containsDicePool` (Group's deep
-    //   walk recurses into Versus's roll/dc), so the explicit reject is the
-    //   only thing that closes the metadata-drop hole.
+    // ! Keep/drop on a Versus target silently drops `degree`/`natural` metadata,
+    // ! and `{1d20 vs 15}kh1` gets past `containsDicePool` — whose Group deep
+    // ! walk recurses into Versus's `roll`/`dc` — so this reject is the only
+    // ! thing closing that hole. Mirrors `parseSort`/`parseCritThreshold`.
     this.rejectVersusTarget(target, token);
 
-    // Keep/drop modifiers need a dice pool to select from. Wrapping arithmetic
-    // (e.g. `(1d6+5)kh1`, `4d6+2kh3`) would silently drop user math.
+    // Keep/drop needs a pool to select from; `(1d6+5)kh1` or `4d6+2kh3` would
+    // silently drop the user's arithmetic.
     if (!containsDicePool(target)) {
       throw new ParseError(
         `Keep/drop modifiers require a dice pool target`,
@@ -754,7 +738,6 @@ export class Parser {
         ? 'highest'
         : 'lowest';
 
-    // Default to 1 when no explicit count follows the modifier (e.g., 4d6kh → 4d6kh1)
     const nextToken = this.peek().type;
     const hasExplicitCount =
       nextToken === TokenType.NUMBER ||
@@ -780,13 +763,12 @@ export class Parser {
   private parseExplode(target: ASTNode, token: Token): ExplodeNode {
     this.rejectSuccessCountTarget(target, token);
 
-    // Groups have no explode semantics — reject outright. Must come before
-    // `containsDicePool`, which recurses into `Group` and would otherwise
-    // let `{4d6}!` slip through.
+    // Groups have no explode semantics. Must precede `containsDicePool`, which
+    // recurses into `Group` and would let `{4d6}!` slip through.
     this.rejectGroupTarget(target, token, 'explode', 'INVALID_EXPLODE_TARGET');
 
-    // Explode needs a dice pool to explode on. Wrapping arithmetic (e.g.
-    // `(1d6+5)!`, `floor(1d6/2)!`) would silently drop user math.
+    // Arithmetic wrappers like `(1d6+5)!` or `floor(1d6/2)!` would silently drop
+    // the user's math.
     if (!containsDicePool(target)) {
       throw new ParseError(
         `Explode modifier requires a dice pool target`,
@@ -796,9 +778,8 @@ export class Parser {
       );
     }
 
-    // Fate dice (sides = 0) cannot explode — the symmetric -1/0/+1 range has
-    // no natural "max" trigger, so semantics are undefined. Reject at parse
-    // time rather than silently no-op in the evaluator.
+    // Fate's symmetric -1/0/+1 range has no max face to trigger on, so exploding
+    // it has no defined semantics — reject here rather than no-op in the evaluator.
     if (containsFatePool(target)) {
       throw new ParseError(
         `Fate dice cannot explode`,
@@ -808,8 +789,7 @@ export class Parser {
       );
     }
 
-    // Reject nested explodes (e.g., `1d6!!!`) — a second explode token atop
-    // an ExplodeNode has no meaningful semantics and is rejected per spec.
+    // A second explode token atop an `Explode` (`1d6!!!`) has no semantics.
     if (target.type === 'Explode') {
       throw new ParseError(
         `Cannot chain explode modifiers`,
@@ -819,8 +799,8 @@ export class Parser {
       );
     }
 
-    // ? `parseLed` dispatches here only for the three explode tokens, so the
-    //   lookup always hits; the fallback keeps the type non-optional.
+    // `parseLed` reaches here only for the three explode tokens, so the lookup
+    // always hits; the fallback exists to keep the type non-optional.
     const variant: ExplodeNode['variant'] = EXPLODE_VARIANTS[token.type] ?? 'penetrating';
 
     const start = target.start ?? token.position;
@@ -843,12 +823,12 @@ export class Parser {
   private parseReroll(target: ASTNode, token: Token): RerollNode {
     this.rejectSuccessCountTarget(target, token);
 
-    // Groups have no reroll semantics — reject outright. Must come before
-    // `containsDicePool`, which recurses into `Group`.
+    // Groups have no reroll semantics. Must precede `containsDicePool`, which
+    // recurses into `Group`.
     this.rejectGroupTarget(target, token, 'reroll', 'INVALID_REROLL_TARGET');
 
-    // Reroll needs a dice pool to inspect. Wrapping arithmetic (e.g.
-    // `(1d6+5)r<3`, `floor(1d6/2)ro<3`) would silently drop user math.
+    // Arithmetic wrappers like `(1d6+5)r<3` or `floor(1d6/2)ro<3` would silently
+    // drop the user's math.
     if (!containsDicePool(target)) {
       throw new ParseError(
         `Reroll modifier requires a dice pool target`,
@@ -858,7 +838,6 @@ export class Parser {
       );
     }
 
-    // A reroll token must be followed by a comparison — bare `r` / `ro` is invalid.
     if (!this.isComparePointAhead()) {
       throw new ParseError(
         `Expected comparison operator after '${token.value}'`,
@@ -885,10 +864,9 @@ export class Parser {
     this.rejectSuccessCountTarget(target, token);
     this.rejectVersusTarget(target, token);
 
-    // Sort is purely visual but still needs a dice pool to reorder —
-    // `5s`, `(1+2)s`, or `floor(5)s` have no dice to touch. Uses the deep
-    // guard so arithmetic-wrapped pools like `(1d6+2d8)s` are accepted per
-    // Stage 3 spec, while pure literals/arithmetic reject.
+    // Deep guard, unlike explode/reroll: arithmetic-wrapped pools like
+    // `(1d6+2d8)s` are sortable, while `5s`, `(1+2)s`, and `floor(5)s` have no
+    // dice to reorder.
     if (!deepContainsDicePool(target)) {
       throw new ParseError(
         `Sort modifier requires a dice pool target`,
@@ -898,14 +876,11 @@ export class Parser {
       );
     }
 
-    // ! Multi-sub-roll groups (`{a, b}s`, `({a, b})s`) need hierarchical
-    //   sort per Stage 3 spec §3 (sort dice within each sub-roll, then sort
-    //   sub-rolls by total) — `evalSort` only flat-sorts, so accepting the
-    //   syntax would silently ship non-spec behaviour. Single-sub Groups keep
-    //   passing through (the unwrap returns a `Group` with one expression,
-    //   which is the user's flat-pool escape hatch).
-    // TODO: Implement hierarchical multi-sub-roll group sort, then drop this
-    //   reject.
+    // ! Multi-sub-roll groups (`{a, b}s`, `({a, b})s`) require hierarchical sort —
+    // ! dice within each sub-roll, then sub-rolls by total — but `evalSort` only
+    // ! flat-sorts, so accepting the syntax would silently ship wrong output.
+    // ! Single-sub Groups still pass; that is the flat-pool escape hatch.
+    // TODO: Implement hierarchical group sort, then drop this reject.
     const base = unwrapAllTransparent(target);
     if (base.type === 'Group' && base.expressions.length >= 2) {
       throw new ParseError(
@@ -918,9 +893,8 @@ export class Parser {
 
     const order: SortNode['order'] = token.type === TokenType.SORT_ASC ? 'ascending' : 'descending';
 
-    // Chained sorts (`4d6ss`, `4d6sasd`) are allowed — sort is idempotent
-    // when repeated in the same direction; a later `sd` after `s` just
-    // overrides the order since both pass over the same pool.
+    // Chained sorts (`4d6ss`, `4d6sasd`) are deliberately allowed: repeats are
+    // idempotent and a later `sd` just overrides the order.
     return {
       type: 'Sort',
       order,
@@ -934,12 +908,11 @@ export class Parser {
     this.rejectSuccessCountTarget(target, token);
     this.rejectVersusTarget(target, token);
 
-    // Multi-sub-roll groups have no crit-threshold semantics per Stage 3 spec
-    // — a group there is a container of sub-roll subtotals, not a dice pool,
-    // and applying cs/cf would override `critical`/`fumble` on dropped
-    // sub-roll dice. Single-sub-roll groups pass through under the documented
-    // flat-pool rule (`{1d20}kh1cs>18` ≡ `(1d20)kh1cs>18`). Must run before
-    // `containsDicePool`, which recurses into `Group`.
+    // A multi-sub-roll group is a container of sub-roll subtotals, not a pool:
+    // `cs`/`cf` there would override `critical`/`fumble` on dropped sub-roll
+    // dice. Single-sub-roll groups pass through as the flat-pool form
+    // (`{1d20}kh1cs>18` ≡ `(1d20)kh1cs>18`). Must run before `containsDicePool`,
+    // which recurses into `Group`.
     this.rejectGroupTarget(
       target,
       token,
@@ -948,10 +921,9 @@ export class Parser {
       true,
     );
 
-    // Shallow dice-pool check (bare dice only) — rejects `(1d6+2d8)cs>5`,
-    // `5cs`, `(1+2)cs`, `floor(5)cs`. Matches explode/reroll behavior.
-    // Note: if `target` already is a `CritThresholdNode`, `containsDicePool`
-    // recurses into its `target`, so chained `cs`/`cf` naturally pass.
+    // Shallow check like explode/reroll: `(1d6+2d8)cs>5`, `5cs`, `(1+2)cs`, and
+    // `floor(5)cs` reject. Chained `cs`/`cf` still pass, since `containsDicePool`
+    // recurses into a `CritThreshold`'s own target.
     if (!containsDicePool(target)) {
       throw new ParseError(
         `Crit threshold modifier requires a dice pool target`,
@@ -961,11 +933,9 @@ export class Parser {
       );
     }
 
-    // Bare `cs`/`cf` resolve to a per-die default that assumes max-side / 1
-    // semantics — incompatible with Fate dice (`{-1, 0, +1}`), where the bare
-    // fumble check would flip the best face (`+1`) into a fumble. Custom
-    // thresholds with explicit ComparePoints remain accepted. Mirrors the
-    // Fate-explosion rejection above.
+    // The bare `cs`/`cf` per-die default assumes max-side/1 semantics, which on
+    // Fate's `{-1, 0, +1}` would flag the best face (`+1`) as a fumble. Explicit
+    // ComparePoints stay accepted. Mirrors the Fate-explosion reject above.
     if (!this.isComparePointAhead() && containsFatePool(target)) {
       throw new ParseError(
         `Bare cs/cf cannot apply to Fate dice`,
@@ -980,18 +950,16 @@ export class Parser {
       : 'default';
     const end = threshold === 'default' ? token.end : (threshold.value.end ?? token.end);
 
-    // Unwrap parens so `(1d20cs>19)cs=1` chains into the inner node. Without
-    // unwrapping, the outer `cs` would create a second CritThresholdNode
-    // wrapping the Grouped — the collapse-into-single-node design decision
-    // from STAGE3.md §"CritThreshold Collects Multiple Thresholds" would
-    // be subtly broken for any user who parenthesizes the chain.
+    // Unwrap parens so `(1d20cs>19)cs=1` collapses into the inner node instead of
+    // nesting a second `CritThreshold` around the `Grouped` — every threshold in
+    // a chain must collect on one node, which parenthesizing would break.
     let chainTarget: ASTNode = target;
     while (chainTarget.type === 'Grouped') {
       chainTarget = chainTarget.expression;
     }
     if (isCritThreshold(chainTarget)) {
-      // Rebuilt rather than mutated — `NodeSpan` is readonly, and the
-      // discarded `Grouped` wrapper must not keep a stale `end`.
+      // Rebuilt, not mutated: `NodeSpan` is readonly, and the discarded `Grouped`
+      // wrapper must not leave a stale `end`.
       const isSuccess = token.type === TokenType.CRIT_SUCCESS;
       return {
         ...chainTarget,
@@ -1019,9 +987,9 @@ export class Parser {
     // Success counting is terminal: chaining (`>=5>=3`) has no semantics.
     this.rejectSuccessCountTarget(target, token);
 
-    // Reject non-pool targets like `1>=3`, `(1+2)>=3`, `(1d6*2)>=10`, or
-    // `(1d20 vs 15)>=1`. Success counting operates on a raw dice pool; any
-    // arithmetic or composition wrapping would be silently ignored.
+    // Success counting reads a raw pool, so arithmetic or composition wrappers
+    // (`1>=3`, `(1+2)>=3`, `(1d6*2)>=10`, `(1d20 vs 15)>=1`) would be silently
+    // ignored.
     if (!containsDicePool(target)) {
       throw new ParseError(
         `Success counting requires a dice pool target`,
@@ -1032,7 +1000,7 @@ export class Parser {
     }
 
     const operator = this.getCompareOp(token);
-    // Threshold binding: `BP.DICE_LEFT` — see `parseComparePoint` JSDoc.
+    // Threshold binds at `BP.DICE_LEFT` — see `parseComparePoint` TSDoc.
     const value = this.parseExpression(BP.DICE_LEFT);
     this.rejectSuccessCountTarget(value, token);
     this.rejectVersusTarget(value, token);
@@ -1071,10 +1039,10 @@ export class Parser {
   private parseVersus(left: ASTNode, token: Token): VersusNode {
     this.rejectSuccessCountTarget(left, token);
 
-    // Chained `a vs b vs c` has no semantics — a degree is a scalar, not a
-    // comparable. Unwrap `Grouped` so `(a vs b) vs c` rejects at parse
-    // time like the bare form; paren-nested DC (`a vs (b vs c)`) is still
-    // caught by the evaluator via `mergeContext`.
+    // A degree is a scalar, not a comparable, so `a vs b vs c` has no semantics.
+    // Unwrapping `Grouped` makes `(a vs b) vs c` reject here like the bare form;
+    // a paren-nested DC (`a vs (b vs c)`) is caught later by the evaluator's
+    // `mergeContext`.
     let leftChain: ASTNode = left;
     while (leftChain.type === 'Grouped') {
       leftChain = leftChain.expression;
@@ -1095,7 +1063,9 @@ export class Parser {
     };
   }
 
+  //
   // * Compare point utilities
+  //
 
   /**
    * Checks whether the next token is a comparison operator.
@@ -1160,7 +1130,9 @@ export class Parser {
     }
   }
 
+  //
   // * Helpers
+  //
 
   private getOperatorSymbol(token: Token): '+' | '-' | '*' | '/' | '%' | '**' {
     switch (token.type) {
@@ -1217,12 +1189,9 @@ export class Parser {
       case TokenType.CRIT_SUCCESS:
       case TokenType.CRIT_FAIL:
         return BP.MODIFIER;
-      // Comparison operators act as LED-dispatched success-count modifiers
-      // at the Pratt level. Sit below ADD/MUL so arithmetic on a dice pool
-      // completes before success counting wraps it — `5d6+2>4` parses as
-      // `(5d6+2)>4` and then cleanly fails the pool-target guard, rather
-      // than the `>` stealing `2` from the `+`. Inside `parseComparePoint`
-      // (called manually by explode/reroll) this BP is bypassed.
+      // Comparison operators act as LED-dispatched success-count modifiers here;
+      // `parseComparePoint`, called manually by explode/reroll, bypasses this BP.
+      // See `BP.COMPARE` for why it sits below ADD/MUL.
       case TokenType.GREATER:
       case TokenType.GREATER_EQUAL:
       case TokenType.LESS:
@@ -1231,12 +1200,10 @@ export class Parser {
         return BP.COMPARE;
       case TokenType.RPAREN:
       case TokenType.EOF:
-      // Punctuation and keywords that terminate expressions
       case TokenType.COMMA:
       case TokenType.FUNCTION:
-      // Group boundaries: `}` closes the current group (consumed inside
-      // `parseGroup`), and a stray `{` after a complete expression is an
-      // error. Both terminate the outer Pratt loop at -1.
+      // `}` is consumed inside `parseGroup`, and a stray `{` after a complete
+      // expression is an error — both must terminate the outer Pratt loop.
       case TokenType.LBRACE:
       case TokenType.RBRACE:
         return -1;

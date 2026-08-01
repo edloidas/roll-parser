@@ -269,7 +269,7 @@ function expressionNote(result: RollResult): string {
 
 /** Renders the full result panel content for a successful roll. */
 export function renderResultPanel(result: RollResult): string {
-  // ? Success counting reframes the roll — lead with the counts, not the sum.
+  // Success counting reframes the roll — lead with the counts, not the sum.
   const emphasizeCounts = result.successes != null;
   const totalBlock = emphasizeCounts
     ? successSummary(result)

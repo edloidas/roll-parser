@@ -22,8 +22,6 @@ import {
 import { parse } from './parser.js';
 
 describe('AST type guards', () => {
-  // One representative notation per node type — each guard must accept its
-  // own node and reject every other node in the table.
   const nodes: [string, (node: ASTNode) => boolean, ASTNode][] = [
     ['Literal', isLiteral, parse('42')],
     ['Dice', isDice, parse('2d6')],
@@ -62,8 +60,8 @@ describe('AST walkers via parse-level guards', () => {
   });
 
   test('bare cf rejects Fate pools cloaked by wrappers inside a group', () => {
-    // Each notation routes deepContainsFatePool through a different branch:
-    // UnaryOp, Modifier target, Grouped, nested Group.
+    // One notation per `deepContainsFatePool` branch: UnaryOp, Modifier target,
+    // Grouped, nested Group.
     for (const notation of ['{-4dF}cf', '{4dFkh2}cf', '{(4dF)}cf', '{{4dF}}cf']) {
       expect(() => parse(notation)).toThrow('Bare cs/cf cannot apply to Fate dice');
     }

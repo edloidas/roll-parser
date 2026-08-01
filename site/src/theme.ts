@@ -52,9 +52,8 @@ export function initTheme(): void {
     if (event.key === THEME_KEY) applyTheme(getStoredTheme());
   });
 
-  // Re-apply when restored from the back/forward cache: bfcache restores a
-  // frozen page without re-running scripts, so a theme changed on another page
-  // (e.g. the docs) would otherwise stay stale until a manual reload.
+  // bfcache restores a frozen page without re-running scripts, so a theme changed
+  // on another page (e.g. the docs) would otherwise stay stale until a reload.
   window.addEventListener('pageshow', (event) => {
     if (event.persisted) applyTheme(getStoredTheme());
   });

@@ -24,11 +24,9 @@ async function runCommand(
   return { stdout, stderr, exitCode };
 }
 
-// The real `build` script, not a reimplementation of it: the assertions below
-// judge the artifact a consumer installs, including the executable bit that
-// `tsc` alone never sets. `ensureFreshDist` is shared with `readme.test.ts`
-// and memoized to one build per test run; its `clean` step is safe because
-// `bun test` runs files sequentially in a single process.
+// Runs the real `build` script so the assertions judge the artifact a consumer
+// installs — including the executable bit `tsc` never sets. `ensureFreshDist`
+// memoizes one build per run; its `clean` is safe because `bun test` is sequential.
 beforeAll(async () => {
   await ensureFreshDist();
 }, 60_000);

@@ -3,8 +3,8 @@ import pkg from '../package.json' with { type: 'json' };
 const input = process.argv[2];
 const pkgVersion = pkg.version;
 
-// The generated src/version.ts must always match package.json — it is what
-// the published library actually exports as VERSION.
+// src/version.ts is what the published library exports as VERSION, so it must
+// never drift from package.json.
 const versionFile = Bun.file(new URL('../src/version.ts', import.meta.url));
 const versionSource = (await versionFile.exists()) ? await versionFile.text() : '';
 const srcVersion = versionSource.match(/^export const version = '(.+)';\r?$/m)?.[1];

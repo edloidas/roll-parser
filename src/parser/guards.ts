@@ -138,12 +138,12 @@ export function containsDicePool(node: ASTNode): boolean {
     case 'Grouped':
       return containsDicePool(node.expression);
     case 'Group':
-      // Multi-sub-roll groups (`{a, b, c}kh1`) always accept: keep/drop
-      // operates on subtotals, which are "compound dice" by definition —
-      // even a literal-only `{3, 5, 7}kh1` is valid. Single-sub-roll
-      // groups are the user's explicit opt-in to flat-pool semantics, so
-      // we deep-walk through arithmetic that a raw `(1d6+5)kh1` would
-      // reject. This is the `{}` escape hatch per Stage 3 spec.
+      // Multi-sub-roll groups (`{a, b, c}kh1`) always accept: keep/drop operates
+      // on subtotals, which are compound dice by definition — even a
+      // literal-only `{3, 5, 7}kh1` is valid. A single-sub-roll group is the
+      // user's explicit opt-in to flat-pool semantics, so it deep-walks
+      // arithmetic that a raw `(1d6+5)kh1` rejects — the Stage 3 `{}` escape
+      // hatch.
       return node.expressions.length >= 2 || node.expressions.some(deepContainsDicePool);
     default:
       return false;
@@ -221,7 +221,8 @@ export function deepContainsFatePool(node: ASTNode): boolean {
  *
  * Without this walk, the unwrap inside `rejectGroupTarget` only peels
  * `Grouped`/`Modifier`/`Sort`/`CritThreshold` — a multi-sub Group cloaked
- * in a `BinaryOp`/`UnaryOp`/`FunctionCall` revives issue #97.
+ * in a `BinaryOp`/`UnaryOp`/`FunctionCall` reaches the evaluator, where it
+ * flags crits on dice belonging to dropped sub-rolls.
  */
 export function containsMultiSubGroup(node: ASTNode): boolean {
   return someDescendant(node, isMultiSubGroupHit);

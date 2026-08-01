@@ -85,9 +85,8 @@ describe('property-based invariants', () => {
       );
     });
 
-    // `0dX` and `Nd1` are removed: both are the `[N, N*X]` bound above with
-    // the interval collapsed to a point, and `evaluator.test.ts` already
-    // pins the degenerate pools exactly.
+    // `0dX` and `Nd1` belong in `evaluator.test.ts`: both collapse the
+    // `[N, N*X]` bound above to a point, and their pools are pinned there.
   });
 
   describe('modifier invariants', () => {
@@ -213,11 +212,9 @@ describe('property-based invariants', () => {
   });
 
   describe('arithmetic invariants', () => {
-    // Commutativity of `+`/`*` and the `+0`/`*1` identities are removed:
-    // over literal operands they restate IEEE-754 arithmetic, not this
-    // library's behavior. What they did incidentally exercise — signed
-    // literals in either operand position — is pinned exactly by
-    // `signed literal operands` in `parser.test.ts`.
+    // `+`/`*` commutativity and the `+0`/`*1` identities are out of scope: over
+    // literal operands they restate IEEE-754, not this library. Signed literals
+    // in either operand position are pinned in `parser.test.ts`.
     test('unary minus equivalent to subtraction from zero', () => {
       fc.assert(
         fc.property(
@@ -238,9 +235,8 @@ describe('property-based invariants', () => {
 
   describe('expression round-trip', () => {
     test('reparsing result.expression yields the same total on a replayed seed', () => {
-      // Shapes exercise BinaryOp, UnaryOp, dice count/sides, and function
-      // call argument sites, with randomly injected parentheses around any
-      // subexpression.
+      // Shapes cover BinaryOp, UnaryOp, dice count/sides, and call-argument
+      // sites, each with parentheses somewhere in the tree.
       const shapes = [
         '({L})*{C}d{S}',
         '{C}d{S} + ({L}*{L})',
@@ -261,8 +257,8 @@ describe('property-based invariants', () => {
           fc.integer({ min: 1, max: 6 }),
           seedArb,
           (shapeIdx, count, sides, lit, seed) => {
-            // `kh{L}` needs a selector < count; clamp to keep the notation
-            // legal across all shape generators.
+            // The last shape reuses `{L}` as its `kh` selector, so bound it by
+            // the dice count instead of letting it degenerate to keep-all.
             const keep = Math.min(lit, count);
             const notation = (shapes[shapeIdx] ?? '')
               .replaceAll('{C}', String(count))
@@ -367,9 +363,8 @@ describe('property-based invariants', () => {
       );
     });
 
-    // Non-negativity of a chained keep/drop total is removed: every die
-    // face is >= 1 and the modifiers only ever remove dice, so the sum of a
-    // kept subset cannot be negative regardless of what the evaluator does.
+    // No property pins non-negativity of a chained keep/drop total: faces are
+    // >= 1 and the modifiers only remove dice, so a kept subset cannot sum < 0.
     test('chained modifier order does not affect total (commutativity)', () => {
       fc.assert(
         fc.property(
@@ -391,10 +386,8 @@ describe('property-based invariants', () => {
       );
     });
 
-    // Pool length under chained keep/drop is removed: `rolls array length
-    // matches dice count` above already states it, and keep/drop provably
-    // never adds or removes entries — it only sets the `dropped` flag, which
-    // `chained kh+dl total <= single kh total` covers.
+    // Pool length under chained keep/drop needs no property: keep/drop only
+    // sets the `dropped` flag, it never adds or removes pool entries.
   });
 
   describe('seeded reproducibility', () => {
@@ -432,7 +425,6 @@ describe('property-based invariants', () => {
           seedArb,
           (count, sides, seed) => {
             const result = roll(`${count}d${sides}!`, { seed });
-            // Minimum: every original die rolled 1 → total >= count.
             return result.total >= count && result.rolls.length >= count;
           },
         ),
@@ -501,8 +493,7 @@ describe('property-based invariants', () => {
           (seed, count, sides) => {
             const base = roll(`${count}d${sides}`, { seed });
             const exploded = roll(`${count}d${sides}!`, { seed });
-            // Both runs roll the same first N dice from the seeded RNG, then
-            // `!` potentially adds more. So exploded.total >= base.total.
+            // Same seed → both runs draw the same first N dice; `!` only appends.
             return exploded.total >= base.total;
           },
         ),
@@ -547,8 +538,7 @@ describe('property-based invariants', () => {
     });
 
     test('rerolled intermediate dice are always marked rerolled+dropped', () => {
-      // Use `ro` so the chain always terminates — the invariant is about
-      // modifier flags, not termination behavior.
+      // `ro` guarantees termination — the invariant here is flags, not termination.
       fc.assert(
         fc.property(
           seedArb,
@@ -565,8 +555,8 @@ describe('property-based invariants', () => {
     });
 
     test('seeded reroll is reproducible', () => {
-      // Constrain to cases where recursive reroll terminates: threshold
-      // must be strictly less than `sides` so some results exceed it.
+      // Recursive reroll only terminates while the threshold stays below
+      // `sides`, so some results can exceed it.
       fc.assert(
         fc.property(
           seedArb,
@@ -585,10 +575,8 @@ describe('property-based invariants', () => {
   });
 
   describe('math functions', () => {
-    // Wrapping an expression in a math function does not change what it draws
-    // from the RNG, so a same-seed pair of rolls shares its dice exactly. That
-    // makes the unwrapped roll an exact oracle for the wrapped one, rather than
-    // the one-sided bound an inequality would give.
+    // A math wrapper draws nothing extra from the RNG, so a same-seed pair shares
+    // its dice exactly — the unwrapped roll is an exact oracle, not just a bound.
     test('floor(NdX/Y) equals Math.floor of the same seeded NdX/Y', () => {
       fc.assert(
         fc.property(
@@ -655,9 +643,8 @@ describe('property-based invariants', () => {
             const maxDice = maxed.rolls.map((die) => die.result);
             const minDice = minned.rolls.map((die) => die.result);
 
-            // Dice must match pairwise across the two calls — a wrapper that
-            // draws extra values or swaps argument order diverges here even if
-            // it still reports the extrema of whatever it rolled.
+            // Dice must match pairwise: a wrapper that draws extra values or
+            // swaps argument order still reports extrema, but diverges here.
             return (
               maxDice.length === 2 &&
               minDice.length === 2 &&
@@ -865,9 +852,8 @@ describe('property-based invariants', () => {
       }
     }
 
-    // Strings over the notation alphabet reach far deeper lexer/parser states
-    // than arbitrary Unicode: near-valid modifiers, dangling comparators,
-    // unbalanced groups, huge digit runs.
+    // The notation alphabet reaches far deeper lexer/parser states than arbitrary
+    // Unicode: near-valid modifiers, dangling comparators, unbalanced groups.
     const notationChars = fc.constantFrom(...'0123456789dDkKhHlLfFsSrRoOcCpP!<>=%+-*/(){},@ .');
 
     test('roll() on notation-alphabet strings never escapes the typed-error contract', () => {

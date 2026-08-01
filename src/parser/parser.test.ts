@@ -24,7 +24,9 @@ import type {
 } from './ast.js';
 import { ParseError, Parser, parse } from './parser.js';
 
-// * Helper functions for readable assertions
+//
+// * Assertion helpers
+//
 
 /**
  * Recursively removes `start`/`end` spans so structural assertions stay
@@ -174,10 +176,7 @@ describe('Parser', () => {
   });
 
   describe('signed literal operands', () => {
-    // #135 — replaces four fast-check "properties" that re-derived IEEE-754
-    // commutativity and identity over random literals. What they actually
-    // exercised was a signed literal reaching either operand position of every
-    // binary operator; that is a parser concern, so it is pinned here exactly.
+    // Pins a signed literal in either operand position of every binary operator.
     const CASES: [notation: string, expected: ASTNode][] = [
       ['-7+3', binary('+', unary(literal(7)), literal(3))],
       ['3+-7', binary('+', literal(3), unary(literal(7)))],
@@ -365,14 +364,12 @@ describe('Parser', () => {
     });
 
     it('should be right-associative: 2**3**2 = 2**(3**2)', () => {
-      // This evaluates to 2^9 = 512, not (2^3)^2 = 64
       expect(parseAst('2**3**2')).toEqual(
         binary('**', literal(2), binary('**', literal(3), literal(2))),
       );
     });
 
     it('should have higher precedence than multiplication', () => {
-      // 2*3**2 = 2*(3^2) = 2*9 = 18
       expect(parseAst('2*3**2')).toEqual(
         binary('*', literal(2), binary('**', literal(3), literal(2))),
       );
@@ -505,7 +502,6 @@ describe('Parser', () => {
 
   describe('modifier + arithmetic', () => {
     it('should parse 4d6kh3+5', () => {
-      // Modifier applies only to dice, then addition
       expect(parseAst('4d6kh3+5')).toEqual(
         binary(
           '+',
@@ -656,7 +652,6 @@ describe('Parser', () => {
     });
 
     it('should handle prefix d with arithmetic', () => {
-      // d6+d8 = (d6)+(d8)
       expect(parseAst('d6+d8')).toEqual(
         binary('+', dice(literal(1), literal(6)), dice(literal(1), literal(8))),
       );
@@ -665,7 +660,6 @@ describe('Parser', () => {
 
   describe('modifier chaining', () => {
     it('should parse 4d6dl1kh3 as (4d6dl1)kh3', () => {
-      // Chained modifiers: drop lowest 1, then keep highest 3
       expect(parseAst('4d6dl1kh3')).toEqual(
         modifier(
           'keep',
@@ -677,7 +671,6 @@ describe('Parser', () => {
     });
 
     it('should parse 4d6kh3dl1 (reverse order)', () => {
-      // Reverse order: keep highest 3, then drop lowest 1
       expect(parseAst('4d6kh3dl1')).toEqual(
         modifier(
           'drop',
@@ -689,7 +682,7 @@ describe('Parser', () => {
     });
 
     it('should parse multiple same modifiers: 4d6dl1dl1', () => {
-      // Chaining same modifier type (semantically odd but should parse)
+      // A redundant chain is semantically odd, but must still parse.
       expect(parseAst('4d6dl1dl1')).toEqual(
         modifier(
           'drop',
@@ -701,7 +694,6 @@ describe('Parser', () => {
     });
 
     it('should allow computed count in chain: 4d6kh(1+2)', () => {
-      // Computed counts should still work with the fix
       expect(parseAst('4d6kh(1+2)')).toEqual(
         modifier(
           'keep',
@@ -713,7 +705,6 @@ describe('Parser', () => {
     });
 
     it('should parse triple chain: 4d6dl1kh3dh1', () => {
-      // Three modifiers in sequence
       expect(parseAst('4d6dl1kh3dh1')).toEqual(
         modifier(
           'drop',
@@ -894,9 +885,8 @@ describe('Parser', () => {
     });
 
     it('should reject d6!d20 as an ambiguous bare dice chain', () => {
-      // EXPLODE (BP.MODIFIER=35) binds to `d6` first, then the second DICE
-      // token would bind the exploded pool as an infix count — the `4d6d1`
-      // trap in another costume. Parenthesized nesting stays legal.
+      // EXPLODE (BP.MODIFIER=35) binds `d6` first, so the second DICE token
+      // would take the exploded pool as an infix count — the `4d6d1` trap again.
       expect(() => parseAst('d6!d20')).toThrow('Ambiguous dice chain');
       expect(parseAst('(d6!)d20')).toEqual(
         dice(grouped(explode('standard', dice(literal(1), literal(6)))), literal(20)),
@@ -1089,9 +1079,8 @@ describe('Parser', () => {
     });
 
     it('should bind compare to explode threshold, not success count: 10d10!>=6', () => {
-      // Explode greedily consumes a trailing ComparePoint as its own
-      // threshold, so `10d10!>=6` means "explode on >=6", not "explode
-      // then count successes". Disambiguate with parentheses.
+      // Explode greedily takes a trailing ComparePoint as its own threshold, so
+      // this is "explode on >=6", not explode-then-count. Parens disambiguate.
       expect(parseAst('10d10!>=6')).toEqual(
         explode('standard', dice(literal(10), literal(10)), cp('>=', literal(6))),
       );
@@ -1217,8 +1206,8 @@ describe('Parser', () => {
   describe('success count rejected in meta-expression positions', () => {
     // SuccessCount is terminal at every meta-expression parse site: modifier
     // count, dice sides/count (infix + prefix), Fate/percent dice count,
-    // SuccessCount threshold value, bare `fN` value, and compare-point values
-    // (Explode / Reroll). Wrapping in parens used to bypass the #51 guards.
+    // threshold value, bare `fN` value, and Explode/Reroll compare points.
+    // Parenthesizing it slips past any check that only looks one level down.
 
     it('should reject SuccessCount as keep-modifier count: 4d6kh(3d6>=3)', () => {
       expectRollError(() => parseAst('4d6kh(3d6>=3)'), ParseError, 'INVALID_SUCCESS_COUNT_TARGET');
@@ -1267,9 +1256,8 @@ describe('Parser', () => {
 
   describe('versus rejected in meta-expression positions', () => {
     // Versus produces a PF2e degree — a terminal scalar, not a valid
-    // meta-expression input. Symmetric with the SuccessCount rejections
-    // above; prevents `versusMetadata` from being silently dropped in
-    // `mergeMetaRolls` sites.
+    // meta-expression input. Rejecting it here keeps `versusMetadata` from
+    // being silently dropped at the `mergeMetaRolls` sites.
 
     it('should reject Versus as keep-modifier count: 4d6kh(1d20 vs 10)', () => {
       expectRollError(() => parseAst('4d6kh(1d20 vs 10)'), ParseError, 'NESTED_VERSUS');
@@ -1311,13 +1299,12 @@ describe('Parser', () => {
       expectRollError(() => parseAst('1d6r<=(1d20 vs 10)'), ParseError, 'NESTED_VERSUS');
     });
 
-    // #109 — single-sub-roll Group passthrough makes Versus reachable past
-    // the shallow rejectVersusTarget check. Each meta-expression site needs
-    // a `{...}`-form rejection to mirror the existing parens-form coverage.
+    // A single-sub-roll `{...}` Group passes its expression through, so a Versus
+    // inside one reaches sites the shallow `rejectVersusTarget` never looked at —
+    // every parens-form case above needs a `{...}`-form twin.
     it('should reject Versus inside parens-wrapped single-sub group as keep-modifier count: 4d6kh({1d20 vs 10})', () => {
-      // `kh{...}` is not valid syntax — `kh` requires parens, not braces.
-      // `kh({...})` is the actual bypass route: parens around a single-sub
-      // Group around Versus. The new deep-walk catches it.
+      // `kh{...}` is not valid syntax — `kh` requires parens. `kh({...})` is the
+      // real bypass route: parens around a single-sub Group around a Versus.
       expectRollError(() => parseAst('4d6kh({1d20 vs 10})'), ParseError, 'NESTED_VERSUS');
     });
 
@@ -1326,11 +1313,9 @@ describe('Parser', () => {
     });
 
     it('should reject Versus inside single-sub group as kh target: {1d20 vs 15}kh1', () => {
-      // ! Pre-existing inconsistency closed: parseModifier did not call
-      //   rejectVersusTarget. The Group passthrough made it reachable past
-      //   `containsDicePool` (deep walk recurses into Versus.roll/dc), so the
-      //   reject was the only thing standing between user input and a
-      //   silently-dropped `degree`/`natural`.
+      // `containsDicePool`'s deep walk recurses into `Versus.roll`/`dc`, so a
+      // single-sub Group target reaches parseModifier; `rejectVersusTarget` is
+      // the only thing stopping a silently-dropped `degree`/`natural`.
       expectRollError(() => parseAst('{1d20 vs 15}kh1'), ParseError, 'NESTED_VERSUS');
     });
 
@@ -1343,9 +1328,8 @@ describe('Parser', () => {
     });
 
     it('should accept Versus inside single-sub group as arithmetic operand: {1d20 vs 15}+5', () => {
-      // BinaryOp uses `mergeContext`, which propagates `versusMetadata`.
-      // Not a meta-expression site — explicitly distinguished from the
-      // modifier/sort/cs cases above.
+      // BinaryOp propagates `versusMetadata` through `mergeContext`, so
+      // arithmetic is not a meta-expression site.
       expect(() => parseAst('{1d20 vs 15}+5')).not.toThrow();
     });
   });
@@ -1558,8 +1542,7 @@ describe('Parser', () => {
     });
 
     it('should reject paren-wrapped chained versus at parse: (1d20 vs 15) vs 10', () => {
-      // Chain guard unwraps `Grouped`, so parens do not bypass the parse-time
-      // check. Previously parsed and threw at eval via `mergeContext`.
+      // The chain guard unwraps `Grouped`, so parens cannot defer this to eval.
       expectRollError(() => parseAst('(1d20 vs 15) vs 10'), ParseError, 'NESTED_VERSUS');
     });
   });
@@ -1955,8 +1938,7 @@ describe('Parser', () => {
       });
 
       it('should chain keep/drop over sort (modifier outer)', () => {
-        // `sdl` as one identifier maxes-munches to an unknown keyword in
-        // the lexer; whitespace separates the two modifiers cleanly.
+        // `sdl` maximal-munches into one unknown keyword — the space splits it.
         expect(parseAst('4d6s dl1')).toEqual(
           modifier('drop', 'lowest', literal(1), sort('ascending', dice(literal(4), literal(6)))),
         );
@@ -1969,8 +1951,7 @@ describe('Parser', () => {
       });
 
       it('should allow double sort (idempotent chain)', () => {
-        // Maximal-munch lexing treats `ss` / `ssd` as a single identifier,
-        // so chained sorts need whitespace between the keywords.
+        // `ss` / `ssd` lex as one identifier, so chained sorts need whitespace.
         expect(parseAst('4d6s s')).toEqual(
           sort('ascending', sort('ascending', dice(literal(4), literal(6)))),
         );
@@ -2138,25 +2119,22 @@ describe('Parser', () => {
       });
 
       it('should chain cs over sort', () => {
-        // `4d6scs` maxes-munches to an unknown `scs` identifier in the
-        // lexer — whitespace separates the two keywords cleanly, same
-        // as the `4d6s dl1` pattern used by sort tests.
+        // `scs` maximal-munches into one unknown identifier — the space splits it.
         expect(parseAst('4d6s cs>4')).toEqual(
           critThreshold([cp('>', literal(4))], [], sort('ascending', dice(literal(4), literal(6)))),
         );
       });
 
       it('should chain sort over cs (sort outer)', () => {
-        // `cs` and `s` cannot be lexed together as one identifier — the
-        // intervening `>value` breaks maximal munch. No whitespace needed.
+        // The intervening `>value` breaks maximal munch, so `cs` and `s` cannot
+        // fuse into one identifier — no whitespace needed here.
         expect(parseAst('4d6cs>4 s')).toEqual(
           sort('ascending', critThreshold([cp('>', literal(4))], [], dice(literal(4), literal(6)))),
         );
       });
 
       it('should collapse chain through parens', () => {
-        // `(1d20cs>19)cs=1` must collapse into one CritThresholdNode, not
-        // double-wrap through the Grouped node.
+        // Must collapse into one CritThresholdNode, not double-wrap the Grouped.
         expect(parseAst('(1d20cs>19)cs=1')).toEqual(
           critThreshold(
             [cp('>', literal(19)), cp('=', literal(1))],
@@ -2188,9 +2166,8 @@ describe('Parser', () => {
         );
       });
 
-      // Single-sub-roll groups are the documented flat-pool escape hatch
-      // (STAGE3.md "Group Semantics: Single vs Multi Sub-Roll") and pass
-      // through to cs/cf as if they were the unwrapped form.
+      // Single-sub-roll groups are the flat-pool escape hatch — cs/cf sees them
+      // as the unwrapped form.
       it('should accept cs on a single-sub-roll group: {1d6}cs>5', () => {
         expect(parseAst('{1d6}cs>5')).toEqual(
           critThreshold([cp('>', literal(5))], [], group([dice(literal(1), literal(6))])),
@@ -2246,8 +2223,8 @@ describe('Parser', () => {
       });
 
       it('should reject cs on arithmetic-wrapped pool', () => {
-        // Mirrors explode/reroll — cs/cf is "bare dice only". `(1d6+2d8)` is
-        // an arithmetic wrapper, not a dice pool in the shallow sense.
+        // cs/cf is "bare dice only", like explode/reroll: `(1d6+2d8)` is an
+        // arithmetic wrapper, not a dice pool in the shallow sense.
         expectRollError(
           () => parseAst('(1d6+2d8)cs>5'),
           ParseError,
@@ -2298,9 +2275,8 @@ describe('Parser', () => {
       });
 
       it('should reject cs on a parens-wrapped modifier-wrapped multi-sub-roll group', () => {
-        // Acceptance criterion 5 from #97 — Grouped wrapper around the
-        // Modifier(Group([...])) chain still resolves to a Group via the
-        // shared unwrap.
+        // The shared unwrap peels both wrappers, so a `Grouped` around a
+        // `Modifier(Group([...]))` chain still resolves to a Group.
         expectRollError(
           () => parseAst('({1d20, 1d20}kh1)cs>18'),
           ParseError,
@@ -2308,8 +2284,9 @@ describe('Parser', () => {
         );
       });
 
-      // #109 — single-sub-roll passthrough must not smuggle a buried
-      // multi-sub Group through a wrapper `unwrapAllTransparent` doesn't peel.
+      // The single-sub-roll passthrough must not smuggle a buried multi-sub Group
+      // through a wrapper `unwrapAllTransparent` does not peel — otherwise the
+      // evaluator flags crits on dropped sub-roll dice again.
       it('should reject cs on nested multi-sub-roll group: {{1d20, 1d20}kh1}cs>18', () => {
         const error = expectRollError(
           () => parseAst('{{1d20, 1d20}kh1}cs>18'),
@@ -2377,9 +2354,8 @@ describe('Parser', () => {
       });
 
       it('should reject bare cf chained after custom cs on Fate pool', () => {
-        // `containsFatePool` recurses through `CritThreshold`, so the bare
-        // `cf` is caught even when the target is already a wrapping crit
-        // threshold node from a custom success threshold.
+        // `containsFatePool` recurses through `CritThreshold`, so the bare `cf`
+        // is caught even when its target is already a crit-threshold node.
         const error = expectRollError(
           () => parseAst('4dFcs>0cf'),
           ParseError,
@@ -2389,9 +2365,9 @@ describe('Parser', () => {
         expect(error.message).toContain('Fate');
       });
 
-      // #109 — single-sub-roll Group passthrough makes Fate reachable past
-      // the shallow `containsFatePool` check; `deepContainsFatePool` recurses
-      // through arithmetic, so the bare-Fate guard still fires.
+      // The single-sub-roll Group passthrough puts Fate behind arithmetic, where
+      // the shallow `containsFatePool` stops; its Group case delegates to
+      // `deepContainsFatePool` so the bare-Fate guard still fires.
       it('should reject bare cf on Fate inside arithmetic group: {4dF+1d6}cf', () => {
         const error = expectRollError(
           () => parseAst('{4dF+1d6}cf'),
@@ -2410,14 +2386,15 @@ describe('Parser', () => {
         expect(() => parseAst('{abs(4dF)}cf')).toThrow(ParseError);
       });
 
-      // #134 — both guards match `{1d20 vs 4dF}cf`; `rejectVersusTarget` runs
-      // first, so `deepContainsFatePool` never walks the Versus children here.
+      // Both guards match this notation; `rejectVersusTarget` runs first, so
+      // `deepContainsFatePool` never walks the Versus children — guard order,
+      // not Fate detection, decides the code.
       it('should report NESTED_VERSUS before the Fate guard: {1d20 vs 4dF}cf', () => {
         expectRollError(() => parseAst('{1d20 vs 4dF}cf'), ParseError, 'NESTED_VERSUS');
       });
 
-      // #109 — single-sub-roll Group passthrough also smuggles Versus past
-      // `rejectVersusTarget`'s shallow check at the cs/cf consumer site.
+      // The same passthrough smuggles a Versus past `rejectVersusTarget`'s
+      // shallow check at the cs/cf consumer site.
       it('should reject cs on Versus inside single-sub group: {1d20 vs 15}cs>18', () => {
         expectRollError(() => parseAst('{1d20 vs 15}cs>18'), ParseError, 'NESTED_VERSUS');
       });

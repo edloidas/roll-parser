@@ -68,7 +68,6 @@ describe('SeededRNG', () => {
       const rng1 = new SeededRNG(-12345);
       const rng2 = new SeededRNG(-12345);
 
-      // Should produce consistent results
       for (let i = 0; i < 10; i++) {
         expect(rng1.nextInt(1, 100)).toBe(rng2.nextInt(1, 100));
       }
@@ -117,7 +116,6 @@ describe('SeededRNG', () => {
       const rng1 = new SeededRNG('seed');
       const rng2 = new SeededRNG('seed1');
 
-      // At least one of the first 10 values should differ
       let allSame = true;
       for (let i = 0; i < 10; i++) {
         if (rng1.nextInt(1, 100) !== rng2.nextInt(1, 100)) {
@@ -318,7 +316,6 @@ describe('SeededRNG', () => {
     it('should handle single value range (min === max)', () => {
       const rng = new SeededRNG(42);
 
-      // Multiple calls should always return the same value
       expect(rng.nextInt(7, 7)).toBe(7);
       expect(rng.nextInt(0, 0)).toBe(0);
       expect(rng.nextInt(-5, -5)).toBe(-5);
@@ -354,7 +351,7 @@ describe('SeededRNG', () => {
       }
 
       const expected = iterations / 6;
-      const tolerance = expected * 0.05; // 5% tolerance
+      const tolerance = expected * 0.05;
 
       for (let i = 1; i <= 6; i++) {
         expect(counts[i]).toBeGreaterThan(expected - tolerance);
@@ -374,7 +371,7 @@ describe('SeededRNG', () => {
       }
 
       const expected = iterations / 20;
-      const tolerance = expected * 0.1; // 10% tolerance for smaller sample per bucket
+      const tolerance = expected * 0.1; // Looser than d6 — fewer samples per bucket.
 
       for (let i = 1; i <= 20; i++) {
         expect(counts[i]).toBeGreaterThan(expected - tolerance);
@@ -410,7 +407,6 @@ describe('SeededRNG', () => {
       const rng1 = new SeededRNG('consistency-test');
       const rng2 = new SeededRNG('consistency-test');
 
-      // Generate 1000 values and verify they match
       for (let i = 0; i < 1000; i++) {
         expect(rng1.nextInt(1, 1000)).toBe(rng2.nextInt(1, 1000));
       }
@@ -420,15 +416,12 @@ describe('SeededRNG', () => {
       const rng1 = new SeededRNG(42);
       const rng2 = new SeededRNG(42);
 
-      // Consume one value from rng1
       rng1.nextInt(1, 6);
 
-      // Now they should be out of sync
       const seq1 = Array.from({ length: 5 }, () => rng1.nextInt(1, 6));
       const seq2 = Array.from({ length: 5 }, () => rng2.nextInt(1, 6));
 
-      // First value of seq2 should match what rng1 got initially
-      // But the arrays as a whole should differ
+      // Same seed, offset by one draw — the streams overlap but the windows differ.
       expect(seq1).not.toEqual(seq2);
     });
   });
@@ -648,8 +641,7 @@ describe.each(IMPLEMENTATIONS)('RNG conformance — $name', (impl: RngImplementa
   });
 
   it('handles inverted bounds per its documented contract', () => {
-    // ? The two implementations deliberately diverge here; the shared block
-    //   asserts each side of the divergence rather than papering over it.
+    // The divergence is deliberate — assert each side, do not paper over it.
     const rng = impl.create([3]);
 
     if (impl.invertedBounds === 'throw') {
@@ -663,28 +655,25 @@ describe.each(IMPLEMENTATIONS)('RNG conformance — $name', (impl: RngImplementa
 });
 
 describe('SeededRNG golden sequences', () => {
-  // ! Committed output of the shipped algorithm, not a self-comparison. A
-  // ! failure here means the seed → sequence mapping changed, which breaks
-  // ! the README's within-version reproducibility promise even if the new
-  // ! sequence is internally consistent. That is a breaking change: revert,
-  // ! or regenerate deliberately as part of a major release.
+  // ! Committed output of the shipped algorithm, not a self-comparison. A failure
+  // ! means the seed → sequence mapping changed, which breaks the README's
+  // ! within-version reproducibility promise even if the new sequence is
+  // ! internally consistent — revert, or regenerate as part of a major release.
   //
-  // Each field draws from a fresh instance: `d6` exercises the single-draw
-  // rejection path, `wide` the two-draw path above 2^32, `safe` the widest
-  // exactly-representable range, and `next()` the raw float derivation.
+  // Every field draws from a fresh instance, so the vectors are independent.
+  // `safe` is the widest exactly-representable range; `next` pins the raw float
+  // derivation rather than any bounded path.
   //
-  // `d6` only ever reaches that path's accept-on-first-draw case — 2^32 % 6 = 4,
-  // so it resamples with probability ~9.3e-10. `reject` draws from range 2^31 + 1
-  // instead, where the single acceptance zone rejects ~50% of draws, so every
-  // committed vector below crosses the resample loop at least once.
+  // `d6` never crosses the single-draw resample loop — 2^32 % 6 = 4, so it resamples
+  // with probability ~9.3e-10. `reject` uses range 2^31 + 1 instead, where ~50% of
+  // draws reject, so every vector below crosses that loop at least once.
   //
-  // The two-draw path has its own resample loop, and neither `wide` nor `safe`
-  // can reach it: at range 2^40 the limit lands on exactly 2^53 while a composed
-  // value tops out at 2^53 - 1, and at range 2^53 - 1 only that single value is
-  // rejected. `wideReject` draws from range 2^52 + 1, where the limit is 2^52 + 1
-  // and half of all composed values reject. Accepted values there are below the
-  // range, so `value % range` is the identity — these vectors pin the composed
-  // 53-bit value itself, shift and floor included.
+  // Neither `wide` (2^40) nor `safe` (2^53 - 1) can cross the two-draw resample loop:
+  // at 2^40 the limit lands on exactly 2^53 while a composed value tops out at
+  // 2^53 - 1, and at 2^53 - 1 only that single value is rejected. `wideReject` uses
+  // range 2^52 + 1, where half of all composed values reject; accepted values sit
+  // below the range, so `value % range` is the identity — those vectors pin the
+  // composed 53-bit value itself, shift and floor included.
   type GoldenVector = {
     seed: string | number;
     d6: number[];
