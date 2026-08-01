@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.build.json",
+  "compilerOptions": {
+    //
+    // * Declaration pass
+    //
+    // Companion to the comment-free JS pass in `tsconfig.build.json`: emits
+    // `.d.ts` + `.d.ts.map` only, with TSDoc intact so editor hovers survive.
+    "emitDeclarationOnly": true,
+    "declaration": true,
+    "declarationMap": true,
+    "removeComments": false,
+    "sourceMap": false
+  },
+  // `exclude` does not merge on `extends` — restated so tests stay out here too.
+  "exclude": ["node_modules", "dist", "**/*.test.ts", "src/test-helpers.ts"]
+}

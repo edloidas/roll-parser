@@ -73,7 +73,7 @@
     "check:changelog": "bun scripts/check-changelog.ts",
     "generate:version": "bun scripts/generate-version.ts",
     "clean": "rm -rf dist",
-    "build": "bun run clean && tsc -p tsconfig.build.json && chmod +x dist/cli/index.js",
+    "build": "bun run clean && tsc -p tsconfig.build.json && tsc -p tsconfig.build.types.json && chmod +x dist/cli/index.js",
     "check:package": "attw --pack . --profile esm-only && publint",
     "check:size": "size-limit",
     "bench": "bun run bench/index.bench.ts",
