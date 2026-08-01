@@ -672,11 +672,17 @@ describe('SeededRNG golden sequences', () => {
   // Each field draws from a fresh instance: `d6` exercises the single-draw
   // rejection path, `wide` the two-draw path above 2^32, `safe` the widest
   // exactly-representable range, and `next()` the raw float derivation.
+  //
+  // `d6` only ever reaches that path's accept-on-first-draw case — 2^32 % 6 = 4,
+  // so it resamples with probability ~9.3e-10. `reject` draws from range 2^31 + 1
+  // instead, where the single acceptance zone rejects ~50% of draws, so every
+  // committed vector below crosses the resample loop at least once.
   type GoldenVector = {
     seed: string | number;
     d6: number[];
     d20: number[];
     next: number[];
+    reject: number[];
     wide: number[];
     safe: number[];
   };
@@ -687,6 +693,7 @@ describe('SeededRNG golden sequences', () => {
       d6: [1, 1, 4, 5, 2, 5],
       d20: [17, 1, 4, 3],
       next: [0.8679328383877873, 0.8667920529842377, 0.07695949240587652, 0.011353977490216494],
+      reject: [1580259507, 1575359871, 937607533, 764651437, 1684383620, 919775968],
       wide: [116343422147, 497157168388],
       safe: [7817644016909507, 693189482667268],
     },
@@ -695,6 +702,7 @@ describe('SeededRNG golden sequences', () => {
       d6: [4, 5, 5, 3, 6, 3],
       d20: [6, 19, 13, 17],
       next: [0.750008235918358, 0.5732201267965138, 0.5506118135526776, 0.4993512099608779],
+      reject: [1073777196, 314478049, 217376083, 994101032, 1576508477, 1979849872],
       wide: [74183759826, 672876460720],
       safe: [6755473624815570, 4959470317730480],
     },
@@ -703,6 +711,7 @@ describe('SeededRNG golden sequences', () => {
       d6: [1, 5, 2, 6, 2, 3],
       d20: [3, 5, 18, 18],
       next: [0.5212148143909872, 0.4235102152451873, 0.8607655430678278, 0.560251371236518],
+      reject: [91116933, 1549476208, 258777668, 580183402, 1882066922, 950266993],
       wide: [870549654886, 430271753621],
       safe: [4694685688630630, 7753086759202197],
     },
@@ -713,6 +722,7 @@ describe('SeededRNG golden sequences', () => {
       d6: [1, 4, 3, 2, 2, 3],
       d20: [11, 8, 1, 2],
       next: [0.07579136872664094, 0.004450056469067931, 0.060825226828455925, 0.9507468438241631],
+      reject: [1935942952, 1487510830, 1149919853, 150393330, 187493854, 512190569],
       wide: [970750698613, 308149120133],
       safe: [682667959919733, 547864939752581],
     },
@@ -721,6 +731,7 @@ describe('SeededRNG golden sequences', () => {
       d6: [1, 1, 2, 6, 2, 1],
       d20: [9, 13, 16, 6],
       next: [0.17120876535773277, 0.5691772727295756, 0.0033915264066308737, 0.3398960374761373],
+      reject: [297114123, 1592645242, 1672827471, 1836300427, 605900959, 1596757657],
       wide: [596162786996, 861340885102],
       safe: [1542111464928948, 30548154835054],
     },
@@ -729,6 +740,7 @@ describe('SeededRNG golden sequences', () => {
       d6: [5, 3, 2, 6, 4, 6],
       d20: [17, 1, 20, 14],
       next: [0.2511115549132228, 0.21425421815365553, 0.7295500996988267, 0.08448794786818326],
+      reject: [985910170, 1877358680, 1380869456, 546779057, 351015751, 1399582936],
       wide: [116392385324, 521626891297],
       safe: [2261811810720556, 6571203114480673],
     },
@@ -737,6 +749,7 @@ describe('SeededRNG golden sequences', () => {
       d6: [4, 6, 6, 5, 1, 4],
       d20: [4, 6, 18, 15],
       next: [0.932455827249214, 0.7405093649867922, 0.48083222401328385, 0.3460868061520159],
+      reject: [1857383634, 1032979856, 1977533166, 1348229753, 1402352419, 794292105],
       wide: [745620877889, 1074860331813],
       safe: [8398815433830977, 4330951650513701],
     },
@@ -745,6 +758,7 @@ describe('SeededRNG golden sequences', () => {
       d6: [5, 6, 2, 3, 1, 4],
       d20: [1, 12, 12, 7],
       next: [0.47865111846476793, 0.677673241822049, 0.28416736773215234, 0.11811965750530362],
+      reject: [763100762, 1627261331, 964817632, 690224875, 1399340448, 1339929417],
       wide: [120906428288, 988545271715],
       safe: [4311305998937984, 2559552103106467],
     },
@@ -758,6 +772,9 @@ describe('SeededRNG golden sequences', () => {
       expect(draws(new SeededRNG(v.seed), v.d6.length, (r) => r.nextInt(1, 6))).toEqual(v.d6);
       expect(draws(new SeededRNG(v.seed), v.d20.length, (r) => r.nextInt(1, 20))).toEqual(v.d20);
       expect(draws(new SeededRNG(v.seed), v.next.length, (r) => r.next())).toEqual(v.next);
+      expect(draws(new SeededRNG(v.seed), v.reject.length, (r) => r.nextInt(0, 2 ** 31))).toEqual(
+        v.reject,
+      );
       expect(draws(new SeededRNG(v.seed), v.wide.length, (r) => r.nextInt(1, 2 ** 40))).toEqual(
         v.wide,
       );
