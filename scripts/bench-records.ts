@@ -73,17 +73,21 @@ function findStatsProblem({ p50, p75, ticks }: MitataStats): string | null {
 export function toRecords(dump: MitataDump): RecordsResult {
   const records: BenchmarkRecord[] = [];
   const problems: string[] = [];
+  const seen = new Set<string>();
 
   for (const trial of dump.benchmarks) {
     // ? `trial.group` is an index into `layout`; `summary()` nests a collection
     //   that inherits its parent group's name, so this stays the group label.
-    const group = dump.layout[trial.group]?.name ?? 'ungrouped';
+    const group = dump.layout[trial.group]?.name;
+    const groupLabel = isNonEmptyName(group) ? group : `#${trial.group}`;
 
     for (const [index, trialRun] of trial.runs.entries()) {
-      const label = `${group} / ${isNonEmptyName(trialRun.name) ? trialRun.name : `#${index}`}`;
+      const label = `${groupLabel} / ${isNonEmptyName(trialRun.name) ? trialRun.name : `#${index}`}`;
 
+      // Every bench registers inside a `group()`, so an index the layout cannot
+      // resolve means a corrupt dump, never a legitimately ungrouped bench.
       if (!isNonEmptyName(group)) {
-        problems.push(`${label}: group name is empty`);
+        problems.push(`${label}: group ${trial.group} has no name in the layout`);
         continue;
       }
 
@@ -105,6 +109,15 @@ export function toRecords(dump: MitataDump): RecordsResult {
         problems.push(`${label}: ${problem}`);
         continue;
       }
+
+      // The count check cannot catch this: a duplicate plus a dropped run leaves
+      // the total intact while one series carries another's numbers.
+      if (seen.has(label)) {
+        problems.push(`${label}: duplicate record name`);
+        continue;
+      }
+
+      seen.add(label);
 
       const { p50, p75, ticks } = stats;
       const mode = getSamplingMode(ticks);
