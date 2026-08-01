@@ -31,7 +31,7 @@ async function runCommand(
 // `bun test` runs files sequentially in a single process.
 beforeAll(async () => {
   await ensureFreshDist();
-});
+}, 60_000);
 
 describe('packaged CLI smoke', () => {
   test('package bin points to the built executable', async () => {
