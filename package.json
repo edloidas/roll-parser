@@ -59,7 +59,7 @@
   "publishConfig": {
     "access": "public"
   },
-  "workspaces": ["scripts/docs"],
+  "workspaces": ["scripts/browser-smoke", "scripts/docs"],
   "scripts": {
     "prepare": "git rev-parse --git-dir > /dev/null 2>&1 && git config core.hooksPath .githooks || exit 0",
     "typecheck": "tsc --noEmit && bun run build && tsc --noEmit -p site/tsconfig.json && tsc --noEmit -p scripts/tsconfig.json && tsc --noEmit -p bench/tsconfig.json",
