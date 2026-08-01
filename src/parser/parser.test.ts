@@ -2350,7 +2350,7 @@ describe('Parser', () => {
       });
 
       // #109 — single-sub-roll passthrough must not smuggle a buried
-      // multi-sub Group through a wrapper `unwrapTransparent` doesn't peel.
+      // multi-sub Group through a wrapper `unwrapAllTransparent` doesn't peel.
       it('should reject cs on nested multi-sub-roll group: {{1d20, 1d20}kh1}cs>18', () => {
         expect(() => parseAst('{{1d20, 1d20}kh1}cs>18')).toThrow(ParseError);
         try {

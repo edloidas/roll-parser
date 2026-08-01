@@ -12,47 +12,41 @@
 import type { ASTNode } from './ast.js';
 
 /**
- * Wrapper kinds that `unwrapTransparent` can peel.
- *
- * "Transparent" is relative to the question being asked. `Modifier`/`Sort`/
- * `CritThreshold` are transparent for "what is the underlying operand?" when
- * deciding whether to reject a `Group` target — they preserve `containsDicePool`'s
- * answer for whatever they wrap. They are NOT transparent for "is this a
- * `SuccessCount`?" or "is this a `Versus`?", because the parsers that build
- * those wrappers already reject `SuccessCount`/`Versus` operands upstream.
+ * Peels nested `Grouped` wrappers, returning the first descendant that is not
+ * one. The narrow unwrap for reject helpers whose forbidden node cannot live
+ * inside `Modifier`/`Sort`/`CritThreshold` — those parsers already reject it
+ * upstream, so peeling parentheses is all that is left to see through.
  */
-export type TransparentWrapperKind = 'Grouped' | 'Modifier' | 'Sort' | 'CritThreshold';
+export function unwrapGrouped(node: ASTNode): ASTNode {
+  let current = node;
+  while (current.type === 'Grouped') {
+    current = current.expression;
+  }
+  return current;
+}
 
 /**
- * Walks `node` while its `.type` is in `kinds`, returning the first descendant
- * that is not one of the listed wrappers. Each caller picks the subset that
- * matches its rejection semantics — see `TransparentWrapperKind` for guidance.
+ * Peels every transparent wrapper — `Grouped`, `Modifier`, `Sort`,
+ * `CritThreshold` — returning the first descendant that is none of them.
  *
- * Used by parser reject helpers to look past wrappers when deciding whether
- * an operand violates a rule (e.g., `Group` cannot be the target of `cs`/`cf`,
- * even when wrapped in `Modifier` like `{1d6}kh1cs>5`).
+ * "Transparent" is relative to the question being asked. These wrappers
+ * preserve `containsDicePool`'s answer for whatever they wrap, so they are
+ * transparent for "what is the underlying operand?" when deciding whether to
+ * reject a `Group` target (e.g., `Group` cannot be the target of `cs`/`cf`,
+ * even when wrapped in `Modifier` like `{1d6}kh1cs>5`). They are NOT
+ * transparent for "is this a `SuccessCount`?" or "is this a `Versus`?" —
+ * those questions use `unwrapGrouped`.
  */
-export function unwrapTransparent(
-  node: ASTNode,
-  kinds: readonly TransparentWrapperKind[],
-): ASTNode {
+export function unwrapAllTransparent(node: ASTNode): ASTNode {
   let current = node;
   while (true) {
     switch (current.type) {
       case 'Grouped':
-        if (!kinds.includes('Grouped')) return current;
         current = current.expression;
         break;
       case 'Modifier':
-        if (!kinds.includes('Modifier')) return current;
-        current = current.target;
-        break;
       case 'Sort':
-        if (!kinds.includes('Sort')) return current;
-        current = current.target;
-        break;
       case 'CritThreshold':
-        if (!kinds.includes('CritThreshold')) return current;
         current = current.target;
         break;
       default:
@@ -62,61 +56,63 @@ export function unwrapTransparent(
 }
 
 /**
- * Yields every direct child of `node`, covering the full node vocabulary:
- * arithmetic operands, modifier-chain targets, `Versus` sides, function
- * arguments, and group sub-expressions. Leaves yield nothing.
+ * Returns `true` when `node` or any descendant satisfies `isHit`. Recurses
+ * directly through the entire node vocabulary: arithmetic operands,
+ * modifier-chain targets, `Versus` sides, function arguments, and group
+ * sub-expressions. This is the shared driver behind the four deep walkers
+ * below. The shallow walkers (`containsDicePool`, `containsFatePool`) stay
+ * hand-written because their rejection semantics deliberately stop at
+ * arithmetic boundaries.
  */
-function* childNodes(node: ASTNode): Generator<ASTNode> {
+function someDescendant(node: ASTNode, isHit: (node: ASTNode) => boolean): boolean {
+  if (isHit(node)) return true;
+
   switch (node.type) {
     case 'BinaryOp':
-      yield node.left;
-      yield node.right;
-      return;
+      return someDescendant(node.left, isHit) || someDescendant(node.right, isHit);
     case 'UnaryOp':
-      yield node.operand;
-      return;
+      return someDescendant(node.operand, isHit);
     case 'Modifier':
     case 'Explode':
     case 'Reroll':
     case 'SuccessCount':
     case 'Sort':
     case 'CritThreshold':
-      yield node.target;
-      return;
+      return someDescendant(node.target, isHit);
     case 'Versus':
-      yield node.roll;
-      yield node.dc;
-      return;
-    case 'FunctionCall':
-      yield* node.args;
-      return;
+      return someDescendant(node.roll, isHit) || someDescendant(node.dc, isHit);
+    case 'FunctionCall': {
+      for (const arg of node.args) {
+        if (someDescendant(arg, isHit)) return true;
+      }
+      return false;
+    }
     case 'Grouped':
-      yield node.expression;
-      return;
-    case 'Group':
-      yield* node.expressions;
-      return;
+      return someDescendant(node.expression, isHit);
+    case 'Group': {
+      for (const expression of node.expressions) {
+        if (someDescendant(expression, isHit)) return true;
+      }
+      return false;
+    }
     default:
-      return;
+      return false;
   }
 }
 
-/**
- * Returns `true` when `node` or any descendant satisfies `isHit`. Recurses
- * through the entire node vocabulary via `childNodes` — this is the shared
- * driver behind the four deep walkers below. The shallow walkers
- * (`containsDicePool`, `containsFatePool`) stay hand-written because their
- * rejection semantics deliberately stop at arithmetic boundaries.
- */
-function someDescendant(node: ASTNode, isHit: (node: ASTNode) => boolean): boolean {
-  if (isHit(node)) return true;
+// Hoisted `someDescendant` predicates — the deep walkers run on nearly every
+// LED parse, so rebuilding these closures per call is measurable churn.
+const isDicePoolHit = (current: ASTNode): boolean =>
+  current.type === 'Dice' ||
+  current.type === 'FateDice' ||
+  (current.type === 'Group' && current.expressions.length >= 2);
 
-  for (const child of childNodes(node)) {
-    if (someDescendant(child, isHit)) return true;
-  }
+const isFateDiceHit = (current: ASTNode): boolean => current.type === 'FateDice';
 
-  return false;
-}
+const isMultiSubGroupHit = (current: ASTNode): boolean =>
+  current.type === 'Group' && current.expressions.length >= 2;
+
+const isVersusHit = (current: ASTNode): boolean => current.type === 'Versus';
 
 /**
  * Returns `true` only when `node`'s direct result is a dice pool —
@@ -165,13 +161,7 @@ export function containsDicePool(node: ASTNode): boolean {
  * matching `containsDicePool`'s Group rule.
  */
 export function deepContainsDicePool(node: ASTNode): boolean {
-  return someDescendant(
-    node,
-    (current) =>
-      current.type === 'Dice' ||
-      current.type === 'FateDice' ||
-      (current.type === 'Group' && current.expressions.length >= 2),
-  );
+  return someDescendant(node, isDicePoolHit);
 }
 
 /**
@@ -219,7 +209,7 @@ export function containsFatePool(node: ASTNode): boolean {
  * intentionally stays Group-internal.
  */
 export function deepContainsFatePool(node: ASTNode): boolean {
-  return someDescendant(node, (current) => current.type === 'FateDice');
+  return someDescendant(node, isFateDiceHit);
 }
 
 /**
@@ -234,10 +224,7 @@ export function deepContainsFatePool(node: ASTNode): boolean {
  * in a `BinaryOp`/`UnaryOp`/`FunctionCall` revives issue #97.
  */
 export function containsMultiSubGroup(node: ASTNode): boolean {
-  return someDescendant(
-    node,
-    (current) => current.type === 'Group' && current.expressions.length >= 2,
-  );
+  return someDescendant(node, isMultiSubGroupHit);
 }
 
 /**
@@ -248,5 +235,5 @@ export function containsMultiSubGroup(node: ASTNode): boolean {
  * silently dropping `versusMetadata` at the modifier consumer site.
  */
 export function containsVersus(node: ASTNode): boolean {
-  return someDescendant(node, (current) => current.type === 'Versus');
+  return someDescendant(node, isVersusHit);
 }

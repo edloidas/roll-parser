@@ -36,7 +36,8 @@ import {
   containsMultiSubGroup,
   containsVersus,
   deepContainsDicePool,
-  unwrapTransparent,
+  unwrapAllTransparent,
+  unwrapGrouped,
 } from './guards.js';
 
 /**
@@ -637,7 +638,7 @@ export class Parser {
     // `Modifier`/`Sort`/`CritThreshold` because each of those parsers calls
     // this same reject on their target before constructing the wrapper —
     // so widening the set here would never match.
-    const node = unwrapTransparent(target, ['Grouped']);
+    const node = unwrapGrouped(target);
     if (isSuccessCount(node)) {
       throw new ParseError(
         `Cannot apply modifier after success counting`,
@@ -670,10 +671,10 @@ export class Parser {
     code: RollParserErrorCode,
     singleSubRollPasses = false,
   ): void {
-    const node = unwrapTransparent(target, ['Grouped', 'Modifier', 'Sort', 'CritThreshold']);
+    const node = unwrapAllTransparent(target);
     if (node.type !== 'Group') return;
     if (singleSubRollPasses && node.expressions.length === 1) {
-      // ! Deep-walk the inner sub-expression — `unwrapTransparent` only peels
+      // ! Deep-walk the inner sub-expression — `unwrapAllTransparent` only peels
       //   `Grouped`/`Modifier`/`Sort`/`CritThreshold`, so a multi-sub Group
       //   buried under arithmetic (`{{1d6,2d8}+0}cs>5`), function calls
       //   (`{abs({1d6,2d8})}cs>5`), or unary ops would otherwise revive the
@@ -696,7 +697,7 @@ export class Parser {
     // Narrow unwrap: only `Grouped`. `Modifier`/`Sort`/`CritThreshold`
     // cannot wrap a `Versus` because `containsDicePool` does not recurse
     // into `Versus`, so each of those parsers rejects the wrap upstream.
-    const node = unwrapTransparent(target, ['Grouped']);
+    const node = unwrapGrouped(target);
     if (node.type === 'Versus') {
       throw new ParseError(
         `Versus cannot be used as a meta-expression`,
@@ -905,7 +906,7 @@ export class Parser {
     //   which is the user's flat-pool escape hatch).
     // TODO: Implement hierarchical multi-sub-roll group sort, then drop this
     //   reject.
-    const base = unwrapTransparent(target, ['Grouped', 'Modifier', 'Sort', 'CritThreshold']);
+    const base = unwrapAllTransparent(target);
     if (base.type === 'Group' && base.expressions.length >= 2) {
       throw new ParseError(
         `Sort modifier does not yet support multi-sub-roll groups`,
