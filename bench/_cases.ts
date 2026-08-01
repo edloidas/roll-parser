@@ -57,6 +57,7 @@ export const BENCH_CASES: BenchCase[] = [
   { id: '4dF', notation: '4dF', tier: 'simple' },
 
   { id: '4d6kh3', notation: '4d6kh3', tier: 'common' },
+  { id: '{1d6+2}kh1', notation: '{1d6+2}kh1', tier: 'common' },
   { id: '2d20kh1 vs 15', notation: '2d20kh1 vs 15', tier: 'common' },
   { id: '10d10>=6f1', notation: '10d10>=6f1', tier: 'common' },
   { id: '4d6r<2', notation: '4d6r<2', tier: 'common', variableWork: true },
@@ -72,6 +73,7 @@ export const BENCH_CASES: BenchCase[] = [
   },
   { id: 'sum-20-terms', notation: FLAT_SUM_NOTATION, tier: 'heavy' },
   { id: '100d6', notation: '100d6', tier: 'heavy' },
+  { id: '100d6kh1', notation: '100d6kh1', tier: 'heavy' },
 
   { id: '1000d6', notation: '1000d6', tier: 'pathological' },
 ];
