@@ -577,12 +577,9 @@ describe('Parser', () => {
     });
 
     it('should include position in error', () => {
-      try {
-        parseAst('1+');
-      } catch (e) {
-        expect(e).toBeInstanceOf(ParseError);
-        expect((e as ParseError).position).toBeGreaterThanOrEqual(0);
-      }
+      const error = expectRollError(() => parseAst('1+'), ParseError, 'UNEXPECTED_END');
+
+      expect(error.position).toBeGreaterThanOrEqual(0);
     });
 
     it('should throw on modifier without target', () => {
@@ -1431,11 +1428,9 @@ describe('Parser', () => {
       });
 
       it('should carry a descriptive message mentioning Fate dice', () => {
-        try {
-          parseAst('4dF!');
-        } catch (err) {
-          expect((err as ParseError).message).toContain('Fate');
-        }
+        const error = expectRollError(() => parseAst('4dF!'), ParseError, 'INVALID_EXPLODE_TARGET');
+
+        expect(error.message).toContain('Fate');
       });
     });
 
@@ -1854,23 +1849,15 @@ describe('Parser', () => {
 
     describe('errors', () => {
       it('should reject empty group', () => {
-        expect(() => parseAst('{}')).toThrow(ParseError);
-        try {
-          parseAst('{}');
-        } catch (e) {
-          expect((e as ParseError).code).toBe('UNEXPECTED_TOKEN');
-          expect((e as ParseError).message).toContain('Empty group');
-        }
+        const error = expectRollError(() => parseAst('{}'), ParseError, 'UNEXPECTED_TOKEN');
+
+        expect(error.message).toContain('Empty group');
       });
 
       it('should reject unterminated group with EOF', () => {
-        expect(() => parseAst('{1d6, 2d8')).toThrow(ParseError);
-        try {
-          parseAst('{1d6, 2d8');
-        } catch (e) {
-          expect((e as ParseError).code).toBe('EXPECTED_TOKEN');
-          expect((e as ParseError).message).toContain('Unterminated group');
-        }
+        const error = expectRollError(() => parseAst('{1d6, 2d8'), ParseError, 'EXPECTED_TOKEN');
+
+        expect(error.message).toContain('Unterminated group');
       });
 
       it('should reject unterminated group with stray token', () => {
@@ -1886,13 +1873,13 @@ describe('Parser', () => {
       });
 
       it('should reject explode on a group: {4d6}!', () => {
-        expect(() => parseAst('{4d6}!')).toThrow(ParseError);
-        try {
-          parseAst('{4d6}!');
-        } catch (e) {
-          expect((e as ParseError).code).toBe('INVALID_EXPLODE_TARGET');
-          expect((e as ParseError).message).toContain('Cannot explode a group');
-        }
+        const error = expectRollError(
+          () => parseAst('{4d6}!'),
+          ParseError,
+          'INVALID_EXPLODE_TARGET',
+        );
+
+        expect(error.message).toContain('Cannot explode a group');
       });
 
       it('should reject explode on a parenthesized group: ({4d6})!', () => {
@@ -1908,13 +1895,13 @@ describe('Parser', () => {
       });
 
       it('should reject reroll on a group: {4d6}r<2', () => {
-        expect(() => parseAst('{4d6}r<2')).toThrow(ParseError);
-        try {
-          parseAst('{4d6}r<2');
-        } catch (e) {
-          expect((e as ParseError).code).toBe('INVALID_REROLL_TARGET');
-          expect((e as ParseError).message).toContain('Cannot reroll a group');
-        }
+        const error = expectRollError(
+          () => parseAst('{4d6}r<2'),
+          ParseError,
+          'INVALID_REROLL_TARGET',
+        );
+
+        expect(error.message).toContain('Cannot reroll a group');
       });
 
       it('should reject reroll-once on a group', () => {
@@ -1922,32 +1909,27 @@ describe('Parser', () => {
       });
 
       it('should reject explode on a modifier-wrapped group: {4d6}kh1!', () => {
-        expect(() => parseAst('{4d6}kh1!')).toThrow(ParseError);
-        try {
-          parseAst('{4d6}kh1!');
-        } catch (e) {
-          expect((e as ParseError).code).toBe('INVALID_EXPLODE_TARGET');
-          expect((e as ParseError).message).toContain('Cannot explode a group');
-        }
+        const error = expectRollError(
+          () => parseAst('{4d6}kh1!'),
+          ParseError,
+          'INVALID_EXPLODE_TARGET',
+        );
+
+        expect(error.message).toContain('Cannot explode a group');
       });
 
       it('should reject reroll on a modifier-wrapped group: {4d6}kh1r<2', () => {
-        expect(() => parseAst('{4d6}kh1r<2')).toThrow(ParseError);
-        try {
-          parseAst('{4d6}kh1r<2');
-        } catch (e) {
-          expect((e as ParseError).code).toBe('INVALID_REROLL_TARGET');
-          expect((e as ParseError).message).toContain('Cannot reroll a group');
-        }
+        const error = expectRollError(
+          () => parseAst('{4d6}kh1r<2'),
+          ParseError,
+          'INVALID_REROLL_TARGET',
+        );
+
+        expect(error.message).toContain('Cannot reroll a group');
       });
 
       it('should reject explode on a sort-wrapped group: {4d6}s!', () => {
-        expect(() => parseAst('{4d6}s!')).toThrow(ParseError);
-        try {
-          parseAst('{4d6}s!');
-        } catch (e) {
-          expect((e as ParseError).code).toBe('INVALID_EXPLODE_TARGET');
-        }
+        expectRollError(() => parseAst('{4d6}s!'), ParseError, 'INVALID_EXPLODE_TARGET');
       });
     });
   });
@@ -2022,13 +2004,9 @@ describe('Parser', () => {
 
     describe('errors', () => {
       it('should reject sort on a pure literal', () => {
-        expect(() => parseAst('5s')).toThrow(ParseError);
-        try {
-          parseAst('5s');
-        } catch (e) {
-          expect((e as ParseError).code).toBe('INVALID_SORT_TARGET');
-          expect((e as ParseError).message).toContain('dice pool');
-        }
+        const error = expectRollError(() => parseAst('5s'), ParseError, 'INVALID_SORT_TARGET');
+
+        expect(error.message).toContain('dice pool');
       });
 
       it('should reject sort on pure arithmetic', () => {
@@ -2036,40 +2014,25 @@ describe('Parser', () => {
       });
 
       it('should reject sort on a multi-sub-roll group', () => {
-        expect(() => parseAst('{1d6, 2d8}s')).toThrow(ParseError);
-        try {
-          parseAst('{1d6, 2d8}s');
-        } catch (e) {
-          expect((e as ParseError).code).toBe('INVALID_SORT_TARGET');
-          expect((e as ParseError).message).toContain('not yet support');
-        }
+        const error = expectRollError(
+          () => parseAst('{1d6, 2d8}s'),
+          ParseError,
+          'INVALID_SORT_TARGET',
+        );
+
+        expect(error.message).toContain('not yet support');
       });
 
       it('should reject sort on a parens-wrapped multi-sub-roll group', () => {
-        expect(() => parseAst('({1d6, 2d8})s')).toThrow(ParseError);
-        try {
-          parseAst('({1d6, 2d8})s');
-        } catch (e) {
-          expect((e as ParseError).code).toBe('INVALID_SORT_TARGET');
-        }
+        expectRollError(() => parseAst('({1d6, 2d8})s'), ParseError, 'INVALID_SORT_TARGET');
       });
 
       it('should reject sort on SuccessCount target', () => {
-        expect(() => parseAst('4d6>=4s')).toThrow(ParseError);
-        try {
-          parseAst('4d6>=4s');
-        } catch (e) {
-          expect((e as ParseError).code).toBe('INVALID_SUCCESS_COUNT_TARGET');
-        }
+        expectRollError(() => parseAst('4d6>=4s'), ParseError, 'INVALID_SUCCESS_COUNT_TARGET');
       });
 
       it('should reject sort on Versus target (via parens)', () => {
-        expect(() => parseAst('(1d20 vs 15)s')).toThrow(ParseError);
-        try {
-          parseAst('(1d20 vs 15)s');
-        } catch (e) {
-          expect((e as ParseError).code).toBe('NESTED_VERSUS');
-        }
+        expectRollError(() => parseAst('(1d20 vs 15)s'), ParseError, 'NESTED_VERSUS');
       });
 
       it('should reject sort on a function call over literals', () => {
@@ -2269,13 +2232,13 @@ describe('Parser', () => {
 
     describe('errors', () => {
       it('should reject cs on a pure literal', () => {
-        expect(() => parseAst('5cs')).toThrow(ParseError);
-        try {
-          parseAst('5cs');
-        } catch (e) {
-          expect((e as ParseError).code).toBe('INVALID_CRIT_THRESHOLD_TARGET');
-          expect((e as ParseError).message).toContain('dice pool');
-        }
+        const error = expectRollError(
+          () => parseAst('5cs'),
+          ParseError,
+          'INVALID_CRIT_THRESHOLD_TARGET',
+        );
+
+        expect(error.message).toContain('dice pool');
       });
 
       it('should reject cs on pure arithmetic', () => {
@@ -2285,22 +2248,21 @@ describe('Parser', () => {
       it('should reject cs on arithmetic-wrapped pool', () => {
         // Mirrors explode/reroll — cs/cf is "bare dice only". `(1d6+2d8)` is
         // an arithmetic wrapper, not a dice pool in the shallow sense.
-        expect(() => parseAst('(1d6+2d8)cs>5')).toThrow(ParseError);
-        try {
-          parseAst('(1d6+2d8)cs>5');
-        } catch (e) {
-          expect((e as ParseError).code).toBe('INVALID_CRIT_THRESHOLD_TARGET');
-        }
+        expectRollError(
+          () => parseAst('(1d6+2d8)cs>5'),
+          ParseError,
+          'INVALID_CRIT_THRESHOLD_TARGET',
+        );
       });
 
       it('should reject cs on a multi-sub-roll group', () => {
-        expect(() => parseAst('{1d6, 2d8}cs>5')).toThrow(ParseError);
-        try {
-          parseAst('{1d6, 2d8}cs>5');
-        } catch (e) {
-          expect((e as ParseError).code).toBe('INVALID_CRIT_THRESHOLD_TARGET');
-          expect((e as ParseError).message).toContain('group');
-        }
+        const error = expectRollError(
+          () => parseAst('{1d6, 2d8}cs>5'),
+          ParseError,
+          'INVALID_CRIT_THRESHOLD_TARGET',
+        );
+
+        expect(error.message).toContain('group');
       });
 
       it('should reject cf on a multi-sub-roll group', () => {
@@ -2308,66 +2270,62 @@ describe('Parser', () => {
       });
 
       it('should reject cs on a parens-wrapped multi-sub-roll group', () => {
-        expect(() => parseAst('({1d6, 2d8})cs>5')).toThrow(ParseError);
-        try {
-          parseAst('({1d6, 2d8})cs>5');
-        } catch (e) {
-          expect((e as ParseError).code).toBe('INVALID_CRIT_THRESHOLD_TARGET');
-        }
+        expectRollError(
+          () => parseAst('({1d6, 2d8})cs>5'),
+          ParseError,
+          'INVALID_CRIT_THRESHOLD_TARGET',
+        );
       });
 
       it('should reject cs on a modifier-wrapped multi-sub-roll group: {1d20, 1d20}kh1cs>18', () => {
         // Without the unwrap-through-Modifier check, the evaluator overrides
         // critical/fumble on dropped sub-roll dice from each branch.
-        expect(() => parseAst('{1d20, 1d20}kh1cs>18')).toThrow(ParseError);
-        try {
-          parseAst('{1d20, 1d20}kh1cs>18');
-        } catch (e) {
-          expect((e as ParseError).code).toBe('INVALID_CRIT_THRESHOLD_TARGET');
-          expect((e as ParseError).message).toContain('group');
-        }
+        const error = expectRollError(
+          () => parseAst('{1d20, 1d20}kh1cs>18'),
+          ParseError,
+          'INVALID_CRIT_THRESHOLD_TARGET',
+        );
+
+        expect(error.message).toContain('group');
       });
 
       it('should reject cf on a modifier-wrapped multi-sub-roll group: {1d20, 1d20}kh1cf<3', () => {
-        expect(() => parseAst('{1d20, 1d20}kh1cf<3')).toThrow(ParseError);
-        try {
-          parseAst('{1d20, 1d20}kh1cf<3');
-        } catch (e) {
-          expect((e as ParseError).code).toBe('INVALID_CRIT_THRESHOLD_TARGET');
-        }
+        expectRollError(
+          () => parseAst('{1d20, 1d20}kh1cf<3'),
+          ParseError,
+          'INVALID_CRIT_THRESHOLD_TARGET',
+        );
       });
 
       it('should reject cs on a parens-wrapped modifier-wrapped multi-sub-roll group', () => {
         // Acceptance criterion 5 from #97 — Grouped wrapper around the
         // Modifier(Group([...])) chain still resolves to a Group via the
         // shared unwrap.
-        expect(() => parseAst('({1d20, 1d20}kh1)cs>18')).toThrow(ParseError);
-        try {
-          parseAst('({1d20, 1d20}kh1)cs>18');
-        } catch (e) {
-          expect((e as ParseError).code).toBe('INVALID_CRIT_THRESHOLD_TARGET');
-        }
+        expectRollError(
+          () => parseAst('({1d20, 1d20}kh1)cs>18'),
+          ParseError,
+          'INVALID_CRIT_THRESHOLD_TARGET',
+        );
       });
 
       // #109 — single-sub-roll passthrough must not smuggle a buried
       // multi-sub Group through a wrapper `unwrapAllTransparent` doesn't peel.
       it('should reject cs on nested multi-sub-roll group: {{1d20, 1d20}kh1}cs>18', () => {
-        expect(() => parseAst('{{1d20, 1d20}kh1}cs>18')).toThrow(ParseError);
-        try {
-          parseAst('{{1d20, 1d20}kh1}cs>18');
-        } catch (e) {
-          expect((e as ParseError).code).toBe('INVALID_CRIT_THRESHOLD_TARGET');
-          expect((e as ParseError).message).toContain('group');
-        }
+        const error = expectRollError(
+          () => parseAst('{{1d20, 1d20}kh1}cs>18'),
+          ParseError,
+          'INVALID_CRIT_THRESHOLD_TARGET',
+        );
+
+        expect(error.message).toContain('group');
       });
 
       it('should reject cs on multi-sub group buried in arithmetic: {{1d6, 2d8}+0}cs>5', () => {
-        expect(() => parseAst('{{1d6, 2d8}+0}cs>5')).toThrow(ParseError);
-        try {
-          parseAst('{{1d6, 2d8}+0}cs>5');
-        } catch (e) {
-          expect((e as ParseError).code).toBe('INVALID_CRIT_THRESHOLD_TARGET');
-        }
+        expectRollError(
+          () => parseAst('{{1d6, 2d8}+0}cs>5'),
+          ParseError,
+          'INVALID_CRIT_THRESHOLD_TARGET',
+        );
       });
 
       it('should reject cs on multi-sub group buried in unary: {-{1d6, 2d8}}cs>5', () => {
@@ -2383,21 +2341,11 @@ describe('Parser', () => {
       });
 
       it('should reject cs on SuccessCount target', () => {
-        expect(() => parseAst('4d6>=4cs>5')).toThrow(ParseError);
-        try {
-          parseAst('4d6>=4cs>5');
-        } catch (e) {
-          expect((e as ParseError).code).toBe('INVALID_SUCCESS_COUNT_TARGET');
-        }
+        expectRollError(() => parseAst('4d6>=4cs>5'), ParseError, 'INVALID_SUCCESS_COUNT_TARGET');
       });
 
       it('should reject cs on Versus target (via parens)', () => {
-        expect(() => parseAst('(1d20 vs 15)cs>18')).toThrow(ParseError);
-        try {
-          parseAst('(1d20 vs 15)cs>18');
-        } catch (e) {
-          expect((e as ParseError).code).toBe('NESTED_VERSUS');
-        }
+        expectRollError(() => parseAst('(1d20 vs 15)cs>18'), ParseError, 'NESTED_VERSUS');
       });
 
       it('should reject cs on a function call over literals', () => {
@@ -2407,51 +2355,51 @@ describe('Parser', () => {
       it('should reject bare cs on Fate dice pool', () => {
         // Fate results are `{-1, 0, +1}`; the default crit sentinel assumes
         // max-side semantics that don't apply. Custom thresholds remain valid.
-        expect(() => parseAst('4dFcs')).toThrow(ParseError);
-        try {
-          parseAst('4dFcs');
-        } catch (e) {
-          expect((e as ParseError).code).toBe('INVALID_CRIT_THRESHOLD_TARGET');
-          expect((e as ParseError).message).toContain('Fate');
-        }
+        const error = expectRollError(
+          () => parseAst('4dFcs'),
+          ParseError,
+          'INVALID_CRIT_THRESHOLD_TARGET',
+        );
+
+        expect(error.message).toContain('Fate');
       });
 
       it('should reject bare cf on Fate dice pool', () => {
         // Without this guard, the default fumble check (`result === 1`) flips
         // a `+1` Fate face into a fumble — a semantic inversion.
-        expect(() => parseAst('4dFcf')).toThrow(ParseError);
-        try {
-          parseAst('4dFcf');
-        } catch (e) {
-          expect((e as ParseError).code).toBe('INVALID_CRIT_THRESHOLD_TARGET');
-          expect((e as ParseError).message).toContain('Fate');
-        }
+        const error = expectRollError(
+          () => parseAst('4dFcf'),
+          ParseError,
+          'INVALID_CRIT_THRESHOLD_TARGET',
+        );
+
+        expect(error.message).toContain('Fate');
       });
 
       it('should reject bare cf chained after custom cs on Fate pool', () => {
         // `containsFatePool` recurses through `CritThreshold`, so the bare
         // `cf` is caught even when the target is already a wrapping crit
         // threshold node from a custom success threshold.
-        expect(() => parseAst('4dFcs>0cf')).toThrow(ParseError);
-        try {
-          parseAst('4dFcs>0cf');
-        } catch (e) {
-          expect((e as ParseError).code).toBe('INVALID_CRIT_THRESHOLD_TARGET');
-          expect((e as ParseError).message).toContain('Fate');
-        }
+        const error = expectRollError(
+          () => parseAst('4dFcs>0cf'),
+          ParseError,
+          'INVALID_CRIT_THRESHOLD_TARGET',
+        );
+
+        expect(error.message).toContain('Fate');
       });
 
       // #109 — single-sub-roll Group passthrough makes Fate reachable past
       // the shallow `containsFatePool` check; `deepContainsFatePool` recurses
       // through arithmetic, so the bare-Fate guard still fires.
       it('should reject bare cf on Fate inside arithmetic group: {4dF+1d6}cf', () => {
-        expect(() => parseAst('{4dF+1d6}cf')).toThrow(ParseError);
-        try {
-          parseAst('{4dF+1d6}cf');
-        } catch (e) {
-          expect((e as ParseError).code).toBe('INVALID_CRIT_THRESHOLD_TARGET');
-          expect((e as ParseError).message).toContain('Fate');
-        }
+        const error = expectRollError(
+          () => parseAst('{4dF+1d6}cf'),
+          ParseError,
+          'INVALID_CRIT_THRESHOLD_TARGET',
+        );
+
+        expect(error.message).toContain('Fate');
       });
 
       it('should reject bare cs on Fate inside parens-wrapped arithmetic group: ({4dF+1d6})cs', () => {
@@ -2465,33 +2413,17 @@ describe('Parser', () => {
       // #134 — both guards match `{1d20 vs 4dF}cf`; `rejectVersusTarget` runs
       // first, so `deepContainsFatePool` never walks the Versus children here.
       it('should report NESTED_VERSUS before the Fate guard: {1d20 vs 4dF}cf', () => {
-        try {
-          parseAst('{1d20 vs 4dF}cf');
-          expect.unreachable('expected ParseError');
-        } catch (e) {
-          expect(e).toBeInstanceOf(ParseError);
-          expect((e as ParseError).code).toBe('NESTED_VERSUS');
-        }
+        expectRollError(() => parseAst('{1d20 vs 4dF}cf'), ParseError, 'NESTED_VERSUS');
       });
 
       // #109 — single-sub-roll Group passthrough also smuggles Versus past
       // `rejectVersusTarget`'s shallow check at the cs/cf consumer site.
       it('should reject cs on Versus inside single-sub group: {1d20 vs 15}cs>18', () => {
-        expect(() => parseAst('{1d20 vs 15}cs>18')).toThrow(ParseError);
-        try {
-          parseAst('{1d20 vs 15}cs>18');
-        } catch (e) {
-          expect((e as ParseError).code).toBe('NESTED_VERSUS');
-        }
+        expectRollError(() => parseAst('{1d20 vs 15}cs>18'), ParseError, 'NESTED_VERSUS');
       });
 
       it('should reject cs on Versus buried in arithmetic inside Group: {1+(1d20 vs 15)}cs>18', () => {
-        expect(() => parseAst('{1+(1d20 vs 15)}cs>18')).toThrow(ParseError);
-        try {
-          parseAst('{1+(1d20 vs 15)}cs>18');
-        } catch (e) {
-          expect((e as ParseError).code).toBe('NESTED_VERSUS');
-        }
+        expectRollError(() => parseAst('{1+(1d20 vs 15)}cs>18'), ParseError, 'NESTED_VERSUS');
       });
 
       it('should reject cs on Versus buried in function call inside Group: {abs(1d20 vs 15)}cs>18', () => {

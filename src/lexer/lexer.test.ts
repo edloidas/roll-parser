@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test';
+import { expectRollError } from '../test-helpers.js';
 import { Lexer, LexerError, lex } from './lexer.js';
 import { TokenType } from './tokens.js';
 
@@ -716,13 +717,10 @@ describe('Lexer', () => {
       });
 
       it('should report position and character on @ errors', () => {
-        try {
-          lex('1d20+@');
-        } catch (e) {
-          expect(e).toBeInstanceOf(LexerError);
-          expect((e as LexerError).position).toBe(5);
-          expect((e as LexerError).character).toBe('@');
-        }
+        const error = expectRollError(() => lex('1d20+@'), LexerError, 'UNEXPECTED_CHARACTER');
+
+        expect(error.position).toBe(5);
+        expect(error.character).toBe('@');
       });
     });
   });
@@ -800,13 +798,10 @@ describe('Lexer', () => {
     });
 
     it('should include position in error', () => {
-      try {
-        lex('2d20#');
-      } catch (e) {
-        expect(e).toBeInstanceOf(LexerError);
-        expect((e as LexerError).position).toBe(4);
-        expect((e as LexerError).character).toBe('#');
-      }
+      const error = expectRollError(() => lex('2d20#'), LexerError, 'UNEXPECTED_CHARACTER');
+
+      expect(error.position).toBe(4);
+      expect(error.character).toBe('#');
     });
 
     it('should throw for unexpected identifier', () => {
@@ -815,56 +810,39 @@ describe('Lexer', () => {
     });
 
     it('should include identifier in error message', () => {
-      try {
-        lex('abc');
-      } catch (e) {
-        expect(e).toBeInstanceOf(LexerError);
-        expect((e as LexerError).message).toContain('abc');
-      }
+      const error = expectRollError(() => lex('abc'), LexerError, 'UNEXPECTED_IDENTIFIER');
+
+      expect(error.message).toContain('abc');
     });
 
     it('should report full code points for astral characters', () => {
-      try {
-        lex('🎲d6');
-      } catch (e) {
-        expect(e).toBeInstanceOf(LexerError);
-        expect((e as LexerError).character).toBe('🎲');
-        expect((e as LexerError).message).toContain('🎲');
-      }
-      expect(() => lex('🎲d6')).toThrow(LexerError);
+      const error = expectRollError(() => lex('🎲d6'), LexerError, 'UNEXPECTED_CHARACTER');
+
+      expect(error.character).toBe('🎲');
+      expect(error.message).toContain('🎲');
     });
 
     it('should hint at modifier splits for merged identifiers', () => {
       // `4d6khs` — maximal munch merges `kh` + `s` into one identifier.
-      try {
-        lex('4d6khs');
-      } catch (e) {
-        expect(e).toBeInstanceOf(LexerError);
-        expect((e as LexerError).message).toContain(`did you mean 'kh' followed by 's'`);
-        expect((e as LexerError).message).toContain('kh1s');
-      }
-      expect(() => lex('4d6khs')).toThrow(LexerError);
+      const error = expectRollError(() => lex('4d6khs'), LexerError, 'UNEXPECTED_IDENTIFIER');
+
+      expect(error.message).toContain(`did you mean 'kh' followed by 's'`);
+      expect(error.message).toContain('kh1s');
     });
 
     it('should not hint for identifiers with no keyword prefix', () => {
-      try {
-        lex('xyz');
-      } catch (e) {
-        expect((e as LexerError).message).not.toContain('did you mean');
-      }
+      const error = expectRollError(() => lex('xyz'), LexerError, 'UNEXPECTED_IDENTIFIER');
+
+      expect(error.message).not.toContain('did you mean');
     });
 
     it('should hint at the sd/kh split for merged sort+keep identifiers', () => {
       // `4d6sdkh2` — maximal munch merges `sd` + `kh` into one identifier.
-      try {
-        lex('4d6sdkh2');
-        expect.unreachable('expected LexerError');
-      } catch (e) {
-        expect(e).toBeInstanceOf(LexerError);
-        expect((e as LexerError).message).toContain(`did you mean 'sd' followed by 'kh'`);
-        expect((e as LexerError).message).toContain('sd1kh');
-        expect((e as LexerError).position).toBe(3);
-      }
+      const error = expectRollError(() => lex('4d6sdkh2'), LexerError, 'UNEXPECTED_IDENTIFIER');
+
+      expect(error.message).toContain(`did you mean 'sd' followed by 'kh'`);
+      expect(error.message).toContain('sd1kh');
+      expect(error.position).toBe(3);
     });
   });
 
@@ -874,44 +852,31 @@ describe('Lexer', () => {
     // human is an unexpected character with a code-point-accurate position.
 
     it('should reject a no-break space as an unexpected character', () => {
-      try {
-        lex('2d6 +3');
-        expect.unreachable('expected LexerError');
-      } catch (e) {
-        expect(e).toBeInstanceOf(LexerError);
-        expect((e as LexerError).character).toBe(' ');
-        expect((e as LexerError).position).toBe(3);
-      }
+      const error = expectRollError(() => lex('2d6 +3'), LexerError, 'UNEXPECTED_CHARACTER');
+
+      expect(error.character).toBe(' ');
+      expect(error.position).toBe(3);
     });
 
     it('should reject a zero-width space as an unexpected character', () => {
-      try {
-        lex('2d6​+3');
-        expect.unreachable('expected LexerError');
-      } catch (e) {
-        expect((e as LexerError).character).toBe('​');
-        expect((e as LexerError).position).toBe(3);
-      }
+      const error = expectRollError(() => lex('2d6​+3'), LexerError, 'UNEXPECTED_CHARACTER');
+
+      expect(error.character).toBe('​');
+      expect(error.position).toBe(3);
     });
 
     it('should reject a leading byte-order mark', () => {
-      try {
-        lex('﻿2d6');
-        expect.unreachable('expected LexerError');
-      } catch (e) {
-        expect((e as LexerError).character).toBe('﻿');
-        expect((e as LexerError).position).toBe(0);
-      }
+      const error = expectRollError(() => lex('﻿2d6'), LexerError, 'UNEXPECTED_CHARACTER');
+
+      expect(error.character).toBe('﻿');
+      expect(error.position).toBe(0);
     });
 
     it('should reject full-width digits', () => {
-      try {
-        lex('１ｄ６');
-        expect.unreachable('expected LexerError');
-      } catch (e) {
-        expect((e as LexerError).character).toBe('１');
-        expect((e as LexerError).position).toBe(0);
-      }
+      const error = expectRollError(() => lex('１ｄ６'), LexerError, 'UNEXPECTED_CHARACTER');
+
+      expect(error.character).toBe('１');
+      expect(error.position).toBe(0);
     });
 
     it('should skip CRLF like any other whitespace run', () => {
@@ -944,14 +909,10 @@ describe('Lexer', () => {
     it('should reject a bare @ followed by a non-ASCII name', () => {
       // The bare form is `[A-Za-z_][A-Za-z0-9_]*` only — `@力` reads as an
       // empty variable name rather than a unicode identifier.
-      try {
-        lex('@力');
-        expect.unreachable('expected LexerError');
-      } catch (e) {
-        expect(e).toBeInstanceOf(LexerError);
-        expect((e as LexerError).message).toContain('Empty @ variable name');
-        expect((e as LexerError).position).toBe(0);
-      }
+      const error = expectRollError(() => lex('@力'), LexerError, 'UNEXPECTED_CHARACTER');
+
+      expect(error.message).toContain('Empty @ variable name');
+      expect(error.position).toBe(0);
     });
   });
 

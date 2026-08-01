@@ -178,8 +178,8 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      # ! Not a pure test step: `src/cli/package-smoke.test.ts` runs the tsc
-      # ! emit in `beforeAll`, so this job compiles the package itself. That is
+      # ! Not a pure test step: `src/cli/package-smoke.test.ts` runs `bun run
+      # ! build` in `beforeAll`, so this job builds the package itself. That is
       # ! why it needs only `check` — it deliberately does not consume the
       # ! `build` job's artifact, keeping the two paths independent.
       - name: Run tests with coverage gate
@@ -188,8 +188,9 @@ jobs:
   # Non-blocking trend signal, deliberately outside every required path: wall
   # clock on a shared runner is far too noisy to gate on (cross-process p50
   # variance is ±5-10%, avg ±43%). `fail-on-alert: false` keeps it advisory —
-  # the hard performance gates are `check:size` and the draw-count assertions in
-  # `src/evaluator/complexity.test.ts`.
+  # and advisory as it is, it is the only signal that tracks runtime cost at
+  # all. `check:size` is the one hard budget gate; the draw-count assertions in
+  # `src/evaluator/draws.test.ts` gate RNG consumption, not performance.
   # Unprivileged on purpose: this job executes branch-controlled code and
   # dependencies, so the gh-pages write lives in `bench-trend` below, which
   # only ever runs on the default branch.

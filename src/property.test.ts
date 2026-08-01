@@ -585,7 +585,11 @@ describe('property-based invariants', () => {
   });
 
   describe('math functions', () => {
-    test('floor(NdX/Y) <= NdX/Y for the same seeded roll', () => {
+    // Wrapping an expression in a math function does not change what it draws
+    // from the RNG, so a same-seed pair of rolls shares its dice exactly. That
+    // makes the unwrapped roll an exact oracle for the wrapped one, rather than
+    // the one-sided bound an inequality would give.
+    test('floor(NdX/Y) equals Math.floor of the same seeded NdX/Y', () => {
       fc.assert(
         fc.property(
           seedArb,
@@ -595,14 +599,14 @@ describe('property-based invariants', () => {
           (seed, count, sides, divisor) => {
             const raw = roll(`${count}d${sides}/${divisor}`, { seed });
             const floored = roll(`floor(${count}d${sides}/${divisor})`, { seed });
-            return floored.total <= raw.total && Number.isInteger(floored.total);
+            return floored.total === Math.floor(raw.total);
           },
         ),
         { numRuns: 200 },
       );
     });
 
-    test('ceil(NdX/Y) >= NdX/Y for the same seeded roll', () => {
+    test('ceil(NdX/Y) equals Math.ceil of the same seeded NdX/Y', () => {
       fc.assert(
         fc.property(
           seedArb,
@@ -612,14 +616,14 @@ describe('property-based invariants', () => {
           (seed, count, sides, divisor) => {
             const raw = roll(`${count}d${sides}/${divisor}`, { seed });
             const ceiled = roll(`ceil(${count}d${sides}/${divisor})`, { seed });
-            return ceiled.total >= raw.total && Number.isInteger(ceiled.total);
+            return ceiled.total === Math.ceil(raw.total);
           },
         ),
         { numRuns: 200 },
       );
     });
 
-    test('abs(expr) is always >= 0', () => {
+    test('abs(NdX+K) equals Math.abs of its own dice plus K', () => {
       fc.assert(
         fc.property(
           seedArb,
@@ -630,14 +634,16 @@ describe('property-based invariants', () => {
             const result = roll(`abs(${count}d${sides}${shift >= 0 ? '+' : ''}${shift})`, {
               seed,
             });
-            return result.total >= 0;
+            const inner = result.rolls.reduce((sum, die) => sum + die.result, shift);
+
+            return result.rolls.length === count && result.total === Math.abs(inner);
           },
         ),
         { numRuns: 200 },
       );
     });
 
-    test('max(a, b) >= min(a, b) for two independent dice', () => {
+    test('max(a, b) and min(a, b) select the extremes of the same seeded dice', () => {
       fc.assert(
         fc.property(
           seedArb,
@@ -646,7 +652,19 @@ describe('property-based invariants', () => {
           (seed, sidesA, sidesB) => {
             const maxed = roll(`max(1d${sidesA}, 1d${sidesB})`, { seed });
             const minned = roll(`min(1d${sidesA}, 1d${sidesB})`, { seed });
-            return maxed.total >= minned.total;
+            const maxDice = maxed.rolls.map((die) => die.result);
+            const minDice = minned.rolls.map((die) => die.result);
+
+            // Dice must match pairwise across the two calls — a wrapper that
+            // draws extra values or swaps argument order diverges here even if
+            // it still reports the extrema of whatever it rolled.
+            return (
+              maxDice.length === 2 &&
+              minDice.length === 2 &&
+              maxDice.every((die, i) => die === minDice[i]) &&
+              maxed.total === Math.max(...maxDice) &&
+              minned.total === Math.min(...minDice)
+            );
           },
         ),
         { numRuns: 200 },

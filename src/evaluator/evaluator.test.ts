@@ -269,32 +269,22 @@ describe('evaluate', () => {
       const ast = parse('(-1)dF');
       const rng = createMockRng([]);
 
-      expect(() => evaluate(ast, rng)).toThrow(EvaluatorError);
-      try {
-        evaluate(ast, rng);
-      } catch (err) {
-        expect(err).toBeInstanceOf(EvaluatorError);
-        if (err instanceof EvaluatorError) {
-          expect(err.code).toBe('INVALID_DICE_COUNT');
-          expect(err.nodeType).toBe('FateDice');
-        }
-      }
+      const error = expectRollError(() => evaluate(ast, rng), EvaluatorError, 'INVALID_DICE_COUNT');
+
+      expect(error.nodeType).toBe('FateDice');
     });
 
     test('5dF with maxDice=4 throws DICE_LIMIT_EXCEEDED', () => {
       const ast = parse('5dF');
       const rng = createMockRng([0, 0, 0, 0, 0]);
 
-      try {
-        evaluate(ast, rng, { maxDice: 4 });
-        throw new Error('expected DICE_LIMIT_EXCEEDED');
-      } catch (err) {
-        expect(err).toBeInstanceOf(EvaluatorError);
-        if (err instanceof EvaluatorError) {
-          expect(err.code).toBe('DICE_LIMIT_EXCEEDED');
-          expect(err.nodeType).toBe('FateDice');
-        }
-      }
+      const error = expectRollError(
+        () => evaluate(ast, rng, { maxDice: 4 }),
+        EvaluatorError,
+        'DICE_LIMIT_EXCEEDED',
+      );
+
+      expect(error.nodeType).toBe('FateDice');
     });
 
     test('(2+2)dF evaluates count expression', () => {
@@ -773,14 +763,14 @@ describe('evaluate', () => {
     test('evaluator errors carry the span of the failing sub-expression', () => {
       // `1d0` sits at offsets 4..7 inside `2d6+1d0+3` — the innermost node
       // that failed, not the whole expression.
-      try {
-        evaluate(parse('2d6+1d0+3'), createMockRng([1, 1]));
-        throw new Error('expected EvaluatorError');
-      } catch (error) {
-        expect(error).toBeInstanceOf(EvaluatorError);
-        expect((error as EvaluatorError).start).toBe(4);
-        expect((error as EvaluatorError).end).toBe(7);
-      }
+      const error = expectRollError(
+        () => evaluate(parse('2d6+1d0+3'), createMockRng([1, 1])),
+        EvaluatorError,
+        'INVALID_DICE_SIDES',
+      );
+
+      expect(error.start).toBe(4);
+      expect(error.end).toBe(7);
     });
 
     test('evaluator errors on hand-built ASTs have undefined spans', () => {
@@ -789,13 +779,13 @@ describe('evaluate', () => {
         count: { type: 'Literal', value: 1 },
         sides: { type: 'Literal', value: 0 },
       };
-      try {
-        evaluate(ast, createMockRng([]));
-        throw new Error('expected EvaluatorError');
-      } catch (error) {
-        expect(error).toBeInstanceOf(EvaluatorError);
-        expect((error as EvaluatorError).start).toBeUndefined();
-      }
+      const error = expectRollError(
+        () => evaluate(ast, createMockRng([])),
+        EvaluatorError,
+        'INVALID_DICE_SIDES',
+      );
+
+      expect(error.start).toBeUndefined();
     });
 
     test('1d1 is neither critical nor fumble', () => {
@@ -1032,13 +1022,13 @@ describe('evaluate', () => {
       const ast = parse('10d6');
       const rng = createMockRng(Array.from({ length: 10 }, () => 1));
 
-      try {
-        evaluate(ast, rng, { maxDice: 5 });
-        expect.unreachable('should have thrown');
-      } catch (error) {
-        expect(error).toBeInstanceOf(EvaluatorError);
-        expect((error as EvaluatorError).message).toBe('Total dice count 10 exceeds limit of 5');
-      }
+      const error = expectRollError(
+        () => evaluate(ast, rng, { maxDice: 5 }),
+        EvaluatorError,
+        'DICE_LIMIT_EXCEEDED',
+      );
+
+      expect(error.message).toBe('Total dice count 10 exceeds limit of 5');
     });
   });
 
@@ -1095,12 +1085,7 @@ describe('evaluate', () => {
         const ast = parse('1d1!');
         const rng = createMockRng(Array.from({ length: 2000 }, () => 1));
 
-        expect(() => evaluate(ast, rng)).toThrow(EvaluatorError);
-        try {
-          evaluate(parse('1d1!'), createMockRng(Array.from({ length: 2000 }, () => 1)));
-        } catch (err) {
-          expect((err as EvaluatorError).code).toBe('EXPLODE_LIMIT_EXCEEDED');
-        }
+        expectRollError(() => evaluate(ast, rng), EvaluatorError, 'EXPLODE_LIMIT_EXCEEDED');
       });
 
       test('maxExplodeIterations option caps per-die chain', () => {
@@ -1352,15 +1337,11 @@ describe('evaluate', () => {
 
       test('always-matching condition throws REROLL_LIMIT_EXCEEDED', () => {
         // `1d6r<7` — all d6 results are < 7 → infinite.
-        expect(() =>
-          evaluate(parse('1d6r<7'), createMockRng(Array.from({ length: 2000 }, () => 1))),
-        ).toThrow(EvaluatorError);
-
-        try {
-          evaluate(parse('1d6r<7'), createMockRng(Array.from({ length: 2000 }, () => 1)));
-        } catch (err) {
-          expect((err as EvaluatorError).code).toBe('REROLL_LIMIT_EXCEEDED');
-        }
+        expectRollError(
+          () => evaluate(parse('1d6r<7'), createMockRng(Array.from({ length: 2000 }, () => 1))),
+          EvaluatorError,
+          'REROLL_LIMIT_EXCEEDED',
+        );
       });
 
       test('maxRerollIterations caps the chain', () => {
@@ -2083,13 +2064,7 @@ describe('evaluate', () => {
       // rejects during dc-side evaluation.
       const ast = parse('1d20 vs (5 vs 3)');
 
-      try {
-        evaluate(ast, createMockRng([15]));
-        throw new Error('expected evaluate to throw');
-      } catch (err) {
-        expect(err).toBeInstanceOf(EvaluatorError);
-        expect((err as EvaluatorError).code).toBe('NESTED_VERSUS');
-      }
+      expectRollError(() => evaluate(ast, createMockRng([15])), EvaluatorError, 'NESTED_VERSUS');
     });
 
     test('Sibling versus in arithmetic throw NESTED_VERSUS at merge', () => {
@@ -2099,13 +2074,7 @@ describe('evaluate', () => {
       const ast = parse('(1d20 vs 15) + (1d20 vs 20)');
       const rng = createMockRng([12, 18]);
 
-      try {
-        evaluate(ast, rng);
-        throw new Error('expected evaluate to throw');
-      } catch (err) {
-        expect(err).toBeInstanceOf(EvaluatorError);
-        expect((err as EvaluatorError).code).toBe('NESTED_VERSUS');
-      }
+      expectRollError(() => evaluate(ast, rng), EvaluatorError, 'NESTED_VERSUS');
     });
 
     test('degree/natural populated when vs is wrapped in arithmetic', () => {
@@ -2656,13 +2625,13 @@ describe('evaluate', () => {
     test('throws UNDEFINED_VARIABLE by default when key is missing', () => {
       const ast = parse('@missing');
 
-      expect(() => evaluate(ast, createMockRng([]))).toThrow(EvaluatorError);
-      try {
-        evaluate(ast, createMockRng([]));
-      } catch (err) {
-        expect((err as EvaluatorError).code).toBe('UNDEFINED_VARIABLE');
-        expect((err as EvaluatorError).message).toBe('Undefined variable: missing');
-      }
+      const error = expectRollError(
+        () => evaluate(ast, createMockRng([])),
+        EvaluatorError,
+        'UNDEFINED_VARIABLE',
+      );
+
+      expect(error.message).toBe('Undefined variable: missing');
     });
 
     test('returns 0 when key is missing and onMissingVariable is "zero"', () => {
@@ -2766,39 +2735,33 @@ describe('evaluate', () => {
       const ast = parse('1d20+@str');
       const context = { str: 'high' as unknown as number };
 
-      expect(() => evaluate(ast, createMockRng([5]), { context })).toThrow(EvaluatorError);
-      try {
-        evaluate(ast, createMockRng([5]), { context });
-      } catch (err) {
-        expect((err as EvaluatorError).code).toBe('INVALID_VARIABLE_VALUE');
-        expect((err as EvaluatorError).message).toBe('Invalid variable value: str = high');
-      }
+      const error = expectRollError(
+        () => evaluate(ast, createMockRng([5]), { context }),
+        EvaluatorError,
+        'INVALID_VARIABLE_VALUE',
+      );
+
+      expect(error.message).toBe('Invalid variable value: str = high');
     });
 
     test('throws INVALID_VARIABLE_VALUE when context value is NaN', () => {
       const ast = parse('1d20+@str');
 
-      expect(() => evaluate(ast, createMockRng([5]), { context: { str: Number.NaN } })).toThrow(
+      expectRollError(
+        () => evaluate(ast, createMockRng([5]), { context: { str: Number.NaN } }),
         EvaluatorError,
+        'INVALID_VARIABLE_VALUE',
       );
-      try {
-        evaluate(ast, createMockRng([5]), { context: { str: Number.NaN } });
-      } catch (err) {
-        expect((err as EvaluatorError).code).toBe('INVALID_VARIABLE_VALUE');
-      }
     });
 
     test('throws INVALID_VARIABLE_VALUE when context value is Infinity', () => {
       const ast = parse('1d20+@str');
 
-      expect(() =>
-        evaluate(ast, createMockRng([5]), { context: { str: Number.POSITIVE_INFINITY } }),
-      ).toThrow(EvaluatorError);
-      try {
-        evaluate(ast, createMockRng([5]), { context: { str: Number.POSITIVE_INFINITY } });
-      } catch (err) {
-        expect((err as EvaluatorError).code).toBe('INVALID_VARIABLE_VALUE');
-      }
+      expectRollError(
+        () => evaluate(ast, createMockRng([5]), { context: { str: Number.POSITIVE_INFINITY } }),
+        EvaluatorError,
+        'INVALID_VARIABLE_VALUE',
+      );
     });
 
     test('finite numeric value passes through unchanged', () => {
@@ -3032,13 +2995,7 @@ describe('evaluate', () => {
         const ast = parse('{1d20 vs 15, 1d6 vs 10, 1d4}kh2');
         const rng = createMockRng([18, 6, 4]);
 
-        try {
-          evaluate(ast, rng);
-          throw new Error('expected evaluate to throw');
-        } catch (err) {
-          expect(err).toBeInstanceOf(EvaluatorError);
-          expect((err as EvaluatorError).code).toBe('NESTED_VERSUS');
-        }
+        expectRollError(() => evaluate(ast, rng), EvaluatorError, 'NESTED_VERSUS');
       });
     });
 
