@@ -14,8 +14,10 @@ on:
   # how a branch gets bench numbers now.
   workflow_dispatch:
 
+# PR events key on the PR number — `head_ref` is the bare fork branch name,
+# so same-named branches from different forks would cancel each other's runs.
 concurrency:
-  group: ci-${{ github.head_ref || github.ref }}
+  group: ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 permissions:
