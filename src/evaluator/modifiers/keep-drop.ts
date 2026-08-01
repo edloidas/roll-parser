@@ -29,6 +29,11 @@ export function markDroppedIndices(
   selector: ModifierSpec['selector'],
   droppedMask: Uint8Array,
 ): void {
+  if (count === 1) {
+    markSingleExtreme(dice, kind, selector, droppedMask);
+    return;
+  }
+
   const eligible: EligibleDie[] = [];
 
   for (let index = 0; index < dice.length; index++) {
@@ -71,6 +76,57 @@ export function markDroppedIndices(
     const item = eligible[i];
     if (item != null) droppedMask[item.index] = 1;
   }
+}
+
+/**
+ * `count === 1` fast path: a single linear scan replaces the wrapper array
+ * and comparator sort — `2d20kh1` (advantage) and `4d6dl1` are the most
+ * common notations. Strict comparison preserves the stable sort's
+ * first-occurrence tie-break, and bits are only ever set, never cleared, so
+ * a shared mask keeps every previous spec's drops.
+ */
+function markSingleExtreme(
+  dice: DieResult[],
+  kind: ModifierSpec['kind'],
+  selector: ModifierSpec['selector'],
+  droppedMask: Uint8Array,
+): void {
+  const isKeep = kind === 'keep';
+  const wantHighest = selector === 'highest';
+
+  let extremeIndex = -1;
+  let extremeResult = 0;
+
+  for (let index = 0; index < dice.length; index++) {
+    const die = dice[index];
+    if (die == null) continue;
+
+    if (die.modifiers.includes('dropped')) {
+      droppedMask[index] = 1;
+      continue;
+    }
+
+    const { result } = die;
+
+    if (extremeIndex === -1) {
+      extremeIndex = index;
+      extremeResult = result;
+      continue;
+    }
+
+    if (wantHighest ? result > extremeResult : result < extremeResult) {
+      // A keep drops the dethroned extreme; a drop keeps everything else.
+      if (isKeep) droppedMask[extremeIndex] = 1;
+      extremeIndex = index;
+      extremeResult = result;
+    } else if (isKeep) {
+      droppedMask[index] = 1;
+    }
+  }
+
+  // Keeping 1 of ≤1 eligible dice drops nothing; dropping 1 of ≥1 drops the
+  // extreme — both match the general path's whole-pool guards.
+  if (!isKeep && extremeIndex !== -1) droppedMask[extremeIndex] = 1;
 }
 
 /**
