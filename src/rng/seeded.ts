@@ -1,10 +1,16 @@
 /**
- * Seedable RNG using xorshift128 algorithm.
+ * Seedable RNG using the xoshiro128** algorithm.
  *
  * @module rng/seeded
  */
 
 import type { RNG } from './types.js';
+
+/**
+ * Rotates the low 32 bits of `value` left by `bits`, returning a signed int32.
+ * Callers that need the unsigned reading apply `>>> 0` themselves.
+ */
+const rotl = (value: number, bits: number): number => (value << bits) | (value >>> (32 - bits));
 
 /**
  * Draws discarded after seeding. cyrb128's four outputs are XOR-derived from
@@ -31,6 +37,15 @@ const CYRB128_BASIS_2 = 3144134277;
 const CYRB128_BASIS_3 = 1013904242;
 const CYRB128_BASIS_4 = 2773480762;
 
+/** xoshiro128** output-scrambler multipliers and rotations. */
+const SCRAMBLE_MULTIPLIER_1 = 5;
+const SCRAMBLE_ROTATION = 7;
+const SCRAMBLE_MULTIPLIER_2 = 9;
+
+/** xoshiro128** state-transition shift and rotation. */
+const STATE_SHIFT = 9;
+const STATE_ROTATION = 11;
+
 /** cyrb128 mixing multipliers — one per output word. */
 const CYRB128_MULTIPLIER_1 = 597399067;
 const CYRB128_MULTIPLIER_2 = 2869860233;
@@ -38,7 +53,7 @@ const CYRB128_MULTIPLIER_3 = 951274213;
 const CYRB128_MULTIPLIER_4 = 2716044179;
 
 /**
- * Seedable pseudo-random number generator using xorshift128. The default
+ * Seedable pseudo-random number generator using xoshiro128**. The default
  * randomness source — `roll(notation)` builds one per call, and
  * `roll(notation, { seed })` builds one from your seed.
  *
@@ -68,14 +83,18 @@ const CYRB128_MULTIPLIER_4 = 2716044179;
  * // An injected instance keeps advancing across rolls; `{ seed }` restarts
  * // the stream on every call.
  * const rng = new SeededRNG('demo');
- * roll('1d20', { rng }).total; // 14
- * roll('1d20', { rng }).total; // 19 — the stream moved on
- * roll('1d20', { seed: 'demo' }).total; // 14, every single time
+ * roll('1d20', { rng }).total; // 1
+ * roll('1d20', { rng }).total; // 20 — the stream moved on
+ * roll('1d20', { seed: 'demo' }).total; // 1, every single time
  * ```
  *
  * @category RNG
  */
 export class SeededRNG implements RNG {
+  // ! Signed int32 on purpose. Every read below is bitwise, so the sequence is
+  // ! identical to uint32 words — but normalizing with `>>> 0` on write costs
+  // ! ~2x per draw, since a word above 2^31 leaves V8's Smi representation.
+  // ! Exposing a word to a caller needs `>>> 0` at that boundary.
   private s0: number;
   private s1: number;
   private s2: number;
@@ -97,7 +116,7 @@ export class SeededRNG implements RNG {
   private initState(seed?: string | number): void {
     this.hashSeed(this.toSeedString(seed));
 
-    // All-zero is a fixed point for xorshift — at least one word must be non-zero.
+    // All-zero is a fixed point for xoshiro — at least one word must be non-zero.
     if (this.s0 === 0 && this.s1 === 0 && this.s2 === 0 && this.s3 === 0) {
       this.s0 = 1;
     }
@@ -134,26 +153,27 @@ export class SeededRNG implements RNG {
 
     const mixed = h1 ^ h2 ^ h3 ^ h4;
 
-    this.s0 = mixed >>> 0;
-    this.s1 = (h2 ^ mixed) >>> 0;
-    this.s2 = (h3 ^ mixed) >>> 0;
-    this.s3 = (h4 ^ mixed) >>> 0;
+    this.s0 = mixed;
+    this.s1 = h2 ^ mixed;
+    this.s2 = h3 ^ mixed;
+    this.s3 = h4 ^ mixed;
   }
 
   private nextUint32(): number {
-    // xorshift128 — the 11/8/19 shift triple is part of the algorithm, not a tunable.
-    let t = this.s3;
-    const s = this.s0;
+    // xoshiro128** 1.0 — these constants are part of the algorithm, not tunables.
+    const scrambled = rotl(Math.imul(this.s1, SCRAMBLE_MULTIPLIER_1), SCRAMBLE_ROTATION);
+    const result = Math.imul(scrambled, SCRAMBLE_MULTIPLIER_2) >>> 0;
 
-    this.s3 = this.s2;
-    this.s2 = this.s1;
-    this.s1 = s;
+    const t = this.s1 << STATE_SHIFT;
 
-    t ^= t << 11;
-    t ^= t >>> 8;
-    this.s0 = (t ^ s ^ (s >>> 19)) >>> 0;
+    this.s2 ^= this.s0;
+    this.s3 ^= this.s1;
+    this.s1 ^= this.s2;
+    this.s0 ^= this.s3;
+    this.s2 ^= t;
+    this.s3 = rotl(this.s3, STATE_ROTATION);
 
-    return this.s0;
+    return result;
   }
 
   /**

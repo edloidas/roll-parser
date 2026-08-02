@@ -436,8 +436,8 @@ export type RollResult = Readonly<{
  * ```typescript
  * import { roll } from 'roll-parser';
  *
- * roll('1d20+@str', { context: { str: 4 }, seed: 'demo' }).total; // 18
- * roll('1d20+@str', { onMissingVariable: 'zero', seed: 'demo' }).total; // 14
+ * roll('1d20+@str', { context: { str: 4 }, seed: 'demo' }).total; // 5
+ * roll('1d20+@str', { onMissingVariable: 'zero', seed: 'demo' }).total; // 1
  * ```
  *
  * @category Core
