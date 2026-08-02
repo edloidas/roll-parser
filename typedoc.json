@@ -9,6 +9,9 @@
   "excludeInternal": true,
   "excludePrivate": true,
   "excludeExternals": true,
+  "visibilityFilters": {
+    "inherited": true
+  },
   "categorizeByGroup": false,
   "categoryOrder": ["Core", "Results", "AST", "Errors", "RNG", "Limits", "Testing", "*"],
   "defaultCategory": "Other",
