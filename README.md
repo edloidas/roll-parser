@@ -1,15 +1,19 @@
+<p align="center">
+  <a href="https://roll-parser.edloidas.io/"><img src="https://raw.githubusercontent.com/edloidas/roll-parser/master/.github/logo.svg" width="92" alt="roll-parser logo"></a>
+</p>
+
 <h1 align="center">Roll Parser</h1>
 
 <p align="center">
-Dice notation for tabletop RPGs — parsed, rolled, and handed back as data you can render.
+Dice notation for tabletop RPGs, rolled into structured results.
 </p>
 
 <p align="center">
   <a href="https://www.npmjs.com/package/roll-parser"><img src="https://img.shields.io/npm/v/roll-parser?color=cb3837" alt="npm version"></a>
   <a href="https://github.com/edloidas/roll-parser/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/edloidas/roll-parser/ci.yml?branch=master&label=CI" alt="CI status"></a>
   <a href="LICENSE"><img src="https://img.shields.io/npm/l/roll-parser?color=blue" alt="MIT license"></a>
-  <a href="https://nodejs.org/"><img src="https://img.shields.io/node/v/roll-parser?label=node" alt="Node.js >= 22.12"></a>
-  <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-strict-3178c6.svg" alt="TypeScript"></a>
+  <!-- TODO: switch to img.shields.io/node/v/roll-parser once 3.0.0 is npm `latest` — until then it reads 2.x engines -->
+  <a href="https://nodejs.org/"><img src="https://img.shields.io/badge/node-%3E%3D22.12-5fa04e" alt="Node.js >= 22.12"></a>
 </p>
 
 <p align="center">
@@ -34,7 +38,7 @@ Read the breakdown instead of re-parsing the string:
 const result = roll('4d6kh3 + 2');
 
 result.parts.type; // 'binaryOp'
-result.parts.total === result.total; // true, at every level of the tree
+result.parts.total === result.total; // true — every node of the tree carries its sub-total
 result.rolls.filter((die) => !die.modifiers.includes('dropped')); // the kept dice
 ```
 
@@ -45,16 +49,6 @@ import { createMockRng } from 'roll-parser/testing';
 
 roll('4d6kh3', { rng: createMockRng([3, 6, 2, 5]) }).total; // 14, every run
 ```
-
-## Status
-
-> **v3 is the current major line** — this source tree is v3, a complete
-> rewrite of 2.x covered by 1,200+ tests at 99.9% line coverage. The version
-> badge above reflects what npm serves right now.
->
-> Upgrading from 2.x? The API is not compatible — see
-> [MIGRATION.md](MIGRATION.md). To stay on the old line, pin
-> `roll-parser@2.3.2`.
 
 ## Why roll-parser
 
@@ -75,25 +69,27 @@ roll('4d6kh3', { rng: createMockRng([3, 6, 2, 5]) }).total; // 14, every run
 - **Small and fast.** ≈10.9 kB brotli for the whole library, ≈5.1 kB for just
   `parse`, ≈215 B for the testing entry point. Zero runtime dependencies, zero
   `node:` imports. A `1d20` round trip takes about 1.5 µs.
+- **Tested.** 1,200+ tests behind CI-enforced coverage floors — 100% of
+  functions, 98% of lines — including every code example in this README, which
+  must produce the values its comments claim.
 
 ## Contents
 
-[Install](#install) · [Quick start](#quick-start) ·
-[Notation reference](#notation-reference) ([dice](#dice),
-[arithmetic](#arithmetic-and-functions), [modifiers](#modifiers),
-[pools and checks](#pools-and-checks)) ·
-[Recipes by game system](#recipes-by-game-system) ·
-[Working with results](#working-with-results) ([RollResult](#rollresult),
-[parts tree](#the-parts-tree), [rendering](#rendering)) ·
-[Randomness](#randomness) ([seeded](#seeded-rolls), [custom](#custom-rngs),
-[testing](#testing)) · [Options](#options) · [Error handling](#error-handling)
-([classes](#error-classes), [codes](#error-codes), [spans](#source-spans)) ·
-[Safety limits](#safety-limits) ·
-[Using the parser directly](#using-the-parser-directly) ·
-[TypeScript](#typescript) · [CLI](#cli) · [Environments](#environments) ·
-[Performance](#performance) · [Known limitations](#known-limitations) ·
-[Upgrading from v2](MIGRATION.md) · [Contributing](#contributing) ·
-[License](#license)
+- [Install](#install)
+- [Notation reference](#notation-reference)
+- [Recipes by game system](#recipes-by-game-system)
+- [Working with results](#working-with-results)
+- [Randomness](#randomness)
+- [Options](#options)
+- [Error handling](#error-handling)
+- [Using the parser directly](#using-the-parser-directly)
+- [TypeScript](#typescript)
+- [CLI](#cli)
+- [Performance](#performance)
+- [Known limitations](#known-limitations)
+- [Upgrading from 2.x](#upgrading-from-2x)
+- [Contributing](#contributing)
+- [License](#license)
 
 ## Install
 
@@ -101,21 +97,17 @@ roll('4d6kh3', { rng: createMockRng([3, 6, 2, 5]) }).total; // 14, every run
 npm install roll-parser
 ```
 
-```bash
-pnpm add roll-parser
-```
-
-```bash
-bun add roll-parser
-```
-
-**ESM-only.** Node.js ≥ 22.12 is required — that is where `require(esm)` is
-unflagged, so CommonJS consumers can still `require('roll-parser')` even though
-the published files are ESM.
+> [!IMPORTANT]
+> **ESM-only.** Node.js ≥ 22.12 is required — the floor at which
+> `require(esm)` is unflagged — so CommonJS consumers can still
+> `require('roll-parser')` even though the published files are ESM.
 
 For TypeScript consumers, `moduleResolution` must be `bundler`, `node16`, or
 `nodenext` — the package resolves through `exports` only, so the legacy `node10`
 resolution does not find it.
+
+Bundlers tree-shake the library cleanly: it is marked `sideEffects: false` and
+touches no `process` or filesystem globals.
 
 ### CDN / browser without a bundler
 
@@ -134,22 +126,10 @@ as one request:
 `https://esm.sh/roll-parser` works the same way. Raw file URLs
 (`unpkg.com/roll-parser`) also work but fetch each module separately.
 
-## Quick start
+### Upgrading from 2.x
 
-```typescript
-import { roll } from 'roll-parser';
-
-roll('2d6+3').total; // 5..15
-
-// Reproducible: same seed, same dice
-roll('2d6+3', { seed: 'demo' }).rendered; // '2d6[2, 6] + 3 = 11'
-
-// Variables resolved from a context map
-roll('1d20+@str', { context: { str: 4 }, seed: 'demo' }).total; // 16
-
-// Guardrails for notation you did not write
-roll(userInput, { maxDice: 100, maxExplodeIterations: 20 });
-```
+v3 is a complete rewrite and the API is not compatible — see
+[MIGRATION.md](MIGRATION.md). To stay on the old line, pin `roll-parser@2.3.2`.
 
 ## Notation reference
 
@@ -221,28 +201,33 @@ the Roll20 rule.
 | `{a, b}khN` | Grouped roll: each sub-roll's subtotal competes as one compound die |
 | `{a+b}khN` | Single-sub-roll group: keep/drop selects across the flattened pool |
 
-Success counting is **terminal** — nothing may wrap it, so `10d10>=6 + 2` is a
-parse error. Put the arithmetic inside the threshold: `10d10>=(4+2)`.
+> [!IMPORTANT]
+> Success counting is **terminal** — nothing may wrap it, so `10d10>=6 + 2` is
+> a parse error. Put the arithmetic inside the threshold: `10d10>=(4+2)`.
 
-A bare `d` after a dice expression is also rejected: `4d6d1` throws
-`AMBIGUOUS_DICE_CHAIN`. Write `4d6dl1` to drop a die, or `(4d6)d1` if you
-really meant nested dice.
+> [!WARNING]
+> A bare `d` after a dice expression is rejected: `4d6d1` throws
+> `AMBIGUOUS_DICE_CHAIN`. Write `4d6dl1` to drop a die, or `(4d6)d1` if you
+> really meant nested dice.
 
 ## Recipes by game system
 
+Every notation below links to a live roll in the
+[playground](https://roll-parser.edloidas.io/).
+
 | System | Notation | What it does |
 |--------|----------|--------------|
-| D&D 5e | `4d6kh3` | Roll an ability score |
-| D&D 5e | `2d20kh1+7` | Attack with advantage |
-| D&D 5e | `2d6ro<3+4` | Great Weapon Fighting — reroll 1s and 2s once |
-| D&D 5e | `8d6` | Fireball damage |
-| Pathfinder 2e | `1d20+12 vs 20` | Check against a DC, with degrees of success |
-| World of Darkness | `7d10>=6f1` | Successes with a botch threshold |
-| World of Darkness | `5d10!=10>=8` | 10-again, successes on 8+ |
-| Shadowrun | `12d6>=5` | Count hits on 5 or 6 |
-| Fate | `4dF+2` | Four Fudge dice plus a skill |
-| Savage Worlds | `{1d8!, 1d6!}kh1` | Trait die vs. exploding wild die |
-| Call of Cthulhu | `d%` | Percentile roll |
+| D&D 5e | [`4d6kh3`](https://roll-parser.edloidas.io/?d=4d6kh3) | Roll an ability score |
+| D&D 5e | [`2d20kh1+7`](https://roll-parser.edloidas.io/?d=2d20kh1%2B7) | Attack with advantage |
+| D&D 5e | [`2d6ro<3+4`](https://roll-parser.edloidas.io/?d=2d6ro%3C3%2B4) | Great Weapon Fighting — reroll 1s and 2s once |
+| D&D 5e | [`8d6`](https://roll-parser.edloidas.io/?d=8d6) | Fireball damage |
+| Pathfinder 2e | [`1d20+12 vs 20`](https://roll-parser.edloidas.io/?d=1d20%2B12%20vs%2020) | Check against a DC, with degrees of success |
+| World of Darkness | [`7d10>=6f1`](https://roll-parser.edloidas.io/?d=7d10%3E%3D6f1) | Successes with a botch threshold |
+| World of Darkness | [`5d10!=10>=8`](https://roll-parser.edloidas.io/?d=5d10!%3D10%3E%3D8) | 10-again, successes on 8+ |
+| Shadowrun | [`12d6>=5`](https://roll-parser.edloidas.io/?d=12d6%3E%3D5) | Count hits on 5 or 6 |
+| Fate | [`4dF+2`](https://roll-parser.edloidas.io/?d=4dF%2B2) | Four Fudge dice plus a skill |
+| Savage Worlds | [`{1d8!, 1d6!}kh1`](https://roll-parser.edloidas.io/?d=%7B1d8!%2C%201d6!%7Dkh1) | Trait die vs. exploding wild die |
+| Call of Cthulhu | [`d%`](https://roll-parser.edloidas.io/?d=d%25) | Percentile roll |
 
 ```typescript
 // Pathfinder 2e — the natural d20 face drives the degree upgrade
@@ -277,18 +262,26 @@ the CLI's `--json` flag prints.
 
 ```typescript
 JSON.stringify(roll('3d6', { rng: createMockRng([4, 2, 6]) }));
-// { "total": 12, "notation": "3d6", "expression": "3d6",
-//   "rendered": "3d6[4, 2, 6] = 12",
-//   "rolls": [
-//     { "sides": 6, "result": 4, "modifiers": ["kept"], "critical": false, "fumble": false },
-//     { "sides": 6, "result": 2, "modifiers": ["kept"], "critical": false, "fumble": false },
-//     { "sides": 6, "result": 6, "modifiers": ["kept"], "critical": true,  "fumble": false } ],
-//   "parts": { "type": "dice", "count": 3, "sides": 6, "rolls": [ ... ],
-//              "total": 12, "start": 0, "end": 3 } }
 ```
 
-`rolls[]` and the `rolls[]` inside `parts` hold the *same* `DieResult` objects —
-no deep clone, so annotating a die is visible through both views.
+```json
+{
+  "total": 12,
+  "notation": "3d6",
+  "expression": "3d6",
+  "rendered": "3d6[4, 2, 6] = 12",
+  "rolls": [
+    { "sides": 6, "result": 4, "modifiers": ["kept"], "critical": false, "fumble": false },
+    { "sides": 6, "result": 2, "modifiers": ["kept"], "critical": false, "fumble": false },
+    { "sides": 6, "result": 6, "modifiers": ["kept"], "critical": true, "fumble": false }
+  ],
+  "parts": { "type": "dice", "count": 3, "sides": 6, "rolls": ["…"], "total": 12, "start": 0, "end": 3 }
+}
+```
+
+> [!NOTE]
+> `rolls[]` and the `rolls[]` inside `parts` hold the *same* `DieResult`
+> objects — no deep clone, so annotating a die is visible through both views.
 
 ### The parts tree
 
@@ -375,9 +368,10 @@ roll('1d20', { rng }).total; // 12
 roll('1d20', { rng }).total; // 14
 ```
 
-The guarantee: within one released version, the same seed and the same notation
-produce the same dice. It is not cryptographically secure and is not promised
-stable across major versions — persist the `RollResult`, not the seed.
+Within one released version, the same seed and the same notation always
+produce the same dice. The generator is not cryptographically secure, and its
+output may change between major versions — persist the `RollResult`, not the
+seed.
 
 ### Custom RNGs
 
@@ -412,10 +406,10 @@ try {
 }
 ```
 
-The mock is deliberately strict, so a miscounted sequence fails loudly rather
-than silently passing: it never wraps around, and `nextInt` rejects a scripted
-value outside the requested range with a `RangeError` — `createMockRng([7])`
-cannot satisfy a `d6`.
+The mock is deliberately strict so that a miscounted sequence fails loudly
+instead of silently passing: it never wraps around, and `nextInt` throws a
+`RangeError` when a scripted value falls outside the requested range —
+`createMockRng([7])` cannot satisfy a `d6`.
 
 **Draw order.** Values are consumed left to right, one `nextInt` per die. Two
 rules cover meta-expressions:
@@ -427,11 +421,21 @@ rules cover meta-expressions:
    crit-threshold, and success-count modifiers post-process a pool that already
    exists, so their thresholds resolve later.
 
-| `4d6kh(1d2)` with `[1, 5, 3, 4, 6]` | | `4d6cs>(1d2)` with `[5, 3, 4, 6, 1]` | |
-|---|---|---|---|
-| 1 | `1d2`, the keep count → `1` | 1–4 | `4d6` pool → `5, 3, 4, 6` |
-| 2–5 | `4d6` pool → `5, 3, 4, 6` | 5 | `1d2`, the crit threshold → `1` |
-| | total `6` — the highest die | | total `18`, all four dice crit against `>1` |
+`4d6kh(1d2)` with `[1, 5, 3, 4, 6]` — the keep count draws first:
+
+| Draw | Consumed by |
+|------|-------------|
+| 1 | `1d2`, the keep count → `1` |
+| 2–5 | `4d6` pool → `5, 3, 4, 6` |
+| | total `6` — the highest die |
+
+`4d6cs>(1d2)` with `[5, 3, 4, 6, 1]` — the threshold draws last:
+
+| Draw | Consumed by |
+|------|-------------|
+| 1–4 | `4d6` pool → `5, 3, 4, 6` |
+| 5 | `1d2`, the crit threshold → `1` |
+| | total `18` — all four dice crit against `>1` |
 
 ## Options
 
@@ -455,12 +459,29 @@ roll('1d20+@prof', { context: { prof: 3 }, seed: 'demo' }).total; // 15
 roll('1d20+@prof', { onMissingVariable: 'zero', seed: 'demo' }).total; // 12
 ```
 
+### Safety limits
+
+Untrusted notation is bounded by default, and every limit can be lowered per
+call. `maxDice` counts the total dice across the whole expression —
+explosions, rerolls, and meta-expressions included — so `6000d6+6000d6`
+breaches the default. `maxExplodeIterations` and `maxRerollIterations` apply
+per die.
+
+```typescript
+roll('99999d6', { maxDice: 100 }); // throws, code 'DICE_LIMIT_EXCEEDED'
+```
+
+One limit is not configurable: expression nesting is capped at
+`MAX_PARSE_DEPTH` (128). Deeply nested input — 20,000 parentheses, say —
+throws a typed `MAX_DEPTH_EXCEEDED` instead of blowing the stack, which keeps
+`isRollParserError` a complete filter for adversarial input.
+
 ## Error handling
 
 Every failure extends `RollParserError` and carries a stable `code`. Use
-`isRollParserError` as the outer filter — it beats `instanceof` because it also
-matches errors that crossed a realm boundary, and anything it rejects is a
-genuine bug that should be rethrown.
+`isRollParserError` as the outer filter. Unlike `instanceof`, it also matches
+errors that crossed a realm boundary — and anything it rejects is a genuine
+bug, so rethrow it.
 
 ```typescript
 import { isRollParserError, roll } from 'roll-parser';
@@ -482,28 +503,17 @@ try {
 | `ParseError` | parsing | `position`, `token` |
 | `EvaluatorError` | evaluation | `nodeType`, `start`, `end` |
 
-Messages never embed the source position. Read it from the fields, or uniformly
-through `getErrorSpan`.
+Error messages never embed the source position. Read it from the class fields,
+or read it uniformly through `getErrorSpan`.
 
 ### Error codes
 
-`RollParserErrorCode` is a closed union of 30 codes, grouped by the stage that
-raises them.
-
-**Lexer** — `UNEXPECTED_CHARACTER`, `UNEXPECTED_IDENTIFIER`
-
-**Parser** — `UNEXPECTED_TOKEN`, `UNEXPECTED_END`, `EXPECTED_TOKEN`,
-`INVALID_MODIFIER_TARGET`, `INVALID_EXPLODE_TARGET`, `INVALID_REROLL_TARGET`,
-`INVALID_SUCCESS_COUNT_TARGET`, `INVALID_SORT_TARGET`,
-`INVALID_CRIT_THRESHOLD_TARGET`, `NESTED_VERSUS`, `INVALID_FUNCTION_ARITY`,
-`AMBIGUOUS_DICE_CHAIN`, `MAX_DEPTH_EXCEEDED`
-
-**Evaluator** — `INVALID_DICE_COUNT`, `INVALID_DICE_SIDES`,
-`DICE_LIMIT_EXCEEDED`, `DIVISION_BY_ZERO`, `MODULO_BY_ZERO`,
-`UNKNOWN_OPERATOR`, `UNKNOWN_NODE_TYPE`, `INVALID_MODIFIER_COUNT`,
-`EXPLODE_LIMIT_EXCEEDED`, `REROLL_LIMIT_EXCEEDED`, `INVALID_THRESHOLD`,
-`NESTED_VERSUS`, `UNKNOWN_FUNCTION`, `UNDEFINED_VARIABLE`,
-`INVALID_VARIABLE_VALUE`, `NON_FINITE_RESULT`
+`RollParserErrorCode` is a closed union of 30 stable codes — match on the code,
+not the message. The ones you will meet first: `EXPECTED_TOKEN` and
+`UNEXPECTED_TOKEN` for malformed notation, `AMBIGUOUS_DICE_CHAIN` for `4d6d1`,
+`UNDEFINED_VARIABLE` for a `@name` missing from `context`, and
+`DICE_LIMIT_EXCEEDED` when a [safety limit](#safety-limits) trips. The full
+list lives in the [API reference](https://roll-parser.edloidas.io/docs/).
 
 ### Source spans
 
@@ -521,27 +531,6 @@ if (span != null) {
 // 2d6+&            2d6+1d0+3
 //     ^                ^^^
 ```
-
-## Safety limits
-
-Notation from users you do not control is bounded by default, and can be bounded
-harder per call.
-
-| Option | Default | Bounds |
-|--------|--------:|--------|
-| `maxDice` | `10_000` | Total dice across the whole expression, including explosions, rerolls, and meta-expressions |
-| `maxExplodeIterations` | `1_000` | Explosions per die |
-| `maxRerollIterations` | `1_000` | Recursive rerolls per die |
-| `MAX_PARSE_DEPTH` | `128` | Expression nesting. Not configurable — always applies |
-
-```typescript
-roll('99999d6', { maxDice: 100 }); // throws, code 'DICE_LIMIT_EXCEEDED'
-```
-
-`maxDice` is charged across the whole expression rather than per pool, so
-`6000d6+6000d6` breaches the default. Deeply nested input — 20,000 parentheses,
-say — throws a typed `MAX_DEPTH_EXCEEDED` rather than blowing the stack, which
-keeps `isRollParserError` a complete filter for adversarial input.
 
 ## Using the parser directly
 
@@ -582,23 +571,22 @@ numbers — that is what makes `(1d4)d6` expressible.
 
 ## TypeScript
 
-Every public symbol is typed and documented; the generated reference lives at
-[roll-parser.edloidas.io/docs/](https://roll-parser.edloidas.io/docs/).
-
-| What you want | Types |
-|---------------|-------|
-| Roll and read a result | `RollResult`, `DieResult`, `DieModifier`, `DegreeOfSuccess` |
-| Walk the breakdown | `RollPart`, `RollPartType`, `ModifierSpec`, `ResolvedComparePoint` |
-| Configure a roll | `RollOptions`, `EvaluateOptions`, `EvaluationLimits`, `RNG` |
-| Inspect the syntax tree | `ASTNode` and its 16 members, `NodeSpan`, `CompareOp`, `ComparePoint` |
-| Work with tokens | `Token`, `TokenType` |
-| Handle failures | `RollParserErrorCode`, `ErrorSpan` |
+Every public symbol is typed and documented in the generated
+[API reference](https://roll-parser.edloidas.io/docs/). The
+types you name in practice are few — `RollResult` and `RollPart` for reading
+results, `RollOptions` and `RNG` for configuring a roll, `ASTNode` for walking
+the syntax tree, `RollParserErrorCode` for handling failures — and the rest
+(`Token` from `lex`, `ErrorSpan` from `getErrorSpan`, and the like) arrives
+through inference from the functions that return it.
 
 `RollPart` and `ASTNode` are both discriminated unions, so an exhaustive
 `switch` type-checks without a default branch — add a variant upstream and
 TypeScript points at every switch that needs updating. `RollPart` discriminants
 are camelCase (`'binaryOp'`), `ASTNode` discriminants PascalCase
 (`'BinaryOp'`), which keeps the two trees distinguishable at a glance.
+
+Type resolution across module settings ([see Install](#install)) is verified
+in CI by `@arethetypeswrong/cli` and `publint`.
 
 ## CLI
 
@@ -649,21 +637,6 @@ precedes them. Errors go to stderr; only the result goes to stdout.
 | `1` | Roll or parse error |
 | `2` | Usage error — unknown option, missing notation |
 
-## Environments
-
-- **Node.js ≥ 22.12** — the supported floor, where `require(esm)` is
-  unflagged. Older releases may manage a plain ESM `import`, but they are
-  untested and unsupported.
-- **Bun** — the development runtime; the library and CLI are built and tested
-  with it.
-- **Browsers and bundlers** — the library imports nothing from `node:`, touches
-  no `process` or filesystem globals, and is marked `sideEffects: false`, so it
-  bundles for the browser and tree-shakes. Importing only `{ parse }` costs
-  ≈5.1 kB brotli against ≈10.9 kB for the whole surface.
-
-Types resolve under `moduleResolution: node16` / `nodenext`, verified in CI by
-`@arethetypeswrong/cli` and `publint`.
-
 ## Performance
 
 | Notation | `lex` | `parse` | `roll` (end to end) |
@@ -674,7 +647,15 @@ Types resolve under `moduleResolution: node16` / `nodenext`, verified in CI by
 | `10d10>=6f1` | 0.35 µs | 0.83 µs | **5.6 µs** |
 | `100d6` | 0.14 µs | 0.36 µs | **12 µs** |
 
-**Protocol.** Values are **p50**, from
+The `roll` column pays for a fresh `SeededRNG` per call, which an injected RNG
+avoids. Every roll also builds the `parts` tree; there is no opt-out and these
+numbers include it. A 1000-die pool costs roughly 60x a `1d20` (~90 µs here),
+while lexing and parsing stay flat at ~0.14 / ~0.36 µs.
+
+<details>
+<summary>Measurement protocol</summary>
+
+Values are **p50**, from
 [mitata](https://github.com/evanwashere/mitata) with forced per-iteration GC
 (`.gc('inner')`), averaged over two full `bun run bench:json` passes that agreed
 within 15%. Measured 2026-07-27 on Bun 1.3.11, Intel Xeon @ 2.80 GHz, 4 vCPU
@@ -682,11 +663,9 @@ container. p50 rather than mean, because the mean here is effectively a GC-pause
 histogram and swings ±40% between processes. Every bench body is JIT-primed
 before measurement and pinned to mitata's batched sampling mode, so all cases
 are timed the same way — mitata otherwise picks the mode from cold calls and
-mis-times mid-weight cases by 10-30x. The `roll` column pays for a fresh
-`SeededRNG` per call, which an injected RNG avoids. Every roll also builds the
-`parts` tree; there is no opt-out and these numbers include it. A 1000-die pool
-costs roughly 60x a `1d20` (~90 µs here), while lexing and parsing stay flat at
-~0.14 / ~0.36 µs.
+mis-times mid-weight cases by 10-30x.
+
+</details>
 
 Run `bun run bench` for the full suite, or `bench:lex` / `bench:parse` /
 `bench:evaluate` / `bench:roll` for one stage. Bundle size is gated in CI by
