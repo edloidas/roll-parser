@@ -438,6 +438,72 @@ describe('SeededRNG', () => {
     });
   });
 
+  describe('state()', () => {
+    it('should resume the exact sequence from a captured state', () => {
+      const source = new SeededRNG('replay');
+      source.nextInt(1, 6);
+
+      const restored = new SeededRNG(source.state());
+
+      expect(draws(restored)).toEqual(draws(source));
+    });
+
+    it('should skip the warm-up so a restored state round-trips unchanged', () => {
+      const snapshot = new SeededRNG('roundtrip').state();
+
+      expect(new SeededRNG(snapshot).state()).toEqual(snapshot);
+    });
+
+    it('should return unsigned words', () => {
+      const rng = new SeededRNG('unsigned');
+
+      for (const word of rng.state()) {
+        expect(word).toBeGreaterThanOrEqual(0);
+        expect(word).toBeLessThan(0x100000000);
+      }
+    });
+
+    it('should not advance the source instance', () => {
+      const rng = new SeededRNG('untouched');
+      const before = rng.state();
+      rng.state();
+
+      expect(rng.state()).toEqual(before);
+    });
+
+    it('should leave the source unaffected when the restored clone advances', () => {
+      const source = new SeededRNG('independence');
+      const reference = new SeededRNG('independence');
+      const restored = new SeededRNG(source.state());
+
+      restored.nextInt(1, 6);
+
+      expect(draws(source)).toEqual(draws(reference));
+    });
+
+    it('should leave the restored clone unaffected when the source advances', () => {
+      const source = new SeededRNG('reverse-independence');
+      const snapshot = source.state();
+      const restored = new SeededRNG(snapshot);
+
+      source.nextInt(1, 6);
+
+      expect(restored.state()).toEqual(snapshot);
+    });
+
+    it('should guard an all-zero state', () => {
+      const rng = new SeededRNG([0, 0, 0, 0]);
+
+      expect(rng.state()).toEqual([1, 0, 0, 0]);
+    });
+
+    it('should truncate out-of-range words to 32 bits', () => {
+      const rng = new SeededRNG([0x1_0000_0007, -1, 0, 0]);
+
+      expect(rng.state()).toEqual([7, 0xffffffff, 0, 0]);
+    });
+  });
+
   describe('table-driven invariants', () => {
     it('nextInt always returns value in valid range across fixed seeds', () => {
       const testCases = [
