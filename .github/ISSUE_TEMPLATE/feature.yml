@@ -1,0 +1,19 @@
+name: Feature request
+description: New notation, API, or CLI capability
+title: 'feat: '
+labels: ['feature']
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What should roll-parser do? Include example notation if relevant.
+    validations:
+      required: true
+  - type: textarea
+    id: rationale
+    attributes:
+      label: Rationale
+      description: Why is this worth adding?
+    validations:
+      required: true

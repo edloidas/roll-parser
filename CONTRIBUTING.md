@@ -2,7 +2,8 @@
 
 Thanks for helping out. Bug reports, notation gaps, and pull requests are all
 welcome — open an [issue](https://github.com/edloidas/roll-parser/issues) first
-for anything larger than a fix.
+for anything larger than a fix; the bug and feature forms collect what a report
+needs.
 
 ## Toolchain
 
@@ -67,7 +68,8 @@ references. Add a `Changelog: skip` trailer to keep a commit out of the release
 notes.
 
 A pull request should be a single commit when it merges — squash locally and
-force-push rather than merging a chain of fixups.
+force-push rather than merging a chain of fixups. The pull request template
+prefills the expected body shape.
 
 ## Site and API reference
 

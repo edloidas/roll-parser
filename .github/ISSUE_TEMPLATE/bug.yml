@@ -1,0 +1,54 @@
+name: Bug report
+description: A notation parses or rolls wrong, errors unexpectedly, or the CLI misbehaves
+title: 'fix: '
+labels: ['bug']
+body:
+  - type: textarea
+    id: input
+    attributes:
+      label: Notation / input
+      description: The dice notation or CLI invocation that triggers the problem.
+      placeholder: 4d6kh3 + 2
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What should happen.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What happens instead — include the error message or wrong result verbatim.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: From `npm ls roll-parser` or `roll-parser --version`.
+      placeholder: 3.0.0
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Surface
+      description: Where does the problem show up?
+      options:
+        - Library
+        - CLI
+        - Both
+    validations:
+      required: false
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Anything else worth knowing — e.g. how other dice rollers treat this notation.
+    validations:
+      required: false
