@@ -944,3 +944,61 @@ describe('SeededRNG golden sequences', () => {
     });
   }
 });
+
+describe('SeededRNG cyrb128 conformance', () => {
+  // ! Pins the seed → state derivation to reference cyrb128. "Correcting" it to
+  // ! the withdrawn 2023 variant rewrites every seeded sequence while the
+  // ! determinism-only suites stay green — this is what fails instead.
+  const referenceCyrb128 = (str: string): [number, number, number, number] => {
+    let h1 = 1779033703;
+    let h2 = 3144134277;
+    let h3 = 1013904242;
+    let h4 = 2773480762;
+
+    for (let i = 0; i < str.length; i++) {
+      const k = str.charCodeAt(i);
+      h1 = h2 ^ Math.imul(h1 ^ k, 597399067);
+      h2 = h3 ^ Math.imul(h2 ^ k, 2869860233);
+      h3 = h4 ^ Math.imul(h3 ^ k, 951274213);
+      h4 = h1 ^ Math.imul(h4 ^ k, 2716044179);
+    }
+
+    h1 = Math.imul(h3 ^ (h1 >>> 18), 597399067);
+    h2 = Math.imul(h4 ^ (h2 >>> 22), 2869860233);
+    h3 = Math.imul(h1 ^ (h3 >>> 17), 951274213);
+    h4 = Math.imul(h2 ^ (h4 >>> 19), 2716044179);
+
+    // The reference writes these as one comma sequence; split for Biome, order
+    // intact. `h1` folds first, so the other three read the folded value.
+    h1 ^= h2 ^ h3 ^ h4;
+    h2 ^= h1;
+    h3 ^= h1;
+    h4 ^= h1;
+
+    return [h1 >>> 0, h2 >>> 0, h3 >>> 0, h4 >>> 0];
+  };
+
+  // The hash output is never observable directly — the run-in has already moved
+  // the state by the time `state()` can be read. Restoring skips the run-in, so
+  // replay it: `next()` is one draw, and `WARMUP_DRAWS` in `seeded.ts` is 8.
+  const seedFromReference = (seed: string): SeededRNG => {
+    const rng = new SeededRNG(referenceCyrb128(seed));
+    for (let i = 0; i < 8; i++) {
+      rng.next();
+    }
+    return rng;
+  };
+
+  const seeds = ['demo', 'test-seed', '12345', '-1', '1.9', '', '🎲✨', 'world:goblin'];
+
+  for (const seed of seeds) {
+    it(`derives its state from reference cyrb128 for ${seed === '' ? 'the empty seed' : `'${seed}'`} (#210)`, () => {
+      const seeded = new SeededRNG(seed);
+      const fromReference = seedFromReference(seed);
+
+      expect(Array.from({ length: 8 }, () => seeded.nextInt(1, 1_000_000))).toEqual(
+        Array.from({ length: 8 }, () => fromReference.nextInt(1, 1_000_000)),
+      );
+    });
+  }
+});
