@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'bun:test';
+import { describe, expect, it, spyOn } from 'bun:test';
 import { createMockRng, MockRNGExhaustedError } from './mock.js';
 import { SeededRNG } from './seeded.js';
 import type { RNG } from './types.js';
@@ -136,6 +136,31 @@ describe('SeededRNG', () => {
         }
       }
       expect(allSame).toBe(false);
+    });
+  });
+
+  describe('auto-seeding', () => {
+    it('should draw in range when constructed without a seed', () => {
+      const rng = new SeededRNG();
+
+      for (const value of draws(rng)) {
+        expect(value).toBeGreaterThanOrEqual(1);
+        expect(value).toBeLessThanOrEqual(100);
+      }
+    });
+
+    it('separates instances built in the same millisecond (#204)', () => {
+      // A frozen clock leaves the `Math.random()` draws as the only thing
+      // separating the streams — a clock-only auto-seed makes all 20 identical.
+      const clock = spyOn(Date, 'now').mockReturnValue(1_700_000_000_000);
+
+      try {
+        const sequences = Array.from({ length: 20 }, () => draws(new SeededRNG()).join(','));
+
+        expect(new Set(sequences).size).toBe(sequences.length);
+      } finally {
+        clock.mockRestore();
+      }
     });
   });
 

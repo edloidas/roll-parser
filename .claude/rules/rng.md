@@ -2,9 +2,10 @@
 
 All dice rolling goes through the `RNG` interface (`src/rng/types.ts`),
 injected via the options parameter, defaulting to `SeededRNG`; tests use
-`createMockRng`. `Math.random()` has exactly one permitted call site: seeding
-`SeededRNG` when the caller supplies no seed. Anywhere else in a roll path is
-a bug.
+`createMockRng`. `Math.random()` has exactly one permitted call site:
+`SeededRNG.toSeedString` building the auto-seed when the caller supplies no
+seed. That site invokes it twice — both draws feed the same entropy string, and
+neither may move elsewhere. Anywhere else in a roll path is a bug.
 
 ## Draw Order
 

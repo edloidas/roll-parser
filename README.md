@@ -341,8 +341,10 @@ renders as `8d6![…]`. Read `result.expression` when you need the modifier back
 
 Every die is drawn through the `RNG` interface — no roll path bypasses the RNG
 you chose. `Math.random()` appears in exactly one place: seeding a `SeededRNG`
-when you do not supply a seed. Pass a seed or your own `RNG` and it is never
-reached.
+when you do not supply a seed — the auto-seed hashes `Date.now()` together with
+two `Math.random()` draws, carrying roughly 100 bits into the 128-bit state
+rather than the 32 an XOR of clock and one draw would cap it at. Pass a seed or
+your own `RNG` and it is never reached.
 
 ```typescript
 type RNG = {
