@@ -66,7 +66,9 @@ try {
 }
 ```
 
-See [Error handling](README.md#error-handling) for the full code list.
+See [Error handling](README.md#error-handling) for the error classes and span
+helpers; the full code list lives in the
+[API reference](https://roll-parser.edloidas.io/docs/).
 
 **Notation changes.** Classic notation (`2d10+1`, `d6`) parses unchanged. Two
 v2 forms do not:

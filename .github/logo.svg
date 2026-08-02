@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <defs>
+    <linearGradient id="logo-rainbow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ff4d6d" />
+      <stop offset="20%" stop-color="#ff9e3d" />
+      <stop offset="40%" stop-color="#ffe14d" />
+      <stop offset="60%" stop-color="#4dff9e" />
+      <stop offset="80%" stop-color="#4dc4ff" />
+      <stop offset="100%" stop-color="#b06dff" />
+    </linearGradient>
+  </defs>
+  <g fill="none" stroke="url(#logo-rainbow)" stroke-width="4" stroke-linejoin="round" stroke-linecap="round">
+    <polygon points="50,4 89.8,27 89.8,73 50,96 10.2,73 10.2,27" />
+    <polygon points="50,26 72,64 28,64" />
+    <path d="M50,4 L50,26 M89.8,27 L72,64 M89.8,73 L72,64 M50,96 L50,64 M10.2,73 L28,64 M10.2,27 L28,64 M28,64 L50,64 M72,64 L50,64" />
+  </g>
+</svg>
