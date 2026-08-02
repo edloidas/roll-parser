@@ -238,8 +238,8 @@ check.rendered; // '1d20[12] + 7 vs 15 = Success'
 
 // World of Darkness — successes and failures are tallied separately
 const pool = roll('10d10>=6f1', { seed: 'demo' });
-pool.total; // 4 — successes minus failures
-[pool.successes, pool.failures]; // [4, 0]
+pool.total; // 7 — successes minus failures
+[pool.successes, pool.failures]; // [7, 0]
 ```
 
 ## Working with results
@@ -326,8 +326,8 @@ it as-is: `~~n~~` for a die dropped by keep/drop or group selection, `**n**` for
 a success, `__n__` for a failure.
 
 ```typescript
-roll('4d6kh3', { seed: 'demo' }).rendered; // '4d6[2, 6, 1, ~~1~~] = 9'
-roll('4d6sd', { seed: 'demo' }).rendered; // '4d6sd[6, 2, 1, 1] = 10'
+roll('4d6kh3', { seed: 'demo' }).rendered; // '4d6[4, 3, 3, ~~3~~] = 10'
+roll('4d6sd', { seed: 'demo' }).rendered; // '4d6sd[4, 3, 3, 3] = 13'
 
 // Source spans map any sub-total back onto the characters the user typed
 const { start, end } = roll('4d6kh3 + 2', { seed: 'demo' }).parts; // 0, 10
@@ -360,12 +360,12 @@ call. Pass `seed` to make it reproducible, or `rng` to supply your own instance
 ```typescript
 import { SeededRNG, roll } from 'roll-parser';
 
-roll('2d6+3', { seed: 'demo' }).total; // 11, every time
+roll('2d6+3', { seed: 'demo' }).total; // 10, every time
 
 // An injected instance keeps advancing; `{ seed }` restarts the stream
 const rng = new SeededRNG('demo');
-roll('1d20', { rng }).total; // 12
 roll('1d20', { rng }).total; // 14
+roll('1d20', { rng }).total; // 19
 ```
 
 Within one released version, the same seed and the same notation always
@@ -455,8 +455,8 @@ options minus `rng`/`seed` (it receives the RNG directly) plus `notation`.
 ```typescript
 import { roll } from 'roll-parser';
 
-roll('1d20+@prof', { context: { prof: 3 }, seed: 'demo' }).total; // 15
-roll('1d20+@prof', { onMissingVariable: 'zero', seed: 'demo' }).total; // 12
+roll('1d20+@prof', { context: { prof: 3 }, seed: 'demo' }).total; // 17
+roll('1d20+@prof', { onMissingVariable: 'zero', seed: 'demo' }).total; // 14
 ```
 
 ### Safety limits

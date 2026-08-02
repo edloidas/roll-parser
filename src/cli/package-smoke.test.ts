@@ -57,13 +57,13 @@ describe('packaged CLI smoke', () => {
 
     const roll = await runCommand(['node', CLI_BIN, '4d6kh3', '--verbose', '--seed', 'test']);
     expect(roll.exitCode).toBe(0);
-    expect(roll.stdout.trim()).toBe('4d6[3, 6, 3, (3)] = 12');
+    expect(roll.stdout.trim()).toBe('4d6[6, (3), 6, 5] = 17');
   });
 
   test('built CLI accepts negative prefix dice notation', async () => {
     const result = await runCommand(['node', CLI_BIN, '-d6', '--seed', 'test']);
     expect(result.exitCode).toBe(0);
-    expect(result.stdout.trim()).toBe('-3');
+    expect(result.stdout.trim()).toBe('-6');
   });
 });
 

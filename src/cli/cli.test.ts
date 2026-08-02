@@ -35,7 +35,7 @@ describe('CLI process wiring', () => {
     const { stdout, stderr, exitCode } = await runCli(['4d6kh3', '--verbose', '--seed', 'test']);
 
     expect(exitCode).toBe(0);
-    expect(stdout).toBe('4d6[3, 6, 3, (3)] = 12\n');
+    expect(stdout).toBe('4d6[6, (3), 6, 5] = 17\n');
     expect(stderr).toBe('');
   });
 

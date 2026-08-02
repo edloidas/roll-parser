@@ -116,7 +116,7 @@ describe('cli main', () => {
       const { stdout, exitCode } = run(['4d6kh3', '--verbose', '--seed', 'test']);
 
       expect(exitCode).toBe(0);
-      expect(stdout).toBe('4d6[3, 6, 3, (3)] = 12\n');
+      expect(stdout).toBe('4d6[6, (3), 6, 5] = 17\n');
     });
 
     test('-v matches --verbose', () => {
@@ -145,14 +145,14 @@ describe('cli main', () => {
 
       const parsed = JSON.parse(stdout);
 
-      expect(parsed.total).toBe(12);
+      expect(parsed.total).toBe(17);
       expect(parsed.notation).toBe('4d6kh3');
       expect(parsed.rolls).toHaveLength(4);
       expect(parsed.parts.type).toBe('modifier');
-      expect(parsed.parts.total).toBe(12);
+      expect(parsed.parts.total).toBe(17);
       expect(parsed.parts.target.type).toBe('dice');
       expect(parsed.parts.target.rolls.map((die: { result: number }) => die.result)).toEqual([
-        3, 6, 3, 3,
+        6, 3, 6, 5,
       ]);
     });
 
@@ -184,7 +184,7 @@ describe('cli main', () => {
       const { stdout, exitCode } = run(['--seed', 'test', '--', '-1d6+3']);
 
       expect(exitCode).toBe(0);
-      expect(stdout).toBe('0\n');
+      expect(stdout).toBe('-3\n');
       expect(stdout).toBe(run(['-1d6+3', '--seed', 'test']).stdout);
     });
 
@@ -192,7 +192,7 @@ describe('cli main', () => {
       const { stdout, exitCode } = run(['--seed', 'test', '--', '{2d20kh1,1d8}kh1']);
 
       expect(exitCode).toBe(0);
-      expect(stdout).toBe('11\n');
+      expect(stdout).toBe('17\n');
     });
 
     test('-- lets a variable notation reach the evaluator', () => {

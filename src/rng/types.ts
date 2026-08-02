@@ -55,7 +55,7 @@
  *
  * const draws: number[] = [];
  * roll('4d6kh3', { rng: withLog(new SeededRNG('demo'), draws) });
- * draws; // [2, 6, 1, 1] — every face, including the dropped one
+ * draws; // [4, 3, 3, 3] — every face, including the dropped one
  * ```
  *
  * @category RNG
