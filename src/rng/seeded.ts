@@ -226,9 +226,10 @@ export class SeededRNG implements RNG {
     h3 = Math.imul(h1 ^ (h3 >>> 17), CYRB128_MULTIPLIER_3);
     h4 = Math.imul(h2 ^ (h4 >>> 19), CYRB128_MULTIPLIER_4);
 
-    // ! Reference cyrb128 derives the trailing three words against `h1`, not
-    // ! `mixed`. The map is invertible, so no entropy is lost — but aligning it
-    // ! with the reference rewrites every seeded sequence. Not a cleanup.
+    // ! Matches reference cyrb128, which folds `h1` first and derives the other
+    // ! three against the folded value. A revision withdrawn in 2023 used the
+    // ! unmixed `h1` and its mirrors still circulate — matching one rewrites
+    // ! every seeded sequence. Pinned by `rng.test.ts`.
     const mixed = h1 ^ h2 ^ h3 ^ h4;
 
     this.s0 = mixed;
