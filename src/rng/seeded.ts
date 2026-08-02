@@ -73,8 +73,9 @@ const CYRB128_MULTIPLIER_4 = 2716044179;
  *
  * Period 2^128 - 1. Every seed is stringified and hashed with cyrb128 into
  * the full 128-bit state, so numeric seeds keep all 53 bits and distinct
- * strings stay distinct; an omitted seed mixes `Date.now()` with
- * `Math.random()`. The first 8 draws are discarded as a run-in.
+ * strings stay distinct; an omitted seed hashes `Date.now()` together with two
+ * `Math.random()` draws, carrying roughly 100 bits of entropy rather than 32.
+ * The first 8 draws are discarded as a run-in.
  *
  * Stringifying means `42` and `'42'` are the same seed — the two forms share
  * one namespace, which matters when seeds arrive from a CLI flag or JSON.
@@ -201,7 +202,8 @@ export class SeededRNG implements RNG {
    * rather than coerced to uint32, so all 53 exact bits reach the hash.
    */
   private toSeedString(seed?: string | number): string {
-    if (seed == null) return String((Date.now() ^ (Math.random() * 0xffffffff)) >>> 0);
+    // ! The library's one permitted `Math.random()` site — both draws stay here.
+    if (seed == null) return `${Date.now()}-${Math.random()}-${Math.random()}`;
     return String(seed);
   }
 
