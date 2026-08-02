@@ -63,6 +63,7 @@ export {
   isVersus,
 } from './parser/ast.js';
 export { MAX_PARSE_DEPTH, ParseError, parse } from './parser/parser.js';
+export type { RngState } from './rng/seeded.js';
 export { SeededRNG } from './rng/seeded.js';
 export type { RNG } from './rng/types.js';
 export type { RollOptions } from './roll.js';

@@ -373,6 +373,55 @@ produce the same dice. The generator is not cryptographically secure, and its
 output may change between major versions — persist the `RollResult`, not the
 seed.
 
+### Replay and save/resume
+
+`SeededRNG` can hand out its internal state as an `RngState` — four unsigned
+32-bit words — and take one back through its constructor. Restoring copies the
+words verbatim, with no re-hashing and no warm-up draws, so the resumed stream
+continues exactly where the snapshot was taken. That holds for snapshots
+`state()` produced — the type is the contract, and a hand-built tuple is
+coerced to 32 bits per word rather than rejected.
+
+That answers the question an auto-seeded roll otherwise cannot. `roll('1d20')`
+mints a seed and discards it; snapshot the state first and the roll is
+reproducible after the fact:
+
+```typescript
+import { SeededRNG, roll } from 'roll-parser';
+
+const rng = new SeededRNG(); // auto-seeded, seed discarded
+const snapshot = rng.state();
+
+const first = roll('1d20', { rng });
+const replay = roll('1d20', { rng: new SeededRNG(snapshot) });
+first.total === replay.total; // true
+```
+
+The same snapshot is what a mid-session save writes: it is a plain tuple, so
+`JSON.stringify` round-trips it, and loading it resumes the campaign's dice
+rather than restarting them.
+
+Forking a second generator off a live one gives an entity its own substream.
+A fork resumes the parent's stream, so advance the parent between forks —
+two children taken at the same state are the same stream:
+
+```typescript
+import { SeededRNG } from 'roll-parser';
+
+const world = new SeededRNG('world');
+
+const goblin = new SeededRNG(world.state());
+world.next();
+const orc = new SeededRNG(world.state());
+
+goblin.nextInt(1, 20); // 5
+orc.nextInt(1, 20); // 7
+```
+
+`RngState` carries the same version binding as a seed: the words are opaque,
+and a major release may change the engine behind them. Keep snapshots for a
+session or a save file, not across an upgrade.
+
 ### Custom RNGs
 
 Anything structurally matching `RNG` works, so a crypto-backed or table-driven

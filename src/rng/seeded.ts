@@ -7,6 +7,20 @@
 import type { RNG } from './types.js';
 
 /**
+ * A snapshot of {@link SeededRNG}'s four internal state words, as unsigned
+ * 32-bit integers. Pass one back to the constructor to resume the exact
+ * sequence it was taken from.
+ *
+ * Opaque and bound to the major version, the same contract seeds carry: the
+ * words mean nothing outside the engine that produced them, and a major
+ * release may change that engine. Safe to hold in memory or serialize for a
+ * save file; not safe to persist across a major upgrade.
+ *
+ * @category RNG
+ */
+export type RngState = readonly [number, number, number, number];
+
+/**
  * Rotates the low 32 bits of `value` left by `bits`, returning a signed int32.
  * Callers that need the unsigned reading apply `>>> 0` themselves.
  */
@@ -65,11 +79,16 @@ const CYRB128_MULTIPLIER_4 = 2716044179;
  * Stringifying means `42` and `'42'` are the same seed — the two forms share
  * one namespace, which matters when seeds arrive from a CLI flag or JSON.
  *
+ * {@link state} snapshots the four state words as an {@link RngState}, and
+ * passing one to the constructor resumes that exact sequence — restore copies
+ * the words verbatim, skipping both the hash and the run-in. The type is the
+ * contract: a hand-built tuple is coerced to 32 bits per word, not rejected.
+ *
  * Reproducibility guarantee: within one released version, the same seed and
- * the same notation always produce the same dice. The sequence is *not*
- * cryptographically secure and is not guaranteed stable across major
- * versions — do not persist rolls by re-deriving them from a seed, persist
- * the {@link RollResult}.
+ * the same notation always produce the same dice. The same version binding
+ * covers `RngState`. The sequence is *not* cryptographically secure and is not
+ * guaranteed stable across major versions — do not persist rolls by
+ * re-deriving them from a seed, persist the {@link RollResult}.
  *
  * @example
  * ```typescript
@@ -100,11 +119,22 @@ export class SeededRNG implements RNG {
   private s2: number;
   private s3: number;
 
-  constructor(seed?: string | number) {
+  constructor(seed?: string | number | RngState) {
     this.s0 = 0;
     this.s1 = 0;
     this.s2 = 0;
     this.s3 = 0;
+
+    if (seed !== null && typeof seed === 'object') {
+      // ! No hashing and no warm-up — either would diverge the resumed stream.
+      // ! Signed on write to keep the Smi invariant above; `state()` re-widens.
+      this.s0 = seed[0] | 0;
+      this.s1 = seed[1] | 0;
+      this.s2 = seed[2] | 0;
+      this.s3 = seed[3] | 0;
+      this.guardZeroState();
+      return;
+    }
 
     this.initState(seed);
 
@@ -115,11 +145,55 @@ export class SeededRNG implements RNG {
 
   private initState(seed?: string | number): void {
     this.hashSeed(this.toSeedString(seed));
+    this.guardZeroState();
+  }
 
-    // All-zero is a fixed point for xoshiro — at least one word must be non-zero.
+  /** All-zero is a fixed point for xoshiro — at least one word must be non-zero. */
+  private guardZeroState(): void {
     if (this.s0 === 0 && this.s1 === 0 && this.s2 === 0 && this.s3 === 0) {
       this.s0 = 1;
     }
+  }
+
+  /**
+   * Returns the current state as four unsigned 32-bit words. Feeding the
+   * snapshot back to the constructor resumes this exact sequence; the source
+   * instance is untouched, and the two then advance independently.
+   *
+   * The words are {@link RngState} — opaque, and stable only within a major
+   * version.
+   *
+   * @returns A snapshot of the four state words
+   *
+   * @example Replay a roll that was never seeded
+   * ```typescript
+   * import { SeededRNG, roll } from 'roll-parser';
+   *
+   * const rng = new SeededRNG();
+   * const snapshot = rng.state();
+   *
+   * const first = roll('1d20', { rng });
+   * const replay = roll('1d20', { rng: new SeededRNG(snapshot) });
+   * first.total === replay.total; // true
+   * ```
+   *
+   * @example Split per-entity substreams off one parent
+   * ```typescript
+   * import { SeededRNG } from 'roll-parser';
+   *
+   * const world = new SeededRNG('world');
+   *
+   * // A fork resumes the parent's stream, so advance the parent between
+   * // forks — two children taken at the same state are the same stream.
+   * const goblin = new SeededRNG(world.state());
+   * world.next();
+   * const orc = new SeededRNG(world.state());
+   *
+   * goblin.nextInt(1, 20); // advances the goblin only
+   * ```
+   */
+  state(): RngState {
+    return [this.s0 >>> 0, this.s1 >>> 0, this.s2 >>> 0, this.s3 >>> 0];
   }
 
   /**
