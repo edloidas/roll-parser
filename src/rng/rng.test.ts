@@ -527,6 +527,30 @@ describe('SeededRNG', () => {
 
       expect(rng.state()).toEqual([7, 0xffffffff, 0, 0]);
     });
+
+    it('replays the parent stream at an offset rather than forking it (#205)', () => {
+      const parent = new SeededRNG('world');
+      const first = new SeededRNG(parent.state());
+      parent.next();
+      const second = new SeededRNG(parent.state());
+
+      const firstDraws = Array.from({ length: 32 }, () => first.nextInt(1, 20));
+      const secondDraws = Array.from({ length: 32 }, () => second.nextInt(1, 20));
+
+      expect(secondDraws.slice(0, 31)).toEqual(firstDraws.slice(1));
+    });
+
+    it('gives derived seeds unrelated streams (#205)', () => {
+      const goblin = new SeededRNG('world:goblin');
+      const orc = new SeededRNG('world:orc');
+
+      const goblinDraws = Array.from({ length: 32 }, () => goblin.nextInt(1, 20));
+      const orcDraws = Array.from({ length: 32 }, () => orc.nextInt(1, 20));
+
+      for (let offset = 0; offset < 8; offset++) {
+        expect(orcDraws.slice(0, 24)).not.toEqual(goblinDraws.slice(offset, offset + 24));
+      }
+    });
   });
 
   describe('table-driven invariants', () => {

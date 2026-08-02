@@ -342,9 +342,11 @@ renders as `8d6![…]`. Read `result.expression` when you need the modifier back
 Every die is drawn through the `RNG` interface — no roll path bypasses the RNG
 you chose. `Math.random()` appears in exactly one place: seeding a `SeededRNG`
 when you do not supply a seed — the auto-seed hashes `Date.now()` together with
-two `Math.random()` draws, carrying roughly 100 bits into the 128-bit state
-rather than the 32 an XOR of clock and one draw would cap it at. Pass a seed or
-your own `RNG` and it is never reached.
+two `Math.random()` draws, giving roughly 100 bits of width rather than the 32 an
+XOR of clock and one draw would cap it at. That width is what keeps two
+auto-seeded generators from landing on the same stream; it is not a claim about
+unpredictability, which stays bounded by however the host engine seeds
+`Math.random()`. Pass a seed or your own `RNG` and it is never reached.
 
 ```typescript
 type RNG = {
@@ -358,6 +360,14 @@ type RNG = {
 `roll(notation)` builds a fresh `SeededRNG` (xoshiro128\*\*, period 2^128 − 1) per
 call. Pass `seed` to make it reproducible, or `rng` to supply your own instance
 — `rng` wins when both are given.
+
+Behind a seed sit three stages. cyrb128 hashes the seed into all four state
+words, so the full 128 bits are seeded rather than a single word; xoshiro128\*\*
+generates the stream; and `nextInt` maps each draw onto the die's faces by
+rejection sampling, discarding the values that would make a plain `% sides`
+favour the low faces. Seeds are stringified before hashing — numeric seeds keep
+all 53 exact bits instead of truncating to 32, distinct strings stay distinct,
+and `42` and `'42'` name the same stream.
 
 ```typescript
 import { SeededRNG, roll } from 'roll-parser';
@@ -403,21 +413,23 @@ The same snapshot is what a mid-session save writes: it is a plain tuple, so
 `JSON.stringify` round-trips it, and loading it resumes the campaign's dice
 rather than restarting them.
 
-Forking a second generator off a live one gives an entity its own substream.
-A fork resumes the parent's stream, so advance the parent between forks —
-two children taken at the same state are the same stream:
+> [!WARNING]
+> `state()` is for replay and save/resume, **not** for forking substreams. A
+> restored generator resumes the parent's stream verbatim, so two children taken
+> a few draws apart replay the same sequence at an offset — their rolls predict
+> each other exactly. xoshiro has no jump function here to separate them.
+
+To give each entity its own stream, derive a seed per entity instead. cyrb128
+sends distinct strings to unrelated states, which is what makes this work:
 
 ```typescript
 import { SeededRNG } from 'roll-parser';
 
-const world = new SeededRNG('world');
+const goblin = new SeededRNG('world:goblin');
+const orc = new SeededRNG('world:orc');
 
-const goblin = new SeededRNG(world.state());
-world.next();
-const orc = new SeededRNG(world.state());
-
-goblin.nextInt(1, 20); // 5
-orc.nextInt(1, 20); // 7
+goblin.nextInt(1, 20); // 9
+orc.nextInt(1, 20); // 1
 ```
 
 `RngState` carries the same version binding as a seed: the words are opaque,

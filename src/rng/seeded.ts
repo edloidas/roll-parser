@@ -74,8 +74,10 @@ const CYRB128_MULTIPLIER_4 = 2716044179;
  * Period 2^128 - 1. Every seed is stringified and hashed with cyrb128 into
  * the full 128-bit state, so numeric seeds keep all 53 bits and distinct
  * strings stay distinct; an omitted seed hashes `Date.now()` together with two
- * `Math.random()` draws, carrying roughly 100 bits of entropy rather than 32.
- * The first 8 draws are discarded as a run-in.
+ * `Math.random()` draws, roughly 100 bits of width rather than 32 — enough that
+ * auto-seeded generators do not collide, though unpredictability stays bounded
+ * by the host engine's `Math.random()` seeding. The first 8 draws are discarded
+ * as a run-in.
  *
  * Stringifying means `42` and `'42'` are the same seed — the two forms share
  * one namespace, which matters when seeds arrive from a CLI flag or JSON.
@@ -178,19 +180,16 @@ export class SeededRNG implements RNG {
    * first.total === replay.total; // true
    * ```
    *
-   * @example Split per-entity substreams off one parent
+   * Not a fork primitive. A restored generator replays the parent's stream, so
+   * children taken at different points are the same sequence at an offset, not
+   * independent substreams — derive a seed per entity instead.
+   *
+   * @example Per-entity streams — derive seeds, do not fork state
    * ```typescript
    * import { SeededRNG } from 'roll-parser';
    *
-   * const world = new SeededRNG('world');
-   *
-   * // A fork resumes the parent's stream, so advance the parent between
-   * // forks — two children taken at the same state are the same stream.
-   * const goblin = new SeededRNG(world.state());
-   * world.next();
-   * const orc = new SeededRNG(world.state());
-   *
-   * goblin.nextInt(1, 20); // advances the goblin only
+   * const goblin = new SeededRNG('world:goblin');
+   * const orc = new SeededRNG('world:orc');
    * ```
    */
   state(): RngState {
@@ -227,6 +226,9 @@ export class SeededRNG implements RNG {
     h3 = Math.imul(h1 ^ (h3 >>> 17), CYRB128_MULTIPLIER_3);
     h4 = Math.imul(h2 ^ (h4 >>> 19), CYRB128_MULTIPLIER_4);
 
+    // ! Reference cyrb128 derives the trailing three words against `h1`, not
+    // ! `mixed`. The map is invertible, so no entropy is lost — but aligning it
+    // ! with the reference rewrites every seeded sequence. Not a cleanup.
     const mixed = h1 ^ h2 ^ h3 ^ h4;
 
     this.s0 = mixed;
@@ -236,7 +238,9 @@ export class SeededRNG implements RNG {
   }
 
   private nextUint32(): number {
-    // xoshiro128** 1.0 — these constants are part of the algorithm, not tunables.
+    // xoshiro128** 1.1 — these constants are part of the algorithm, not tunables.
+    // ! Scrambling `s1`, not `s0`, is what makes this 1.1; 1.0 used `s0` and was
+    // ! withdrawn for it.
     const scrambled = rotl(Math.imul(this.s1, SCRAMBLE_MULTIPLIER_1), SCRAMBLE_ROTATION);
     const result = Math.imul(scrambled, SCRAMBLE_MULTIPLIER_2) >>> 0;
 
