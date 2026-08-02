@@ -7,10 +7,11 @@
 import type { RNG } from './types.js';
 
 /**
- * Draws discarded after seeding. xorshift128 needs a short run-in before its
- * low bits decorrelate from the splitmix32 state expansion.
+ * Draws discarded after seeding. cyrb128's four outputs are XOR-derived from
+ * one another, so a short run-in is a cheap hedge against that correlation
+ * surfacing in the first draws.
  */
-const WARMUP_DRAWS = 20;
+const WARMUP_DRAWS = 8;
 
 /** 2^32 — the size of the uint32 output space. */
 const UINT32_SPACE = 0x100000000;
@@ -24,25 +25,30 @@ const HIGH_DRAW_SCALE = 0x200000;
 /** Bits discarded from the low draw so the two draws total 53 bits. */
 const LOW_DRAW_SHIFT = 11;
 
-/** splitmix32 increment (32-bit golden ratio). */
-const GOLDEN_RATIO_32 = 0x9e3779b9;
+/** cyrb128 offset basis — one per output word. */
+const CYRB128_BASIS_1 = 1779033703;
+const CYRB128_BASIS_2 = 3144134277;
+const CYRB128_BASIS_3 = 1013904242;
+const CYRB128_BASIS_4 = 2773480762;
 
-/** splitmix32 mixing multipliers. */
-const SPLITMIX_MULTIPLIER_1 = 0x85ebca6b;
-const SPLITMIX_MULTIPLIER_2 = 0xc2b2ae35;
-
-/** djb2 hash offset basis. */
-const DJB2_SEED = 5381;
+/** cyrb128 mixing multipliers — one per output word. */
+const CYRB128_MULTIPLIER_1 = 597399067;
+const CYRB128_MULTIPLIER_2 = 2869860233;
+const CYRB128_MULTIPLIER_3 = 951274213;
+const CYRB128_MULTIPLIER_4 = 2716044179;
 
 /**
  * Seedable pseudo-random number generator using xorshift128. The default
  * randomness source — `roll(notation)` builds one per call, and
  * `roll(notation, { seed })` builds one from your seed.
  *
- * Period 2^128 - 1. String seeds are hashed (djb2), numeric seeds are
- * coerced to uint32, and an omitted seed mixes `Date.now()` with
- * `Math.random()`. The first 20 draws are discarded so low bits decorrelate
- * from the seed expansion.
+ * Period 2^128 - 1. Every seed is stringified and hashed with cyrb128 into
+ * the full 128-bit state, so numeric seeds keep all 53 bits and distinct
+ * strings stay distinct; an omitted seed mixes `Date.now()` with
+ * `Math.random()`. The first 8 draws are discarded as a run-in.
+ *
+ * Stringifying means `42` and `'42'` are the same seed — the two forms share
+ * one namespace, which matters when seeds arrive from a CLI flag or JSON.
  *
  * Reproducibility guarantee: within one released version, the same seed and
  * the same notation always produce the same dice. The sequence is *not*
@@ -62,9 +68,9 @@ const DJB2_SEED = 5381;
  * // An injected instance keeps advancing across rolls; `{ seed }` restarts
  * // the stream on every call.
  * const rng = new SeededRNG('demo');
- * roll('1d20', { rng }).total; // 12
- * roll('1d20', { rng }).total; // 14 — the stream moved on
- * roll('1d20', { seed: 'demo' }).total; // 12, every single time
+ * roll('1d20', { rng }).total; // 14
+ * roll('1d20', { rng }).total; // 19 — the stream moved on
+ * roll('1d20', { seed: 'demo' }).total; // 14, every single time
  * ```
  *
  * @category RNG
@@ -89,24 +95,7 @@ export class SeededRNG implements RNG {
   }
 
   private initState(seed?: string | number): void {
-    const numSeed = this.toNumericSeed(seed);
-
-    // splitmix32 expansion into four state words.
-    let s = numSeed;
-    const state: number[] = [];
-
-    for (let i = 0; i < 4; i++) {
-      s = (s + GOLDEN_RATIO_32) >>> 0;
-      let z = s;
-      z = Math.imul(z ^ (z >>> 16), SPLITMIX_MULTIPLIER_1) >>> 0;
-      z = Math.imul(z ^ (z >>> 13), SPLITMIX_MULTIPLIER_2) >>> 0;
-      state.push((z ^ (z >>> 16)) >>> 0);
-    }
-
-    this.s0 = state[0] ?? 0;
-    this.s1 = state[1] ?? 0;
-    this.s2 = state[2] ?? 0;
-    this.s3 = state[3] ?? 0;
+    this.hashSeed(this.toSeedString(seed));
 
     // All-zero is a fixed point for xorshift — at least one word must be non-zero.
     if (this.s0 === 0 && this.s1 === 0 && this.s2 === 0 && this.s3 === 0) {
@@ -114,20 +103,41 @@ export class SeededRNG implements RNG {
     }
   }
 
-  /** Normalizes the constructor seed into a uint32. */
-  private toNumericSeed(seed?: string | number): number {
-    if (seed == null) return (Date.now() ^ (Math.random() * 0xffffffff)) >>> 0;
-    if (typeof seed === 'string') return this.hashString(seed);
-    return seed >>> 0;
+  /**
+   * Normalizes the constructor seed into a string. Numbers are stringified
+   * rather than coerced to uint32, so all 53 exact bits reach the hash.
+   */
+  private toSeedString(seed?: string | number): string {
+    if (seed == null) return String((Date.now() ^ (Math.random() * 0xffffffff)) >>> 0);
+    return String(seed);
   }
 
-  private hashString(str: string): number {
-    // djb2 — `hash * 33 + c`, held in uint32 by the `>>> 0`.
-    let hash = DJB2_SEED;
+  /** cyrb128 — hashes the seed into all four state words at once. */
+  private hashSeed(str: string): void {
+    let h1 = CYRB128_BASIS_1;
+    let h2 = CYRB128_BASIS_2;
+    let h3 = CYRB128_BASIS_3;
+    let h4 = CYRB128_BASIS_4;
+
     for (let i = 0; i < str.length; i++) {
-      hash = ((hash << 5) + hash + str.charCodeAt(i)) >>> 0;
+      const k = str.charCodeAt(i);
+      h1 = h2 ^ Math.imul(h1 ^ k, CYRB128_MULTIPLIER_1);
+      h2 = h3 ^ Math.imul(h2 ^ k, CYRB128_MULTIPLIER_2);
+      h3 = h4 ^ Math.imul(h3 ^ k, CYRB128_MULTIPLIER_3);
+      h4 = h1 ^ Math.imul(h4 ^ k, CYRB128_MULTIPLIER_4);
     }
-    return hash;
+
+    h1 = Math.imul(h3 ^ (h1 >>> 18), CYRB128_MULTIPLIER_1);
+    h2 = Math.imul(h4 ^ (h2 >>> 22), CYRB128_MULTIPLIER_2);
+    h3 = Math.imul(h1 ^ (h3 >>> 17), CYRB128_MULTIPLIER_3);
+    h4 = Math.imul(h2 ^ (h4 >>> 19), CYRB128_MULTIPLIER_4);
+
+    const mixed = h1 ^ h2 ^ h3 ^ h4;
+
+    this.s0 = mixed >>> 0;
+    this.s1 = (h2 ^ mixed) >>> 0;
+    this.s2 = (h3 ^ mixed) >>> 0;
+    this.s3 = (h4 ^ mixed) >>> 0;
   }
 
   private nextUint32(): number {
