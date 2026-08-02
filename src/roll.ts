@@ -63,7 +63,7 @@ export type RollOptions = EvaluationLimits & {
  * roll('2d6+3').total; // 5..15
  *
  * // Seeded — same seed, same sequence
- * roll('2d6+3', { seed: 'demo' }).rendered; // '2d6[4, 3] + 3 = 10'
+ * roll('2d6+3', { seed: 'demo' }).rendered; // '2d6[1, 6] + 3 = 10'
  * roll('2d6+3', { seed: 'demo' }).total; // 10
  * ```
  *
