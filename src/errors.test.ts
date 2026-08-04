@@ -13,6 +13,7 @@ import { LexerError, lex } from './lexer/lexer.js';
 import type { ASTNode } from './parser/ast.js';
 import { MAX_PARSE_DEPTH, ParseError, parse } from './parser/parser.js';
 import { createMockRng } from './rng/mock.js';
+import { SeededRNG } from './rng/seeded.js';
 import type { RollOptions } from './roll.js';
 import { roll } from './roll.js';
 
@@ -167,9 +168,13 @@ describe('getErrorSpan', () => {
  * How one error code is provoked. `notation` cases go through the public
  * `roll()` pipeline; `ast` cases hand-build a node the parser can never
  * produce, which is the only way to reach the evaluator's exhaustiveness
- * defaults.
+ * defaults; `call` cases reach a code raised outside the notation pipeline
+ * altogether.
  */
-type CodeCase = { notation: string; options?: RollOptions } | { ast: ASTNode; why: string };
+type CodeCase =
+  | { notation: string; options?: RollOptions }
+  | { ast: ASTNode; why: string }
+  | { call: () => unknown; why: string };
 
 // Forged node type — the parser cannot emit one, so this is the only path to
 // `evalNode`'s exhaustiveness default.
@@ -233,16 +238,20 @@ const CODE_CASES: Record<RollParserErrorCode, CodeCase> = {
     notation: `${'('.repeat(MAX_PARSE_DEPTH + 1)}1${')'.repeat(MAX_PARSE_DEPTH + 1)}`,
   },
   NON_FINITE_RESULT: { notation: '10**400' },
+  INCOMPATIBLE_RNG_STATE: {
+    call: () => new SeededRNG([99, 1, 2, 3, 4]),
+    why: 'restoring a snapshot is an RNG operation, not a notation one',
+  },
 };
 
 describe('error code contract', () => {
   for (const [code, testCase] of Object.entries(CODE_CASES) as [RollParserErrorCode, CodeCase][]) {
     test(`${code} is raised and typed`, () => {
-      const error = captureError(() =>
-        'ast' in testCase
-          ? evaluate(testCase.ast, createMockRng([]))
-          : roll(testCase.notation, { seed: 'code-contract', ...testCase.options }),
-      );
+      const error = captureError(() => {
+        if ('call' in testCase) return testCase.call();
+        if ('ast' in testCase) return evaluate(testCase.ast, createMockRng([]));
+        return roll(testCase.notation, { seed: 'code-contract', ...testCase.options });
+      });
 
       expect(isRollParserError(error)).toBe(true);
       expect((error as RollParserError).code).toBe(code);

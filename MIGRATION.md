@@ -117,15 +117,16 @@ and notation roll different dice. Nothing in the API moved, so this surfaces
 only as tests asserting pinned faces, or as saved games that stored a seed.
 
 The fix is the same one the reproducibility contract has always implied: a seed
-is stable within a released version, not across versions, so **persist the
+is stable within a major version, not across one, so **persist the
 `RollResult`** — it holds the totals, the per-die faces, and the rendered
 breakdown — rather than re-deriving rolls from a stored seed. Tests that need
 exact faces should use `createMockRng` from `roll-parser/testing`, which is
 engine-independent.
 
 When you need a live generator to survive a save and resume, snapshot its state
-instead of its seed. `state()` returns four unsigned 32-bit words that the
-constructor takes back verbatim, with no re-hashing and no warm-up:
+instead of its seed. `state()` returns a format version plus four unsigned
+32-bit words that the constructor takes back verbatim, with no re-hashing and no
+warm-up:
 
 ```typescript
 import { SeededRNG, roll } from 'roll-parser';
@@ -139,4 +140,8 @@ live.total === resumed.total; // true
 ```
 
 `RngState` carries the same major-version binding as a seed — good for a save
-file within a release line, not across an upgrade.
+file within a major, not across one. The binding is enforced rather than
+documented: a snapshot from another format version throws
+`INCOMPATIBLE_RNG_STATE` instead of resuming under different semantics, so a
+stale save fails at load rather than diverging quietly. Snapshots taken with
+`3.0.0-beta.0`, which had no version word, are rejected the same way.

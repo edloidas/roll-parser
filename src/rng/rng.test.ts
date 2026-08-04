@@ -1,5 +1,8 @@
 import { describe, expect, it, spyOn } from 'bun:test';
+import { isRollParserError, RollParserError } from '../errors.js';
+import { expectRollError } from '../test-helpers.js';
 import { createMockRng, MockRNGExhaustedError } from './mock.js';
+import type { RngState } from './seeded.js';
 import { SeededRNG } from './seeded.js';
 import type { RNG } from './types.js';
 
@@ -479,10 +482,13 @@ describe('SeededRNG', () => {
       expect(new SeededRNG(snapshot).state()).toEqual(snapshot);
     });
 
-    it('should return unsigned words', () => {
-      const rng = new SeededRNG('unsigned');
+    it('should return unsigned words behind a version', () => {
+      const [version, ...words] = new SeededRNG('unsigned').state();
 
-      for (const word of rng.state()) {
+      expect(version).toBe(1);
+      expect(words).toHaveLength(4);
+
+      for (const word of words) {
         expect(word).toBeGreaterThanOrEqual(0);
         expect(word).toBeLessThan(0x100000000);
       }
@@ -517,15 +523,38 @@ describe('SeededRNG', () => {
     });
 
     it('should guard an all-zero state', () => {
-      const rng = new SeededRNG([0, 0, 0, 0]);
+      const rng = new SeededRNG([1, 0, 0, 0, 0]);
 
-      expect(rng.state()).toEqual([1, 0, 0, 0]);
+      expect(rng.state()).toEqual([1, 1, 0, 0, 0]);
     });
 
     it('should truncate out-of-range words to 32 bits', () => {
-      const rng = new SeededRNG([0x1_0000_0007, -1, 0, 0]);
+      const rng = new SeededRNG([1, 0x1_0000_0007, -1, 0, 0]);
 
-      expect(rng.state()).toEqual([7, 0xffffffff, 0, 0]);
+      expect(rng.state()).toEqual([1, 7, 0xffffffff, 0, 0]);
+    });
+
+    it('should reject a snapshot from another format version (#215)', () => {
+      const foreign = [2, 1, 2, 3, 4] as const;
+
+      const error = expectRollError(
+        () => new SeededRNG(foreign),
+        RollParserError,
+        'INCOMPATIBLE_RNG_STATE',
+      );
+      expect(error.message).toContain('expected 1');
+    });
+
+    it('should reject an unversioned four-word snapshot (#215)', () => {
+      // The 3.0.0-beta.0 shape — four bare words, no version.
+      const legacy = [1, 2, 3, 4] as unknown as RngState;
+
+      const error = expectRollError(
+        () => new SeededRNG(legacy),
+        RollParserError,
+        'INCOMPATIBLE_RNG_STATE',
+      );
+      expect(isRollParserError(error)).toBe(true);
     });
 
     it('replays the parent stream at an offset rather than forking it (#205)', () => {
@@ -981,8 +1010,11 @@ describe('SeededRNG cyrb128 conformance', () => {
   // The hash output is never observable directly — the run-in has already moved
   // the state by the time `state()` can be read. Restoring skips the run-in, so
   // replay it: `next()` is one draw, and `WARMUP_DRAWS` in `seeded.ts` is 8.
+  // Read off a live snapshot, so a version bump does not touch this suite.
+  const [stateVersion] = new SeededRNG('probe').state();
+
   const seedFromReference = (seed: string): SeededRNG => {
-    const rng = new SeededRNG(referenceCyrb128(seed));
+    const rng = new SeededRNG([stateVersion, ...referenceCyrb128(seed)]);
     for (let i = 0; i < 8; i++) {
       rng.next();
     }

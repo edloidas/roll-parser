@@ -4,21 +4,34 @@
  * @module rng/seeded
  */
 
+import { RollParserError } from '../errors.js';
 import type { RNG } from './types.js';
 
 /**
- * A snapshot of {@link SeededRNG}'s four internal state words, as unsigned
- * 32-bit integers. Pass one back to the constructor to resume the exact
- * sequence it was taken from.
+ * A snapshot of {@link SeededRNG}'s internal state: a format version followed
+ * by the four state words as unsigned 32-bit integers. Pass one back to the
+ * constructor to resume the exact sequence it was taken from.
  *
  * Opaque and bound to the major version, the same contract seeds carry: the
- * words mean nothing outside the engine that produced them, and a major
- * release may change that engine. Safe to hold in memory or serialize for a
- * save file; not safe to persist across a major upgrade.
+ * words mean nothing outside the engine that produced them, and a release that
+ * changes that engine bumps the leading version. A snapshot from a different
+ * version is rejected with an `INCOMPATIBLE_RNG_STATE` error rather than
+ * resumed under the wrong semantics — safe to hold in memory or serialize for
+ * a save file, and loud rather than silent across an upgrade.
  *
  * @category RNG
  */
-export type RngState = readonly [number, number, number, number];
+export type RngState = readonly [version: number, s0: number, s1: number, s2: number, s3: number];
+
+/**
+ * Format version stamped into every {@link RngState}. Bumped by any change to
+ * the engine or the word layout, which is what makes a stale snapshot
+ * detectable instead of silently divergent.
+ */
+const RNG_STATE_VERSION = 1;
+
+/** Length of an {@link RngState}: the version word plus four state words. */
+const RNG_STATE_LENGTH = 5;
 
 /**
  * Rotates the low 32 bits of `value` left by `bits`, returning a signed int32.
@@ -67,6 +80,29 @@ const CYRB128_MULTIPLIER_3 = 951274213;
 const CYRB128_MULTIPLIER_4 = 2716044179;
 
 /**
+ * Rejects a snapshot this engine cannot resume — restoring foreign words would
+ * continue a stream that never existed.
+ *
+ * @throws {RollParserError} `INCOMPATIBLE_RNG_STATE` if the snapshot is not a
+ * current-version {@link RngState}
+ */
+function assertRestorable(state: RngState): void {
+  if (state.length !== RNG_STATE_LENGTH) {
+    throw new RollParserError(
+      `Incompatible RngState: expected ${RNG_STATE_LENGTH} values, received ${state.length}`,
+      'INCOMPATIBLE_RNG_STATE',
+    );
+  }
+
+  if (state[0] !== RNG_STATE_VERSION) {
+    throw new RollParserError(
+      `Incompatible RngState version: expected ${RNG_STATE_VERSION}, received ${state[0]}`,
+      'INCOMPATIBLE_RNG_STATE',
+    );
+  }
+}
+
+/**
  * Seedable pseudo-random number generator using xoshiro128**. The default
  * randomness source — `roll(notation)` builds one per call, and
  * `roll(notation, { seed })` builds one from your seed.
@@ -82,16 +118,20 @@ const CYRB128_MULTIPLIER_4 = 2716044179;
  * Stringifying means `42` and `'42'` are the same seed — the two forms share
  * one namespace, which matters when seeds arrive from a CLI flag or JSON.
  *
- * {@link state} snapshots the four state words as an {@link RngState}, and
+ * {@link state} snapshots the state words as a versioned {@link RngState}, and
  * passing one to the constructor resumes that exact sequence — restore copies
- * the words verbatim, skipping both the hash and the run-in. The type is the
- * contract: a hand-built tuple is coerced to 32 bits per word, not rejected.
+ * the words verbatim, skipping both the hash and the run-in. A snapshot from
+ * another format version throws `INCOMPATIBLE_RNG_STATE`; within the current
+ * version the type is the contract, and a hand-built tuple is coerced to 32
+ * bits per word rather than rejected.
  *
- * Reproducibility guarantee: within one released version, the same seed and
- * the same notation always produce the same dice. The same version binding
- * covers `RngState`. The sequence is *not* cryptographically secure and is not
- * guaranteed stable across major versions — do not persist rolls by
- * re-deriving them from a seed, persist the {@link RollResult}.
+ * Reproducibility guarantee: the same seed and the same notation produce the
+ * same dice for the lifetime of a major version, and `RngState` carries that
+ * binding. The one exception is a genuine distribution bug — bias, faulty
+ * rejection sampling — which may change the mapping in a minor release, never
+ * silently in a patch, and always with a `BREAKING` changelog note. The
+ * sequence is *not* cryptographically secure. To pin a roll beyond that,
+ * persist the {@link RollResult} rather than re-deriving it from a seed.
  *
  * @example
  * ```typescript
@@ -129,12 +169,14 @@ export class SeededRNG implements RNG {
     this.s3 = 0;
 
     if (seed !== null && typeof seed === 'object') {
+      assertRestorable(seed);
+
       // ! No hashing and no warm-up — either would diverge the resumed stream.
       // ! Signed on write to keep the Smi invariant above; `state()` re-widens.
-      this.s0 = seed[0] | 0;
-      this.s1 = seed[1] | 0;
-      this.s2 = seed[2] | 0;
-      this.s3 = seed[3] | 0;
+      this.s0 = seed[1] | 0;
+      this.s1 = seed[2] | 0;
+      this.s2 = seed[3] | 0;
+      this.s3 = seed[4] | 0;
       this.guardZeroState();
       return;
     }
@@ -159,14 +201,16 @@ export class SeededRNG implements RNG {
   }
 
   /**
-   * Returns the current state as four unsigned 32-bit words. Feeding the
-   * snapshot back to the constructor resumes this exact sequence; the source
-   * instance is untouched, and the two then advance independently.
+   * Returns the current state as a format version followed by four unsigned
+   * 32-bit words. Feeding the snapshot back to the constructor resumes this
+   * exact sequence; the source instance is untouched, and the two then advance
+   * independently.
    *
-   * The words are {@link RngState} — opaque, and stable only within a major
-   * version.
+   * The words are {@link RngState} — opaque, restorable within the major
+   * version that produced them, and rejected with `INCOMPATIBLE_RNG_STATE`
+   * outside it.
    *
-   * @returns A snapshot of the four state words
+   * @returns A snapshot of the version and the four state words
    *
    * @example Replay a roll that was never seeded
    * ```typescript
@@ -193,7 +237,7 @@ export class SeededRNG implements RNG {
    * ```
    */
   state(): RngState {
-    return [this.s0 >>> 0, this.s1 >>> 0, this.s2 >>> 0, this.s3 >>> 0];
+    return [RNG_STATE_VERSION, this.s0 >>> 0, this.s1 >>> 0, this.s2 >>> 0, this.s3 >>> 0];
   }
 
   /**
