@@ -40,10 +40,55 @@ describe('isRollParserError', () => {
     expect(isRollParserError(captureError(() => parse('1+')))).toBe(true);
   });
 
-  test('accepts cross-realm look-alikes by code', () => {
+  /**
+   * A library error as another realm — iframe, `vm` context, second copy — hands
+   * it over: a real error there, over a foreign prototype chain carrying the
+   * registered brand, which resolves here because the registry is shared.
+   *
+   * A real `node:vm` context behaves identically, but `noNodejsModules` is an
+   * error everywhere under `src/` outside `src/cli/`.
+   */
+  function foreignError(code: string): unknown {
+    const foreignErrorPrototype = Object.create(null) as object;
+    const prototype = Object.create(foreignErrorPrototype) as object;
+    Object.defineProperty(prototype, Symbol.for('roll-parser.error'), { value: true });
+    return Object.assign(Object.create(prototype) as object, {
+      name: 'EvaluatorError',
+      message: 'boom',
+      stack: 'EvaluatorError: boom\n    at <other realm>',
+      code,
+    });
+  }
+
+  test('accepts a branded error from another realm', () => {
+    const foreign = foreignError('DIVISION_BY_ZERO');
+
+    // The whole point: a realm crossing breaks `instanceof`, brands survive it.
+    expect(foreign instanceof Error).toBe(false);
+    expect(isRollParserError(foreign)).toBe(true);
+  });
+
+  // `RollParserErrorCode` is a deliberately open union, so a copy from a newer
+  // minor may carry a code this build has never heard of. The brand is what says
+  // it is ours; the code list no longer gates acceptance.
+  test('accepts a branded error carrying a code this build does not know', () => {
+    expect(isRollParserError(foreignError('SOME_FUTURE_CODE'))).toBe(true);
+  });
+
+  // A copy predating the brand has nothing to recognize it by.
+  test('rejects a library error from a copy older than the brand (#230)', () => {
+    const legacy = Object.assign(new Error('boom'), {
+      name: 'LexerError',
+      code: 'UNEXPECTED_CHARACTER',
+    });
+
+    expect(isRollParserError(legacy)).toBe(false);
+  });
+
+  test('rejects a foreign error whose code collides with ours (#230)', () => {
     const foreign = Object.assign(new Error('boom'), { code: 'DIVISION_BY_ZERO' });
 
-    expect(isRollParserError(foreign)).toBe(true);
+    expect(isRollParserError(foreign)).toBe(false);
   });
 
   test('rejects unrelated values', () => {
@@ -51,6 +96,42 @@ describe('isRollParserError', () => {
     expect(isRollParserError(Object.assign(new Error('boom'), { code: 'ENOENT' }))).toBe(false);
     expect(isRollParserError({ code: 'DIVISION_BY_ZERO' })).toBe(false);
     expect(isRollParserError(undefined)).toBe(false);
+  });
+
+  // The documented worker limitation. `structuredClone` keeps `message` and
+  // `stack` only, so nothing is left to recognize.
+  test('cannot match an error that went through structuredClone (#230)', () => {
+    const clone = structuredClone(new RollParserError('boom', 'DIVISION_BY_ZERO'));
+
+    expect('code' in clone).toBe(false);
+    expect(isRollParserError(clone)).toBe(false);
+  });
+
+  // The hand-built prototypes above never reach the class's own accessor, and a
+  // second copy of the library reads exactly this to recognize ours.
+  test('every library error carries the brand', () => {
+    const brand = Symbol.for('roll-parser.error');
+    const errors = [
+      new RollParserError('boom', 'DIVISION_BY_ZERO'),
+      new LexerError('bad', 'UNEXPECTED_CHARACTER', 0, '&'),
+      new ParseError('bad', 'UNEXPECTED_TOKEN', 0),
+      new EvaluatorError('bad', 'DIVISION_BY_ZERO', 'Dice'),
+    ];
+
+    for (const error of errors) {
+      expect((error as unknown as Record<symbol, unknown>)[brand]).toBe(true);
+      expect(Object.hasOwn(error, brand)).toBe(false);
+    }
+  });
+
+  test('the brand stays out of spread and JSON', () => {
+    const error = new RollParserError('boom', 'DIVISION_BY_ZERO');
+
+    expect(Object.getOwnPropertySymbols({ ...error })).toEqual([]);
+    expect(JSON.parse(JSON.stringify(error))).toEqual({
+      name: 'RollParserError',
+      code: 'DIVISION_BY_ZERO',
+    });
   });
 });
 

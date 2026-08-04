@@ -116,6 +116,17 @@ export const ROLL_PARSER_ERROR_CODES = [
 export type RollParserErrorCode = (typeof ROLL_PARSER_ERROR_CODES)[number];
 
 /**
+ * Key of the brand {@link isRollParserError} matches on. A *registered* symbol,
+ * because the global symbol registry is shared by every realm in an agent — so
+ * the same key resolves from an iframe or a `vm` context, and from a second copy
+ * of the library in `node_modules`, provided that copy is new enough to carry
+ * the brand at all.
+ */
+// ! The string is wire format between library copies. Changing it severs
+// ! recognition across versions, so it is fixed for the lifetime of the package.
+const ERROR_BRAND = Symbol.for('roll-parser.error');
+
+/**
  * Base error class for all roll-parser errors.
  *
  * Provides a typed `code` field for programmatic error handling.
@@ -124,8 +135,8 @@ export type RollParserErrorCode = (typeof ROLL_PARSER_ERROR_CODES)[number];
  *
  * Error messages never embed the source position — every subclass reports it
  * through structured fields instead, readable uniformly via
- * {@link getErrorSpan}. Prefer {@link isRollParserError} over `instanceof`:
- * it also matches errors that crossed a realm boundary.
+ * {@link getErrorSpan}. Prefer {@link isRollParserError} over `instanceof`: it
+ * also matches errors from another realm or a duplicate copy of the library.
  *
  * @example
  * ```typescript
@@ -154,6 +165,20 @@ export class RollParserError extends Error {
     super(message, options);
     this.name = 'RollParserError';
     this.code = code;
+  }
+
+  /**
+   * Brand {@link isRollParserError} looks for.
+   *
+   * An accessor, not a field or a module-level `defineProperty`: it lands on the
+   * prototype — free per error, inherited by every subclass, invisible to spread
+   * and `JSON.stringify` — without a top-level statement, which would contradict
+   * the package's side-effect-free declaration.
+   *
+   * @internal `stripInternal` drops it from the published `.d.ts`.
+   */
+  get [ERROR_BRAND](): true {
+    return true;
   }
 }
 
@@ -245,16 +270,28 @@ export type ErrorSpan = {
   end?: number;
 };
 
-const VALID_CODES: Set<string> = new Set<string>(ROLL_PARSER_ERROR_CODES);
-
 /**
- * Type guard for roll-parser errors. Checks `instanceof` first, then falls
- * back to duck-typing — an `Error` whose `code` is a known
- * {@link RollParserErrorCode} passes even if it crossed a realm boundary
- * (worker, iframe, vm context) and so failed `instanceof`.
+ * Type guard for roll-parser errors. Checks `instanceof` first, then a brand
+ * carried on the error's prototype — so it still matches when `instanceof`
+ * cannot, namely an error from an iframe or `vm` context, or from a second copy
+ * of the library in `node_modules` at this version or newer.
  *
- * Use it as the outer filter in every `catch`: anything it rejects is a bug
- * in your code or the library, not a bad notation, and should be rethrown.
+ * Use it as the outer filter in every `catch`: anything it rejects is a bug in
+ * your code or the library, not a bad notation, and should be rethrown. The
+ * brand is what makes that two-way — a foreign error is never accepted just for
+ * carrying a `code` that happens to collide with one of ours.
+ *
+ * Only this library's own error prototype carries the brand, so holding it is
+ * proof of origin, and the `code` is trusted rather than re-validated: an error
+ * from a newer minor passes with a code this build has never heard of, which is
+ * what {@link RollParserErrorCode} being an open union already implies. A value
+ * that forges the brand is out of scope, as it is for any brand check.
+ *
+ * The one boundary it cannot cross is a worker. `postMessage` and
+ * `structuredClone` rebuild an `Error` from `message` and `stack` alone,
+ * discarding `code`, `name`, and the prototype with it, so the value that
+ * arrives is no longer recognizable as anything. Send `error.code` yourself as
+ * part of the message payload if the other side needs it.
  *
  * @param value - The caught value, of unknown type
  * @returns `true` when `value` is a roll-parser error
@@ -276,9 +313,11 @@ const VALID_CODES: Set<string> = new Set<string>(ROLL_PARSER_ERROR_CODES);
  */
 export function isRollParserError(value: unknown): value is RollParserError {
   if (value instanceof RollParserError) return true;
-  if (!(value instanceof Error) || !('code' in value)) return false;
-  const { code } = value;
-  return typeof code === 'string' && VALID_CODES.has(code);
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    (value as Record<symbol, unknown>)[ERROR_BRAND] === true
+  );
 }
 
 /**

@@ -598,9 +598,15 @@ throws a typed `MAX_DEPTH_EXCEEDED` instead of blowing the stack, which keeps
 ## Error handling
 
 Every failure extends `RollParserError` and carries a stable `code`. Use
-`isRollParserError` as the outer filter. Unlike `instanceof`, it also matches
-errors that crossed a realm boundary — and anything it rejects is a genuine
-bug, so rethrow it.
+`isRollParserError` as the outer filter — anything it rejects is a genuine bug,
+so rethrow it. Library errors carry a brand on their prototype, so unlike
+`instanceof` the filter still matches an error thrown in an iframe or a `vm`
+context, or by a second copy of the library in `node_modules` at 3.0.0 or newer.
+It is a brand and not a `code` sniff, so a foreign error whose own `code` happens
+to collide with one of ours is rejected rather than reported to your user as a
+bad roll. Holding the brand is proof of origin, so the `code` is trusted rather
+than checked against this build's list — an error from a newer minor passes
+carrying a code this version has never heard of.
 
 ```typescript
 import { isRollParserError, roll } from 'roll-parser';
@@ -621,6 +627,23 @@ rather than escaping as a bare `TypeError`:
 
 ```typescript
 roll(null as unknown as string); // throws, code 'INVALID_NOTATION_TYPE'
+```
+
+One boundary the filter cannot cross is a worker. `postMessage` and
+`structuredClone` rebuild an `Error` from `message` and `stack` alone — `code`,
+`name`, and the prototype are all discarded — so a roll-parser error that
+arrives from a worker is no longer recognizable as one. Roll inside the worker
+and post the parts you need:
+
+<!-- readme-test: skip -->
+
+```typescript
+try {
+  post({ ok: true, total: roll(notation).total });
+} catch (error) {
+  if (!isRollParserError(error)) throw error;
+  post({ ok: false, code: error.code, message: error.message });
+}
 ```
 
 ### Error classes

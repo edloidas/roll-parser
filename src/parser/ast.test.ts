@@ -1,5 +1,4 @@
 import { describe, expect, test } from 'bun:test';
-import { isRollParserError, RollParserError } from '../errors.js';
 import type { Token } from '../lexer/tokens.js';
 import { TokenType } from '../lexer/tokens.js';
 import type { ASTNode, FunctionCallNode } from './ast.js';
@@ -98,23 +97,5 @@ describe('AST and Token immutability', () => {
     token.position = 9;
     // @ts-expect-error -- readonly
     token.end = 9;
-  });
-});
-
-describe('isRollParserError', () => {
-  test('accepts direct instances', () => {
-    expect(isRollParserError(new RollParserError('boom', 'UNEXPECTED_TOKEN'))).toBe(true);
-  });
-
-  test('accepts cross-realm duck-typed errors with a known code', () => {
-    const foreign = Object.assign(new Error('boom'), { code: 'DIVISION_BY_ZERO' });
-    expect(isRollParserError(foreign)).toBe(true);
-  });
-
-  test('rejects errors with unknown codes and non-errors', () => {
-    expect(isRollParserError(Object.assign(new Error('x'), { code: 'ENOENT' }))).toBe(false);
-    expect(isRollParserError(new Error('plain'))).toBe(false);
-    expect(isRollParserError({ code: 'DIVISION_BY_ZERO' })).toBe(false);
-    expect(isRollParserError(null)).toBe(false);
   });
 });
