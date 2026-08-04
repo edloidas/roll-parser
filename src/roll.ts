@@ -54,6 +54,8 @@ export type RollOptions = EvaluationLimits & {
  * @throws {LexerError} On an invalid character
  * @throws {ParseError} On invalid syntax
  * @throws {EvaluatorError} On a limit breach or an impossible expression
+ * @throws {RollParserError} `INVALID_EVALUATION_LIMIT` when a supplied limit is
+ *   not an integer in range — raised before any die is rolled
  *
  * @example
  * ```typescript

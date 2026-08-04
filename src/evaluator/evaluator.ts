@@ -4,7 +4,7 @@
  * @module evaluator/evaluator
  */
 
-import { EvaluatorError } from '../errors.js';
+import { EvaluatorError, RollParserError } from '../errors.js';
 import type {
   ASTNode,
   BinaryOpNode,
@@ -89,22 +89,40 @@ export const DEFAULT_MAX_DICE = 10_000;
 const MAX_DICE_SIDES = Number.MAX_SAFE_INTEGER;
 
 /**
- * Inclusive lower bound standing in for "strictly greater than zero" — every
- * positive double is at least `Number.MIN_VALUE`, so `value >= SMALLEST_POSITIVE`
- * and `value > 0` accept exactly the same finite inputs. Lets `clampLimit` take
- * one inclusive bound while `maxDice` still rejects `0` and iteration limits
- * still accept it.
+ * Resolves a user-supplied evaluation limit, failing closed.
+ *
+ * Absent (`undefined` / `null`) takes the library default — the no-options
+ * path. Anything else must be a safe integer at or above `min`; strings,
+ * `NaN`, `±Infinity`, negatives, and fractions all throw — substituting the
+ * default for a rejected value would hand the caller a *higher* limit than
+ * they asked for.
  */
-const SMALLEST_POSITIVE = Number.MIN_VALUE;
+function resolveLimit(
+  value: number | undefined,
+  option: string,
+  fallback: number,
+  min: number,
+): number {
+  if (value == null) return fallback;
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < min) {
+    throw new RollParserError(
+      `Option '${option}' must be an integer >= ${min}, received ${describeLimit(value)}`,
+      'INVALID_EVALUATION_LIMIT',
+    );
+  }
+  return value;
+}
 
 /**
- * Normalizes a user-supplied evaluation limit. Non-finite, absent, or
- * below-`min` values fall back to the library default; anything accepted is
- * floored to an integer.
+ * Renders a rejected limit for the error message, never coercing an object:
+ * `String(Object.create(null))` throws, and a hostile `toString` can too —
+ * either would replace the typed error with a raw `TypeError`.
  */
-function clampLimit(value: number | undefined, fallback: number, min: number): number {
-  if (value == null || !Number.isFinite(value) || value < min) return fallback;
-  return Math.floor(value);
+function describeLimit(value: unknown): string {
+  // Quoted, so the message tells `'5'` and `5` apart.
+  if (typeof value === 'string') return JSON.stringify(value);
+  if (typeof value === 'object' || typeof value === 'function') return typeof value;
+  return String(value);
 }
 
 export { DEFAULT_MAX_EXPLODE_ITERATIONS, DEFAULT_MAX_REROLL_ITERATIONS };
@@ -1540,6 +1558,8 @@ function evalVersus(node: VersusNode, rng: RNG, ctx: EvalContext, env: EvalEnv):
  * @returns Complete {@link RollResult}
  * @throws {EvaluatorError} On a limit breach, division by zero, an undefined
  *   variable, or a non-finite total
+ * @throws {RollParserError} `INVALID_EVALUATION_LIMIT` when a supplied limit is
+ *   not an integer in range — raised before any die is rolled
  *
  * @example
  * ```typescript
@@ -1559,14 +1579,16 @@ function evalVersus(node: VersusNode, rng: RNG, ctx: EvalContext, env: EvalEnv):
  * @category Core
  */
 export function evaluate(ast: ASTNode, rng: RNG, options: EvaluateOptions = {}): RollResult {
-  const maxDice = clampLimit(options.maxDice, DEFAULT_MAX_DICE, SMALLEST_POSITIVE);
-  const maxExplodeIterations = clampLimit(
+  const maxDice = resolveLimit(options.maxDice, 'maxDice', DEFAULT_MAX_DICE, 1);
+  const maxExplodeIterations = resolveLimit(
     options.maxExplodeIterations,
+    'maxExplodeIterations',
     DEFAULT_MAX_EXPLODE_ITERATIONS,
     0,
   );
-  const maxRerollIterations = clampLimit(
+  const maxRerollIterations = resolveLimit(
     options.maxRerollIterations,
+    'maxRerollIterations',
     DEFAULT_MAX_REROLL_ITERATIONS,
     0,
   );

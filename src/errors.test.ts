@@ -242,6 +242,7 @@ const CODE_CASES: Record<RollParserErrorCode, CodeCase> = {
     call: () => new SeededRNG([99, 1, 2, 3, 4]),
     why: 'restoring a snapshot is an RNG operation, not a notation one',
   },
+  INVALID_EVALUATION_LIMIT: { notation: '1d6', options: { maxDice: 0 } },
 };
 
 describe('error code contract', () => {

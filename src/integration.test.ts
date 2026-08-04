@@ -5,10 +5,12 @@
  */
 
 import { describe, expect, test } from 'bun:test';
+import { RollParserError } from './errors.js';
 import { EvaluatorError } from './evaluator/evaluator.js';
 import { ParseError } from './parser/parser.js';
 import { createMockRng } from './rng/mock.js';
 import { roll } from './roll.js';
+import { expectRollError } from './test-helpers.js';
 import { DegreeOfSuccess } from './types.js';
 
 describe('roll() integration', () => {
@@ -404,6 +406,15 @@ describe('roll() integration', () => {
       // 3d6 is well under the default 10,000 limit
       const result = roll('3d6', { rng: createMockRng([1, 2, 3]) });
       expect(result.total).toBe(6);
+    });
+
+    test('roll() rejects an invalid maxDice rather than failing open (#216)', () => {
+      // The shape a caller hardening an endpoint actually writes.
+      expectRollError(
+        () => roll('99999d6', { maxDice: Number('not-a-number') }),
+        RollParserError,
+        'INVALID_EVALUATION_LIMIT',
+      );
     });
   });
 

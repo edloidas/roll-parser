@@ -525,9 +525,9 @@ options minus `rng`/`seed` (it receives the RNG directly) plus `notation`.
 | `seed` | random | Seeds the per-call `SeededRNG`. Ignored when `rng` is set |
 | `context` | `{}` | Values for `@name` / `@{name}` variable references |
 | `onMissingVariable` | `'throw'` | A variable absent from `context` throws `UNDEFINED_VARIABLE`; `'zero'` substitutes `0` instead |
-| `maxDice` | `10_000` | [Safety limit](#safety-limits): total dice per expression |
-| `maxExplodeIterations` | `1_000` | [Safety limit](#safety-limits): explosions per die |
-| `maxRerollIterations` | `1_000` | [Safety limit](#safety-limits): recursive rerolls per die |
+| `maxDice` | `10_000` | [Safety limit](#safety-limits): total dice per expression, integer `>= 1` |
+| `maxExplodeIterations` | `1_000` | [Safety limit](#safety-limits): explosions per die, integer `>= 0` |
+| `maxRerollIterations` | `1_000` | [Safety limit](#safety-limits): recursive rerolls per die, integer `>= 0` |
 
 ```typescript
 import { roll } from 'roll-parser';
@@ -546,6 +546,30 @@ per die.
 
 ```typescript
 roll('99999d6', { maxDice: 100 }); // throws, code 'DICE_LIMIT_EXCEEDED'
+```
+
+The limits themselves are validated, and they fail closed. Omit one — or pass
+`undefined` or `null`, which a partial config or a JSON body produces — and it
+takes its default; supply anything else that is not a safe integer in range and
+the call throws `INVALID_EVALUATION_LIMIT` before rolling a single die. There is
+no coercion: `maxDice: Number(untrusted)` rejects bad input rather than quietly
+reverting to the permissive default.
+
+| Supplied `maxDice` | Result |
+|--------------------|--------|
+| omitted, `undefined`, `null` | `10_000` — the default |
+| `100` | `100` |
+| `'100'` | throws `INVALID_EVALUATION_LIMIT` |
+| `NaN`, `Infinity`, `-Infinity` | throws `INVALID_EVALUATION_LIMIT` |
+| `0`, `-1` | throws `INVALID_EVALUATION_LIMIT` |
+| `0.5`, `2.9` | throws `INVALID_EVALUATION_LIMIT` |
+
+`maxExplodeIterations` and `maxRerollIterations` follow the same rules, except
+that `0` is valid — it disables the modifier's recursion rather than rejecting
+every roll.
+
+```typescript
+roll('1d6', { maxDice: 0 }); // throws, code 'INVALID_EVALUATION_LIMIT'
 ```
 
 One limit is not configurable: expression nesting is capped at

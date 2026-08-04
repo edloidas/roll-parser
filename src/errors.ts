@@ -56,6 +56,7 @@ export const ROLL_PARSER_ERROR_CODES = [
   'MAX_DEPTH_EXCEEDED',
   'NON_FINITE_RESULT',
   'INCOMPATIBLE_RNG_STATE',
+  'INVALID_EVALUATION_LIMIT',
 ] as const;
 
 /**
@@ -78,6 +79,9 @@ export const ROLL_PARSER_ERROR_CODES = [
  * `INVALID_VARIABLE_VALUE`, `NON_FINITE_RESULT`
  *
  * RNG: `INCOMPATIBLE_RNG_STATE`
+ *
+ * Options: `INVALID_EVALUATION_LIMIT` — raised before evaluation begins, from
+ * the options object rather than from the notation, so it carries no span.
  *
  * New codes are only ever introduced in a minor release, never a patch. Treat
  * the union as open when you switch over it: give the switch a `default` arm

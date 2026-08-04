@@ -5,7 +5,7 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import { isRollParserError } from '../errors.js';
+import { isRollParserError, RollParserError } from '../errors.js';
 import type { ASTNode } from '../parser/ast.js';
 import { parse } from '../parser/parser.js';
 import { createMockRng } from '../rng/mock.js';
@@ -993,25 +993,6 @@ describe('evaluate', () => {
       expect(result.rolls).toHaveLength(0);
     });
 
-    test('invalid maxDice falls back to DEFAULT_MAX_DICE', () => {
-      // The thrown limit pins the fallback: Infinity would not throw at all,
-      // any other value would report a different limit.
-      const overCount = DEFAULT_MAX_DICE + 1;
-      const ast = parse(`${overCount}d6`);
-      const expectedMsg = `Total dice count ${overCount} exceeds limit of ${DEFAULT_MAX_DICE}`;
-
-      for (const maxDice of [Number.NaN, -1, Number.POSITIVE_INFINITY, 0]) {
-        expect(() => evaluate(ast, createMockRng([]), { maxDice })).toThrow(expectedMsg);
-      }
-    });
-
-    test('float maxDice is floored', () => {
-      const ast = parse('3d6');
-      const rng = createMockRng([1, 2, 3]);
-
-      expect(() => evaluate(ast, rng, { maxDice: 2.9 })).toThrow(EvaluatorError);
-    });
-
     test('error message includes actual count and limit', () => {
       const ast = parse('10d6');
       const rng = createMockRng(Array.from({ length: 10 }, () => 1));
@@ -1023,6 +1004,107 @@ describe('evaluate', () => {
       );
 
       expect(error.message).toBe('Total dice count 10 exceeds limit of 5');
+    });
+  });
+
+  describe('limit validation (#216)', () => {
+    const ast = parse('1d6');
+    const rollOnce = (): ReturnType<typeof createMockRng> => createMockRng([3]);
+
+    // `unknown` — the point is inputs that defeat the static type: a JSON
+    // body, an env var, a query parameter.
+    const REJECTED: [label: string, value: unknown][] = [
+      ['numeric string', '5'],
+      ['non-numeric string', 'lots'],
+      ['NaN', Number.NaN],
+      ['Infinity', Number.POSITIVE_INFINITY],
+      ['-Infinity', Number.NEGATIVE_INFINITY],
+      ['negative', -1],
+      ['fraction', 0.5],
+      ['above 2^53', 2 ** 53],
+      ['boolean', true],
+    ];
+
+    for (const [label, value] of REJECTED) {
+      test(`rejects maxDice: ${label}`, () => {
+        const error = expectRollError(
+          () => evaluate(ast, rollOnce(), { maxDice: value as number }),
+          RollParserError,
+          'INVALID_EVALUATION_LIMIT',
+        );
+
+        expect(error.message).toStartWith("Option 'maxDice' must be an integer >= 1");
+      });
+    }
+
+    test('rejects maxDice: 0', () => {
+      expectRollError(
+        () => evaluate(ast, rollOnce(), { maxDice: 0 }),
+        RollParserError,
+        'INVALID_EVALUATION_LIMIT',
+      );
+    });
+
+    test('quotes a string in the message so 5 and "5" differ', () => {
+      const error = expectRollError(
+        () => evaluate(ast, rollOnce(), { maxDice: '5' as unknown as number }),
+        RollParserError,
+        'INVALID_EVALUATION_LIMIT',
+      );
+
+      expect(error.message).toEndWith('received "5"');
+    });
+
+    test('stays typed for values that cannot be stringified', () => {
+      const hostile = {
+        toString: (): string => {
+          throw new Error('nope');
+        },
+      };
+
+      for (const value of [Object.create(null), hostile, (): void => {}]) {
+        const error = expectRollError(
+          () => evaluate(ast, rollOnce(), { maxDice: value as number }),
+          RollParserError,
+          'INVALID_EVALUATION_LIMIT',
+        );
+
+        expect(error.message).toMatch(/received (object|function)$/);
+      }
+    });
+
+    test('iteration limits accept 0 but reject negatives', () => {
+      expect(evaluate(ast, rollOnce(), { maxExplodeIterations: 0 }).total).toBe(3);
+      expect(evaluate(ast, rollOnce(), { maxRerollIterations: 0 }).total).toBe(3);
+
+      for (const option of ['maxExplodeIterations', 'maxRerollIterations'] as const) {
+        const error = expectRollError(
+          () => evaluate(ast, rollOnce(), { [option]: -1 }),
+          RollParserError,
+          'INVALID_EVALUATION_LIMIT',
+        );
+
+        expect(error.message).toStartWith(`Option '${option}' must be an integer >= 0`);
+      }
+    });
+
+    test('throws before any die is rolled', () => {
+      // An empty mock proves it: a draw would raise `MockRNGExhaustedError`.
+      expectRollError(
+        () => evaluate(ast, createMockRng([]), { maxDice: -1 }),
+        RollParserError,
+        'INVALID_EVALUATION_LIMIT',
+      );
+    });
+
+    test('absent and partial options still take defaults', () => {
+      expect(evaluate(ast, rollOnce()).total).toBe(3);
+      expect(evaluate(ast, rollOnce(), {}).total).toBe(3);
+      // `exactOptionalPropertyTypes` rules both out statically; a JS caller
+      // spreading a partial config still reaches them.
+      expect(evaluate(ast, rollOnce(), { maxDice: undefined as unknown as number }).total).toBe(3);
+      expect(evaluate(ast, rollOnce(), { maxDice: null as unknown as number }).total).toBe(3);
+      expect(evaluate(ast, rollOnce(), { maxDice: 5 }).total).toBe(3);
     });
   });
 
