@@ -31,7 +31,7 @@ function flattenParts(part: RollPart): RollPart[] {
     case 'unaryOp':
       out.push(...flattenParts(part.operand));
       break;
-    case 'modifier':
+    case 'keepDrop':
     case 'explode':
     case 'reroll':
     case 'successCount':
@@ -90,7 +90,7 @@ describe('RollResult.parts', () => {
     test('4d6kh3 — flattened modifier chain with resolved specs', () => {
       const result = roll('4d6kh3', { rng: createMockRng([3, 6, 2, 5]) });
       expect(stripSpans(result.parts)).toEqual({
-        type: 'modifier',
+        type: 'keepDrop',
         specs: [{ kind: 'keep', selector: 'highest', count: 3 }],
         target: {
           type: 'dice',
@@ -114,7 +114,7 @@ describe('RollResult.parts', () => {
     test('{1d6, 1d8}kh1 — group under keep with keptIndices', () => {
       const result = roll('{1d6, 1d8}kh1', { rng: createMockRng([2, 7]) });
       expect(stripSpans(result.parts)).toEqual({
-        type: 'modifier',
+        type: 'keepDrop',
         specs: [{ kind: 'keep', selector: 'highest', count: 1 }],
         target: {
           type: 'group',
@@ -292,7 +292,7 @@ describe('RollResult.parts', () => {
     test('modifier chain flattens into one specs[] array', () => {
       const result = roll('4d6kh3kl1', { rng: createMockRng([3, 6, 2, 5]) });
       expect(result.parts).toMatchObject({
-        type: 'modifier',
+        type: 'keepDrop',
         specs: [
           { kind: 'keep', selector: 'highest', count: 3 },
           { kind: 'keep', selector: 'lowest', count: 1 },
@@ -439,7 +439,7 @@ describe('RollResult.parts', () => {
   describe('reference sharing', () => {
     test('dice part rolls are the same objects as result.rolls', () => {
       const result = roll('4d6kh3', { rng: createMockRng([3, 6, 2, 5]) });
-      if (result.parts.type !== 'modifier' || result.parts.target.type !== 'dice') {
+      if (result.parts.type !== 'keepDrop' || result.parts.target.type !== 'dice') {
         throw new Error('unexpected parts shape');
       }
       const partRolls = result.parts.target.rolls;
@@ -471,7 +471,7 @@ describe('RollResult.parts', () => {
       ];
       for (const [notation, draws, expected] of cases) {
         const result = roll(notation, { rng: createMockRng(draws) });
-        if (result.parts.type !== 'modifier' || result.parts.target.type !== 'group') {
+        if (result.parts.type !== 'keepDrop' || result.parts.target.type !== 'group') {
           throw new Error('unexpected parts shape');
         }
         expect(result.parts.target.keptIndices).toEqual(expected);
@@ -486,7 +486,7 @@ describe('RollResult.parts', () => {
 
     test('dropped sub-rolls keep their complete parts', () => {
       const result = roll('{1d20+5 vs 15, 1d8}kh1', { rng: createMockRng([1, 7]) });
-      if (result.parts.type !== 'modifier' || result.parts.target.type !== 'group') {
+      if (result.parts.type !== 'keepDrop' || result.parts.target.type !== 'group') {
         throw new Error('unexpected parts shape');
       }
       const droppedVersus = result.parts.target.parts[0];

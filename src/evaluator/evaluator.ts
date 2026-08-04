@@ -16,8 +16,8 @@ import type {
   FunctionCallNode,
   GroupedNode,
   GroupNode,
+  KeepDropNode,
   LiteralNode,
-  ModifierNode,
   RerollNode,
   SortNode,
   SuccessCountNode,
@@ -25,7 +25,7 @@ import type {
   VariableNode,
   VersusNode,
 } from '../parser/ast.js';
-import { isModifier } from '../parser/ast.js';
+import { isKeepDrop } from '../parser/ast.js';
 import type { RNG } from '../rng/types.js';
 import type {
   CompareOp,
@@ -33,7 +33,7 @@ import type {
   DieModifier,
   DieResult,
   EvaluateOptions,
-  ModifierSpec,
+  KeepDropSpec,
   ResolvedComparePoint,
   ResolvedCritThreshold,
   RollPart,
@@ -69,7 +69,7 @@ export { EvaluatorError };
 //
 
 /**
- * Default value of `EvaluationLimits.maxDice`: the number of dice a single
+ * Default value of `EvaluationOptions.maxDice`: the number of dice a single
  * evaluation may roll before `DICE_LIMIT_EXCEEDED` is thrown.
  *
  * Counted across the whole expression, not per pool, so `6000d6+6000d6`
@@ -166,9 +166,9 @@ function createContext(): EvalContext {
 
 /**
  * Flattened representation of a keep/drop modifier for chain evaluation.
- * Superset of the public `ModifierSpec` (adds the notation `code`).
+ * Superset of the public `KeepDropSpec` (adds the notation `code`).
  */
-type ModifierChainEntry = ModifierSpec & { code: string };
+type KeepDropChainEntry = KeepDropSpec & { code: string };
 
 /**
  * Every branch returns its numeric total AND the `RollPart` it contributes
@@ -207,8 +207,8 @@ function appendAll<T>(target: T[], source: readonly T[]): void {
   }
 }
 
-/** Drops the internal notation `code`, leaving the public `ModifierSpec` shape. */
-function toPublicSpecs(specs: ModifierChainEntry[]): ModifierSpec[] {
+/** Drops the internal notation `code`, leaving the public `KeepDropSpec` shape. */
+function toPublicSpecs(specs: KeepDropChainEntry[]): KeepDropSpec[] {
   return specs.map(({ code: _code, ...spec }) => spec);
 }
 
@@ -314,8 +314,8 @@ function evalNodeInner(node: ASTNode, rng: RNG, ctx: EvalContext, env: EvalEnv):
     case 'UnaryOp':
       return evalUnaryOp(node, rng, ctx, env);
 
-    case 'Modifier':
-      return evalModifier(node, rng, ctx, env);
+    case 'KeepDrop':
+      return evalKeepDrop(node, rng, ctx, env);
 
     case 'Explode':
       return evalExplode(node, rng, ctx, env);
@@ -492,9 +492,9 @@ function rollPool(
 /**
  * RNG draw order: `count` expression → `sides` expression → pool dice
  * (one `nextInt` per die, left-to-right). Meta-expressions on `count`/`sides`
- * (e.g. `(1+1)d(3*2)`) draw before the pool. For modifier-argument
- * meta-expressions like `4d6kh(1d2)`, `flattenModifierChain` draws the
- * modifier args first, then `evalModifier` calls `evalDice` for the base
+ * (e.g. `(1+1)d(3*2)`) draw before the pool. For keep/drop-argument
+ * meta-expressions like `4d6kh(1d2)`, `flattenKeepDropChain` draws the
+ * keep/drop args first, then `evalKeepDrop` calls `evalDice` for the base
  * pool. See README, Randomness → Draw order, for the full spec.
  */
 function evalDice(node: DiceNode, rng: RNG, ctx: EvalContext, env: EvalEnv): EvalResult {
@@ -554,7 +554,7 @@ function evalFateDice(node: FateDiceNode, rng: RNG, ctx: EvalContext, env: EvalE
  * the same `RollResult`. No-op when `metadata` is `undefined`.
  *
  * Use this directly when the caller has already pushed (or transformed) `rolls`
- * itself — e.g. `evalSort`, `evalCritThreshold`, `evalGroupModifier`. For the
+ * itself — e.g. `evalSort`, `evalCritThreshold`, `evalGroupKeepDrop`. For the
  * default case where the child's raw rolls flow up unchanged, use
  * `mergeContext` instead.
  */
@@ -695,7 +695,7 @@ function evalGrouped(node: GroupedNode, rng: RNG, ctx: EvalContext, env: EvalEnv
  * Each sub-expression is evaluated in an isolated context, then its rolls
  * and `versusMetadata` propagate up via `mergeContext`. Sub-roll subtotals
  * sum to the group's total. When the group is the base target of a
- * keep/drop modifier with `expressions.length >= 2`, `evalModifier`
+ * keep/drop modifier with `expressions.length >= 2`, `evalKeepDrop`
  * intercepts first and never calls this function — dual semantics
  * (flat-pool vs sub-roll) are decided there.
  */
@@ -719,7 +719,7 @@ function evalGroup(node: GroupNode, rng: RNG, ctx: EvalContext, env: EvalEnv): E
   ctx.renderedParts.push(`{${subRendered.join(', ')}}`);
 
   // No `keptIndices` — bare groups (and single-sub passthroughs) perform
-  // no sub-roll selection; only `evalGroupModifier` sets it.
+  // no sub-roll selection; only `evalGroupKeepDrop` sets it.
   return { total, part: { type: 'group', parts: subParts, total, ...partSpan(node) } };
 }
 
@@ -824,44 +824,44 @@ function requireUnaryArg(name: string, values: number[]): number {
 //
 
 /** Notation spelling of each keep/drop combination. */
-const MODIFIER_CODES = {
+const KEEP_DROP_CODES = {
   keep: { highest: 'kh', lowest: 'kl' },
   drop: { highest: 'dh', lowest: 'dl' },
 } as const;
 
-function modifierCode(kind: ModifierSpec['kind'], selector: ModifierSpec['selector']): string {
-  return MODIFIER_CODES[kind][selector];
+function keepDropCode(kind: KeepDropSpec['kind'], selector: KeepDropSpec['selector']): string {
+  return KEEP_DROP_CODES[kind][selector];
 }
 
 /**
- * Walks a nested ModifierNode chain, collecting specs outermost-first,
+ * Walks a nested KeepDropNode chain, collecting specs outermost-first,
  * then reverses to notation order (innermost-first).
  */
-function flattenModifierChain(
-  node: ModifierNode,
+function flattenKeepDropChain(
+  node: KeepDropNode,
   rng: RNG,
   ctx: EvalContext,
   env: EvalEnv,
-): { specs: ModifierChainEntry[]; baseTarget: ASTNode } {
-  const specs: ModifierChainEntry[] = [];
+): { specs: KeepDropChainEntry[]; baseTarget: ASTNode } {
+  const specs: KeepDropChainEntry[] = [];
   let current: ASTNode = node;
 
-  while (isModifier(current)) {
+  while (isKeepDrop(current)) {
     const modCount = evalMetaOperand(current.count, rng, ctx, env);
 
     if (!Number.isInteger(modCount) || modCount < 0) {
       throw new EvaluatorError(
-        `Invalid modifier count: ${modCount}`,
-        'INVALID_MODIFIER_COUNT',
-        'Modifier',
+        `Invalid keep/drop count: ${modCount}`,
+        'INVALID_KEEP_DROP_COUNT',
+        'KeepDrop',
       );
     }
 
     specs.push({
-      kind: current.modifier,
+      kind: current.kind,
       selector: current.selector,
       count: modCount,
-      code: modifierCode(current.modifier, current.selector),
+      code: keepDropCode(current.kind, current.selector),
     });
     current = current.target;
   }
@@ -879,7 +879,7 @@ function flattenModifierChain(
  * selects against the unmodified pool: `markDroppedIndices` reads results and
  * writes only into `droppedMask`, so no spec can observe another's outcome.
  */
-function mergeDropSets(baseDice: DieResult[], specs: ModifierChainEntry[]): DieResult[] {
+function mergeDropSets(baseDice: DieResult[], specs: KeepDropChainEntry[]): DieResult[] {
   const droppedMask = new Uint8Array(baseDice.length);
 
   for (const spec of specs) {
@@ -1044,7 +1044,7 @@ function evalReroll(node: RerollNode, rng: RNG, ctx: EvalContext, env: EvalEnv):
  * changing the total or any die-level flag. Dropped dice participate in
  * the sort alongside kept dice, preserving their `'dropped'` marker.
  *
- * Rendering mirrors `evalExplode` / `evalModifier`: emits
+ * Rendering mirrors `evalExplode` / `evalKeepDrop`: emits
  * `<targetExpr><code>[<sortedDice>]`, replacing any inline dice brackets
  * the target itself rendered. Multi-sub-roll Group targets (`{4d6, 3d6}s`)
  * are rejected at parse time with `INVALID_SORT_TARGET` until hierarchical
@@ -1161,14 +1161,14 @@ function resolveCritThreshold(
 // * Keep/drop evaluation
 //
 
-function evalModifier(node: ModifierNode, rng: RNG, ctx: EvalContext, env: EvalEnv): EvalResult {
-  const { specs, baseTarget } = flattenModifierChain(node, rng, ctx, env);
+function evalKeepDrop(node: KeepDropNode, rng: RNG, ctx: EvalContext, env: EvalEnv): EvalResult {
+  const { specs, baseTarget } = flattenKeepDropChain(node, rng, ctx, env);
 
   // Multi-sub-roll group: keep/drop treats each sub-roll subtotal as a compound
   // die. Single-sub groups fall through to the flat-pool path, where
   // `mergeDropSets` selects individual dice.
   if (baseTarget.type === 'Group' && baseTarget.expressions.length >= 2) {
-    return evalGroupModifier(node, baseTarget, specs, rng, ctx, env);
+    return evalGroupKeepDrop(node, baseTarget, specs, rng, ctx, env);
   }
 
   const targetCtx = createContext();
@@ -1181,15 +1181,15 @@ function evalModifier(node: ModifierNode, rng: RNG, ctx: EvalContext, env: EvalE
   const total = sumKeptDice(mergedDice);
 
   const targetExpr = targetCtx.expressionParts.join('');
-  const modifierCodes = specs.map((s) => `${s.code}${s.count}`).join('');
+  const keepDropCodes = specs.map((s) => `${s.code}${s.count}`).join('');
 
-  ctx.expressionParts.push(`${targetExpr}${modifierCodes}`);
+  ctx.expressionParts.push(`${targetExpr}${keepDropCodes}`);
   ctx.renderedParts.push(`${targetExpr}${renderDice(mergedDice)}`);
 
   return {
     total,
     part: {
-      type: 'modifier',
+      type: 'keepDrop',
       specs: toPublicSpecs(specs),
       target: target.part,
       total,
@@ -1221,10 +1221,10 @@ function stripInnerMarkers(rendered: string): string {
  * on the propagated rolls still agrees with the group total, and the
  * rendered form wraps them in strikethrough `~~...~~`.
  */
-function evalGroupModifier(
-  node: ModifierNode,
+function evalGroupKeepDrop(
+  node: KeepDropNode,
   group: GroupNode,
-  specs: ModifierChainEntry[],
+  specs: KeepDropChainEntry[],
   rng: RNG,
   ctx: EvalContext,
   env: EvalEnv,
@@ -1298,10 +1298,10 @@ function evalGroupModifier(
   }
 
   const subExprStrs = subRolls.map((s) => s.expr);
-  const modifierCodes = specs.map((s) => `${s.code}${s.count}`).join('');
+  const keepDropCodes = specs.map((s) => `${s.code}${s.count}`).join('');
 
-  ctx.expressionParts.push(`{${subExprStrs.join(', ')}}${modifierCodes}`);
-  // Modifier codes live in `expressionParts` only — the per-sub strikethrough
+  ctx.expressionParts.push(`{${subExprStrs.join(', ')}}${keepDropCodes}`);
+  // Keep/drop codes live in `expressionParts` only — the per-sub strikethrough
   // already shows which sub-rolls were kept.
   ctx.renderedParts.push(`{${outerRendered.join(', ')}}`);
 
@@ -1319,7 +1319,7 @@ function evalGroupModifier(
   return {
     total,
     part: {
-      type: 'modifier',
+      type: 'keepDrop',
       specs: toPublicSpecs(specs),
       target: groupPart,
       total,

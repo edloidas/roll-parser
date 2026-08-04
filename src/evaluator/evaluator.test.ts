@@ -726,7 +726,7 @@ describe('evaluate', () => {
     });
 
     test("kh1 skips a preceding chain's losers", () => {
-      // Parse: Modifier(kh1, Reroll(r>6, Modifier(dh1, Dice))). The no-op reroll
+      // Parse: KeepDrop(kh1, Reroll(r>6, KeepDrop(dh1, Dice))). The no-op reroll
       // splits the chains, so kh1 sees dh1's 5 already dropped and keeps the 2.
       const ast = parse('2d6dh1r>6kh1');
       const rng = createMockRng([5, 2]);
@@ -1538,7 +1538,7 @@ describe('evaluate', () => {
       });
 
       test('keep highest then reroll only runs on the survivor', () => {
-        // Parse: Reroll(r<2, Modifier(kh1, Dice)) — the reroll only touches kh1's
+        // Parse: Reroll(r<2, KeepDrop(kh1, Dice)) — the reroll only touches kh1's
         // survivor. [5, 1]: kh1 keeps the 5, which does not match r<2.
         const ast = parse('2d6kh1r<2');
         const rng = createMockRng([5, 1]);
@@ -2496,7 +2496,7 @@ describe('evaluate', () => {
 
     test('computed modifier count (kh) preserves meta die', () => {
       // d2 → 2, so kh2 keeps the two highest of [1, 3, 5, 6].
-      // The keep count draws BEFORE the pool: `flattenModifierChain` resolves
+      // The keep count draws BEFORE the pool: `flattenKeepDropChain` resolves
       // modifier arguments up front because selection needs the counts. Threshold
       // modifiers post-process an existing pool and draw last (README → Randomness).
       const ast = parse('4d6kh(1d2)');
@@ -3529,7 +3529,7 @@ describe('evaluate', () => {
       expect(result.expression).toBe('{1d6}cf<2');
     });
 
-    test('{1d6}kh1cf<2 evaluates with cf flag through the single-sub Modifier', () => {
+    test('{1d6}kh1cf<2 evaluates with cf flag through the single-sub KeepDrop', () => {
       const result = evaluate(parse('{1d6}kh1cf<2'), createMockRng([1]));
       expect(result.total).toBe(1);
       expect(result.rolls.map((d) => d.fumble)).toEqual([true]);

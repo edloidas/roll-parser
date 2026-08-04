@@ -148,7 +148,7 @@ describe('cli main', () => {
       expect(parsed.total).toBe(14);
       expect(parsed.notation).toBe('4d6kh3');
       expect(parsed.rolls).toHaveLength(4);
-      expect(parsed.parts.type).toBe('modifier');
+      expect(parsed.parts.type).toBe('keepDrop');
       expect(parsed.parts.total).toBe(14);
       expect(parsed.parts.target.type).toBe('dice');
       expect(parsed.parts.target.rolls.map((die: { result: number }) => die.result)).toEqual([

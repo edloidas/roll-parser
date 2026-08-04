@@ -126,9 +126,9 @@ export type UnaryOpNode = NodeSpan & {
  *
  * @category AST
  */
-export type ModifierNode = NodeSpan & {
-  readonly type: 'Modifier';
-  readonly modifier: 'keep' | 'drop';
+export type KeepDropNode = NodeSpan & {
+  readonly type: 'KeepDrop';
+  readonly kind: 'keep' | 'drop';
   readonly selector: 'highest' | 'lowest';
   readonly count: ASTNode;
   readonly target: ASTNode;
@@ -142,7 +142,7 @@ export type ModifierNode = NodeSpan & {
  * Thresholds accept any comparator. In notation like `1d10!=10` (the
  * Storyteller "10-again" rule) the `!` is the explode marker and `=10` the
  * equality threshold — there is no `!=` comparator. Per-die explosion count
- * is capped by `EvaluationLimits.maxExplodeIterations`.
+ * is capped by `EvaluationOptions.maxExplodeIterations`.
  *
  * @category AST
  */
@@ -158,7 +158,7 @@ export type ExplodeNode = NodeSpan & {
  * Re-rolls dice that match a comparison condition. `once: true` for `ro`
  * keeps the second result regardless of match; `once: false` for `r`
  * re-rolls recursively until the condition no longer matches, bounded by
- * `EvaluationLimits.maxRerollIterations`.
+ * `EvaluationOptions.maxRerollIterations`.
  *
  * @category AST
  */
@@ -330,7 +330,7 @@ export type CritThresholdNode = NodeSpan & {
  * Narrow it either by switching on `node.type` (PascalCase discriminants, as
  * opposed to the camelCase ones on {@link RollPart}) or with the exported
  * type guards: {@link isLiteral}, {@link isDice}, {@link isFateDice},
- * {@link isBinaryOp}, {@link isUnaryOp}, {@link isModifier},
+ * {@link isBinaryOp}, {@link isUnaryOp}, {@link isKeepDrop},
  * {@link isExplode}, {@link isReroll}, {@link isSuccessCount},
  * {@link isVersus}, {@link isFunctionCall}, {@link isGrouped},
  * {@link isVariable}, {@link isGroup}, {@link isSort},
@@ -372,7 +372,7 @@ export type ASTNode =
   | FateDiceNode
   | BinaryOpNode
   | UnaryOpNode
-  | ModifierNode
+  | KeepDropNode
   | ExplodeNode
   | RerollNode
   | SuccessCountNode
@@ -448,12 +448,12 @@ export function isUnaryOp(node: ASTNode): node is UnaryOpNode {
  * Narrows an {@link ASTNode} to a keep/drop modifier (`kh`, `kl`, `dh`, `dl`).
  *
  * @param node - Any AST node
- * @returns `true` when `node` is a {@link ModifierNode}
+ * @returns `true` when `node` is a {@link KeepDropNode}
  *
  * @category AST
  */
-export function isModifier(node: ASTNode): node is ModifierNode {
-  return node.type === 'Modifier';
+export function isKeepDrop(node: ASTNode): node is KeepDropNode {
+  return node.type === 'KeepDrop';
 }
 
 /**

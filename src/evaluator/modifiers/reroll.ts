@@ -18,7 +18,7 @@ import { matchesCondition } from './compare.js';
 import { REROLL_SLOT_FLAGS, rewriteFlags } from './flags.js';
 
 /**
- * Default value of `EvaluationLimits.maxRerollIterations`: how many times a
+ * Default value of `EvaluationOptions.maxRerollIterations`: how many times a
  * single die may be re-rolled by `r` before `REROLL_LIMIT_EXCEEDED` is
  * thrown.
  *

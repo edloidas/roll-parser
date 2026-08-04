@@ -8,10 +8,10 @@ import { evaluate } from './evaluator/evaluator.js';
 import { parse } from './parser/parser.js';
 import { SeededRNG } from './rng/seeded.js';
 import type { RNG } from './rng/types.js';
-import type { EvaluationLimits, RollResult } from './types.js';
+import type { EvaluationOptions, RollResult } from './types.js';
 
 /**
- * Everything {@link roll} accepts on top of the shared {@link EvaluationLimits}:
+ * Everything {@link roll} accepts on top of the shared {@link EvaluationOptions}:
  * a randomness source, given either as a ready-made {@link RNG} or as a seed.
  *
  * @category Core
@@ -25,7 +25,7 @@ import type { EvaluationLimits, RollResult } from './types.js';
  * roll('1d20+@str', { context: { str: 4 } });
  * ```
  */
-export type RollOptions = EvaluationLimits & {
+export type RollOptions = EvaluationOptions & {
   /**
    * Randomness source. Takes precedence over `seed` — when both are given,
    * `seed` is ignored.
@@ -48,7 +48,7 @@ export type RollOptions = EvaluationLimits & {
  * a loop.
  *
  * @param notation - Dice notation, e.g. `'2d6+3'` or `'4d6kh3'`
- * @param options - RNG or seed, plus the shared {@link EvaluationLimits}
+ * @param options - RNG or seed, plus the shared {@link EvaluationOptions}
  * @returns Complete {@link RollResult} with total, per-die results and the
  *   structured `parts` tree
  * @throws {LexerError} On an invalid character

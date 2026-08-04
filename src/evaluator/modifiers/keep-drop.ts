@@ -4,7 +4,7 @@
  * @module evaluator/modifiers/keep-drop
  */
 
-import type { DieResult, ModifierSpec } from '../../types.js';
+import type { DieResult, KeepDropSpec } from '../../types.js';
 
 /** One selectable die: its rolled value and its slot in the original pool. */
 type EligibleDie = { result: number; index: number };
@@ -25,8 +25,8 @@ type EligibleDie = { result: number; index: number };
 export function markDroppedIndices(
   dice: DieResult[],
   count: number,
-  kind: ModifierSpec['kind'],
-  selector: ModifierSpec['selector'],
+  kind: KeepDropSpec['kind'],
+  selector: KeepDropSpec['selector'],
   droppedMask: Uint8Array,
 ): void {
   if (count === 1) {
@@ -86,8 +86,8 @@ export function markDroppedIndices(
  */
 function markSingleExtreme(
   dice: DieResult[],
-  kind: ModifierSpec['kind'],
-  selector: ModifierSpec['selector'],
+  kind: KeepDropSpec['kind'],
+  selector: KeepDropSpec['selector'],
   droppedMask: Uint8Array,
 ): void {
   const isKeep = kind === 'keep';

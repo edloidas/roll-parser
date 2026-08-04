@@ -15,7 +15,7 @@ import { createDieResult } from '../die.js';
 import { chargeDie, type EvalEnv } from '../env.js';
 
 /**
- * Default value of `EvaluationLimits.maxExplodeIterations`: how many times a
+ * Default value of `EvaluationOptions.maxExplodeIterations`: how many times a
  * single die may explode before `EXPLODE_LIMIT_EXCEEDED` is thrown.
  *
  * Per die, not per pool — it bounds notations like `1d1!`, where the
