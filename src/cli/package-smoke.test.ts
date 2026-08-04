@@ -86,4 +86,15 @@ describe('two-pass emit', () => {
       expect(existsSync(map)).toBe(true);
     }
   });
+
+  test('strips @internal members from declarations (#220)', async () => {
+    const declaration = await Bun.file('./dist/errors.d.ts').text();
+
+    expect(declaration).not.toContain('@internal');
+    expect(declaration).not.toContain('stampSpan');
+
+    // Stripping must be surgical — the public accessors over the span survive.
+    expect(declaration).toContain('get start()');
+    expect(declaration).toContain('get end()');
+  });
 });

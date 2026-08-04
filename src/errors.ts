@@ -219,7 +219,8 @@ export class EvaluatorError extends RollParserError {
    * first stamp wins, so the innermost `evalNode` frame keeps the tightest
    * span as the error bubbles up.
    *
-   * @internal Called only by `evalNode`; not part of the public API.
+   * @internal Called only by `evalNode`; `stripInternal` drops it from the
+   * published `.d.ts`.
    */
   stampSpan(start: number, end: number | undefined): void {
     if (this.#start != null) return;
