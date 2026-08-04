@@ -94,6 +94,8 @@ roll('4d6kh3', { rng: createMockRng([3, 6, 2, 5]) }).total; // 14, every run
 
 ## Install
 
+<!-- readme-test: skip -->
+
 ```bash
 npm install roll-parser
 ```
@@ -707,6 +709,8 @@ in CI by `@arethetypeswrong/cli` and `publint`.
 
 ## CLI
 
+<!-- readme-test: skip -->
+
 ```bash
 npx roll-parser 2d6+3
 ```
@@ -738,8 +742,8 @@ Error: Invalid dice sides: 0
   2d6+1d0+3
       ^
 
-$ roll-parser -- -1d6+3
-1
+$ roll-parser --seed demo -- -1d6+3
+2
 ```
 
 Verbose mode rewrites the markdown markers for plain terminals: `~~n~~` becomes
