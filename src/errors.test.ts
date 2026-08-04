@@ -6,11 +6,13 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import type { RollParserErrorCode } from './errors.js';
+import type { NotationErrorCode, RollParserErrorCode } from './errors.js';
 import {
   EvaluatorError,
   getErrorSpan,
+  isNotationError,
   isRollParserError,
+  NOTATION_ERROR_CODES,
   ROLL_PARSER_ERROR_CODES,
   RollParserError,
 } from './errors.js';
@@ -33,32 +35,32 @@ function captureError(fn: () => unknown): unknown {
   throw new Error('Expected the callback to throw');
 }
 
+/**
+ * A library error as another realm — iframe, `vm` context, second copy — hands
+ * it over: a real error there, over a foreign prototype chain carrying the
+ * registered brand, which resolves here because the registry is shared.
+ *
+ * A real `node:vm` context behaves identically, but `noNodejsModules` is an
+ * error everywhere under `src/` outside `src/cli/`.
+ */
+function foreignError(code: string): unknown {
+  const foreignErrorPrototype = Object.create(null) as object;
+  const prototype = Object.create(foreignErrorPrototype) as object;
+  Object.defineProperty(prototype, Symbol.for('roll-parser.error'), { value: true });
+  return Object.assign(Object.create(prototype) as object, {
+    name: 'EvaluatorError',
+    message: 'boom',
+    stack: 'EvaluatorError: boom\n    at <other realm>',
+    code,
+  });
+}
+
 describe('isRollParserError', () => {
   test('accepts library errors', () => {
     expect(isRollParserError(new RollParserError('boom', 'UNKNOWN_FUNCTION'))).toBe(true);
     expect(isRollParserError(captureError(() => lex('2d6+&')))).toBe(true);
     expect(isRollParserError(captureError(() => parse('1+')))).toBe(true);
   });
-
-  /**
-   * A library error as another realm — iframe, `vm` context, second copy — hands
-   * it over: a real error there, over a foreign prototype chain carrying the
-   * registered brand, which resolves here because the registry is shared.
-   *
-   * A real `node:vm` context behaves identically, but `noNodejsModules` is an
-   * error everywhere under `src/` outside `src/cli/`.
-   */
-  function foreignError(code: string): unknown {
-    const foreignErrorPrototype = Object.create(null) as object;
-    const prototype = Object.create(foreignErrorPrototype) as object;
-    Object.defineProperty(prototype, Symbol.for('roll-parser.error'), { value: true });
-    return Object.assign(Object.create(prototype) as object, {
-      name: 'EvaluatorError',
-      message: 'boom',
-      stack: 'EvaluatorError: boom\n    at <other realm>',
-      code,
-    });
-  }
 
   test('accepts a branded error from another realm', () => {
     const foreign = foreignError('DIVISION_BY_ZERO');
@@ -132,6 +134,54 @@ describe('isRollParserError', () => {
       name: 'RollParserError',
       code: 'DIVISION_BY_ZERO',
     });
+  });
+});
+
+describe('isNotationError', () => {
+  test('accepts failures the notation caused', () => {
+    expect(isNotationError(captureError(() => lex('2d6+&')))).toBe(true);
+    expect(isNotationError(captureError(() => parse('1+')))).toBe(true);
+    expect(isNotationError(captureError(() => roll('1/0')))).toBe(true);
+  });
+
+  test('rejects a bad options object and a broken invariant (#231)', () => {
+    const badLimit = captureError(() => roll('1d6', { maxDice: 0 }));
+    const brokenInvariant = new RollParserError('boom', 'UNKNOWN_NODE_TYPE');
+
+    expect(isRollParserError(badLimit)).toBe(true);
+    expect(isNotationError(badLimit)).toBe(false);
+    expect(isRollParserError(brokenInvariant)).toBe(true);
+    expect(isNotationError(brokenInvariant)).toBe(false);
+  });
+
+  test('accepts a branded error from another realm', () => {
+    expect(isNotationError(foreignError('DIVISION_BY_ZERO'))).toBe(true);
+    expect(isNotationError(foreignError('INVALID_EVALUATION_LIMIT'))).toBe(false);
+  });
+
+  // A brand cannot carry attribution, so unlike `isRollParserError` this one
+  // does not take an unknown code on trust.
+  test('rejects a branded error carrying a code this build does not know', () => {
+    const future = foreignError('SOME_FUTURE_CODE');
+
+    expect(isRollParserError(future)).toBe(true);
+    expect(isNotationError(future)).toBe(false);
+  });
+
+  test('rejects unrelated values', () => {
+    expect(isNotationError(new Error('boom'))).toBe(false);
+    expect(isNotationError({ code: 'DIVISION_BY_ZERO' })).toBe(false);
+    expect(isNotationError(undefined)).toBe(false);
+  });
+
+  test('narrows to the notation code union', () => {
+    const error = captureError(() => lex('2d6+&'));
+
+    if (!isNotationError(error)) throw new Error('expected a notation error');
+
+    // Assignable only if `code` narrowed; `RollParserErrorCode` would not fit.
+    const code: NotationErrorCode = error.code;
+    expect(code).toBe('UNEXPECTED_CHARACTER');
   });
 });
 
@@ -336,6 +386,99 @@ const CODE_CASES: Record<RollParserErrorCode, CodeCase> = {
   },
 };
 
+/**
+ * Whether each code is attributable to the input rather than to the calling code
+ * or to a broken invariant in here.
+ *
+ * The `Record<RollParserErrorCode, …>` annotation is the second completeness
+ * gate, working the same way as `CODE_CASES`: adding a code without classifying
+ * it here is a type error, so `NOTATION_ERROR_CODES` cannot silently omit one.
+ */
+const IS_NOTATION_CODE: Record<RollParserErrorCode, boolean> = {
+  UNEXPECTED_CHARACTER: true,
+  UNEXPECTED_IDENTIFIER: true,
+  UNEXPECTED_TOKEN: true,
+  UNEXPECTED_END: true,
+  EXPECTED_TOKEN: true,
+  INVALID_DICE_COUNT: true,
+  INVALID_DICE_SIDES: true,
+  DICE_LIMIT_EXCEEDED: true,
+  DIVISION_BY_ZERO: true,
+  MODULO_BY_ZERO: true,
+  UNKNOWN_OPERATOR: false,
+  UNKNOWN_NODE_TYPE: false,
+  INVALID_KEEP_DROP_COUNT: true,
+  INVALID_KEEP_DROP_TARGET: true,
+  EXPLODE_LIMIT_EXCEEDED: true,
+  INVALID_EXPLODE_TARGET: true,
+  REROLL_LIMIT_EXCEEDED: true,
+  INVALID_REROLL_TARGET: true,
+  INVALID_SUCCESS_COUNT_TARGET: true,
+  INVALID_SORT_TARGET: true,
+  INVALID_CRIT_THRESHOLD_TARGET: true,
+  INVALID_THRESHOLD: true,
+  NESTED_VERSUS: true,
+  INVALID_FUNCTION_ARITY: true,
+  UNKNOWN_FUNCTION: false,
+  UNDEFINED_VARIABLE: true,
+  INVALID_VARIABLE_VALUE: false,
+  AMBIGUOUS_DICE_CHAIN: true,
+  MAX_DEPTH_EXCEEDED: true,
+  NON_FINITE_RESULT: true,
+  INCOMPATIBLE_RNG_STATE: false,
+  INVALID_EVALUATION_LIMIT: false,
+  INVALID_NOTATION_TYPE: true,
+};
+
+describe('notation code contract', () => {
+  test('the exported tuple matches the classification, in code order', () => {
+    const classified = ROLL_PARSER_ERROR_CODES.filter((code) => IS_NOTATION_CODE[code]);
+    const exported: RollParserErrorCode[] = [...NOTATION_ERROR_CODES];
+
+    expect(exported).toEqual(classified);
+  });
+
+  test('the excluded codes are the three options cases and the three invariants', () => {
+    const excluded = ROLL_PARSER_ERROR_CODES.filter((code) => !IS_NOTATION_CODE[code]);
+
+    expect(excluded).toEqual([
+      'UNKNOWN_OPERATOR',
+      'UNKNOWN_NODE_TYPE',
+      'UNKNOWN_FUNCTION',
+      'INVALID_VARIABLE_VALUE',
+      'INCOMPATIBLE_RNG_STATE',
+      'INVALID_EVALUATION_LIMIT',
+    ]);
+  });
+
+  // Prose, so `readme.test.ts` never executes it — nothing else catches the drift.
+  test('README lists exactly the excluded codes', async () => {
+    const readme = await Bun.file(new URL('../README.md', import.meta.url)).text();
+    const section = readme.slice(
+      readme.indexOf('### Notation errors'),
+      readme.indexOf('### Error classes'),
+    );
+    const rows = section.split('\n').filter((line) => line.startsWith('| '));
+    const listed = rows
+      .flatMap((row) => [...row.matchAll(/`([A-Z][A-Z0-9_]*)`/g)])
+      .map((match) => match[1] ?? '');
+    const excluded = ROLL_PARSER_ERROR_CODES.filter((code) => !IS_NOTATION_CODE[code]);
+
+    expect(listed.sort()).toEqual([...excluded].sort());
+  });
+
+  // `INVALID_NOTATION_TYPE` is the one code with no bare notation case, because a
+  // non-string notation is not a string to pass.
+  test('every included code but INVALID_NOTATION_TYPE has a bare notation case', () => {
+    for (const code of NOTATION_ERROR_CODES) {
+      if (code === 'INVALID_NOTATION_TYPE') continue;
+      const testCase = CODE_CASES[code];
+
+      expect('notation' in testCase && testCase.options === undefined).toBe(true);
+    }
+  });
+});
+
 describe('error code contract', () => {
   test('README quotes the current code count', async () => {
     // Prose, so `readme.test.ts` never executes it — nothing else catches the drift.
@@ -356,6 +499,7 @@ describe('error code contract', () => {
       expect(isRollParserError(error)).toBe(true);
       expect((error as RollParserError).code).toBe(code);
       expect((error as Error).message).not.toBe('');
+      expect(isNotationError(error)).toBe(IS_NOTATION_CODE[code]);
     });
   }
 });

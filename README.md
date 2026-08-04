@@ -598,8 +598,12 @@ throws a typed `MAX_DEPTH_EXCEEDED` instead of blowing the stack, which keeps
 ## Error handling
 
 Every failure extends `RollParserError` and carries a stable `code`. Use
-`isRollParserError` as the outer filter — anything it rejects is a genuine bug,
-so rethrow it. Library errors carry a brand on their prototype, so unlike
+`isRollParserError` as the outer filter — anything it rejects came from
+somewhere else, so rethrow it. What it does *not* tell you is whose fault the
+failure was: it answers `true` for bad notation, for a bad options object, and
+for a broken invariant in here alike, so it is the wrong test to hang a
+user-facing message on. [`isNotationError`](#notation-errors) is that test.
+Library errors carry a brand on their prototype, so unlike
 `instanceof` the filter still matches an error thrown in an iframe or a `vm`
 context, or by a second copy of the library in `node_modules` at 3.0.0 or newer.
 It is a brand and not a `code` sniff, so a foreign error whose own `code` happens
@@ -645,6 +649,49 @@ try {
   post({ ok: false, code: error.code, message: error.message });
 }
 ```
+
+### Notation errors
+
+`isRollParserError` establishes origin; `isNotationError` splits what is left
+into "tell the user" and "report a bug". It is `true` only for the codes the
+*input* is answerable for, which is all of them but six:
+
+| Excluded code | Why it is not the user's fault |
+|---------------|--------------------------------|
+| `INVALID_EVALUATION_LIMIT` | a bad `maxDice` / `maxExplodeIterations` / `maxRerollIterations` |
+| `INVALID_VARIABLE_VALUE` | a non-finite entry in the `context` you supplied |
+| `INCOMPATIBLE_RNG_STATE` | an RNG snapshot from another version |
+| `UNKNOWN_NODE_TYPE`, `UNKNOWN_OPERATOR`, `UNKNOWN_FUNCTION` | a hand-built AST, or a bug in here |
+
+So a bot that treats every `isRollParserError` as bad notation answers "check
+your dice" to `maxDice: '100'` — its own bug — and to a broken library
+invariant. Branch on both:
+
+```typescript
+import { isNotationError, isRollParserError, roll } from 'roll-parser';
+
+try {
+  roll(userInput);
+} catch (error) {
+  if (!isRollParserError(error)) throw error;
+  if (isNotationError(error)) console.log(`Bad notation: ${error.message}`);
+  else console.error('a bug, not a typo:', error.code);
+}
+```
+
+The subset is exported as `NOTATION_ERROR_CODES`, with `NotationErrorCode` as its
+union — `isNotationError` narrows `code` to that union, so a message catalog
+keyed by it stays exhaustive without covering the six.
+
+Two boundaries are worth knowing. `DIVISION_BY_ZERO`, `MODULO_BY_ZERO`, and
+`NON_FINITE_RESULT` are included because notation alone reaches them (`1d6/0`,
+`10**400`), but a `context` variable reaches them too — a `true` is not proof the
+notation was at fault. And unlike `isRollParserError`, which trusts the brand and
+never re-reads the code, `isNotationError` has to check the code against the list
+this build carries: an error from a *newer* copy of the library, carrying a
+notation code added after your build, reads as `false` and lands in the bug
+branch. That is the safe direction, but keep versions aligned when the
+distinction drives more than a message.
 
 ### Error classes
 

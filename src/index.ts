@@ -6,10 +6,12 @@
 
 import { version } from './version.js';
 
-export type { ErrorSpan, RollParserErrorCode } from './errors.js';
+export type { ErrorSpan, NotationErrorCode, RollParserErrorCode } from './errors.js';
 export {
   getErrorSpan,
+  isNotationError,
   isRollParserError,
+  NOTATION_ERROR_CODES,
   ROLL_PARSER_ERROR_CODES,
   RollParserError,
 } from './errors.js';
