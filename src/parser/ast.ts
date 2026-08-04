@@ -34,8 +34,8 @@ export type NodeSpan = {
  * @category AST
  */
 export type LiteralNode = NodeSpan & {
-  type: 'Literal';
-  value: number;
+  readonly type: 'Literal';
+  readonly value: number;
 };
 
 /**
@@ -52,9 +52,9 @@ export type LiteralNode = NodeSpan & {
  * @category AST
  */
 export type DiceNode = NodeSpan & {
-  type: 'Dice';
-  count: ASTNode;
-  sides: ASTNode;
+  readonly type: 'Dice';
+  readonly count: ASTNode;
+  readonly sides: ASTNode;
 };
 
 /**
@@ -67,8 +67,8 @@ export type DiceNode = NodeSpan & {
  * @category AST
  */
 export type FateDiceNode = NodeSpan & {
-  type: 'FateDice';
-  count: ASTNode;
+  readonly type: 'FateDice';
+  readonly count: ASTNode;
 };
 
 /**
@@ -91,10 +91,10 @@ export type FateDiceNode = NodeSpan & {
  * @category AST
  */
 export type BinaryOpNode = NodeSpan & {
-  type: 'BinaryOp';
-  operator: '+' | '-' | '*' | '/' | '%' | '**';
-  left: ASTNode;
-  right: ASTNode;
+  readonly type: 'BinaryOp';
+  readonly operator: '+' | '-' | '*' | '/' | '%' | '**';
+  readonly left: ASTNode;
+  readonly right: ASTNode;
 };
 
 /**
@@ -106,9 +106,9 @@ export type BinaryOpNode = NodeSpan & {
  * @category AST
  */
 export type UnaryOpNode = NodeSpan & {
-  type: 'UnaryOp';
-  operator: '-';
-  operand: ASTNode;
+  readonly type: 'UnaryOp';
+  readonly operator: '-';
+  readonly operand: ASTNode;
 };
 
 /**
@@ -127,11 +127,11 @@ export type UnaryOpNode = NodeSpan & {
  * @category AST
  */
 export type ModifierNode = NodeSpan & {
-  type: 'Modifier';
-  modifier: 'keep' | 'drop';
-  selector: 'highest' | 'lowest';
-  count: ASTNode;
-  target: ASTNode;
+  readonly type: 'Modifier';
+  readonly modifier: 'keep' | 'drop';
+  readonly selector: 'highest' | 'lowest';
+  readonly count: ASTNode;
+  readonly target: ASTNode;
 };
 
 /**
@@ -147,10 +147,10 @@ export type ModifierNode = NodeSpan & {
  * @category AST
  */
 export type ExplodeNode = NodeSpan & {
-  type: 'Explode';
-  variant: 'standard' | 'compound' | 'penetrating';
-  threshold?: ComparePoint;
-  target: ASTNode;
+  readonly type: 'Explode';
+  readonly variant: 'standard' | 'compound' | 'penetrating';
+  readonly threshold?: ComparePoint;
+  readonly target: ASTNode;
 };
 
 /**
@@ -163,10 +163,10 @@ export type ExplodeNode = NodeSpan & {
  * @category AST
  */
 export type RerollNode = NodeSpan & {
-  type: 'Reroll';
-  once: boolean;
-  condition: ComparePoint;
-  target: ASTNode;
+  readonly type: 'Reroll';
+  readonly once: boolean;
+  readonly condition: ComparePoint;
+  readonly target: ASTNode;
 };
 
 /**
@@ -181,10 +181,10 @@ export type RerollNode = NodeSpan & {
  * @category AST
  */
 export type SuccessCountNode = NodeSpan & {
-  type: 'SuccessCount';
-  target: ASTNode;
-  threshold: ComparePoint;
-  failThreshold?: ComparePoint;
+  readonly type: 'SuccessCount';
+  readonly target: ASTNode;
+  readonly threshold: ComparePoint;
+  readonly failThreshold?: ComparePoint;
 };
 
 /**
@@ -200,9 +200,9 @@ export type SuccessCountNode = NodeSpan & {
  * @category AST
  */
 export type VersusNode = NodeSpan & {
-  type: 'Versus';
-  roll: ASTNode;
-  dc: ASTNode;
+  readonly type: 'Versus';
+  readonly roll: ASTNode;
+  readonly dc: ASTNode;
 };
 
 /**
@@ -219,9 +219,9 @@ export type VersusNode = NodeSpan & {
  * @category AST
  */
 export type FunctionCallNode = NodeSpan & {
-  type: 'FunctionCall';
-  name: string;
-  args: ASTNode[];
+  readonly type: 'FunctionCall';
+  readonly name: string;
+  readonly args: readonly ASTNode[];
 };
 
 /**
@@ -235,8 +235,8 @@ export type FunctionCallNode = NodeSpan & {
  * @category AST
  */
 export type GroupedNode = NodeSpan & {
-  type: 'Grouped';
-  expression: ASTNode;
+  readonly type: 'Grouped';
+  readonly expression: ASTNode;
 };
 
 /**
@@ -254,8 +254,8 @@ export type GroupedNode = NodeSpan & {
  * @category AST
  */
 export type VariableNode = NodeSpan & {
-  type: 'Variable';
-  name: string;
+  readonly type: 'Variable';
+  readonly name: string;
 };
 
 /**
@@ -270,8 +270,8 @@ export type VariableNode = NodeSpan & {
  * @category AST
  */
 export type GroupNode = NodeSpan & {
-  type: 'Group';
-  expressions: ASTNode[];
+  readonly type: 'Group';
+  readonly expressions: readonly ASTNode[];
 };
 
 /**
@@ -288,9 +288,9 @@ export type GroupNode = NodeSpan & {
  * @category AST
  */
 export type SortNode = NodeSpan & {
-  type: 'Sort';
-  order: 'ascending' | 'descending';
-  target: ASTNode;
+  readonly type: 'Sort';
+  readonly order: 'ascending' | 'descending';
+  readonly target: ASTNode;
 };
 
 /**
@@ -317,10 +317,10 @@ export type CritThreshold = ComparePoint | 'default';
  * @category AST
  */
 export type CritThresholdNode = NodeSpan & {
-  type: 'CritThreshold';
-  successThresholds: CritThreshold[];
-  failThresholds: CritThreshold[];
-  target: ASTNode;
+  readonly type: 'CritThreshold';
+  readonly successThresholds: readonly CritThreshold[];
+  readonly failThresholds: readonly CritThreshold[];
+  readonly target: ASTNode;
 };
 
 /**
