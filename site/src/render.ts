@@ -198,7 +198,7 @@ function renderEquation(root: RollPart, notation: string): string {
         return braceGroup(part, subtotalText(part), isOutermost);
       case 'versus':
         return `${render(part.roll, false)}<span class="eq-vs">vs</span>${render(part.dc, false)}`;
-      case 'modifier':
+      case 'keepDrop':
       case 'explode':
       case 'reroll':
       case 'sort':

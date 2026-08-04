@@ -162,9 +162,8 @@ export type DieResult = {
 };
 
 /**
- * Per-spec keep/drop entry inside a flattened modifier chain. Counts are
- * resolved at evaluation time (meta-expressions like `kh(1d2)` become the
- * rolled number).
+ * One entry inside a flattened keep/drop chain. Counts are resolved at
+ * evaluation time (meta-expressions like `kh(1d2)` become the rolled number).
  *
  * Chained keep/drop modifiers flatten into one list — `4d6kh3dl1` yields two
  * specs against a single pool, each applied independently, with drop sets
@@ -172,7 +171,7 @@ export type DieResult = {
  *
  * @category Results
  */
-export type ModifierSpec = {
+export type KeepDropSpec = {
   readonly kind: 'keep' | 'drop';
   readonly selector: 'highest' | 'lowest';
   readonly count: number;
@@ -234,7 +233,7 @@ export type RollPartBase = {
  *       return `${describe(part.left)} ${part.operator} ${describe(part.right)}`;
  *     case 'unaryOp':
  *       return `-${describe(part.operand)}`;
- *     case 'modifier':
+ *     case 'keepDrop':
  *       return `${describe(part.target)} [${part.specs.length} keep/drop]`;
  *     case 'explode':
  *       return `${describe(part.target)} (${part.variant} explode)`;
@@ -282,7 +281,7 @@ export type RollPart =
       right: RollPart;
     })
   | (RollPartBase & { type: 'unaryOp'; operator: '-'; operand: RollPart })
-  | (RollPartBase & { type: 'modifier'; specs: ModifierSpec[]; target: RollPart })
+  | (RollPartBase & { type: 'keepDrop'; specs: KeepDropSpec[]; target: RollPart })
   | (RollPartBase & {
       type: 'explode';
       variant: 'standard' | 'compound' | 'penetrating';
@@ -451,7 +450,7 @@ export type RollResult = Readonly<{
  *
  * @category Core
  */
-export type EvaluationLimits = {
+export type EvaluationOptions = {
   /** Maximum total dice allowed per evaluation; integer >= 1 (default: 10,000) */
   maxDice?: number;
   /** Maximum explosion iterations allowed per die; integer >= 0 (default: 1,000) */
@@ -465,12 +464,12 @@ export type EvaluationLimits = {
 };
 
 /**
- * Options for {@link evaluate}: the shared {@link EvaluationLimits} plus the
+ * Options for {@link evaluate}: the shared {@link EvaluationOptions} plus the
  * original notation, which `evaluate` cannot recover from an AST.
  *
  * @category Core
  */
-export type EvaluateOptions = EvaluationLimits & {
+export type EvaluateOptions = EvaluationOptions & {
   /**
    * Original notation string, echoed back as `RollResult.notation`. When
    * omitted, falls back to the normalized `expression` reconstructed from the

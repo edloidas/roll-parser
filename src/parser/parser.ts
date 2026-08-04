@@ -20,8 +20,8 @@ import type {
   FunctionCallNode,
   GroupedNode,
   GroupNode,
+  KeepDropNode,
   LiteralNode,
-  ModifierNode,
   RerollNode,
   SortNode,
   SuccessCountNode,
@@ -131,7 +131,7 @@ const BP = {
  * would also break the `isRollParserError` contract). Bounding parse depth
  * also bounds AST depth, protecting the recursive AST walkers and evaluator.
  *
- * Not configurable — unlike the {@link EvaluationLimits} caps, this one always
+ * Not configurable — unlike the {@link EvaluationOptions} caps, this one always
  * applies, so untrusted notation can never blow the stack.
  *
  * @example
@@ -355,7 +355,7 @@ export class Parser {
       case TokenType.KEEP_LOW:
       case TokenType.DROP_HIGH:
       case TokenType.DROP_LOW:
-        return this.parseModifier(left, token);
+        return this.parseKeepDrop(left, token);
 
       case TokenType.EXPLODE:
       case TokenType.EXPLODE_COMPOUND:
@@ -624,7 +624,7 @@ export class Parser {
       case 'FateDice':
       case 'Explode':
       case 'Reroll':
-      case 'Modifier':
+      case 'KeepDrop':
       case 'Sort':
       case 'CritThreshold':
         throw new ParseError(
@@ -639,7 +639,7 @@ export class Parser {
   }
 
   private rejectSuccessCountTarget(target: ASTNode, token: Token): void {
-    // Narrow unwrap (only `Grouped`): `Modifier`/`Sort`/`CritThreshold` each run
+    // Narrow unwrap (only `Grouped`): `KeepDrop`/`Sort`/`CritThreshold` each run
     // this same reject before building their wrapper, so a `SuccessCount` can
     // never hide inside one and widening the set would never match.
     const node = unwrapGrouped(target);
@@ -657,7 +657,7 @@ export class Parser {
    * Rejects `GroupNode` (or a wrapper-cloaked group) as the target of `token`.
    * Explode, reroll, and crit-threshold wrap bare dice pools only — a group
    * is a container of sub-expressions, so these modifiers have no defined
-   * semantics. Walks `Grouped`/`Modifier`/`Sort`/`CritThreshold` so wrappers
+   * semantics. Walks `Grouped`/`KeepDrop`/`Sort`/`CritThreshold` so wrappers
    * cannot smuggle a group past the check (`{1d6}kh1cs>5`, `({1d6})!`,
    * `{1d6}scs>5` all reject the same as `{1d6}!`/`{1d6}cs>5`).
    *
@@ -678,7 +678,7 @@ export class Parser {
     if (node.type !== 'Group') return;
     if (singleSubRollPasses && node.expressions.length === 1) {
       // ! Deep-walk the inner sub-expression — `unwrapAllTransparent` only peels
-      // ! `Grouped`/`Modifier`/`Sort`/`CritThreshold`, so a multi-sub Group
+      // ! `Grouped`/`KeepDrop`/`Sort`/`CritThreshold`, so a multi-sub Group
       // ! buried under arithmetic (`{{1d6,2d8}+0}cs>5`), a function call
       // ! (`{abs({1d6,2d8})}cs>5`), or a unary op would reach the evaluator and
       // ! override `critical`/`fumble` on dice from dropped sub-rolls.
@@ -697,7 +697,7 @@ export class Parser {
     // `versusMetadata` would silently vanish; wrappers like `floor(vs)+0` still
     // propagate it via `mergeContext`.
     // Narrow unwrap (only `Grouped`): `containsDicePool` does not recurse into
-    // `Versus`, so `Modifier`/`Sort`/`CritThreshold` reject the wrap upstream.
+    // `Versus`, so `KeepDrop`/`Sort`/`CritThreshold` reject the wrap upstream.
     const node = unwrapGrouped(target);
     if (node.type === 'Versus') {
       throw new ParseError(
@@ -725,7 +725,7 @@ export class Parser {
     }
   }
 
-  private parseModifier(target: ASTNode, token: Token): ModifierNode {
+  private parseKeepDrop(target: ASTNode, token: Token): KeepDropNode {
     this.rejectSuccessCountTarget(target, token);
     // ! Keep/drop on a Versus target silently drops `degree`/`natural` metadata,
     // ! and `{1d20 vs 15}kh1` gets past `containsDicePool` — whose Group deep
@@ -738,13 +738,13 @@ export class Parser {
     if (!containsDicePool(target)) {
       throw new ParseError(
         `Keep/drop modifiers require a dice pool target`,
-        'INVALID_MODIFIER_TARGET',
+        'INVALID_KEEP_DROP_TARGET',
         token.position,
         token,
       );
     }
 
-    const modifier =
+    const kind =
       token.type === TokenType.KEEP_HIGH || token.type === TokenType.KEEP_LOW ? 'keep' : 'drop';
 
     const selector =
@@ -764,8 +764,8 @@ export class Parser {
     this.rejectVersusTarget(count, token);
 
     return {
-      type: 'Modifier',
-      modifier,
+      type: 'KeepDrop',
+      kind,
       selector,
       count,
       target,

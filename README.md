@@ -311,7 +311,7 @@ function describe(part: RollPart): string {
       return `${part.count}d${part.sides}[${part.rolls.map((d) => d.result).join(', ')}]`;
     case 'binaryOp':
       return `${describe(part.left)} ${part.operator} ${describe(part.right)}`;
-    case 'modifier':
+    case 'keepDrop':
       return `${describe(part.target)} [${part.specs.length} keep/drop]`;
     default: // fateDice, variable, grouped, unaryOp, explode, reroll,
       return part.type; // successCount, versus, functionCall, group, sort, critThreshold

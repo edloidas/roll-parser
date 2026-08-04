@@ -12,8 +12,8 @@ import {
   isFunctionCall,
   isGroup,
   isGrouped,
+  isKeepDrop,
   isLiteral,
-  isModifier,
   isReroll,
   isSort,
   isSuccessCount,
@@ -30,7 +30,7 @@ describe('AST type guards', () => {
     ['FateDice', isFateDice, parse('4dF')],
     ['BinaryOp', isBinaryOp, parse('1+2')],
     ['UnaryOp', isUnaryOp, parse('-1d6')],
-    ['Modifier', isModifier, parse('4d6kh3')],
+    ['KeepDrop', isKeepDrop, parse('4d6kh3')],
     ['Explode', isExplode, parse('1d6!')],
     ['Reroll', isReroll, parse('2d6r<2')],
     ['SuccessCount', isSuccessCount, parse('5d10>=8')],
@@ -62,7 +62,7 @@ describe('AST walkers via parse-level guards', () => {
   });
 
   test('bare cf rejects Fate pools cloaked by wrappers inside a group', () => {
-    // One notation per `deepContainsFatePool` branch: UnaryOp, Modifier target,
+    // One notation per `deepContainsFatePool` branch: UnaryOp, KeepDrop target,
     // Grouped, nested Group.
     for (const notation of ['{-4dF}cf', '{4dFkh2}cf', '{(4dF)}cf', '{{4dF}}cf']) {
       expect(() => parse(notation)).toThrow('Bare cs/cf cannot apply to Fate dice');

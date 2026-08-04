@@ -13,8 +13,8 @@ import type {
   FunctionCallNode,
   GroupedNode,
   GroupNode,
+  KeepDropNode,
   LiteralNode,
-  ModifierNode,
   RerollNode,
   SortNode,
   SuccessCountNode,
@@ -74,8 +74,8 @@ function modifier(
   sel: 'highest' | 'lowest',
   count: ASTNode,
   target: ASTNode,
-): ModifierNode {
-  return { type: 'Modifier', modifier: mod, selector: sel, count, target };
+): KeepDropNode {
+  return { type: 'KeepDrop', kind: mod, selector: sel, count, target };
 }
 
 function explode(
@@ -771,8 +771,8 @@ describe('Parser', () => {
     });
 
     it('modifiers span target through count; implicit counts are zero-width', () => {
-      expect(parse('4d6kh3')).toMatchObject({ type: 'Modifier', start: 0, end: 6 });
-      const implicit = parse('4d6kh') as ModifierNode;
+      expect(parse('4d6kh3')).toMatchObject({ type: 'KeepDrop', start: 0, end: 6 });
+      const implicit = parse('4d6kh') as KeepDropNode;
       expect(implicit).toMatchObject({ start: 0, end: 5 });
       expect(implicit.count).toMatchObject({ start: 3, end: 3 });
     });
@@ -1341,7 +1341,7 @@ describe('Parser', () => {
 
     it('should reject Versus inside single-sub group as kh target: {1d20 vs 15}kh1', () => {
       // `containsDicePool`'s deep walk recurses into `Versus.roll`/`dc`, so a
-      // single-sub Group target reaches parseModifier; `rejectVersusTarget` is
+      // single-sub Group target reaches parseKeepDrop; `rejectVersusTarget` is
       // the only thing stopping a silently-dropped `degree`/`natural`.
       expectRollError(() => parseAst('{1d20 vs 15}kh1'), ParseError, 'NESTED_VERSUS');
     });
@@ -1367,19 +1367,19 @@ describe('Parser', () => {
 
     describe('keep/drop reject non-pool targets', () => {
       it('should reject (1d6+5)kh1', () => {
-        expectRollError(() => parseAst('(1d6+5)kh1'), ParseError, 'INVALID_MODIFIER_TARGET');
+        expectRollError(() => parseAst('(1d6+5)kh1'), ParseError, 'INVALID_KEEP_DROP_TARGET');
       });
 
       it('should reject floor(1d6/2)kh1', () => {
-        expectRollError(() => parseAst('floor(1d6/2)kh1'), ParseError, 'INVALID_MODIFIER_TARGET');
+        expectRollError(() => parseAst('floor(1d6/2)kh1'), ParseError, 'INVALID_KEEP_DROP_TARGET');
       });
 
       it('should reject 4d6+2kh3 (modifier binds to literal 2)', () => {
-        expectRollError(() => parseAst('4d6+2kh3'), ParseError, 'INVALID_MODIFIER_TARGET');
+        expectRollError(() => parseAst('4d6+2kh3'), ParseError, 'INVALID_KEEP_DROP_TARGET');
       });
 
       it('should reject (1+2)dl1', () => {
-        expectRollError(() => parseAst('(1+2)dl1'), ParseError, 'INVALID_MODIFIER_TARGET');
+        expectRollError(() => parseAst('(1+2)dl1'), ParseError, 'INVALID_KEEP_DROP_TARGET');
       });
     });
 
@@ -2282,7 +2282,7 @@ describe('Parser', () => {
       });
 
       it('should reject cs on a modifier-wrapped multi-sub-roll group: {1d20, 1d20}kh1cs>18', () => {
-        // Without the unwrap-through-Modifier check, the evaluator overrides
+        // Without the unwrap-through-KeepDrop check, the evaluator overrides
         // critical/fumble on dropped sub-roll dice from each branch.
         const error = expectRollError(
           () => parseAst('{1d20, 1d20}kh1cs>18'),
@@ -2303,7 +2303,7 @@ describe('Parser', () => {
 
       it('should reject cs on a parens-wrapped modifier-wrapped multi-sub-roll group', () => {
         // The shared unwrap peels both wrappers, so a `Grouped` around a
-        // `Modifier(Group([...]))` chain still resolves to a Group.
+        // `KeepDrop(Group([...]))` chain still resolves to a Group.
         expectRollError(
           () => parseAst('({1d20, 1d20}kh1)cs>18'),
           ParseError,

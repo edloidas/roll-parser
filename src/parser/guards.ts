@@ -14,7 +14,7 @@ import type { ASTNode } from './ast.js';
 /**
  * Peels nested `Grouped` wrappers, returning the first descendant that is not
  * one. The narrow unwrap for reject helpers whose forbidden node cannot live
- * inside `Modifier`/`Sort`/`CritThreshold` — those parsers already reject it
+ * inside `KeepDrop`/`Sort`/`CritThreshold` — those parsers already reject it
  * upstream, so peeling parentheses is all that is left to see through.
  */
 export function unwrapGrouped(node: ASTNode): ASTNode {
@@ -26,14 +26,14 @@ export function unwrapGrouped(node: ASTNode): ASTNode {
 }
 
 /**
- * Peels every transparent wrapper — `Grouped`, `Modifier`, `Sort`,
+ * Peels every transparent wrapper — `Grouped`, `KeepDrop`, `Sort`,
  * `CritThreshold` — returning the first descendant that is none of them.
  *
  * "Transparent" is relative to the question being asked. These wrappers
  * preserve `containsDicePool`'s answer for whatever they wrap, so they are
  * transparent for "what is the underlying operand?" when deciding whether to
  * reject a `Group` target (e.g., `Group` cannot be the target of `cs`/`cf`,
- * even when wrapped in `Modifier` like `{1d6}kh1cs>5`). They are NOT
+ * even when wrapped in `KeepDrop` like `{1d6}kh1cs>5`). They are NOT
  * transparent for "is this a `SuccessCount`?" or "is this a `Versus`?" —
  * those questions use `unwrapGrouped`.
  */
@@ -44,7 +44,7 @@ export function unwrapAllTransparent(node: ASTNode): ASTNode {
       case 'Grouped':
         current = current.expression;
         break;
-      case 'Modifier':
+      case 'KeepDrop':
       case 'Sort':
       case 'CritThreshold':
         current = current.target;
@@ -72,7 +72,7 @@ function someDescendant(node: ASTNode, isHit: (node: ASTNode) => boolean): boole
       return someDescendant(node.left, isHit) || someDescendant(node.right, isHit);
     case 'UnaryOp':
       return someDescendant(node.operand, isHit);
-    case 'Modifier':
+    case 'KeepDrop':
     case 'Explode':
     case 'Reroll':
     case 'SuccessCount':
@@ -116,7 +116,7 @@ const isVersusHit = (current: ASTNode): boolean => current.type === 'Versus';
 
 /**
  * Returns `true` only when `node`'s direct result is a dice pool —
- * `Dice`, `FateDice`, or a chained pool modifier (`Modifier` / `Explode` /
+ * `Dice`, `FateDice`, or a chained pool modifier (`KeepDrop` / `Explode` /
  * `Reroll`). Does NOT recurse through arithmetic wrappers (`BinaryOp`,
  * `UnaryOp`, `FunctionCall`), so `(1d6+5)` and `floor(1d6/2)` are rejected.
  *
@@ -128,7 +128,7 @@ export function containsDicePool(node: ASTNode): boolean {
   switch (node.type) {
     case 'Dice':
     case 'FateDice':
-    case 'Modifier':
+    case 'KeepDrop':
     case 'Explode':
     case 'Reroll':
       return true;
@@ -166,7 +166,7 @@ export function deepContainsDicePool(node: ASTNode): boolean {
 
 /**
  * Returns `true` if the pool this node resolves to is (or wraps) a `FateDice`
- * pool. Walks through chained pool modifiers (`Modifier` / `Explode` /
+ * pool. Walks through chained pool modifiers (`KeepDrop` / `Explode` /
  * `Reroll`) but not arithmetic wrappers — callers should run
  * `containsDicePool` first to reject those.
  *
@@ -183,7 +183,7 @@ export function containsFatePool(node: ASTNode): boolean {
   switch (node.type) {
     case 'FateDice':
       return true;
-    case 'Modifier':
+    case 'KeepDrop':
     case 'Explode':
     case 'Reroll':
     case 'Sort':
@@ -220,7 +220,7 @@ export function deepContainsFatePool(node: ASTNode): boolean {
  * other non-transparent wrapper still rejects with the same error code.
  *
  * Without this walk, the unwrap inside `rejectGroupTarget` only peels
- * `Grouped`/`Modifier`/`Sort`/`CritThreshold` — a multi-sub Group cloaked
+ * `Grouped`/`KeepDrop`/`Sort`/`CritThreshold` — a multi-sub Group cloaked
  * in a `BinaryOp`/`UnaryOp`/`FunctionCall` reaches the evaluator, where it
  * flags crits on dice belonging to dropped sub-rolls.
  */

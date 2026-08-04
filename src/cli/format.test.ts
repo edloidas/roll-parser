@@ -105,7 +105,7 @@ describe('formatResult', () => {
       const result = roll('4d6kh3', { rng: createMockRng([3, 1, 5, 4]) });
       const parsed = JSON.parse(formatResult(result, { json: true }));
 
-      expect(parsed.parts.type).toBe('modifier');
+      expect(parsed.parts.type).toBe('keepDrop');
       expect(parsed.parts.total).toBe(parsed.total);
       expect(parsed.parts.specs).toEqual([{ kind: 'keep', selector: 'highest', count: 3 }]);
       expect(parsed.parts.target.rolls).toHaveLength(4);
