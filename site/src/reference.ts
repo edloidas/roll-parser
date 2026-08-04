@@ -49,6 +49,14 @@ const SECTIONS: Section[] = [
       { notation: 'max(1d20,1d20)', note: 'Advantage as a function — the larger of two rolls.' },
       { notation: 'min(1d20,1d20)', note: 'Disadvantage — the smaller of two rolls.' },
       { notation: '(1d4)d6', note: 'Computed dice: roll 1d4, then roll that many d6.' },
+      { notation: '2d(2*3)', note: 'Computed sides: the side count can be an expression too.' },
+      { notation: '1d20%3', note: 'Modulo — the remainder after division.' },
+      { notation: '1d6**2', note: 'Power, right-associative. “^” is the same operator.' },
+      { notation: '-1d4+10', note: 'Unary minus negates the die, not the sum — −(1d4) + 10.' },
+      {
+        notation: '1d6*2.5',
+        note: 'Decimals work in arithmetic, though never as a dice or side count.',
+      },
     ],
   },
   {
@@ -58,6 +66,9 @@ const SECTIONS: Section[] = [
       { notation: '4d6kh3', note: 'Keep the highest 3 of 4 — classic ability scores.' },
       { notation: '2d20kl1', note: 'Keep the lowest 1 of 2 — disadvantage.' },
       { notation: '4d6dl1', note: 'Drop the lowest 1, keep the rest.' },
+      { notation: '4d6dh1', note: 'Drop the highest 1 — the other drop direction.' },
+      { notation: '4d6k3', note: '“k” alone is shorthand for “kh” — keep the highest 3.' },
+      { notation: '4d6kh', note: 'The count defaults to 1, so this keeps a single die.' },
     ],
   },
   {
@@ -84,13 +95,21 @@ const SECTIONS: Section[] = [
     examples: [
       { notation: '10d10>=6', note: 'Count dice that meet the threshold as successes.' },
       { notation: '10d10>=6f1', note: 'Add a failure threshold — 1s subtract from the tally.' },
+      {
+        notation: '10d10>=6f<=2',
+        note: 'The failure threshold takes a comparator, not just a face.',
+      },
     ],
   },
   {
     id: 'crits-sorting',
     title: 'Crits & sorting',
     examples: [
+      { notation: '1d20cs', note: 'Bare “cs” means the max face, which is already the default.' },
       { notation: '1d20cs>=19', note: 'Flag a critical success on 19 or 20.' },
+      { notation: '1d20cf', note: 'Bare “cf” means a 1 — likewise the default fumble face.' },
+      { notation: '1d20cf<=2', note: 'Widen the fumble threshold to 1 or 2.' },
+      { notation: '4d6s', note: 'Sort the dice ascending — “sa” spells the same thing.' },
       { notation: '4d6sd', note: 'Sort the dice descending — presentation only.' },
     ],
   },
@@ -106,6 +125,10 @@ const SECTIONS: Section[] = [
     title: 'Grouped rolls',
     examples: [
       { notation: '{1d8, 1d10}kh1', note: 'Keep the highest result across separate rolls.' },
+      {
+        notation: '{1d6+1d6}kh1',
+        note: 'A single sub-roll flattens into one pool — keep the highest die of the two.',
+      },
     ],
   },
   {
@@ -116,6 +139,11 @@ const SECTIONS: Section[] = [
         notation: '1d20+@str',
         note: 'Reference an external value. Evaluated here with a preset context of { str: 3 }.',
         context: { str: 3 },
+      },
+      {
+        notation: '1d20+@{str mod}',
+        note: 'Braces allow any name, including spaces. Evaluated with { "str mod": 3 }.',
+        context: { 'str mod': 3 },
       },
     ],
   },
