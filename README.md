@@ -843,8 +843,9 @@ need a roll to survive a major upgrade, persist the `RollResult`, not the seed o
 the state.
 
 **What is deliberately mutable.** `RollResult.rolls` and the `parts` tree stay
-mutable so you can annotate your own views; the AST and tokens are treated as
-immutable inputs. See [Working with results](#working-with-results).
+mutable so you can annotate your own views; the AST and tokens are typed
+`readonly` throughout, so the compiler rejects mutating a parsed node or token
+in place. See [Working with results](#working-with-results).
 
 **Runtimes.** The supported floor is Node ≥ 22.12, current Bun, and any browser
 with ES2022. Raising the floor is a major. The library imports no `node:`

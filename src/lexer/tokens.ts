@@ -194,15 +194,15 @@ export enum TokenType {
  */
 export type Token = {
   /** The type of this token */
-  type: TokenType;
+  readonly type: TokenType;
   /** The raw string value from input (lowercased for identifiers) */
-  value: string;
+  readonly value: string;
   /** Zero-based start offset in the input string (UTF-16 code units) */
-  position: number;
+  readonly position: number;
   /**
    * Zero-based end offset (exclusive). Not always `position + value.length` —
    * braced variables (`@{name}` stores only `name`) and case-normalized
    * identifiers consume more input than their `value` retains.
    */
-  end: number;
+  readonly end: number;
 };

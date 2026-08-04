@@ -1,6 +1,8 @@
 import { describe, expect, test } from 'bun:test';
 import { isRollParserError, RollParserError } from '../errors.js';
-import type { ASTNode } from './ast.js';
+import type { Token } from '../lexer/tokens.js';
+import { TokenType } from '../lexer/tokens.js';
+import type { ASTNode, FunctionCallNode } from './ast.js';
 import {
   isBinaryOp,
   isCritThreshold,
@@ -65,6 +67,37 @@ describe('AST walkers via parse-level guards', () => {
     for (const notation of ['{-4dF}cf', '{4dFkh2}cf', '{(4dF)}cf', '{{4dF}}cf']) {
       expect(() => parse(notation)).toThrow('Bare cs/cf cannot apply to Fate dice');
     }
+  });
+});
+
+// The gate here is the typecheck, not the assertions: `readonly` erases at emit,
+// so every assignment below succeeds at runtime. An `@ts-expect-error` whose
+// property loses `readonly` goes unused, which is itself a type error.
+describe('AST and Token immutability', () => {
+  test('node properties and node-reachable arrays reject assignment', () => {
+    const node: FunctionCallNode = { type: 'FunctionCall', name: 'floor', args: [], start: 0 };
+    expect(node.args).toEqual([]);
+
+    // @ts-expect-error -- readonly
+    node.type = 'Literal';
+    // @ts-expect-error -- readonly array
+    node.args.push({ type: 'Literal', value: 1 });
+    // @ts-expect-error -- readonly
+    node.start = 1;
+  });
+
+  test('token properties reject assignment', () => {
+    const token: Token = { type: TokenType.NUMBER, value: '2', position: 0, end: 1 };
+    expect(token.value).toBe('2');
+
+    // @ts-expect-error -- readonly
+    token.type = TokenType.DICE;
+    // @ts-expect-error -- readonly
+    token.value = 'x';
+    // @ts-expect-error -- readonly
+    token.position = 9;
+    // @ts-expect-error -- readonly
+    token.end = 9;
   });
 });
 

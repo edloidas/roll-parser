@@ -83,9 +83,7 @@ function explode(
   target: ASTNode,
   threshold?: ComparePoint,
 ): ExplodeNode {
-  const node: ExplodeNode = { type: 'Explode', variant, target };
-  if (threshold) node.threshold = threshold;
-  return node;
+  return { type: 'Explode', variant, target, ...(threshold ? { threshold } : {}) };
 }
 
 function reroll(once: boolean, condition: ComparePoint, target: ASTNode): RerollNode {
@@ -97,9 +95,12 @@ function successCount(
   threshold: ComparePoint,
   failThreshold?: ComparePoint,
 ): SuccessCountNode {
-  const node: SuccessCountNode = { type: 'SuccessCount', target, threshold };
-  if (failThreshold) node.failThreshold = failThreshold;
-  return node;
+  return {
+    type: 'SuccessCount',
+    target,
+    threshold,
+    ...(failThreshold ? { failThreshold } : {}),
+  };
 }
 
 function cp(operator: ComparePoint['operator'], value: ASTNode): ComparePoint {
