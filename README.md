@@ -330,7 +330,9 @@ describe(roll('4d6kh3 + 2', { rng: createMockRng([3, 6, 2, 5]) }).parts);
 
 Invariants worth relying on: `result.parts.total === result.total`,
 `successCount.total === successes - failures`, and every part's `rolls[]`
-sharing references with `result.rolls`.
+sharing references with `result.rolls`. A `sort` part's `rolls[]` is its
+target's pool in sorted order — chained sorts (`4d6s sd`) nest, and the
+outermost one holds the order `rendered` shows.
 
 Meta-expressions do **not** appear as nested parts. `(1d4)d6`, `4d6kh(1d2)`, and
 `1d6!>(1d2+3)` surface only their resolved numbers in the owning part; their

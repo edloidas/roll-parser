@@ -352,6 +352,18 @@ describe('RollResult.parts', () => {
         target: { type: 'dice' },
         total: 10,
       });
+      if (result.parts.type !== 'sort') throw new Error('expected sort root');
+      expect(result.parts.rolls.map((d) => d.result)).toEqual([1, 2, 3, 4]);
+    });
+
+    test('chained sort nests, each level carrying its own pool (#242)', () => {
+      const result = roll('4d6s sd', { rng: createMockRng([3, 1, 4, 2]) });
+      if (result.parts.type !== 'sort' || result.parts.target.type !== 'sort') {
+        throw new Error('expected nested sort parts');
+      }
+      expect(result.parts.order).toBe('descending');
+      expect(result.parts.rolls.map((d) => d.result)).toEqual([4, 3, 2, 1]);
+      expect(result.parts.target.rolls.map((d) => d.result)).toEqual([1, 2, 3, 4]);
     });
 
     test('critThreshold chain surfaces resolved threshold arrays', () => {
@@ -458,6 +470,36 @@ describe('RollResult.parts', () => {
       expect(result.rolls[0]).toBe(
         result.parts.target.rolls[0] as NonNullable<(typeof result.rolls)[number]>,
       );
+    });
+  });
+
+  describe('sort part pool', () => {
+    test('shares DieResult objects with result.rolls (#242)', () => {
+      const result = roll('4d6s', { rng: createMockRng([3, 1, 4, 2]) });
+      if (result.parts.type !== 'sort') throw new Error('expected sort root');
+      for (let i = 0; i < result.parts.rolls.length; i++) {
+        expect(result.parts.rolls[i]).toBe(
+          result.rolls[i] as NonNullable<(typeof result.rolls)[number]>,
+        );
+      }
+    });
+
+    test('keeps meta dice, which rendered hides (#242)', () => {
+      const result = roll('(1d4)d6s', { rng: createMockRng([3, 5, 2, 6]) });
+      if (result.parts.type !== 'sort') throw new Error('expected sort root');
+      expect(result.parts.rolls.map((d) => d.result)).toEqual([2, 3, 5, 6]);
+      expect(result.parts.rolls[1]?.modifiers).toContain('meta');
+      expect(result.rendered).toBe('3d6s[2, 5, 6] = 13');
+    });
+
+    test('shows flags set after the sort ran (#242)', () => {
+      const result = roll('4d6s dl1', { rng: createMockRng([3, 1, 4, 2]) });
+      if (result.parts.type !== 'keepDrop' || result.parts.target.type !== 'sort') {
+        throw new Error('unexpected parts shape');
+      }
+      const sorted = result.parts.target.rolls;
+      expect(sorted.map((d) => d.result)).toEqual([1, 2, 3, 4]);
+      expect(sorted[0]?.modifiers).toEqual(['dropped']);
     });
   });
 

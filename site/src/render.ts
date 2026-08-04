@@ -149,14 +149,18 @@ function renderEquation(root: RollPart, notation: string): string {
   /** Renders a modifier-family part as one chip, unwrapping to the dice it decorates. */
   function modifierLike(part: RollPart, isOutermost: boolean): string {
     let core: RollPart = part;
-    while ('target' in core) core = core.target;
+    let sortedRolls: DieResult[] | undefined;
+    while ('target' in core) {
+      if (core.type === 'sort') sortedRolls ??= core.rolls;
+      core = core.target;
+    }
 
     const label = sliceOf(part);
 
     if (core.type === 'dice' || core.type === 'fateDice') {
       return groupChip(
         label || fallbackDiceLabel(core),
-        core.rolls,
+        sortedRolls ?? core.rolls,
         subtotalText(part),
         isOutermost,
       );
