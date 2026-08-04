@@ -91,10 +91,18 @@ describe('two-pass emit', () => {
     const declaration = await Bun.file('./dist/errors.d.ts').text();
 
     expect(declaration).not.toContain('@internal');
-    expect(declaration).not.toContain('stampSpan');
+    expect(declaration).not.toContain('stampEvaluatorSpan');
 
     // Stripping must be surgical — the public accessors over the span survive.
     expect(declaration).toContain('get start()');
     expect(declaration).toContain('get end()');
+  });
+
+  // ! `stripInternal` only reaches the declaration it annotates. A re-export from
+  // ! `index.ts` would carry no `@internal` of its own and reopen the span setter.
+  test('keeps the span setter out of the entry point (#232)', async () => {
+    for (const entry of ['./dist/index.d.ts', './dist/index.js']) {
+      expect(await Bun.file(entry).text()).not.toContain('stampEvaluatorSpan');
+    }
   });
 });

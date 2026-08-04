@@ -4,7 +4,7 @@
  * @module evaluator/evaluator
  */
 
-import { describeValue, EvaluatorError, RollParserError } from '../errors.js';
+import { describeValue, EvaluatorError, RollParserError, stampEvaluatorSpan } from '../errors.js';
 import type {
   ASTNode,
   BinaryOpNode,
@@ -279,7 +279,7 @@ function evalNode(node: ASTNode, rng: RNG, ctx: EvalContext, env: EvalEnv): Eval
     return evalNodeInner(node, rng, ctx, env);
   } catch (error) {
     if (error instanceof EvaluatorError && node.start != null) {
-      error.stampSpan(node.start, node.end);
+      stampEvaluatorSpan(error, node.start, node.end);
     }
     throw error;
   }

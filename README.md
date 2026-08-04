@@ -597,7 +597,10 @@ throws a typed `MAX_DEPTH_EXCEEDED` instead of blowing the stack, which keeps
 
 ## Error handling
 
-Every failure extends `RollParserError` and carries a stable `code`. Use
+Every failure raised by lexing, parsing, evaluation, or options validation
+extends `RollParserError` and carries a stable `code`. Two failures do not, and
+both need an injected mock to occur — see [Errors outside the
+hierarchy](#errors-outside-the-hierarchy). Use
 `isRollParserError` as the outer filter — anything it rejects came from
 somewhere else, so rethrow it. What it does *not* tell you is whose fault the
 failure was: it answers `true` for bad notation, for a bad options object, and
@@ -649,6 +652,29 @@ try {
   post({ ok: false, code: error.code, message: error.message });
 }
 ```
+
+### Errors outside the hierarchy
+
+Two failures can surface from `roll()` without extending `RollParserError` or
+carrying a `code`, and both come from `roll-parser/testing`:
+
+| Thrown | When |
+|--------|------|
+| `MockRNGExhaustedError` | a `createMockRng` sequence runs out of values mid-roll |
+| `RangeError` | a scripted value falls outside the `[min, max]` a die asked for |
+
+Neither is reachable unless you passed `{ rng: createMockRng(...) }` yourself, so
+the filter stays complete for untrusted notation — this is a miscounted test
+fixture, not a runtime failure mode, and it is deliberately left un-branded so it
+cannot be mistaken for one. `isRollParserError` returns `false` for both, which
+means the `if (!isRollParserError(error)) throw error` line above already does
+the right thing: the exhausted mock propagates to your test runner and fails the
+test, rather than being swallowed by a `catch` written for bad dice notation.
+
+Nothing else in the library documents `instanceof` as the check — for these two
+it is the only option, and `MockRNGExhaustedError` exposes `consumed` to tell you
+how many draws the sequence supplied before it ran dry. See
+[Testing](#testing) for the worked example.
 
 ### Notation errors
 
