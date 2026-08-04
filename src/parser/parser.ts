@@ -237,15 +237,9 @@ export class Parser {
    * Parse an expression with minimum binding power.
    */
   private parseExpression(minBp: number): ASTNode {
+    const entryDepth = this.depth;
     this.depth += 1;
-    if (this.depth > MAX_PARSE_DEPTH) {
-      throw new ParseError(
-        `Expression nesting exceeds the maximum depth of ${MAX_PARSE_DEPTH}`,
-        'MAX_DEPTH_EXCEEDED',
-        this.peek().position,
-        this.peek(),
-      );
-    }
+    this.guardDepth();
 
     try {
       let left = this.parseNud();
@@ -258,11 +252,31 @@ export class Parser {
 
         this.advance();
         left = this.parseLed(left, token);
+        // ! Each continuation wraps `left`, so the AST is one level deeper even
+        // ! though this loop never recursed. Drop this and the bound stops
+        // ! holding for left-associative chains.
+        this.depth += 1;
+        this.guardDepth();
       }
 
       return left;
     } finally {
-      this.depth -= 1;
+      this.depth = entryDepth;
+    }
+  }
+
+  /**
+   * Throw once the AST under construction is deeper than the recursive walkers
+   * can safely descend.
+   */
+  private guardDepth(): void {
+    if (this.depth > MAX_PARSE_DEPTH) {
+      throw new ParseError(
+        `Expression nesting exceeds the maximum depth of ${MAX_PARSE_DEPTH}`,
+        'MAX_DEPTH_EXCEEDED',
+        this.peek().position,
+        this.peek(),
+      );
     }
   }
 

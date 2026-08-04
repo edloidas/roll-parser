@@ -597,6 +597,32 @@ describe('Parser', () => {
       const nested = `${'('.repeat(50)}1d6${')'.repeat(50)}`;
       expect(() => parseAst(nested)).not.toThrow();
     });
+
+    it('counts left-associative chain growth toward the depth bound (#213)', () => {
+      for (const operator of ['+', '-', '*', '/', '%', '**']) {
+        const chain = `${`1${operator}`.repeat(20_000)}1`;
+
+        expectRollError(() => parseAst(chain), ParseError, 'MAX_DEPTH_EXCEEDED');
+      }
+    });
+
+    it('keeps a typed error on chains reached through dice and groups (#213)', () => {
+      expectRollError(
+        () => parseAst(`${'1d6+'.repeat(20_000)}1`),
+        ParseError,
+        'MAX_DEPTH_EXCEEDED',
+      );
+      expectRollError(
+        () => parseAst(`${'(1+1)*'.repeat(20_000)}1`),
+        ParseError,
+        'MAX_DEPTH_EXCEEDED',
+      );
+    });
+
+    it('still accepts operator chains a human would write', () => {
+      expect(() => parseAst(`${'1+'.repeat(60)}1`)).not.toThrow();
+      expect(() => parseAst('2d6+1d8+3-1')).not.toThrow();
+    });
   });
 
   describe('ambiguous bare dice chains', () => {

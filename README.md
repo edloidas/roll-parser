@@ -11,7 +11,7 @@ Dice notation for tabletop RPGs, rolled into structured results.
 <p align="center">
   <a href="https://www.npmjs.com/package/roll-parser"><img src="https://img.shields.io/npm/v/roll-parser?color=cb3837" alt="npm version"></a>
   <a href="https://github.com/edloidas/roll-parser/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/edloidas/roll-parser/ci.yml?branch=master&label=CI" alt="CI status"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/npm/l/roll-parser?color=blue" alt="MIT license"></a>
+  <a href="https://github.com/edloidas/roll-parser/blob/master/LICENSE"><img src="https://img.shields.io/npm/l/roll-parser?color=blue" alt="MIT license"></a>
   <!-- TODO: switch to img.shields.io/node/v/roll-parser once 3.0.0 is npm `latest` — until then it reads 2.x engines -->
   <a href="https://nodejs.org/"><img src="https://img.shields.io/badge/node-%3E%3D22.12-5fa04e" alt="Node.js >= 22.12"></a>
 </p>
@@ -66,10 +66,10 @@ roll('4d6kh3', { rng: createMockRng([3, 6, 2, 5]) }).total; // 14, every run
 - **Safe on untrusted input.** Dice count, explosion depth, reroll depth, and
   parse depth are all bounded, and every failure is a typed error with a stable
   code and a source span.
-- **Small and fast.** ≈10.9 kB brotli for the whole library, ≈5.1 kB for just
+- **Small and fast.** ≈11.1 kB brotli for the whole library, ≈5.1 kB for just
   `parse`, ≈215 B for the testing entry point. Zero runtime dependencies, zero
   `node:` imports. A `1d20` round trip takes about 1.5 µs.
-- **Tested.** 1,200+ tests behind CI-enforced coverage floors — 100% of
+- **Tested.** 1,350+ tests behind CI-enforced coverage floors — 100% of
   functions, 98% of lines — including every code example in this README, which
   must produce the values its comments claim.
 
@@ -87,6 +87,7 @@ roll('4d6kh3', { rng: createMockRng([3, 6, 2, 5]) }).total; // 14, every run
 - [CLI](#cli)
 - [Performance](#performance)
 - [Known limitations](#known-limitations)
+- [Versioning](#versioning)
 - [Upgrading from 2.x](#upgrading-from-2x)
 - [Contributing](#contributing)
 - [License](#license)
@@ -380,10 +381,12 @@ roll('1d20', { rng }).total; // 1
 roll('1d20', { rng }).total; // 20
 ```
 
-Within one released version, the same seed and the same notation always
-produce the same dice. The generator is not cryptographically secure, and its
-output may change between major versions — persist the `RollResult`, not the
-seed.
+Within one released version, the same seed and the same notation always produce
+the same dice. Across versions they do not: the mapping is outside the semver
+contract and can change in any release (see [Versioning](#versioning)), as it
+did between 3.0.0-beta.0 and 3.0.0. The generator is also not cryptographically
+secure. If a roll has to be reproducible later, persist the `RollResult`, not
+the seed.
 
 ### Replay and save/resume
 
@@ -571,8 +574,11 @@ or read it uniformly through `getErrorSpan`.
 
 ### Error codes
 
-`RollParserErrorCode` is a closed union of 30 stable codes — match on the code,
-not the message. The ones you will meet first: `EXPECTED_TOKEN` and
+`RollParserErrorCode` is a union of 30 codes today — match on the code, not the
+message, and give the `switch` a `default` arm: new codes arrive in minor
+releases (never patches), so an exhaustive switch would turn a minor upgrade
+into a silent fall-through. See [Versioning](#versioning) for the full policy.
+The ones you will meet first: `EXPECTED_TOKEN` and
 `UNEXPECTED_TOKEN` for malformed notation, `AMBIGUOUS_DICE_CHAIN` for `4d6d1`,
 `UNDEFINED_VARIABLE` for a `@name` missing from `context`, and
 `DICE_LIMIT_EXCEEDED` when a [safety limit](#safety-limits) trips. The full
@@ -642,11 +648,12 @@ the syntax tree, `RollParserErrorCode` for handling failures — and the rest
 (`Token` from `lex`, `ErrorSpan` from `getErrorSpan`, and the like) arrives
 through inference from the functions that return it.
 
-`RollPart` and `ASTNode` are both discriminated unions, so an exhaustive
-`switch` type-checks without a default branch — add a variant upstream and
-TypeScript points at every switch that needs updating. `RollPart` discriminants
-are camelCase (`'binaryOp'`), `ASTNode` discriminants PascalCase
-(`'BinaryOp'`), which keeps the two trees distinguishable at a glance.
+`RollPart` and `ASTNode` are both discriminated unions, so a `switch` over the
+discriminant narrows each arm to the right variant. Give it a `default` arm
+anyway — new notation means new variants, and those arrive in minor releases
+(see [Versioning](#versioning)). `RollPart` discriminants are camelCase
+(`'binaryOp'`), `ASTNode` discriminants PascalCase (`'BinaryOp'`), which keeps
+the two trees distinguishable at a glance.
 
 Type resolution across module settings ([see Install](#install)) is verified
 in CI by `@arethetypeswrong/cli` and `publint`.
@@ -671,13 +678,13 @@ Options:
 
 ```bash
 $ roll-parser 2d6+3 --seed demo
-11
+10
 
 $ roll-parser 4d6kh3 --verbose --seed demo
-4d6[2, 6, 1, (1)] = 9
+4d6[1, 6, (1), 3] = 10
 
 $ roll-parser "1d20+7 vs 15" --json --seed demo
-{"total":19,"notation":"1d20+7 vs 15","expression":"1d20 + 7 vs 15",...}
+{"total":8,"notation":"1d20+7 vs 15","expression":"1d20 + 7 vs 15","rendered":"1d20[1] + 7 vs 15 = Critical Failure",...}
 
 $ roll-parser "2d6+1d0+3"
 Error: Invalid dice sides: 0
@@ -737,7 +744,7 @@ Run `bun run bench` for the full suite, or `bench:lex` / `bench:parse` /
 ## Known limitations
 
 - **Keep/drop does not echo into the render prefix.** `4d6kh3` renders as
-  `4d6[2, 6, 1, ~~1~~] = 9`, while every other modifier family does echo
+  `4d6[1, 6, ~~1~~, 3] = 10`, while every other modifier family does echo
   (`8d6![…]`, `4d6sd[…]`, `10d10>=6f1[…]`). The dropped die is still marked;
   only the `kh3` is missing, and `result.expression` has it.
 - **`4d6d1` is a parse error, not "drop 1".** The bare `d` is the dice
@@ -771,6 +778,38 @@ Run `bun run bench` for the full suite, or `bench:lex` / `bench:parse` /
   JavaScript numbers, so `9007199254740993` evaluates to `9007199254740992`. Dice
   `sides` past that ceiling are rejected with `INVALID_DICE_SIDES`, but plain
   literals are not.
+
+## Versioning
+
+[Semantic Versioning](https://semver.org/spec/v2.0.0.html), with the type-level
+and randomness details spelled out below, because for a library like this one
+they are where "breaking" is ambiguous.
+
+**Unions are open.** `RollParserErrorCode`, `RollPart`, `ASTNode`, `TokenType`,
+and `DieModifier` all gain members in minor releases — new notation means new
+node types, new part types, and new error codes. Give every `switch` over them
+a `default` arm. Members are only ever removed or renamed in a major.
+
+**Types.** Widening a parameter, adding an optional option, and adding a field
+to a returned object are all minor. Removing or narrowing anything you can name
+from the public entry points is major. Every type reachable from a public
+signature is exported — you should never need to reach into `dist/`.
+
+**Randomness is not covered by semver.** The seed → dice mapping is stable
+within a released version and may change in **any** release, including a patch:
+an RNG fix is a bug fix, and 3.0.0 shipped exactly such a change against
+3.0.0-beta.0. The same applies to `RngState` snapshots, which are only
+guaranteed to restore into the version that produced them. If you need a roll
+to be reproducible later, persist the `RollResult`, not the seed or the state.
+
+**What is deliberately mutable.** `RollResult.rolls` and the `parts` tree stay
+mutable so you can annotate your own views; the AST and tokens are treated as
+immutable inputs. See [Working with results](#working-with-results).
+
+**Runtimes.** The supported floor is Node ≥ 22.12, current Bun, and any browser
+with ES2022. Raising the floor is a major. The library imports no `node:`
+builtins, which is enforced in CI, so Deno and edge runtimes work too — they are
+just not yet in the smoke matrix.
 
 ## Contributing
 

@@ -869,5 +869,19 @@ describe('property-based invariants', () => {
         { numRuns: 500 },
       );
     });
+
+    // ! Separate from the two properties above because they cap input at 64
+    // ! characters — reaching the stack limit takes thousands of terms.
+    test('roll() on long operator chains never escapes the typed-error contract', () => {
+      const chainArb = fc
+        .tuple(
+          fc.constantFrom('1', '1d6', '2d6kh1', '(1+1)'),
+          fc.constantFrom('+', '-', '*', '/', '%', '**'),
+          fc.integer({ min: 2_000, max: 40_000 }),
+        )
+        .map(([term, operator, count]) => `${term}${operator}`.repeat(count) + term);
+
+      fc.assert(fc.property(chainArb, seedArb, rollsOrThrowsTyped), { numRuns: 40 });
+    });
   });
 });
