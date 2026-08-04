@@ -388,6 +388,132 @@ jobs:
         if: contains(fromJSON('["failure", "cancelled"]'), needs.node-smoke.result)
         run: exit 1
 
+  # The published types on the TypeScript versions consumers actually run.
+  # Typechecks `scripts/ts-compat/consumer.ts` against the packed tarball, so
+  # the `exports` map, both entry points, and the emitted `.d.ts` all take
+  # part — `tsc` resolves here exactly the way a consumer's does. Node-only:
+  # no Bun setup and no root install, since the fixture depends on the tarball
+  # and one matrix TypeScript, nothing else.
+  ts-compat:
+    name: TypeScript Compat (${{ matrix.typescript }}.x)
+    runs-on: ubuntu-latest
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        # Declared floor first — `README.md` promises it. 5.9 is the end of the
+        # 5.x line and where most installs sit; 7 is what this repo builds with.
+        typescript: ['5.0', '5.4', '5.9', '6', '7']
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: lts/*
+          # ! No package-lock.json in this repo — setup-node's npm auto-cache
+          # ! (on by default since v5) hard-fails when it cannot find one.
+          package-manager-cache: false
+
+      - name: Download tarball
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: npm-tarball
+          path: ${{ runner.temp }}/tarball
+
+      - name: Install fixture against the tarball
+        env:
+          TS_VERSION: ${{ matrix.typescript }}
+        run: |
+          cp -R scripts/ts-compat "$RUNNER_TEMP/ts-compat"
+          cd "$RUNNER_TEMP/ts-compat"
+          npm install --no-audit --no-fund "$RUNNER_TEMP"/tarball/roll-parser-*.tgz "typescript@$TS_VERSION"
+          node -p "'typescript ' + require('typescript/package.json').version"
+
+      - name: Typecheck consumer with moduleResolution bundler
+        working-directory: ${{ runner.temp }}/ts-compat
+        run: ./node_modules/.bin/tsc -p tsconfig.bundler.json
+
+      - name: Typecheck consumer with moduleResolution nodenext
+        working-directory: ${{ runner.temp }}/ts-compat
+        run: ./node_modules/.bin/tsc -p tsconfig.nodenext.json
+
+  # The negative case. Without it the matrix proves only that some versions
+  # pass, never that the floor is where the README says it is. 4.9 is the last
+  # release before `moduleResolution: bundler` existed, so it cannot resolve
+  # the package at all: every import degrades to `any`, and that is precisely
+  # what the fixture's `NotAny` assertions and `@ts-expect-error` lines catch.
+  # (`node16`/`nodenext` do still resolve on 4.9 — 5.0 is the floor because it
+  # is the lowest version where every documented setting works.)
+  ts-compat-floor:
+    name: TypeScript Floor Guard
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: lts/*
+          # ! No package-lock.json in this repo — setup-node's npm auto-cache
+          # ! (on by default since v5) hard-fails when it cannot find one.
+          package-manager-cache: false
+
+      - name: Download tarball
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: npm-tarball
+          path: ${{ runner.temp }}/tarball
+
+      - name: Install fixture against the tarball
+        run: |
+          cp -R scripts/ts-compat "$RUNNER_TEMP/ts-compat"
+          cd "$RUNNER_TEMP/ts-compat"
+          npm install --no-audit --no-fund "$RUNNER_TEMP"/tarball/roll-parser-*.tgz typescript@4.9
+          node -p "'typescript ' + require('typescript/package.json').version"
+
+      - name: Assert the version below the floor fails
+        working-directory: ${{ runner.temp }}/ts-compat
+        run: |
+          if output=$(./node_modules/.bin/tsc -p tsconfig.bundler.json 2>&1); then
+            echo 'TypeScript 4.9 typechecked the published types: either the 5.0 floor in README.md is stale, or the fixture no longer asserts anything.'
+            exit 1
+          fi
+          echo "$output"
+          # A non-zero exit alone would also be satisfied by an unrelated
+          # fixture break, which proves nothing about the floor. TS2792 is the
+          # `exports`-only import going unresolved, TS2344 is the
+          # `Assert<NotAny<…>>` guards catching the `any` that leaves behind.
+          for code in TS2792 TS2344; do
+            if ! printf '%s\n' "$output" | grep -q "$code"; then
+              echo "Expected $code below the floor; got the failure above instead."
+              exit 1
+            fi
+          done
+          echo 'Below-floor typecheck failed for the expected reasons.'
+
+  # Stable fan-in for branch protection, same reasoning as `node-smoke-gate`:
+  # the matrix bakes versions into check names, so protection should require
+  # this one name instead of the legs.
+  ts-compat-gate:
+    name: TypeScript Compat
+    runs-on: ubuntu-latest
+    needs: [ts-compat, ts-compat-floor]
+    if: always()
+    steps:
+      - name: Fail if any TypeScript leg failed
+        if: >-
+          contains(fromJSON('["failure", "cancelled"]'), needs.ts-compat.result) ||
+          contains(fromJSON('["failure", "cancelled"]'), needs.ts-compat-floor.result)
+        run: exit 1
+
   # The neutrality gate Bun's bundler cannot provide: esbuild with
   # `--platform=browser` hard-errors on any Node builtin import (Bun's
   # `--target browser` silently stubs them instead), the minified bundle is

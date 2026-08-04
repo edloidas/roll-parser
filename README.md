@@ -105,7 +105,11 @@ npm install roll-parser
 
 For TypeScript consumers, `moduleResolution` must be `bundler`, `node16`, or
 `nodenext` — the package resolves through `exports` only, so the legacy `node10`
-resolution does not find it.
+resolution does not find it. **TypeScript ≥ 5.0** is the supported floor — the
+first release with `moduleResolution: bundler`. CI typechecks a consumer fixture
+against the packed tarball on 5.0, 5.4, 5.9, 6.x, and 7.x, and asserts the types
+really resolve rather than degrading to `any`. `node16`/`nodenext` setups do
+resolve on 4.9, but that combination is untested and outside the promise.
 
 Bundlers tree-shake the library cleanly: the library entries are side-effect-free
 and touch no `process` or filesystem globals. Only the CLI entry is marked as
@@ -859,8 +863,9 @@ mutable so you can annotate your own views; the AST and tokens are typed
 `readonly` throughout, so the compiler rejects mutating a parsed node or token
 in place. See [Working with results](#working-with-results).
 
-**Runtimes.** The supported floor is Node ≥ 22.12, current Bun, and any browser
-with ES2022. Raising the floor is a major. The library imports no `node:`
+**Runtimes.** The supported floor is Node ≥ 22.12, current Bun, any browser
+with ES2022, and TypeScript ≥ 5.0 for the shipped types. Raising a floor is a
+major. The library imports no `node:`
 builtins, which is enforced in CI, so Deno and edge runtimes are expected to work
 too — they are just not yet in the smoke matrix, so nothing has verified them.
 
