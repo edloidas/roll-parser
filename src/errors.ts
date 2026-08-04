@@ -116,6 +116,82 @@ export const ROLL_PARSER_ERROR_CODES = [
 export type RollParserErrorCode = (typeof ROLL_PARSER_ERROR_CODES)[number];
 
 /**
+ * The subset of {@link ROLL_PARSER_ERROR_CODES} the *input* is answerable for,
+ * as a readonly tuple. Runtime counterpart of {@link NotationErrorCode} and the
+ * list {@link isNotationError} matches against.
+ *
+ * A code is in when `roll(notation)` can raise it for some notation string,
+ * given valid options and a valid `context` — so the right response is to tell
+ * whoever supplied the notation that it was rejected. Six codes are out, because
+ * for each of them the notation is innocent:
+ *
+ * Calling code: `INVALID_EVALUATION_LIMIT` (a bad `maxDice`,
+ * `maxExplodeIterations`, or `maxRerollIterations`), `INVALID_VARIABLE_VALUE` (a
+ * non-finite entry in `context`), `INCOMPATIBLE_RNG_STATE` (a snapshot from
+ * another version)
+ *
+ * Library invariant: `UNKNOWN_NODE_TYPE`, `UNKNOWN_OPERATOR`,
+ * `UNKNOWN_FUNCTION` — the lexer and parser only ever hand the evaluator shapes
+ * it already covers, so reaching one means a hand-built AST or a bug in here.
+ *
+ * Two boundaries are worth knowing. `DIVISION_BY_ZERO`, `MODULO_BY_ZERO`, and
+ * `NON_FINITE_RESULT` are in because notation alone reaches them (`1d6/0`,
+ * `10**400`), but a `context` variable reaches them too, so a `true` is not
+ * proof the notation was at fault. `INVALID_NOTATION_TYPE` is in even though no
+ * user can type a non-string: it means the `notation` you were handed was
+ * `null` or `undefined` — an absent slash-command option, a missing JSON field —
+ * and "give me a dice expression" is the reply that fits.
+ *
+ * @example
+ * ```typescript
+ * import { NOTATION_ERROR_CODES } from 'roll-parser';
+ *
+ * // Prompt copy is only worth writing for the codes a user can actually cause.
+ * const needsCopy = new Set(NOTATION_ERROR_CODES);
+ * ```
+ *
+ * @category Errors
+ */
+export const NOTATION_ERROR_CODES = [
+  'UNEXPECTED_CHARACTER',
+  'UNEXPECTED_IDENTIFIER',
+  'UNEXPECTED_TOKEN',
+  'UNEXPECTED_END',
+  'EXPECTED_TOKEN',
+  'INVALID_DICE_COUNT',
+  'INVALID_DICE_SIDES',
+  'DICE_LIMIT_EXCEEDED',
+  'DIVISION_BY_ZERO',
+  'MODULO_BY_ZERO',
+  'INVALID_KEEP_DROP_COUNT',
+  'INVALID_KEEP_DROP_TARGET',
+  'EXPLODE_LIMIT_EXCEEDED',
+  'INVALID_EXPLODE_TARGET',
+  'REROLL_LIMIT_EXCEEDED',
+  'INVALID_REROLL_TARGET',
+  'INVALID_SUCCESS_COUNT_TARGET',
+  'INVALID_SORT_TARGET',
+  'INVALID_CRIT_THRESHOLD_TARGET',
+  'INVALID_THRESHOLD',
+  'NESTED_VERSUS',
+  'INVALID_FUNCTION_ARITY',
+  'UNDEFINED_VARIABLE',
+  'AMBIGUOUS_DICE_CHAIN',
+  'MAX_DEPTH_EXCEEDED',
+  'NON_FINITE_RESULT',
+  'INVALID_NOTATION_TYPE',
+] as const;
+
+/**
+ * A {@link RollParserErrorCode} the input is answerable for. The runtime list
+ * behind this union is exported as {@link NOTATION_ERROR_CODES}, which documents
+ * where the line falls.
+ *
+ * @category Errors
+ */
+export type NotationErrorCode = (typeof NOTATION_ERROR_CODES)[number];
+
+/**
  * Key of the brand {@link isRollParserError} matches on. A *registered* symbol,
  * because the global symbol registry is shared by every realm in an agent — so
  * the same key resolves from an iframe or a `vm` context, and from a second copy
@@ -276,10 +352,15 @@ export type ErrorSpan = {
  * cannot, namely an error from an iframe or `vm` context, or from a second copy
  * of the library in `node_modules` at this version or newer.
  *
- * Use it as the outer filter in every `catch`: anything it rejects is a bug in
- * your code or the library, not a bad notation, and should be rethrown. The
- * brand is what makes that two-way — a foreign error is never accepted just for
- * carrying a `code` that happens to collide with one of ours.
+ * Use it as the outer filter in every `catch`: anything it rejects came from
+ * somewhere else and should be rethrown. The brand is what makes that sound — a
+ * foreign error is never accepted just for carrying a `code` that happens to
+ * collide with one of ours.
+ *
+ * What it answers is "did this come from us", not "whose fault was it". A `true`
+ * covers bad notation, a bad options object, and a broken invariant in here
+ * alike, so it is the wrong test to hang a user-facing message on. Reach for
+ * {@link isNotationError} for that.
  *
  * Only this library's own error prototype carries the brand, so holding it is
  * proof of origin, and the `code` is trusted rather than re-validated: an error
@@ -318,6 +399,50 @@ export function isRollParserError(value: unknown): value is RollParserError {
     value !== null &&
     (value as Record<symbol, unknown>)[ERROR_BRAND] === true
   );
+}
+
+const NOTATION_CODES: ReadonlySet<string> = new Set(NOTATION_ERROR_CODES);
+
+/**
+ * Type guard for the failures the input is answerable for: a roll-parser error
+ * whose `code` is one of {@link NOTATION_ERROR_CODES}. This is the test to hang
+ * a user-facing message on — {@link isRollParserError} only establishes origin,
+ * and answers `true` for a bad options object and a broken library invariant
+ * too, both of which should page you instead.
+ *
+ * Pair the two: the outer filter rethrows what is not ours, and this one splits
+ * what is left into "tell the user" and "report a bug".
+ *
+ * Unlike {@link isRollParserError}, this one has to read the `code` against the
+ * list this build carries — attribution is not something a brand can express. So
+ * where the outer filter accepts a code it has never heard of, this one rejects
+ * it: an error from a newer minor carrying a notation code added after this build
+ * reads as `false` and is misfiled as internal. That is the safe direction — it
+ * pages a developer rather than blaming a user — but keep the library and its
+ * consumers on one version when the distinction drives more than a message.
+ *
+ * @param value - The caught value, of unknown type
+ * @returns `true` when `value` is a roll-parser error the input caused
+ *
+ * @example Two channels, one catch
+ * ```typescript
+ * import { isNotationError, isRollParserError, roll } from 'roll-parser';
+ *
+ * try {
+ *   roll(userInput);
+ * } catch (error) {
+ *   if (!isRollParserError(error)) throw error;
+ *   if (isNotationError(error)) reply(`Bad notation: ${error.message}`);
+ *   else report(error); // our bug or yours — never the user's
+ * }
+ * ```
+ *
+ * @category Errors
+ */
+export function isNotationError(
+  value: unknown,
+): value is RollParserError & { code: NotationErrorCode } {
+  return isRollParserError(value) && NOTATION_CODES.has(value.code);
 }
 
 /**
