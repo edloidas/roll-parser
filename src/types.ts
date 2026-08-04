@@ -415,6 +415,15 @@ export type RollResult = Readonly<{
  * rolls ten million dice. Parse depth is capped separately and
  * unconditionally by {@link MAX_PARSE_DEPTH}.
  *
+ * The three numeric limits fail closed: omit one — or pass `undefined` or
+ * `null`, the no-options path a partial config produces — and it takes its
+ * default, but supply anything else that is not a safe integer in range — a
+ * string, `NaN`, `±Infinity`, a negative, a fraction — and evaluation throws
+ * `INVALID_EVALUATION_LIMIT` before rolling. `maxDice` accepts `>= 1`, the two
+ * iteration limits `>= 0`. No coercion: `maxDice: Number(input)` on
+ * unparseable input rejects rather than quietly reverting to the permissive
+ * default.
+ *
  * @example Untrusted input
  * ```typescript
  * import { isRollParserError, roll } from 'roll-parser';
@@ -443,11 +452,11 @@ export type RollResult = Readonly<{
  * @category Core
  */
 export type EvaluationLimits = {
-  /** Maximum total dice allowed per evaluation (default: 10,000) */
+  /** Maximum total dice allowed per evaluation; integer >= 1 (default: 10,000) */
   maxDice?: number;
-  /** Maximum explosion iterations allowed per die (default: 1,000) */
+  /** Maximum explosion iterations allowed per die; integer >= 0 (default: 1,000) */
   maxExplodeIterations?: number;
-  /** Maximum reroll iterations allowed per die (default: 1,000) */
+  /** Maximum reroll iterations allowed per die; integer >= 0 (default: 1,000) */
   maxRerollIterations?: number;
   /** Variable context for `@name` / `@{name}` references (default: empty) */
   context?: Readonly<Record<string, number>>;
