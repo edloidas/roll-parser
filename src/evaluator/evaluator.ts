@@ -1058,6 +1058,7 @@ function evalSort(node: SortNode, rng: RNG, ctx: EvalContext, env: EvalEnv): Eva
     part: {
       type: 'sort',
       order: node.order,
+      rolls: sortedRolls,
       target: target.part,
       total: target.total,
       ...partSpan(node),

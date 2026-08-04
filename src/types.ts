@@ -305,7 +305,18 @@ export type RollPart =
   | (RollPartBase & { type: 'versus'; roll: RollPart; dc: RollPart; degree: DegreeOfSuccess })
   | (RollPartBase & { type: 'functionCall'; name: string; args: RollPart[] })
   | (RollPartBase & { type: 'group'; parts: RollPart[]; keptIndices?: number[] })
-  | (RollPartBase & { type: 'sort'; order: 'ascending' | 'descending'; target: RollPart })
+  | (RollPartBase & {
+      type: 'sort';
+      order: 'ascending' | 'descending';
+      /**
+       * Every die the target produced, in sorted order, sharing `DieResult`
+       * references with `target` — so flags set after the sort (`4d6s dl1`)
+       * show through both. Like `RollResult.rolls` it keeps `'meta'` dice,
+       * which `rendered` omits from the bracket.
+       */
+      rolls: DieResult[];
+      target: RollPart;
+    })
   | (RollPartBase & {
       type: 'critThreshold';
       successThresholds: ResolvedCritThreshold[];
