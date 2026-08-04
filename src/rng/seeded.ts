@@ -108,12 +108,12 @@ function assertRestorable(state: RngState): void {
  * `roll(notation, { seed })` builds one from your seed.
  *
  * Period 2^128 - 1. Every seed is stringified and hashed with cyrb128 into
- * the full 128-bit state, so numeric seeds keep all 53 bits and distinct
- * strings stay distinct; an omitted seed hashes `Date.now()` together with two
- * `Math.random()` draws, roughly 100 bits of width rather than 32 — enough that
- * auto-seeded generators do not collide, though unpredictability stays bounded
- * by the host engine's `Math.random()` seeding. The first 8 draws are discarded
- * as a run-in.
+ * the full 128-bit state, so numeric seeds keep all 53 bits and unrelated
+ * strings are overwhelmingly unlikely to share a state; an omitted seed hashes
+ * `Date.now()` together with two `Math.random()` draws, roughly 100 bits of
+ * width rather than 32 — wide enough that concurrently created generators are
+ * very unlikely to collide, though unpredictability stays bounded by the host
+ * engine's `Math.random()` seeding. The first 8 draws are discarded as a run-in.
  *
  * Stringifying means `42` and `'42'` are the same seed — the two forms share
  * one namespace, which matters when seeds arrive from a CLI flag or JSON.
