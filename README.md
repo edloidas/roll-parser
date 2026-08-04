@@ -107,8 +107,9 @@ For TypeScript consumers, `moduleResolution` must be `bundler`, `node16`, or
 `nodenext` — the package resolves through `exports` only, so the legacy `node10`
 resolution does not find it.
 
-Bundlers tree-shake the library cleanly: it is marked `sideEffects: false` and
-touches no `process` or filesystem globals.
+Bundlers tree-shake the library cleanly: the library entries are side-effect-free
+and touch no `process` or filesystem globals. Only the CLI entry is marked as
+having effects, since it calls `main()` at module scope.
 
 ### CDN / browser without a bundler
 
@@ -367,8 +368,9 @@ words, so the full 128 bits are seeded rather than a single word; xoshiro128\*\*
 generates the stream; and `nextInt` maps each draw onto the die's faces by
 rejection sampling, discarding the values that would make a plain `% sides`
 favour the low faces. Seeds are stringified before hashing — numeric seeds keep
-all 53 exact bits instead of truncating to 32, distinct strings stay distinct,
-and `42` and `'42'` name the same stream.
+all 53 exact bits instead of truncating to 32, unrelated strings are
+overwhelmingly unlikely to land on the same state, and `42` and `'42'` name the
+same stream.
 
 ```typescript
 import { SeededRNG, roll } from 'roll-parser';
@@ -424,7 +426,8 @@ rather than restarting them.
 > each other exactly. xoshiro has no jump function here to separate them.
 
 To give each entity its own stream, derive a seed per entity instead. cyrb128
-sends distinct strings to unrelated states, which is what makes this work:
+sends unrelated strings to states that are overwhelmingly unlikely to coincide,
+which is what makes this work:
 
 ```typescript
 import { SeededRNG } from 'roll-parser';
@@ -849,8 +852,8 @@ in place. See [Working with results](#working-with-results).
 
 **Runtimes.** The supported floor is Node ≥ 22.12, current Bun, and any browser
 with ES2022. Raising the floor is a major. The library imports no `node:`
-builtins, which is enforced in CI, so Deno and edge runtimes work too — they are
-just not yet in the smoke matrix.
+builtins, which is enforced in CI, so Deno and edge runtimes are expected to work
+too — they are just not yet in the smoke matrix, so nothing has verified them.
 
 ## Contributing
 
