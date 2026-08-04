@@ -15,12 +15,13 @@ import {
   NOTATION_ERROR_CODES,
   ROLL_PARSER_ERROR_CODES,
   RollParserError,
+  stampEvaluatorSpan,
 } from './errors.js';
 import { evaluate } from './evaluator/evaluator.js';
 import { LexerError, lex } from './lexer/lexer.js';
 import type { ASTNode } from './parser/ast.js';
 import { MAX_PARSE_DEPTH, ParseError, parse } from './parser/parser.js';
-import { createMockRng } from './rng/mock.js';
+import { createMockRng, MockRNGExhaustedError } from './rng/mock.js';
 import { SeededRNG } from './rng/seeded.js';
 import type { RollOptions } from './roll.js';
 import { roll } from './roll.js';
@@ -242,11 +243,55 @@ describe('EvaluatorError span', () => {
   test('the innermost stamp wins', () => {
     const error = new EvaluatorError('boom', 'DIVISION_BY_ZERO', 'BinaryOp');
 
-    error.stampSpan(4, 7);
-    error.stampSpan(0, 9);
+    stampEvaluatorSpan(error, 4, 7);
+    stampEvaluatorSpan(error, 0, 9);
 
     expect(error.start).toBe(4);
     expect(error.end).toBe(7);
+  });
+
+  test('an undefined end stamps alongside the start', () => {
+    const error = new EvaluatorError('boom', 'DIVISION_BY_ZERO', 'BinaryOp');
+
+    stampEvaluatorSpan(error, 4, undefined);
+
+    expect(error.start).toBe(4);
+    expect(error.end).toBeUndefined();
+  });
+
+  test('a start of 0 still blocks a re-stamp', () => {
+    const error = new EvaluatorError('boom', 'DIVISION_BY_ZERO', 'BinaryOp');
+
+    stampEvaluatorSpan(error, 0, 3);
+    stampEvaluatorSpan(error, 5, 9);
+
+    expect(error.start).toBe(0);
+    expect(error.end).toBe(3);
+  });
+
+  test('the stamping method is not on the class (#232)', () => {
+    const error = new EvaluatorError('boom', 'DIVISION_BY_ZERO', 'BinaryOp');
+
+    expect('stampSpan' in error).toBe(false);
+    expect(Object.getOwnPropertySymbols(EvaluatorError.prototype)).toEqual([]);
+  });
+});
+
+describe('errors outside the hierarchy (#232)', () => {
+  test('MockRNGExhaustedError carries no code and is not ours', () => {
+    const error = captureError(() => roll('4d6', { rng: createMockRng([1, 2, 3]) }));
+
+    expect(error).toBeInstanceOf(MockRNGExhaustedError);
+    expect(error).not.toBeInstanceOf(RollParserError);
+    expect(isRollParserError(error)).toBe(false);
+    expect(error).not.toHaveProperty('code');
+  });
+
+  test('an out-of-range scripted value escapes as a bare RangeError', () => {
+    const error = captureError(() => roll('1d6', { rng: createMockRng([7]) }));
+
+    expect(error).toBeInstanceOf(RangeError);
+    expect(isRollParserError(error)).toBe(false);
   });
 });
 

@@ -15,6 +15,13 @@ import type { RNG } from './types.js';
  * sequence supplied — count the dice, including explosions, rerolls, and
  * meta-expressions, and check the draw order in the roll-parser README.
  *
+ * Deliberately outside the `RollParserError` hierarchy — no `code`, and
+ * `isRollParserError` answers `false` for it. An exhausted mock is a bug in the
+ * test fixture, not a failure mode of the notation, so the
+ * `if (!isRollParserError(error)) throw error` line a consumer writes around
+ * `roll()` rethrows it and fails the test instead of routing it to a "bad dice"
+ * message. `instanceof` is the check here — there is no `code` to branch on.
+ *
  * @example
  * ```typescript
  * import { roll } from 'roll-parser';
@@ -57,6 +64,10 @@ export class MockRNGExhaustedError extends Error {
  * - It never wraps around. Running out throws {@link MockRNGExhaustedError}.
  * - `nextInt` rejects a scripted value outside the requested `[min, max]`
  *   with a `RangeError`, so `createMockRng([7])` cannot satisfy a `d6`.
+ *
+ * Both are the only failures that reach a caller of `roll()` without a
+ * roll-parser `code`, and only ever when a mock was injected — see
+ * {@link MockRNGExhaustedError} for why they stay outside the hierarchy.
  *
  * Draw order matters when the notation contains meta-expressions. Keep/drop
  * counts (`4d6kh(1d2)`) are drawn *before* the pool; threshold expressions

@@ -259,6 +259,24 @@ export class RollParserError extends Error {
 }
 
 /**
+ * Records the source span of the node being evaluated on an
+ * {@link EvaluatorError}. Idempotent — the first stamp wins, so the innermost
+ * `evalNode` frame keeps the tightest span as the error bubbles up.
+ *
+ * @internal Called only by `evalNode`; `stripInternal` drops it from the
+ * published `.d.ts`.
+ */
+// ! A module-scoped function, not a method: `EvaluatorError` is exported, so a
+// ! method would let any consumer overwrite a caught error's span. Assigned from
+// ! the `static` block below — the only scope `#start` / `#end` are reachable
+// ! from — and never re-exported from `index.ts`.
+export let stampEvaluatorSpan!: (
+  error: EvaluatorError,
+  start: number,
+  end: number | undefined,
+) => void;
+
+/**
  * Error thrown during AST evaluation.
  *
  * Lives here rather than in `evaluator/evaluator.ts` so the modifier
@@ -319,18 +337,12 @@ export class EvaluatorError extends RollParserError {
     return this.#end;
   }
 
-  /**
-   * Records the source span of the node being evaluated. Idempotent — the
-   * first stamp wins, so the innermost `evalNode` frame keeps the tightest
-   * span as the error bubbles up.
-   *
-   * @internal Called only by `evalNode`; `stripInternal` drops it from the
-   * published `.d.ts`.
-   */
-  stampSpan(start: number, end: number | undefined): void {
-    if (this.#start != null) return;
-    this.#start = start;
-    this.#end = end;
+  static {
+    stampEvaluatorSpan = (error, start, end) => {
+      if (error.#start != null) return;
+      error.#start = start;
+      error.#end = end;
+    };
   }
 }
 
