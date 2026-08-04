@@ -381,21 +381,22 @@ roll('1d20', { rng }).total; // 1
 roll('1d20', { rng }).total; // 20
 ```
 
-Within one released version, the same seed and the same notation always produce
-the same dice. Across versions they do not: the mapping is outside the semver
-contract and can change in any release (see [Versioning](#versioning)), as it
-did between 3.0.0-beta.0 and 3.0.0. The generator is also not cryptographically
-secure. If a roll has to be reproducible later, persist the `RollResult`, not
-the seed.
+The same seed and the same notation produce the same dice for the lifetime of a
+major version, with one narrow exception for distribution bugs — see
+[Versioning](#versioning) for the exact promise. Across majors they do not: the
+mapping changed between 3.0.0-beta.0 and 3.0.0. The generator is also not
+cryptographically secure. If a roll has to survive an upgrade, persist the
+`RollResult`, not the seed.
 
 ### Replay and save/resume
 
-`SeededRNG` can hand out its internal state as an `RngState` — four unsigned
-32-bit words — and take one back through its constructor. Restoring copies the
-words verbatim, with no re-hashing and no warm-up draws, so the resumed stream
-continues exactly where the snapshot was taken. That holds for snapshots
-`state()` produced — the type is the contract, and a hand-built tuple is
-coerced to 32 bits per word rather than rejected.
+`SeededRNG` can hand out its internal state as an `RngState` — a format version
+followed by four unsigned 32-bit words — and take one back through its
+constructor. Restoring copies the words verbatim, with no re-hashing and no
+warm-up draws, so the resumed stream continues exactly where the snapshot was
+taken. That holds for snapshots `state()` produced — the type is the contract,
+and within the current version a hand-built tuple is coerced to 32 bits per
+word rather than rejected.
 
 That answers the question an auto-seeded roll otherwise cannot. `roll('1d20')`
 mints a seed and discards it; snapshot the state first and the roll is
@@ -435,9 +436,19 @@ goblin.nextInt(1, 20); // 9
 orc.nextInt(1, 20); // 1
 ```
 
-`RngState` carries the same version binding as a seed: the words are opaque,
-and a major release may change the engine behind them. Keep snapshots for a
-session or a save file, not across an upgrade.
+`RngState` carries the same version binding as a seed: the words are opaque, and
+a release that changes the engine behind them bumps the leading version. A
+snapshot from a different version is rejected with an `INCOMPATIBLE_RNG_STATE`
+error rather than resumed under the wrong semantics, so a save file that
+outlives the promise fails loudly:
+
+```typescript
+import { SeededRNG } from 'roll-parser';
+
+const foreign = [0, 1, 2, 3, 4] as const; // a version this build does not speak
+
+new SeededRNG(foreign); // throws 'INCOMPATIBLE_RNG_STATE'
+```
 
 ### Custom RNGs
 
@@ -574,7 +585,7 @@ or read it uniformly through `getErrorSpan`.
 
 ### Error codes
 
-`RollParserErrorCode` is a union of 30 codes today — match on the code, not the
+`RollParserErrorCode` is a union of 31 codes today — match on the code, not the
 message, and give the `switch` a `default` arm: new codes arrive in minor
 releases (never patches), so an exhaustive switch would turn a minor upgrade
 into a silent fall-through. See [Versioning](#versioning) for the full policy.
@@ -795,12 +806,17 @@ to a returned object are all minor. Removing or narrowing anything you can name
 from the public entry points is major. Every type reachable from a public
 signature is exported — you should never need to reach into `dist/`.
 
-**Randomness is not covered by semver.** The seed → dice mapping is stable
-within a released version and may change in **any** release, including a patch:
-an RNG fix is a bug fix, and 3.0.0 shipped exactly such a change against
-3.0.0-beta.0. The same applies to `RngState` snapshots, which are only
-guaranteed to restore into the version that produced them. If you need a roll
-to be reproducible later, persist the `RollResult`, not the seed or the state.
+**Randomness is stable within a major.** The seed → dice mapping holds for the
+lifetime of a major version: the same seed and notation keep producing the same
+dice across patches and minors, which is what makes seeds usable for replay and
+test fixtures. One exception, and it is narrow — a genuine distribution bug
+(bias, faulty rejection sampling) may change the mapping in a **minor** release,
+never silently in a patch, and always with a `BREAKING` note in the changelog.
+`RngState` snapshots carry the same binding and enforce it: they are stamped
+with a format version, and restoring one from another version throws
+`INCOMPATIBLE_RNG_STATE` instead of resuming a stream that never existed. If you
+need a roll to survive a major upgrade, persist the `RollResult`, not the seed or
+the state.
 
 **What is deliberately mutable.** `RollResult.rolls` and the `parts` tree stay
 mutable so you can annotate your own views; the AST and tokens are treated as

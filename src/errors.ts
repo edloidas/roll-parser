@@ -55,6 +55,7 @@ export const ROLL_PARSER_ERROR_CODES = [
   'AMBIGUOUS_DICE_CHAIN',
   'MAX_DEPTH_EXCEEDED',
   'NON_FINITE_RESULT',
+  'INCOMPATIBLE_RNG_STATE',
 ] as const;
 
 /**
@@ -75,6 +76,8 @@ export const ROLL_PARSER_ERROR_CODES = [
  * `INVALID_MODIFIER_COUNT`, `EXPLODE_LIMIT_EXCEEDED`, `REROLL_LIMIT_EXCEEDED`,
  * `INVALID_THRESHOLD`, `NESTED_VERSUS`, `UNKNOWN_FUNCTION`, `UNDEFINED_VARIABLE`,
  * `INVALID_VARIABLE_VALUE`, `NON_FINITE_RESULT`
+ *
+ * RNG: `INCOMPATIBLE_RNG_STATE`
  *
  * New codes are only ever introduced in a minor release, never a patch. Treat
  * the union as open when you switch over it: give the switch a `default` arm
