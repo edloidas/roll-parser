@@ -3,6 +3,7 @@
   "extends": "../tsconfig.json",
   // Non-recursive on purpose: `docs/` is a workspace that exists only to hold a
   // nested TypeDoc dependency tree (see its `package.json`), and has no sources.
-  // `browser-smoke/` has sources, so it is listed explicitly.
-  "include": ["*.ts", "browser-smoke/*.ts"]
+  // `browser-smoke/` and `worker-smoke/` have sources, so they are listed
+  // explicitly.
+  "include": ["*.ts", "browser-smoke/*.ts", "worker-smoke/*.ts"]
 }

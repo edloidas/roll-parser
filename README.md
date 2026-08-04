@@ -877,11 +877,15 @@ mutable so you can annotate your own views; the AST and tokens are typed
 `readonly` throughout, so the compiler rejects mutating a parsed node or token
 in place. See [Working with results](#working-with-results).
 
-**Runtimes.** The supported floor is Node ≥ 22.12, current Bun, any browser
-with ES2022, and TypeScript ≥ 5.0 for the shipped types. Raising a floor is a
-major. The library imports no `node:`
-builtins, which is enforced in CI, so Deno and edge runtimes are expected to work
-too — they are just not yet in the smoke matrix, so nothing has verified them.
+**Runtimes.** The supported floor is Node ≥ 22.12, current Bun, current Deno,
+Cloudflare Workers, any browser with ES2022, and TypeScript ≥ 5.0 for the
+shipped types. Raising a floor or dropping a runtime is a major. The library
+imports no `node:` builtins, and Node, Deno, Cloudflare Workers, and the browser
+each install the packed tarball in CI and assert a known roll from it — headless
+Chromium for the browser claim, Deno's npm resolution for Deno, and local
+`workerd` for Workers. Bun is the development runtime and runs the full test
+suite instead. Other edge runtimes are not in the matrix, but nothing in the
+library is aimed at a specific host.
 
 ## Contributing
 

@@ -1,0 +1,10 @@
+{
+  "name": "@roll-parser/worker-smoke",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Cloudflare Workers smoke fixture: a Worker importing both library entry points, run under workerd via `wrangler dev`. Deliberately NOT a root workspace member — wrangler pulls a platform workerd binary, which is CI-only weight no contributor's `bun install` should carry, and the fixture has to be installed against the packed tarball rather than the repo anyway. Same reasoning as scripts/ts-compat. See .github/workflows/ci.yml and release.yml for the jobs that run it. wrangler is pinned exact rather than caret precisely because nothing outside a root workspace pins it: a range would let the release gate's verdict move with the registry, and wrangler pins its own workerd exactly, so this pins the runtime too. The thing under test is the library, not workerd — bump it deliberately to pick up a newer runtime.",
+  "dependencies": {
+    "wrangler": "4.118.0"
+  }
+}

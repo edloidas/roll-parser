@@ -1,0 +1,11 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "roll-parser-worker-smoke",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-01-01",
+  // No bindings, no KV, no account: `wrangler dev` runs this in local workerd,
+  // which needs no Cloudflare credentials.
+  "observability": {
+    "enabled": false
+  }
+}

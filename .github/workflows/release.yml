@@ -265,6 +265,42 @@ jobs:
       - name: Execute bundle in headless Chromium
         run: node scripts/browser-smoke/run.ts "$RUNNER_TEMP/smoke/bundle.js"
 
+      # Both host legs below mirror the `deno-smoke` and `workers-smoke` jobs in
+      # ci.yml; the difference is the artifact — here it is the exact tarball
+      # about to be published.
+      - name: Setup Deno
+        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+        with:
+          deno-version: v2.x
+
+      - name: Write Deno fixture importing both entry points
+        working-directory: ${{ runner.temp }}/smoke
+        run: |
+          printf '%s\n' \
+            "import { roll, SeededRNG, VERSION } from 'roll-parser';" \
+            "import { createMockRng } from 'roll-parser/testing';" \
+            "const pinned = roll('4d6kh3', { rng: createMockRng([3, 6, 2, 5]) });" \
+            "if (pinned.total !== 14) throw new Error('pinned total ' + pinned.total);" \
+            "const seeded = roll('2d6', { rng: new SeededRNG('release') });" \
+            "if (!Number.isInteger(seeded.total) || seeded.total < 2 || seeded.total > 12) throw new Error('seeded total ' + seeded.total);" \
+            "if (typeof VERSION !== 'string' || VERSION.length === 0) throw new Error('missing VERSION');" \
+            "console.log('deno-smoke OK', VERSION, pinned.total, seeded.total);" \
+            > deno-fixture.mjs
+
+      - name: Execute fixture in Deno
+        working-directory: ${{ runner.temp }}/smoke
+        run: deno run --node-modules-dir=manual deno-fixture.mjs
+
+      - name: Install Worker fixture against the tarball
+        run: |
+          cp -R scripts/worker-smoke "$RUNNER_TEMP/worker-smoke"
+          cd "$RUNNER_TEMP/worker-smoke"
+          npm install --no-audit --no-fund "$RUNNER_TEMP"/roll-parser-*.tgz
+
+      - name: Execute Worker in workerd
+        timeout-minutes: 5
+        run: node "$RUNNER_TEMP/worker-smoke/run.ts"
+
   # Deliberately minimal: no checkout, no dependency install, no cache — the
   # only thing that runs next to the OIDC publishing identity is npm itself,
   # publishing the exact tarball `validate` produced and `smoke` verified.
