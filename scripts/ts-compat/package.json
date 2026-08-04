@@ -1,0 +1,7 @@
+{
+  "name": "@roll-parser/ts-compat",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Consumer fixture for the TypeScript version-floor matrix. Deliberately NOT a root workspace: CI copies this directory to a scratch dir and installs the packed tarball plus one matrix TypeScript version into it, so the root dependency tree never sees a second typescript. See the ts-compat jobs in .github/workflows/ci.yml."
+}
