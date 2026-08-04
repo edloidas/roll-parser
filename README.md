@@ -135,6 +135,15 @@ v3 is a complete rewrite and the API is not compatible — see
 
 ## Notation reference
 
+The notation tracks
+[Roll20's Dice Reference](https://help.roll20.net/hc/en-us/articles/360037773133-Dice-Reference)
+wherever the two overlap: `kh`/`kl`/`dh`/`dl`, `!`/`!!`/`!p`, `r`/`ro`, success
+and failure counting, `cs`/`cf`, grouped rolls, and `floor`/`ceil`/`round`/`abs`
+all use Roll20's spelling and semantics. It is not a strict superset — sorting
+(`s`), PF2e `vs` checks, `max`/`min`, and computed dice counts and sides are
+additions, and two Roll20 forms are deliberately rejected (`4d6d1`, arithmetic
+after a success count) — see [Known limitations](#known-limitations).
+
 Notation is case-insensitive and whitespace-tolerant — `2 D 20 KH 1` and
 `2d20kh1` are the same expression, newlines included. The one exception is
 variable names: `@StrMod` and `@strmod` are different variables.
