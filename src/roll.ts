@@ -56,6 +56,8 @@ export type RollOptions = EvaluationOptions & {
  * @throws {EvaluatorError} On a limit breach or an impossible expression
  * @throws {RollParserError} `INVALID_EVALUATION_LIMIT` when a supplied limit is
  *   not an integer in range — raised before any die is rolled
+ * @throws {RollParserError} `INVALID_NOTATION_TYPE` when `notation` is not a
+ *   string, so `isRollParserError` still filters untrusted input completely
  *
  * @example
  * ```typescript

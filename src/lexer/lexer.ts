@@ -5,7 +5,7 @@
  */
 
 import type { RollParserErrorCode } from '../errors.js';
-import { RollParserError } from '../errors.js';
+import { describeValue, RollParserError } from '../errors.js';
 import { type Token, TokenType } from './tokens.js';
 
 /**
@@ -416,6 +416,8 @@ export class Lexer {
  * @returns Every token in source order, always ending with one
  *   `TokenType.EOF` token
  * @throws {LexerError} If an invalid character or unknown identifier is found
+ * @throws {RollParserError} `INVALID_NOTATION_TYPE` when `input` is not a
+ *   string — raised before scanning, so it carries no position
  *
  * @example
  * ```typescript
@@ -431,5 +433,13 @@ export class Lexer {
  * @category Core
  */
 export function lex(input: string): Token[] {
+  // ! The pipeline's only notation type guard — `parse` and `roll` both funnel through here.
+  if (typeof input !== 'string') {
+    throw new RollParserError(
+      `Notation must be a string, received ${describeValue(input)}`,
+      'INVALID_NOTATION_TYPE',
+    );
+  }
+
   return new Lexer(input).tokenize();
 }

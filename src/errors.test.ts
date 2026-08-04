@@ -7,7 +7,13 @@
 
 import { describe, expect, test } from 'bun:test';
 import type { RollParserErrorCode } from './errors.js';
-import { EvaluatorError, getErrorSpan, isRollParserError, RollParserError } from './errors.js';
+import {
+  EvaluatorError,
+  getErrorSpan,
+  isRollParserError,
+  ROLL_PARSER_ERROR_CODES,
+  RollParserError,
+} from './errors.js';
 import { evaluate } from './evaluator/evaluator.js';
 import { LexerError, lex } from './lexer/lexer.js';
 import type { ASTNode } from './parser/ast.js';
@@ -243,9 +249,21 @@ const CODE_CASES: Record<RollParserErrorCode, CodeCase> = {
     why: 'restoring a snapshot is an RNG operation, not a notation one',
   },
   INVALID_EVALUATION_LIMIT: { notation: '1d6', options: { maxDice: 0 } },
+  INVALID_NOTATION_TYPE: {
+    call: () => roll(null as unknown as string),
+    why: 'the case is a non-string notation, which the `notation` field cannot express',
+  },
 };
 
 describe('error code contract', () => {
+  test('README quotes the current code count', async () => {
+    // Prose, so `readme.test.ts` never executes it — nothing else catches the drift.
+    const readme = await Bun.file(new URL('../README.md', import.meta.url)).text();
+    const quoted = readme.match(/union of (\d+) codes/)?.[1];
+
+    expect(quoted).toBe(String(ROLL_PARSER_ERROR_CODES.length));
+  });
+
   for (const [code, testCase] of Object.entries(CODE_CASES) as [RollParserErrorCode, CodeCase][]) {
     test(`${code} is raised and typed`, () => {
       const error = captureError(() => {

@@ -4,7 +4,7 @@
  * @module evaluator/evaluator
  */
 
-import { EvaluatorError, RollParserError } from '../errors.js';
+import { describeValue, EvaluatorError, RollParserError } from '../errors.js';
 import type {
   ASTNode,
   BinaryOpNode,
@@ -106,23 +106,11 @@ function resolveLimit(
   if (value == null) return fallback;
   if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < min) {
     throw new RollParserError(
-      `Option '${option}' must be an integer >= ${min}, received ${describeLimit(value)}`,
+      `Option '${option}' must be an integer >= ${min}, received ${describeValue(value)}`,
       'INVALID_EVALUATION_LIMIT',
     );
   }
   return value;
-}
-
-/**
- * Renders a rejected limit for the error message, never coercing an object:
- * `String(Object.create(null))` throws, and a hostile `toString` can too —
- * either would replace the typed error with a raw `TypeError`.
- */
-function describeLimit(value: unknown): string {
-  // Quoted, so the message tells `'5'` and `5` apart.
-  if (typeof value === 'string') return JSON.stringify(value);
-  if (typeof value === 'object' || typeof value === 'function') return typeof value;
-  return String(value);
 }
 
 export { DEFAULT_MAX_EXPLODE_ITERATIONS, DEFAULT_MAX_REROLL_ITERATIONS };
