@@ -17,7 +17,7 @@ dependency tree than CI resolves.
 ```bash
 bun install     # also installs the pre-commit hook
 bun check:fix   # typecheck + biome check --write (lint, format, import sort)
-bun test        # full suite, ~2s
+bun test        # full suite, ~5s
 bun validate    # full gate: check, build, package checks, size budgets, coverage
 ```
 

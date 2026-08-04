@@ -55,6 +55,56 @@ const VALUE_EXPORTS = [
 // `noDynamicNamespaceImportAccess`, hence the re-bind.
 const surface: Record<string, unknown> = api;
 
+/**
+ * Every type the package promises to export.
+ *
+ * Types leave no runtime footprint, so the value assertions below cannot see
+ * them — naming each one here turns a drop or rename into a typecheck failure.
+ *
+ * Additions are not caught: there is no reflection over a module's type
+ * exports. Removals and renames — the breaking direction — are.
+ */
+export type PublicTypeSurface = [
+  api.ASTNode,
+  api.BinaryOpNode,
+  api.CompareOp,
+  api.ComparePoint,
+  api.CritThreshold,
+  api.CritThresholdNode,
+  api.DiceNode,
+  api.DieModifier,
+  api.DieResult,
+  api.ErrorSpan,
+  api.EvaluateOptions,
+  api.EvaluationLimits,
+  api.ExplodeNode,
+  api.FateDiceNode,
+  api.FunctionCallNode,
+  api.GroupNode,
+  api.GroupedNode,
+  api.LiteralNode,
+  api.ModifierNode,
+  api.ModifierSpec,
+  api.NodeSpan,
+  api.RNG,
+  api.RerollNode,
+  api.ResolvedComparePoint,
+  api.ResolvedCritThreshold,
+  api.RngState,
+  api.RollOptions,
+  api.RollPart,
+  api.RollPartBase,
+  api.RollPartType,
+  api.RollParserErrorCode,
+  api.RollResult,
+  api.SortNode,
+  api.SuccessCountNode,
+  api.Token,
+  api.UnaryOpNode,
+  api.VariableNode,
+  api.VersusNode,
+];
+
 describe('public API surface', () => {
   test('every promised export is defined', () => {
     for (const name of VALUE_EXPORTS) {

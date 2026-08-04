@@ -11,12 +11,26 @@
 
 import { describe, expect, test } from 'bun:test';
 import { roll } from './roll.js';
+import * as testingApi from './testing.js';
 import { createMockRng, MockRNGExhaustedError } from './testing.js';
+
+/** Runtime values the subpath promises to export. */
+const VALUE_EXPORTS = ['MockRNGExhaustedError', 'createMockRng'] as const;
+
+/**
+ * Every type the subpath promises to export. See `PublicTypeSurface` in
+ * `index.test.ts` for why the list is written out by hand.
+ */
+export type PublicTestingTypeSurface = [testingApi.RNG];
 
 describe('roll-parser/testing', () => {
   test('exports exactly the documented surface', () => {
     expect(typeof createMockRng).toBe('function');
     expect(typeof MockRNGExhaustedError).toBe('function');
+  });
+
+  test('the subpath exports nothing beyond the promised set', () => {
+    expect(Object.keys(testingApi).sort()).toEqual([...VALUE_EXPORTS].sort());
   });
 
   test('createMockRng drives a real roll deterministically', () => {

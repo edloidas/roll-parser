@@ -3598,6 +3598,9 @@ describe('evaluate', () => {
     // ? `push(...array)` and `Math.max(...array)` used to blow the stack with a
     // ? bare `RangeError`.
     const OVER_SPREAD_LIMIT = 700_000;
+    // Each case allocates 700k objects: under two seconds alone, but past Bun's
+    // 5s default once the rest of the suite's GC pressure is in play.
+    const SPREAD_LIMIT_TIMEOUT_MS = 60_000;
 
     test('sides beyond the safe-integer ceiling raise a typed error', () => {
       const error = captureError(() =>
@@ -3624,39 +3627,51 @@ describe('evaluate', () => {
       expect(result.total).toBe(7);
     });
 
-    test('pools past the spread limit evaluate instead of overflowing the stack', () => {
-      const result = evaluate(parse(`${OVER_SPREAD_LIMIT}d1+1`), new SeededRNG('spread'), {
-        maxDice: OVER_SPREAD_LIMIT + 1,
-      });
+    test(
+      'pools past the spread limit evaluate instead of overflowing the stack',
+      () => {
+        const result = evaluate(parse(`${OVER_SPREAD_LIMIT}d1+1`), new SeededRNG('spread'), {
+          maxDice: OVER_SPREAD_LIMIT + 1,
+        });
 
-      expect(result.total).toBe(OVER_SPREAD_LIMIT + 1);
-      expect(result.rolls).toHaveLength(OVER_SPREAD_LIMIT);
-    });
+        expect(result.total).toBe(OVER_SPREAD_LIMIT + 1);
+        expect(result.rolls).toHaveLength(OVER_SPREAD_LIMIT);
+      },
+      SPREAD_LIMIT_TIMEOUT_MS,
+    );
 
-    test('pools past the spread limit still report the dice limit as a typed error', () => {
-      const error = captureError(() =>
-        evaluate(parse(`${OVER_SPREAD_LIMIT}d1`), new SeededRNG('spread')),
-      );
+    test(
+      'pools past the spread limit still report the dice limit as a typed error',
+      () => {
+        const error = captureError(() =>
+          evaluate(parse(`${OVER_SPREAD_LIMIT}d1`), new SeededRNG('spread')),
+        );
 
-      expect(isRollParserError(error)).toBe(true);
-      expect((error as EvaluatorError).code).toBe('DICE_LIMIT_EXCEEDED');
-    });
+        expect(isRollParserError(error)).toBe(true);
+        expect((error as EvaluatorError).code).toBe('DICE_LIMIT_EXCEEDED');
+      },
+      SPREAD_LIMIT_TIMEOUT_MS,
+    );
 
-    test('max/min past the spread limit fold instead of overflowing the stack', () => {
-      // Hand-built AST — the equivalent notation is a multi-megabyte string whose
-      // lexing would dominate the runtime.
-      const args: ASTNode[] = Array.from({ length: OVER_SPREAD_LIMIT }, (_, i) => ({
-        type: 'Literal',
-        value: i % 97,
-      }));
+    test(
+      'max/min past the spread limit fold instead of overflowing the stack',
+      () => {
+        // Hand-built AST — the equivalent notation is a multi-megabyte string whose
+        // lexing would dominate the runtime.
+        const args: ASTNode[] = Array.from({ length: OVER_SPREAD_LIMIT }, (_, i) => ({
+          type: 'Literal',
+          value: i % 97,
+        }));
 
-      expect(evaluate({ type: 'FunctionCall', name: 'max', args }, createMockRng([])).total).toBe(
-        96,
-      );
-      expect(evaluate({ type: 'FunctionCall', name: 'min', args }, createMockRng([])).total).toBe(
-        0,
-      );
-    });
+        expect(evaluate({ type: 'FunctionCall', name: 'max', args }, createMockRng([])).total).toBe(
+          96,
+        );
+        expect(evaluate({ type: 'FunctionCall', name: 'min', args }, createMockRng([])).total).toBe(
+          0,
+        );
+      },
+      SPREAD_LIMIT_TIMEOUT_MS,
+    );
 
     test('max propagates NaN the way Math.max does', () => {
       // `10**400` overflows to Infinity, so `Infinity - Infinity` is NaN — the fold

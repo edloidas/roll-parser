@@ -6,7 +6,7 @@
   "bin": {
     "roll-parser": "./dist/cli/index.js"
   },
-  "sideEffects": false,
+  "sideEffects": ["./dist/cli/index.js"],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -130,6 +130,9 @@
     "publint": "^0.3.22",
     "size-limit": "^13.0.2",
     "typescript": "^7.0.2"
+  },
+  "overrides": {
+    "brace-expansion": "^5.0.9"
   },
   "engines": {
     "node": ">=22.12.0"
