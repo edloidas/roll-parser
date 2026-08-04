@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test';
+import { getErrorSpan, isRollParserError, RollParserError } from '../errors.js';
 import { expectRollError } from '../test-helpers.js';
 import { Lexer, LexerError, lex } from './lexer.js';
 import { TokenType } from './tokens.js';
@@ -908,6 +909,47 @@ describe('Lexer', () => {
 
       expect(error.message).toContain('Empty @ variable name');
       expect(error.position).toBe(0);
+    });
+  });
+
+  describe('non-string input', () => {
+    // The signature says `string`; the APIs feeding untrusted notation say `string | null`.
+    const cases: [label: string, input: unknown, received: string][] = [
+      ['null', null, 'null'],
+      ['undefined', undefined, 'undefined'],
+      ['a number', 42, '42'],
+      ['a plain object', {}, 'object'],
+      ['an array', ['1d6'], 'object'],
+      ['a function', () => '1d6', 'function'],
+      ['a String wrapper', new String('1d6'), 'object'],
+    ];
+
+    for (const [label, input, received] of cases) {
+      it(`rejects ${label} with a typed error (#229)`, () => {
+        const error = expectRollError(
+          () => lex(input as string),
+          RollParserError,
+          'INVALID_NOTATION_TYPE',
+        );
+
+        expect(error.message).toBe(`Notation must be a string, received ${received}`);
+        expect(isRollParserError(error)).toBe(true);
+        expect(getErrorSpan(error)).toBeUndefined();
+      });
+    }
+
+    it('rejects an object with a hostile toString (#229)', () => {
+      const hostile = {
+        toString() {
+          throw new Error('nope');
+        },
+      };
+
+      expectRollError(
+        () => lex(hostile as unknown as string),
+        RollParserError,
+        'INVALID_NOTATION_TYPE',
+      );
     });
   });
 

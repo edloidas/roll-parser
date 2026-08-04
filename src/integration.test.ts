@@ -7,7 +7,7 @@
 import { describe, expect, test } from 'bun:test';
 import { RollParserError } from './errors.js';
 import { EvaluatorError } from './evaluator/evaluator.js';
-import { ParseError } from './parser/parser.js';
+import { ParseError, parse } from './parser/parser.js';
 import { createMockRng } from './rng/mock.js';
 import { roll } from './roll.js';
 import { expectRollError } from './test-helpers.js';
@@ -310,6 +310,27 @@ describe('roll() integration', () => {
 
     test('floating point dice sides throws EvaluatorError', () => {
       expect(() => roll('1d(6.5)')).toThrow(EvaluatorError);
+    });
+
+    test('rejects a non-string notation before rolling (#229)', () => {
+      // `string | null` is what a slash-command option or a parsed JSON field hands over.
+      for (const input of [null, undefined, 42]) {
+        const error = expectRollError(
+          () => roll(input as unknown as string),
+          RollParserError,
+          'INVALID_NOTATION_TYPE',
+        );
+
+        expect(error.name).toBe('RollParserError');
+      }
+    });
+
+    test('rejects a non-string notation from parse() too (#229)', () => {
+      expectRollError(
+        () => parse(null as unknown as string),
+        RollParserError,
+        'INVALID_NOTATION_TYPE',
+      );
     });
   });
 

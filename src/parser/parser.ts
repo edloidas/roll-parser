@@ -1290,6 +1290,8 @@ export class Parser {
  * @returns The root AST node, with `start`/`end` spans on every node
  * @throws {LexerError} If the input contains invalid characters
  * @throws {ParseError} If the input has invalid syntax
+ * @throws {RollParserError} `INVALID_NOTATION_TYPE` when `notation` is not a
+ *   string — raised before lexing, so it carries no position
  *
  * @example
  * ```typescript

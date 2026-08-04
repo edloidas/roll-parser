@@ -613,6 +613,16 @@ try {
 }
 ```
 
+That filter is complete for untrusted input, including input that is not a
+string at all. `notation` is typed `string`, but the APIs that produce it hand
+you `string | null` — an absent slash-command option, a missing JSON field — so
+a non-string is checked at the boundary and reported as `INVALID_NOTATION_TYPE`
+rather than escaping as a bare `TypeError`:
+
+```typescript
+roll(null as unknown as string); // throws, code 'INVALID_NOTATION_TYPE'
+```
+
 ### Error classes
 
 | Class | Stage | Extra fields |
@@ -627,7 +637,7 @@ or read it uniformly through `getErrorSpan`.
 
 ### Error codes
 
-`RollParserErrorCode` is a union of 31 codes today — match on the code, not the
+`RollParserErrorCode` is a union of 33 codes today — match on the code, not the
 message, and give the `switch` a `default` arm: new codes arrive in minor
 releases (never patches), so an exhaustive switch would turn a minor upgrade
 into a silent fall-through. See [Versioning](#versioning) for the full policy.

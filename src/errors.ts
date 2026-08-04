@@ -57,6 +57,7 @@ export const ROLL_PARSER_ERROR_CODES = [
   'NON_FINITE_RESULT',
   'INCOMPATIBLE_RNG_STATE',
   'INVALID_EVALUATION_LIMIT',
+  'INVALID_NOTATION_TYPE',
 ] as const;
 
 /**
@@ -82,6 +83,9 @@ export const ROLL_PARSER_ERROR_CODES = [
  *
  * Options: `INVALID_EVALUATION_LIMIT` — raised before evaluation begins, from
  * the options object rather than from the notation, so it carries no span.
+ *
+ * Input: `INVALID_NOTATION_TYPE` — raised before lexing, when `notation` is not
+ * a string, so it carries no span either.
  *
  * New codes are only ever introduced in a minor release, never a patch. Treat
  * the union as open when you switch over it: give the switch a `default` arm
@@ -275,6 +279,23 @@ export function isRollParserError(value: unknown): value is RollParserError {
   if (!(value instanceof Error) || !('code' in value)) return false;
   const { code } = value;
   return typeof code === 'string' && VALID_CODES.has(code);
+}
+
+/**
+ * Renders a rejected value for an error message, never coercing an object:
+ * `String(Object.create(null))` throws, and a hostile `toString` can too —
+ * either would replace the typed error with a raw `TypeError`.
+ *
+ * Module-level export, deliberately absent from `src/index.ts` — the package
+ * surface never mentions it.
+ */
+export function describeValue(value: unknown): string {
+  // Quoted, so the message tells `'5'` and `5` apart.
+  if (typeof value === 'string') return JSON.stringify(value);
+  // Ahead of the `typeof` checks: `typeof null` is `'object'`.
+  if (value === null) return 'null';
+  if (typeof value === 'object' || typeof value === 'function') return typeof value;
+  return String(value);
 }
 
 /** True for finite, non-negative integer offsets. */
