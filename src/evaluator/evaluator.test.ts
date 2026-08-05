@@ -2077,6 +2077,55 @@ describe('evaluate', () => {
       expect(result.degree).toBe(DegreeOfSuccess.Failure);
     });
 
+    // `(1d20 vs 15)min20` is parser-rejected, so these reach the evaluator only
+    // as hand-built ASTs. Clamping re-sums, which invalidates the degree
+    // `evalVersus` resolved against the pre-clamp total.
+    describe('DieBound drops versus metadata rather than staling it (#260)', () => {
+      const boundedVersus = (bound: 'min' | 'max', value: number): ASTNode => ({
+        type: 'DieBound',
+        bound,
+        value: { type: 'Literal', value },
+        target: parse('1d20 vs 15'),
+      });
+
+      test('clamp across the DC reports no degree (#260)', () => {
+        // Unclamped: total 3 vs dc 15 → CriticalFailure. Clamped to 20 the
+        // total is 20, which would be a Success — so neither verdict is safe.
+        const result = evaluate(boundedVersus('min', 20), createMockRng([3]));
+
+        expect(result.total).toBe(20);
+        expect(result.degree).toBeUndefined();
+        expect(result.natural).toBeUndefined();
+        expect(result.rendered).toBe('1d20 vs 15min20[20] = 20');
+      });
+
+      test('max clamp across the DC reports no degree (#260)', () => {
+        // Mirror of the min case: unclamped 18 vs 15 is a Success, clamped down
+        // to 2 the total would be a CriticalFailure.
+        const result = evaluate(boundedVersus('max', 2), createMockRng([18]));
+
+        expect(result.total).toBe(2);
+        expect(result.degree).toBeUndefined();
+        expect(result.natural).toBeUndefined();
+      });
+
+      test('clamp that changes nothing still reports no degree (#260)', () => {
+        // The die already satisfies `min2`, so the total is untouched. The
+        // degree is dropped on the node's identity, not on whether it bit.
+        const result = evaluate(boundedVersus('min', 2), createMockRng([16]));
+
+        expect(result.total).toBe(16);
+        expect(result.degree).toBeUndefined();
+      });
+
+      test('unwrapped versus still reports its degree', () => {
+        const result = evaluate(parse('1d20 vs 15'), createMockRng([3]));
+
+        expect(result.total).toBe(3);
+        expect(result.degree).toBe(DegreeOfSuccess.CriticalFailure);
+      });
+    });
+
     test('No rolls at all: 10 vs 15 → natural undefined, Failure', () => {
       const ast = parse('10 vs 15');
       const rng = createMockRng([]);

@@ -560,19 +560,24 @@ function evalFateDice(node: FateDiceNode, rng: RNG, ctx: EvalContext, env: EvalE
  * itself. For the default case where the child's raw rolls flow up unchanged,
  * use `mergeContext` instead.
  *
- * Propagate only when the caller leaves `total` equal to the value the degree
- * was resolved from — `evalVersus` computes `degree` once, against the total it
- * saw. That rule, not an oversight, is why most postfix modifiers do not call
- * this: `evalExplode` adds dice, `evalReroll` replaces them, `evalKeepDrop`
- * removes them, and `evalSuccessCount` redefines `total` as a success tally, so
- * a propagated `degree` would contradict the total beside it. `evalSort`
- * (reorders) and `evalCritThreshold` (tags) leave the total alone and qualify.
+ * A **postfix modifier** may propagate only when it leaves `total` equal to the
+ * value the degree was resolved from — `evalVersus` computes `degree` once,
+ * against the total it saw, so a modifier that re-totals invalidates it. Among
+ * the modifiers only `evalSort` (reorders) and `evalCritThreshold` (tags)
+ * qualify. `evalExplode` adds dice, `evalReroll` replaces them, `evalKeepDrop`
+ * removes them, `evalDieBound` re-sums after clamping, and `evalSuccessCount`
+ * redefines `total` as a success tally, so none of those five may.
  * `evalGroupKeepDrop` applies the rule per sub-roll, propagating only from
  * sub-rolls it kept.
  *
- * The membership reading — "every die still contributes" — is the trap here.
- * It admits `evalDieBound`, which drops no dice yet re-sums after clamping and
- * so ships a stale degree (see issue #260).
+ * Judge a modifier by what it does to `total`, not by which dice survive. The
+ * membership reading — "every die still contributes" — admits `evalDieBound`,
+ * which drops no dice and still invalidates the degree.
+ *
+ * Arithmetic wrappers are the deliberate exception named above: `(vs) + 100`
+ * reports `degree` beside a total of 103, because the wrapper post-processes a
+ * number without altering the comparison the degree came from. That is why they
+ * route through `mergeContext` rather than being held to the rule here.
  */
 function propagateMetadata(parent: EvalContext, metadata: EvalContext['versusMetadata']): void {
   if (!metadata) return;
@@ -1094,7 +1099,9 @@ function evalDieBound(node: DieBoundNode, rng: RNG, ctx: EvalContext, env: EvalE
   applyDieBound(targetCtx.rolls, node.bound, boundValue);
 
   appendAll(ctx.rolls, targetCtx.rolls);
-  propagateMetadata(ctx, targetCtx.versusMetadata);
+  // ! No `propagateMetadata` here: clamping re-sums, so a propagated `degree`
+  // ! would have been resolved against a total this node just replaced.
+  // ! See the rule on `propagateMetadata`.
 
   const targetExpr = targetCtx.expressionParts.join('');
   // Negative bounds render parenthesized so `result.expression` re-parses
