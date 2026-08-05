@@ -70,7 +70,7 @@
     "check:changelog": "bun scripts/check-changelog.ts",
     "generate:version": "bun scripts/generate-version.ts",
     "clean": "rm -rf dist",
-    "build": "bun run clean && tsc -p tsconfig.build.json && tsc -p tsconfig.build.types.json && chmod +x dist/cli/index.js",
+    "build": "bun scripts/build.ts",
     "check:package": "attw --pack . --profile esm-only && publint",
     "check:size": "size-limit",
     "bench": "bun run bench/index.bench.ts",
@@ -88,7 +88,7 @@
     "test:watch": "bun test --watch",
     "test:ci": "bun test --bail --coverage",
     "validate": "bun run check && bun run build && bun run check:package && bun run check:size && bun run site:build && bun run site:check && bun test:ci",
-    "release:dry": "bun run check:version && bun run check:changelog && bun audit --audit-level=high && bun run validate",
+    "release:dry": "bun run check:version && bun run check:changelog && bun audit --audit-level=high && bun run clean && bun run validate",
     "prepublishOnly": "bun run release:dry"
   },
   "nano-staged": {

@@ -31,7 +31,11 @@ with `biome check --write` and blocks commits on unfixable lint errors.
 
 - Runtime: Bun — never use npm, yarn, or pnpm (npm appears only in the smoke CI jobs and the release publish step). `bunfig.toml` pins `minimumReleaseAge` to 3 days — `bun add` of a freshly published version silently resolves to an older one
 - Library + CLI, ESM-only compiled JS (Node ≥22.12 — first version with unflagged `require(esm)`)
-- `dist/` is a per-file `tsc` emit, never a bundle, in **two** passes: comment-free JS + `.js.map`, then `.d.ts` + `.d.ts.map` with TSDoc intact — one pass cannot do both under TS7 (rationale in the `tsconfig.build*.json` comments). Keep both map kinds. Do not reintroduce a bundler: Bun ≤1.3.11 breaks pure re-export entrypoints (e.g. `src/testing.ts`) and `--target browser` silently stubs `node:` builtins instead of erroring
+- `dist/` is a per-file `tsc` emit, never a bundle, in **two** passes: comment-free JS + `.js.map`, then `.d.ts` + `.d.ts.map` with TSDoc intact — one pass cannot do both under TS7 (rationale in the `tsconfig.build*.json` comments). Keep both map kinds. The emit overwrites in place and never wipes `dist/` first —
+a running `site:dev` resolves `roll-parser` into it and caches resolution failures
+it cannot recover from; `scripts/prune-dist.ts` deletes what the passes did not
+write, and `bun run clean` (which `release:dry` runs) is the pristine path. Do not
+reintroduce a bundler: Bun ≤1.3.11 breaks pure re-export entrypoints (e.g. `src/testing.ts`) and `--target browser` silently stubs `node:` builtins instead of erroring
 - Byte budgets are a release gate (`check:size`): 12.5 kB `index.js`, 6 kB `{ parse }`, 12 kB `{ roll }`, 250 B `testing.js` — see `size-limit` in `package.json` before adding surface area. Raising a budget is its own commit, never a line in a feature PR
 - `files` ships `src/` deliberately: `.d.ts.map` points consumer go-to-definition at the real sources. Removing it breaks nothing visibly — the jumps just die
 - Relative imports in `src/` carry explicit `.js` extensions — enforced by `moduleResolution: nodenext` at typecheck time
