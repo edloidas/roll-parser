@@ -86,7 +86,7 @@
     "test": "bun test",
     "test:watch": "bun test --watch",
     "test:ci": "bun test --bail --coverage",
-    "validate": "bun run check && bun run build && bun run check:package && bun run check:size && bun test:ci",
+    "validate": "bun run check && bun run build && bun run check:package && bun run check:size && bun run site:build && bun run site:check && bun test:ci",
     "release:dry": "bun run check:version && bun run check:changelog && bun audit --audit-level=high && bun run validate",
     "prepublishOnly": "bun run release:dry"
   },
