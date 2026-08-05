@@ -234,11 +234,14 @@ export function containsMultiSubGroup(node: ASTNode): boolean {
 }
 
 /**
- * Deep-walks a node to find any descendant `Versus`. Used by
- * `rejectVersusTarget`'s single-sub-roll Group passthrough so a buried
- * Versus (`{1+(1d20 vs 15)}cs>18`, `{abs(1d20 vs 15)}cs>18`,
- * `{-(1d20 vs 15)}kh1`) still rejects with `NESTED_VERSUS` instead of
- * silently dropping `versusMetadata` at the modifier consumer site.
+ * Deep-walks a node to find any descendant `Versus`. A buried Versus
+ * (`floor(1d20 vs 15)`, `(1d20 vs 15)+0`, `{1+(1d20 vs 15)}`) must reject with
+ * `NESTED_VERSUS` rather than silently drop `versusMetadata` at the consumer.
+ *
+ * Two callers, both on that hole: `rejectVersusMetaOperand` guards every meta
+ * operand — dice count and sides, keep/drop count, thresholds, die bounds — and
+ * `rejectVersusTarget` uses it for its single-sub-roll Group passthrough.
+ * `evalMetaOperand` runs the same walk as the hand-built-AST backstop.
  */
 export function containsVersus(node: ASTNode): boolean {
   return someDescendant(node, isVersusHit);

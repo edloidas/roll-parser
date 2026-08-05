@@ -5,7 +5,7 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import { isRollParserError, RollParserError } from '../errors.js';
+import { getErrorSpan, isRollParserError, RollParserError } from '../errors.js';
 import type { ASTNode } from '../parser/ast.js';
 import { parse } from '../parser/parser.js';
 import { createMockRng } from '../rng/mock.js';
@@ -2327,6 +2327,146 @@ describe('evaluate', () => {
 
         expect(result.successes).toBe(1);
         expect(result.total).toBe(1);
+      });
+    });
+
+    // Every meta position funnels through `evalMetaOperand`, which forwards
+    // rolls but not `versusMetadata`. Before #267 the degree simply vanished on
+    // a hand-built AST; now `evaluate()` raises the code `parse()` does.
+    describe('versus in a meta position is rejected (#267)', () => {
+      const lit = (value: number): ASTNode => ({ type: 'Literal', value });
+      const versus = (): ASTNode => parse('1d20 vs 15');
+
+      const positions: ReadonlyArray<readonly [string, (v: ASTNode) => ASTNode]> = [
+        ['dice count', (v) => ({ type: 'Dice', count: v, sides: lit(6) })],
+        ['dice sides', (v) => ({ type: 'Dice', count: lit(1), sides: v })],
+        ['Fate dice count', (v) => ({ type: 'FateDice', count: v })],
+        [
+          'keep/drop count',
+          (v) => ({
+            type: 'KeepDrop',
+            kind: 'keep',
+            selector: 'highest',
+            count: v,
+            target: parse('4d6'),
+          }),
+        ],
+        [
+          'success-count threshold',
+          (v) => ({
+            type: 'SuccessCount',
+            threshold: { operator: '>=', value: v },
+            target: parse('4d6'),
+          }),
+        ],
+        [
+          'explode threshold',
+          (v) => ({
+            type: 'Explode',
+            variant: 'standard',
+            threshold: { operator: '>=', value: v },
+            target: parse('4d6'),
+          }),
+        ],
+        [
+          'reroll condition',
+          (v) => ({
+            type: 'Reroll',
+            once: true,
+            condition: { operator: '<', value: v },
+            target: parse('4d6'),
+          }),
+        ],
+        [
+          'die-bound value',
+          (v) => ({ type: 'DieBound', bound: 'min', value: v, target: parse('4d6') }),
+        ],
+        [
+          'crit-threshold value',
+          (v) => ({
+            type: 'CritThreshold',
+            successThresholds: [{ operator: '>=', value: v }],
+            failThresholds: [],
+            target: parse('4d6'),
+          }),
+        ],
+      ];
+
+      for (const [name, wrap] of positions) {
+        test(`a versus as a ${name} throws NESTED_VERSUS (#267)`, () => {
+          expectRollError(
+            () => evaluate(wrap(versus()), createMockRng([3, 4, 1, 2, 5, 6])),
+            EvaluatorError,
+            'NESTED_VERSUS',
+          );
+        });
+      }
+
+      test('a wrapped versus is caught too (#267)', () => {
+        // The scan is deep, so a function call or arithmetic around the versus
+        // cannot smuggle one into a meta position.
+        const wrapped: ASTNode = {
+          type: 'FunctionCall',
+          name: 'floor',
+          args: [{ type: 'BinaryOp', operator: '+', left: versus(), right: lit(0) }],
+        };
+
+        expectRollError(
+          () => evaluate({ type: 'FateDice', count: wrapped }, createMockRng([3])),
+          EvaluatorError,
+          'NESTED_VERSUS',
+        );
+      });
+
+      test('the error points at the versus subtree, not the consumer (#267)', () => {
+        // The throw never enters the operand's own `evalNode` frame, so without
+        // an explicit stamp the span would be the outer node's — absent here,
+        // since the consumer is hand-built.
+        const error = expectRollError(
+          () => evaluate({ type: 'FateDice', count: versus() }, createMockRng([3])),
+          EvaluatorError,
+          'NESTED_VERSUS',
+        );
+
+        // `1d20 vs 15` — the whole operand, not the FateDice wrapper.
+        expect(getErrorSpan(error)).toEqual({ start: 0, end: 10 });
+      });
+
+      test('a wrapper that voids the metadata is caught too (#267)', () => {
+        // `evalDieBound` drops `versusMetadata` by design (#260), so watching
+        // for surviving metadata would let this one through. The structural
+        // scan does not care what the wrapper does to the degree.
+        const clamped: ASTNode = {
+          type: 'DieBound',
+          bound: 'min',
+          value: lit(20),
+          target: versus(),
+        };
+
+        expectRollError(
+          () => evaluate({ type: 'FateDice', count: clamped }, createMockRng([3])),
+          EvaluatorError,
+          'NESTED_VERSUS',
+        );
+      });
+
+      test('no RNG is drawn before the rejection (#267)', () => {
+        // The scan is structural and runs first, so the operand's dice never
+        // roll. An exhausted mock would surface as MockRNGExhaustedError.
+        expectRollError(
+          () => evaluate({ type: 'FateDice', count: versus() }, createMockRng([])),
+          EvaluatorError,
+          'NESTED_VERSUS',
+        );
+      });
+
+      test('a non-versus meta expression still resolves (#267)', () => {
+        const result = evaluate(
+          { type: 'Dice', count: parse('1d2'), sides: lit(6) },
+          createMockRng([2, 4, 5]),
+        );
+
+        expect(result.total).toBe(9);
       });
     });
 
