@@ -405,12 +405,13 @@ const CODE_CASES: Record<RollParserErrorCode, CodeCase> = {
   INVALID_SUCCESS_COUNT_TARGET: { notation: '(1d6+5)>3' },
   INVALID_SORT_TARGET: { notation: '5s' },
   INVALID_CRIT_THRESHOLD_TARGET: { notation: '5cs>3' },
+  INVALID_DIE_BOUND_TARGET: { notation: '5min2' },
   // `10**400` overflows to Infinity, which no finite threshold may be.
   INVALID_THRESHOLD: { notation: '2d6cs>(10**400)' },
   NESTED_VERSUS: { notation: '1d20 vs (5 vs 3)' },
   INVALID_FUNCTION_ARITY: { notation: 'floor(1, 2)' },
   UNKNOWN_FUNCTION: {
-    ast: { type: 'FunctionCall', name: 'sqrt', args: [{ type: 'Literal', value: 4 }] },
+    ast: { type: 'FunctionCall', name: 'nonesuch', args: [{ type: 'Literal', value: 4 }] },
     why: 'the lexer only tokenizes function names the evaluator registry knows',
   },
   UNDEFINED_VARIABLE: { notation: '@str' },
@@ -461,6 +462,7 @@ const IS_NOTATION_CODE: Record<RollParserErrorCode, boolean> = {
   INVALID_SUCCESS_COUNT_TARGET: true,
   INVALID_SORT_TARGET: true,
   INVALID_CRIT_THRESHOLD_TARGET: true,
+  INVALID_DIE_BOUND_TARGET: true,
   INVALID_THRESHOLD: true,
   NESTED_VERSUS: true,
   INVALID_FUNCTION_ARITY: true,

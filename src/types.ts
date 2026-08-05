@@ -61,6 +61,8 @@ export type ResolvedCritThreshold = ResolvedComparePoint | 'default';
  * | `'dropped'` | Excluded from the total by `kh`/`kl`/`dh`/`dl` or group selection. | `~~n~~` |
  * | `'exploded'` | Produced by, or the trigger of, an explosion (`!`, `!!`, `!p`). | plain |
  * | `'rerolled'` | A discarded intermediate from `r` / `ro`, always paired with `'dropped'` — the replacement die carries no tag. | `~~n~~` (via `'dropped'`) |
+ * | `'min'` | Raised to a `minN` bound; `initialResult` keeps the raw face. | plain |
+ * | `'max'` | Lowered to a `maxN` bound; `initialResult` keeps the raw face. | plain |
  * | `'success'` | Met a success-count threshold (`>=6`). | `**n**` |
  * | `'failure'` | Met a failure threshold (`f1`). | `__n__` |
  * | `'meta'` | Rolled by a meta-expression rather than by the visible pool. | not shown |
@@ -79,6 +81,8 @@ export type DieModifier =
   | 'kept'
   | 'exploded'
   | 'rerolled'
+  | 'min'
+  | 'max'
   | 'success'
   | 'failure'
   | 'meta';
@@ -239,6 +243,8 @@ export type RollPartBase = {
  *       return `${describe(part.target)} (${part.variant} explode)`;
  *     case 'reroll':
  *       return `${describe(part.target)} (reroll${part.once ? ' once' : ''})`;
+ *     case 'dieBound':
+ *       return `${describe(part.target)} (${part.bound} ${part.value})`;
  *     case 'successCount':
  *       return `${describe(part.target)} => ${part.successes}-${part.failures}`;
  *     case 'versus':
@@ -294,6 +300,7 @@ export type RollPart =
       condition: ResolvedComparePoint;
       target: RollPart;
     })
+  | (RollPartBase & { type: 'dieBound'; bound: 'min' | 'max'; value: number; target: RollPart })
   | (RollPartBase & {
       type: 'successCount';
       threshold: ResolvedComparePoint;
@@ -325,7 +332,7 @@ export type RollPart =
     });
 
 /**
- * The 16 discriminant strings of {@link RollPart}. Convenience alias for
+ * The 17 discriminant strings of {@link RollPart}. Convenience alias for
  * consumers writing exhaustive switches or part-type lookup tables.
  *
  * @category Results

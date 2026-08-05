@@ -53,10 +53,13 @@ roll('4d6kh3', { rng: createMockRng([3, 6, 2, 5]) }).total; // 14, every run
 ## Why roll-parser
 
 - **Complete notation.** Keep/drop, three flavours of exploding dice, rerolls,
-  success pools, crit thresholds, sorting, grouped rolls, PF2e degrees of
-  success, math functions, variables, computed dice — enough for D&D 5e,
+  min/max clamps, success pools, crit thresholds, sorting, grouped rolls, PF2e
+  degrees of success, math functions, variables, computed dice — enough for D&D 5e,
   Pathfinder, World of Darkness, Shadowrun, Fate, Savage Worlds, and Call of
-  Cthulhu without escape hatches.
+  Cthulhu without escape hatches. Spelled the way
+  [Roll20](https://help.roll20.net/hc/en-us/articles/360037773133-Dice-Reference)
+  spells it wherever the two overlap, so the notation your table already uses
+  keeps working.
 - **Deterministic.** Every die goes through an injectable `RNG`. Seed a roll to
   reproduce it, or script the sequence and assert exact totals.
 - **Structured.** Results are not strings. Each roll returns a typed tree
@@ -66,12 +69,19 @@ roll('4d6kh3', { rng: createMockRng([3, 6, 2, 5]) }).total; // 14, every run
 - **Safe on untrusted input.** Dice count, explosion depth, reroll depth, and
   parse depth are all bounded, and every failure is a typed error with a stable
   code and a source span.
-- **Small and fast.** ≈11.1 kB brotli for the whole library, ≈5.1 kB for just
+- **Small and fast.** ≈11.8 kB brotli for the whole library, ≈5.5 kB for just
   `parse`, ≈215 B for the testing entry point. Zero runtime dependencies, zero
-  `node:` imports. A `1d20` round trip takes about 1.5 µs.
-- **Tested.** 1,350+ tests behind CI-enforced coverage floors — 100% of
+  `node:` imports. A `1d20` round trip takes about 0.5 µs.
+- **Tested.** 1,500+ tests behind CI-enforced coverage floors — 100% of
   functions, 98% of lines — including every code example in this README, which
   must produce the values its comments claim.
+- **Measured, not asserted.** A
+  [comparison suite](https://github.com/edloidas/roll-parser/tree/master/bench/competitors)
+  runs 23 canonical notations through every dice-notation library published on
+  npm and validates each cell over 5,000 rolls against its closed-form mean —
+  support means *statistically correct*, not merely parsed. roll-parser is the
+  only one that gets all 23 right. Run `bun run bench:competitors` and check
+  the numbers yourself.
 
 ## Contents
 
@@ -174,7 +184,8 @@ variable names: `@StrMod` and `@strmod` are different variables.
 | `-expr` | Unary minus, binding to the whole dice expression: `-1d4` is `-(1d4)` |
 | `( )` | Explicit grouping — `(1d6+2)*3` |
 | `2.5` | Decimal literals, in arithmetic only — never as a dice count or side count |
-| `floor(x)` `ceil(x)` `round(x)` `abs(x)` | One argument each |
+| `floor(x)` `ceil(x)` `round(x)` `abs(x)` `sqrt(x)` | One argument each |
+| `pow(a, b)` | Exactly two arguments — same as `a ** b` |
 | `max(a, b, …)` `min(a, b, …)` | Variadic, two arguments minimum — `max(1d20, 1d20, 1d20)` |
 | `@name` `@{any name}` | Variable from the `context` option |
 
@@ -194,6 +205,7 @@ Postfix modifiers attach to a dice pool. Counts are optional and default to
 | `!<cmp>` | Explode on a threshold instead of the max face — `1d6!>=5`, `5d10!=10` |
 | `r<cmp>` | Reroll recursively while the condition holds — `2d6r<2` |
 | `ro<cmp>` | Reroll once, keeping the second result — `2d6ro<3` |
+| `minN` / `maxN` | Clamp each die's value — `4d6min2` lifts 1s to 2, `4d6max5` caps 6s at 5 |
 | `s` / `sa` / `sd` | Sort ascending / ascending / descending — display only |
 | `cs` / `cs<cmp>` | Override the crit threshold — bare `cs` means "max face" |
 | `cf` / `cf<cmp>` | Override the fumble threshold — bare `cf` means "1" |
@@ -352,9 +364,10 @@ roll('4d6sd', { seed: 'demo' }).rendered; // '4d6sd[6, 3, 1, 1] = 11'
 const { start, end } = roll('4d6kh3 + 2', { seed: 'demo' }).parts; // 0, 10
 ```
 
-The render prefix echoes explode, reroll, sort, crit, and success-count
-modifiers, but **not** keep/drop — `4d6kh3` renders as `4d6[…]` while `8d6!`
-renders as `8d6![…]`. Read `result.expression` when you need the modifier back.
+The render prefix echoes explode, reroll, min/max, sort, crit, and
+success-count modifiers, but **not** keep/drop — `4d6kh3` renders as `4d6[…]`
+while `8d6!` renders as `8d6![…]`. Read `result.expression` when you need the
+modifier back.
 
 ## Randomness
 
@@ -515,8 +528,9 @@ rules cover meta-expressions:
    modifier chain first, then rolls the dice it selects from. Applies to `kh`,
    `kl`, `dh`, `dl`.
 2. **Threshold expressions are drawn after the pool** — explode, reroll,
-   crit-threshold, and success-count modifiers post-process a pool that already
-   exists, so their thresholds resolve later.
+   min/max, crit-threshold, and success-count modifiers post-process a pool
+   that already exists, so their thresholds (and clamp bounds like
+   `4d6min(1d2)`) resolve later.
 
 `4d6kh(1d2)` with `[1, 5, 3, 4, 6]` — the keep count draws first:
 
@@ -735,7 +749,7 @@ or read it uniformly through `getErrorSpan`.
 
 ### Error codes
 
-`RollParserErrorCode` is a union of 33 codes today — match on the code, not the
+`RollParserErrorCode` is a union of 34 codes today — match on the code, not the
 message, and give the `switch` a `default` arm: new codes arrive in minor
 releases (never patches), so an exhaustive switch would turn a minor upgrade
 into a silent fall-through. See [Versioning](#versioning) for the full policy.
@@ -874,15 +888,15 @@ precedes them. Errors go to stderr; only the result goes to stdout.
 
 | Notation | `lex` | `parse` | `roll` (end to end) |
 |----------|------:|--------:|--------------------:|
-| `1d20` | 86 ns | 165 ns | **0.52 µs** (~1.9M rolls/s) |
-| `2d6+3` | 99 ns | 217 ns | **0.82 µs** |
-| `4d6kh3` | 124 ns | 247 ns | **1.3 µs** |
-| `10d10>=6f1` | 161 ns | 339 ns | **2.2 µs** |
-| `100d6` | 83 ns | 168 ns | **5.3 µs** |
+| `1d20` | 85 ns | 164 ns | **0.49 µs** (~2.0M rolls/s) |
+| `2d6+3` | 98 ns | 215 ns | **0.77 µs** |
+| `4d6kh3` | 122 ns | 245 ns | **1.1 µs** |
+| `10d10>=6f1` | 161 ns | 336 ns | **1.6 µs** |
+| `100d6` | 82 ns | 168 ns | **2.6 µs** |
 
 The `roll` column pays for a fresh `SeededRNG` per call, which an injected RNG
 avoids. Every roll also builds the `parts` tree; there is no opt-out and these
-numbers include it. A 1000-die pool costs roughly 96x a `1d20` (~49 µs here),
+numbers include it. A 1000-die pool costs roughly 47x a `1d20` (~23 µs here),
 while lexing and parsing stay flat at ~84 / ~168 ns.
 
 <details>
@@ -890,8 +904,9 @@ while lexing and parsing stay flat at ~84 / ~168 ns.
 
 Values are **p50**, from
 [mitata](https://github.com/evanwashere/mitata) with forced per-iteration GC
-(`.gc('inner')`), taken as the per-record median of three full
-`bun run bench:json` passes agreeing within 5%. Measured 2026-08-05 on Bun
+(`.gc('inner')`), taken as the per-record median of four full
+`bun run bench:json` passes, every row agreeing within 5% except
+`lex / 4d6kh3` at 7%. Measured 2026-08-05 on Bun
 1.3.14, Apple M2 Pro, macOS, idle and on AC power. Read them as two significant
 digits: another machine shifts every row, and a busy one inflates the heavy
 cases most.
@@ -905,8 +920,10 @@ mis-times mid-weight cases by 10-30x.
 </details>
 
 Run `bun run bench` for the full suite, or `bench:lex` / `bench:parse` /
-`bench:evaluate` / `bench:roll` for one stage. Bundle size is gated in CI by
-`size-limit`; the budgets live in `package.json`.
+`bench:evaluate` / `bench:roll` for one stage. Cross-library numbers live in
+the [competitor suite](https://github.com/edloidas/roll-parser/tree/master/bench/competitors)
+(`bun run bench:competitors`). Bundle size is gated in CI by `size-limit`; the
+budgets live in `package.json`.
 
 ## Known limitations
 

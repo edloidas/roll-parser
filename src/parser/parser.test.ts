@@ -8,6 +8,7 @@ import type {
   CritThreshold,
   CritThresholdNode,
   DiceNode,
+  DieBoundNode,
   ExplodeNode,
   FateDiceNode,
   FunctionCallNode,
@@ -88,6 +89,10 @@ function explode(
 
 function reroll(once: boolean, condition: ComparePoint, target: ASTNode): RerollNode {
   return { type: 'Reroll', once, condition, target };
+}
+
+function dieBound(bound: 'min' | 'max', value: ASTNode, target: ASTNode): DieBoundNode {
+  return { type: 'DieBound', bound, value, target };
 }
 
 function successCount(
@@ -1574,6 +1579,97 @@ describe('Parser', () => {
     });
   });
 
+  describe('die bound modifiers (min/max)', () => {
+    describe('shape', () => {
+      it('should parse min bound: 4d6min2', () => {
+        expect(parseAst('4d6min2')).toEqual(
+          dieBound('min', literal(2), dice(literal(4), literal(6))),
+        );
+      });
+
+      it('should parse max bound: 4d6max5', () => {
+        expect(parseAst('4d6max5')).toEqual(
+          dieBound('max', literal(5), dice(literal(4), literal(6))),
+        );
+      });
+
+      it('should parse chained bounds left to right: 4d6min2max5', () => {
+        expect(parseAst('4d6min2max5')).toEqual(
+          dieBound('max', literal(5), dieBound('min', literal(2), dice(literal(4), literal(6)))),
+        );
+      });
+
+      it('should parse computed bound: 4d6min(1d2)', () => {
+        expect(parseAst('4d6min(1d2)')).toEqual(
+          dieBound('min', grouped(dice(literal(1), literal(2))), dice(literal(4), literal(6))),
+        );
+      });
+
+      it('should parse variable bound: 4d6min@str', () => {
+        expect(parseAst('4d6min@str')).toEqual(
+          dieBound('min', variable('str'), dice(literal(4), literal(6))),
+        );
+      });
+
+      it('should parse bound on modifier chain: 4d6kh3min2', () => {
+        expect(parseAst('4d6kh3min2')).toEqual(
+          dieBound(
+            'min',
+            literal(2),
+            modifier('keep', 'highest', literal(3), dice(literal(4), literal(6))),
+          ),
+        );
+      });
+
+      it('should parse arithmetic after bound: 4d6min2+3', () => {
+        expect(parseAst('4d6min2+3')).toEqual(
+          binary('+', dieBound('min', literal(2), dice(literal(4), literal(6))), literal(3)),
+        );
+      });
+
+      it('should be case-insensitive: 4d6MIN2', () => {
+        expect(parseAst('4d6MIN2')).toEqual(
+          dieBound('min', literal(2), dice(literal(4), literal(6))),
+        );
+      });
+
+      it('should keep min/max function calls working: min(4d6min2, 10)', () => {
+        expect(parseAst('min(4d6min2, 10)')).toEqual(
+          functionCall('min', [
+            dieBound('min', literal(2), dice(literal(4), literal(6))),
+            literal(10),
+          ]),
+        );
+      });
+    });
+
+    describe('errors', () => {
+      it('should reject bare min without a value', () => {
+        expectRollError(() => parseAst('4d6min'), ParseError, 'EXPECTED_TOKEN');
+      });
+
+      it('should reject non-pool target: 5min2', () => {
+        expectRollError(() => parseAst('5min2'), ParseError, 'INVALID_DIE_BOUND_TARGET');
+      });
+
+      it('should reject arithmetic target: (1d6+5)min3', () => {
+        expectRollError(() => parseAst('(1d6+5)min3'), ParseError, 'INVALID_DIE_BOUND_TARGET');
+      });
+
+      it('should reject group target: {2d6, 1d8}min2', () => {
+        expectRollError(() => parseAst('{2d6, 1d8}min2'), ParseError, 'INVALID_DIE_BOUND_TARGET');
+      });
+
+      it('should reject Fate dice target: 4dFmin0', () => {
+        expectRollError(() => parseAst('4dFmin0'), ParseError, 'INVALID_DIE_BOUND_TARGET');
+      });
+
+      it('should reject bound after success counting: 10d10>=6min2', () => {
+        expectRollError(() => parseAst('10d10>=6min2'), ParseError, 'INVALID_SUCCESS_COUNT_TARGET');
+      });
+    });
+  });
+
   describe('math functions', () => {
     it('should parse unary function: floor(10)', () => {
       expect(parseAst('floor(10)')).toEqual(functionCall('floor', [literal(10)]));
@@ -1595,6 +1691,16 @@ describe('Parser', () => {
       expect(parseAst('ceil(1.5)')).toEqual(functionCall('ceil', [literal(1.5)]));
       expect(parseAst('round(1.5)')).toEqual(functionCall('round', [literal(1.5)]));
       expect(parseAst('abs(-5)')).toEqual(functionCall('abs', [unary(literal(5))]));
+    });
+
+    it('should parse unary sqrt: sqrt(16)', () => {
+      expect(parseAst('sqrt(16)')).toEqual(functionCall('sqrt', [literal(16)]));
+    });
+
+    it('should parse binary pow: pow(2, 1d4)', () => {
+      expect(parseAst('pow(2, 1d4)')).toEqual(
+        functionCall('pow', [literal(2), dice(literal(1), literal(4))]),
+      );
     });
 
     it('should parse variadic max with two args: max(1d6, 1d8)', () => {
@@ -1651,6 +1757,18 @@ describe('Parser', () => {
 
     it('should throw INVALID_FUNCTION_ARITY for too many args: floor(1, 2)', () => {
       expectRollError(() => parseAst('floor(1, 2)'), ParseError, 'INVALID_FUNCTION_ARITY');
+    });
+
+    it('should throw INVALID_FUNCTION_ARITY for two-arg sqrt: sqrt(1, 2)', () => {
+      expectRollError(() => parseAst('sqrt(1, 2)'), ParseError, 'INVALID_FUNCTION_ARITY');
+    });
+
+    it('should throw INVALID_FUNCTION_ARITY for one-arg pow: pow(2)', () => {
+      expectRollError(() => parseAst('pow(2)'), ParseError, 'INVALID_FUNCTION_ARITY');
+    });
+
+    it('should throw INVALID_FUNCTION_ARITY for three-arg pow: pow(2, 3, 4)', () => {
+      expectRollError(() => parseAst('pow(2, 3, 4)'), ParseError, 'INVALID_FUNCTION_ARITY');
     });
 
     it('should throw INVALID_FUNCTION_ARITY when max has only 1 arg: max(1d6)', () => {

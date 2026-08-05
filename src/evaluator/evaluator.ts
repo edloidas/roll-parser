@@ -11,6 +11,7 @@ import type {
   CritThreshold,
   CritThresholdNode,
   DiceNode,
+  DieBoundNode,
   ExplodeNode,
   FateDiceNode,
   FunctionCallNode,
@@ -43,6 +44,7 @@ import { DegreeOfSuccess } from '../types.js';
 import { createDieResult, createFateDieResult } from './die.js';
 import { chargeDice, type EvalEnv } from './env.js';
 import { applyCritThresholds } from './modifiers/crit-threshold.js';
+import { applyDieBound } from './modifiers/die-bound.js';
 import {
   applyCompoundExplode,
   applyPenetratingExplode,
@@ -217,6 +219,16 @@ function renderDice(dice: DieResult[]): string {
 
   for (const die of dice) {
     const { modifiers } = die;
+
+    // Fast path: a die untouched by any modifier carries exactly ['kept'].
+    // Skipping the `meta` scan here and the three in `renderDie` more than
+    // halves a plain `1000d6` — rendering dominates large unmodified pools.
+    if (modifiers.length === 1 && modifiers[0] === 'kept') {
+      rendered = isFirst ? `${rendered}${die.result}` : `${rendered}, ${die.result}`;
+      isFirst = false;
+      continue;
+    }
+
     if (modifiers.includes('meta')) continue;
 
     if (!isFirst) rendered += ', ';
@@ -310,6 +322,9 @@ function evalNodeInner(node: ASTNode, rng: RNG, ctx: EvalContext, env: EvalEnv):
 
     case 'Reroll':
       return evalReroll(node, rng, ctx, env);
+
+    case 'DieBound':
+      return evalDieBound(node, rng, ctx, env);
 
     case 'SuccessCount':
       return evalSuccessCount(node, rng, ctx, env);
@@ -765,6 +780,14 @@ function applyFunction(name: string, values: number[]): number {
       return Math.round(requireUnaryArg(name, values));
     case 'abs':
       return Math.abs(requireUnaryArg(name, values));
+    case 'sqrt':
+      // A negative argument yields NaN, surfaced as `NON_FINITE_RESULT` by
+      // the top-level finiteness check — same policy as `1/0`.
+      return Math.sqrt(requireUnaryArg(name, values));
+    case 'pow': {
+      const [base, exponent] = requireBinaryArgs(name, values);
+      return base ** exponent;
+    }
     case 'max':
       return extremumOf(values, 'max');
     case 'min':
@@ -805,6 +828,20 @@ function requireUnaryArg(name: string, values: number[]): number {
     );
   }
   return x;
+}
+
+function requireBinaryArgs(name: string, values: number[]): [number, number] {
+  const [a, b] = values;
+  if (a == null || b == null) {
+    // ? Unreachable: parser validates arity before evaluation. Defensive for
+    // `noNonNullAssertion`.
+    throw new EvaluatorError(
+      `Function '${name}' requires two arguments`,
+      'UNKNOWN_FUNCTION',
+      'FunctionCall',
+    );
+  }
+  return [a, b];
 }
 
 //
@@ -1015,6 +1052,52 @@ function evalReroll(node: RerollNode, rng: RNG, ctx: EvalContext, env: EvalEnv):
       type: 'reroll',
       once: node.once,
       condition,
+      target: target.part,
+      total,
+      ...partSpan(node),
+    },
+  };
+}
+
+/**
+ * Evaluates a per-die clamp (`minN` / `maxN`). The bound expression draws
+ * *after* the target pool, like other threshold arguments (see README,
+ * Randomness → Draw order). Dice are clamped in place by `applyDieBound`
+ * and the total re-summed, since clamping changes kept-die values.
+ */
+function evalDieBound(node: DieBoundNode, rng: RNG, ctx: EvalContext, env: EvalEnv): EvalResult {
+  const targetCtx = createContext();
+  const target = evalNode(node.target, rng, targetCtx, env);
+
+  const boundValue = evalMetaOperand(node.value, rng, ctx, env);
+  if (!Number.isFinite(boundValue)) {
+    throw new EvaluatorError(
+      `Invalid ${node.bound} bound: ${boundValue}`,
+      'INVALID_THRESHOLD',
+      'DieBound',
+    );
+  }
+
+  applyDieBound(targetCtx.rolls, node.bound, boundValue);
+
+  appendAll(ctx.rolls, targetCtx.rolls);
+  propagateMetadata(ctx, targetCtx.versusMetadata);
+
+  const targetExpr = targetCtx.expressionParts.join('');
+  // Negative bounds render parenthesized so `result.expression` re-parses
+  // (`4d6min-2` is a syntax error; `4d6min(-2)` is not).
+  const code = boundValue < 0 ? `${node.bound}(${boundValue})` : `${node.bound}${boundValue}`;
+
+  ctx.expressionParts.push(`${targetExpr}${code}`);
+  ctx.renderedParts.push(`${targetExpr}${code}${renderDice(targetCtx.rolls)}`);
+
+  const total = sumKeptDice(targetCtx.rolls);
+  return {
+    total,
+    part: {
+      type: 'dieBound',
+      bound: node.bound,
+      value: boundValue,
       target: target.part,
       total,
       ...partSpan(node),

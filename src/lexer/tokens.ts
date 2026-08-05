@@ -118,7 +118,11 @@ export enum TokenType {
   // * Functions
   //
 
-  /** Math function: 'floor', 'ceil', 'round', 'abs', 'max', 'min' */
+  /**
+   * Math function: 'floor', 'ceil', 'round', 'abs', 'sqrt', 'pow', 'max',
+   * 'min'. In postfix position, 'min'/'max' double as per-die clamp
+   * modifiers (`4d6min2`) — the parser decides by position, not the lexer.
+   */
   FUNCTION = 28,
 
   //

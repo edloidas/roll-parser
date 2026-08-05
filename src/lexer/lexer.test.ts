@@ -510,11 +510,26 @@ describe('Lexer', () => {
     });
 
     it('should tokenize all math functions', () => {
-      for (const name of ['floor', 'ceil', 'round', 'abs', 'max', 'min']) {
+      for (const name of ['floor', 'ceil', 'round', 'abs', 'sqrt', 'pow', 'max', 'min']) {
         const tokens = lex(name);
         expect(tokens[0]?.type).toBe(TokenType.FUNCTION);
         expect(tokens[0]?.value).toBe(name);
       }
+    });
+
+    it('should tokenize a postfix min bound as FUNCTION + NUMBER: 4d6min2', () => {
+      // The parser decides modifier-vs-call by position; the lexer only
+      // guarantees the digit stops the identifier munch.
+      const tokens = lex('4d6min2');
+      expect(tokens.map((token) => token.type)).toEqual([
+        TokenType.NUMBER,
+        TokenType.DICE,
+        TokenType.NUMBER,
+        TokenType.FUNCTION,
+        TokenType.NUMBER,
+        TokenType.EOF,
+      ]);
+      expect(tokens[3]?.value).toBe('min');
     });
 
     it('should be case-insensitive for functions', () => {

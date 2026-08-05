@@ -554,6 +554,69 @@ describe('property-based invariants', () => {
       );
     });
 
+    test('die bound: every non-meta die respects the bound', () => {
+      fc.assert(
+        fc.property(
+          seedArb,
+          fc.integer({ min: 1, max: 8 }),
+          fc.integer({ min: 2, max: 20 }),
+          fc.integer({ min: 1, max: 20 }),
+          fc.constantFrom('min', 'max'),
+          (seed, count, sides, bound, kind) => {
+            const result = roll(`${count}d${sides}${kind}${bound}`, { seed });
+            const pool = result.rolls.filter((d) => !d.modifiers.includes('meta'));
+            return (
+              pool.length === count &&
+              pool.every((d) => (kind === 'min' ? d.result >= bound : d.result <= bound))
+            );
+          },
+        ),
+        { numRuns: 100 },
+      );
+    });
+
+    test('die bound: total equals the sum of kept dice and clamps never change count', () => {
+      fc.assert(
+        fc.property(
+          seedArb,
+          fc.integer({ min: 1, max: 8 }),
+          fc.integer({ min: 2, max: 20 }),
+          fc.integer({ min: 1, max: 20 }),
+          (seed, count, sides, bound) => {
+            const result = roll(`${count}d${sides}min${bound}`, { seed });
+            const keptSum = result.rolls
+              .filter((d) => !d.modifiers.includes('dropped'))
+              .reduce((sum, d) => sum + d.result, 0);
+            return result.total === keptSum && result.rolls.length === count;
+          },
+        ),
+        { numRuns: 100 },
+      );
+    });
+
+    test('die bound: clamped dice keep their natural face in initialResult', () => {
+      fc.assert(
+        fc.property(
+          seedArb,
+          fc.integer({ min: 1, max: 8 }),
+          fc.integer({ min: 2, max: 10 }),
+          (seed, count, sides) => {
+            // A bound of sides+1 clamps every die, so each must carry its face.
+            const result = roll(`${count}d${sides}min${sides + 1}`, { seed });
+            return result.rolls.every(
+              (d) =>
+                d.result === sides + 1 &&
+                d.initialResult !== undefined &&
+                d.initialResult >= 1 &&
+                d.initialResult <= sides &&
+                d.modifiers.includes('min'),
+            );
+          },
+        ),
+        { numRuns: 100 },
+      );
+    });
+
     test('seeded reroll is reproducible', () => {
       // Recursive reroll only terminates while the threshold stays below
       // `sides`, so some results can exceed it.

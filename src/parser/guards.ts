@@ -27,7 +27,8 @@ export function unwrapGrouped(node: ASTNode): ASTNode {
 
 /**
  * Peels every transparent wrapper — `Grouped`, `KeepDrop`, `Sort`,
- * `CritThreshold` — returning the first descendant that is none of them.
+ * `CritThreshold`, `DieBound` — returning the first descendant that is none of
+ * them.
  *
  * "Transparent" is relative to the question being asked. These wrappers
  * preserve `containsDicePool`'s answer for whatever they wrap, so they are
@@ -47,6 +48,7 @@ export function unwrapAllTransparent(node: ASTNode): ASTNode {
       case 'KeepDrop':
       case 'Sort':
       case 'CritThreshold':
+      case 'DieBound':
         current = current.target;
         break;
       default:
@@ -75,6 +77,7 @@ function someDescendant(node: ASTNode, isHit: (node: ASTNode) => boolean): boole
     case 'KeepDrop':
     case 'Explode':
     case 'Reroll':
+    case 'DieBound':
     case 'SuccessCount':
     case 'Sort':
     case 'CritThreshold':
@@ -131,6 +134,7 @@ export function containsDicePool(node: ASTNode): boolean {
     case 'KeepDrop':
     case 'Explode':
     case 'Reroll':
+    case 'DieBound':
       return true;
     case 'Sort':
     case 'CritThreshold':
@@ -186,6 +190,7 @@ export function containsFatePool(node: ASTNode): boolean {
     case 'KeepDrop':
     case 'Explode':
     case 'Reroll':
+    case 'DieBound':
     case 'Sort':
     case 'CritThreshold':
       return containsFatePool(node.target);

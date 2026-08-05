@@ -170,6 +170,26 @@ export type RerollNode = NodeSpan & {
 };
 
 /**
+ * Per-die clamp node (`minN`, `maxN`).
+ * `4d6min2` raises every die below 2 to 2; `4d6max5` lowers every die above
+ * 5 to 5. The clamp rewrites `DieResult.result` (preserving the raw face in
+ * `initialResult`) and re-sums the pool; `critical`/`fumble` keep reflecting
+ * the natural face. The bound is a full sub-expression (`4d6min(1d2)`),
+ * drawn *after* the pool like other threshold arguments.
+ *
+ * Chained bounds nest and apply left to right: `4d6min2max5` clamps into
+ * [2, 5].
+ *
+ * @category AST
+ */
+export type DieBoundNode = NodeSpan & {
+  type: 'DieBound';
+  bound: 'min' | 'max';
+  value: ASTNode;
+  target: ASTNode;
+};
+
+/**
  * Success counting node (`>=T`, `>T`, `<T`, `<=T`, `=T`, with optional `f=F`).
  *
  * Transforms a dice pool into a success count: each die meeting `threshold`
@@ -324,16 +344,16 @@ export type CritThresholdNode = NodeSpan & {
 };
 
 /**
- * Discriminated union of all 16 AST node types — what {@link parse} returns
+ * Discriminated union of all 17 AST node types — what {@link parse} returns
  * and what {@link evaluate} consumes.
  *
  * Narrow it either by switching on `node.type` (PascalCase discriminants, as
  * opposed to the camelCase ones on {@link RollPart}) or with the exported
  * type guards: {@link isLiteral}, {@link isDice}, {@link isFateDice},
  * {@link isBinaryOp}, {@link isUnaryOp}, {@link isKeepDrop},
- * {@link isExplode}, {@link isReroll}, {@link isSuccessCount},
- * {@link isVersus}, {@link isFunctionCall}, {@link isGrouped},
- * {@link isVariable}, {@link isGroup}, {@link isSort},
+ * {@link isExplode}, {@link isReroll}, {@link isDieBound},
+ * {@link isSuccessCount}, {@link isVersus}, {@link isFunctionCall},
+ * {@link isGrouped}, {@link isVariable}, {@link isGroup}, {@link isSort},
  * {@link isCritThreshold}.
  *
  * Nodes are plain data with no methods, so they are structurally clonable and
@@ -375,6 +395,7 @@ export type ASTNode =
   | KeepDropNode
   | ExplodeNode
   | RerollNode
+  | DieBoundNode
   | SuccessCountNode
   | VersusNode
   | FunctionCallNode
@@ -574,4 +595,16 @@ export function isSort(node: ASTNode): node is SortNode {
  */
 export function isCritThreshold(node: ASTNode): node is CritThresholdNode {
   return node.type === 'CritThreshold';
+}
+
+/**
+ * Narrows an {@link ASTNode} to a per-die clamp (`min2`, `max5`).
+ *
+ * @param node - Any AST node
+ * @returns `true` when `node` is a {@link DieBoundNode}
+ *
+ * @category AST
+ */
+export function isDieBound(node: ASTNode): node is DieBoundNode {
+  return node.type === 'DieBound';
 }

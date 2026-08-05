@@ -79,6 +79,7 @@
     "bench:evaluate": "bun run bench/evaluate.bench.ts",
     "bench:roll": "bun run bench/roll.bench.ts",
     "bench:json": "bun run scripts/bench-json.ts",
+    "bench:competitors": "cd bench/competitors && bun install && bun run all",
     "site:build": "bun run build && bun scripts/build-site.ts",
     "site:check": "bun scripts/check-site.ts",
     "site:dev": "bun run build && bun ./site/index.html ./site/reference.html",

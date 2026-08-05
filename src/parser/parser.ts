@@ -15,6 +15,7 @@ import type {
   CritThreshold,
   CritThresholdNode,
   DiceNode,
+  DieBoundNode,
   ExplodeNode,
   FateDiceNode,
   FunctionCallNode,
@@ -177,6 +178,8 @@ const FUNCTION_ARITY: Record<string, { min: number; max: number }> = {
   ceil: { min: 1, max: 1 },
   round: { min: 1, max: 1 },
   abs: { min: 1, max: 1 },
+  sqrt: { min: 1, max: 1 },
+  pow: { min: 2, max: 2 },
   max: { min: 2, max: Number.POSITIVE_INFINITY },
   min: { min: 2, max: Number.POSITIVE_INFINITY },
 };
@@ -373,6 +376,11 @@ export class Parser {
       case TokenType.CRIT_SUCCESS:
       case TokenType.CRIT_FAIL:
         return this.parseCritThreshold(left, token);
+
+      case TokenType.FUNCTION:
+        // Only `min`/`max` reach LED position — `getLeftBp` keeps every
+        // other function name at -1, ending the Pratt loop before dispatch.
+        return this.parseDieBound(left, token);
 
       case TokenType.GREATER:
       case TokenType.GREATER_EQUAL:
@@ -624,6 +632,7 @@ export class Parser {
       case 'FateDice':
       case 'Explode':
       case 'Reroll':
+      case 'DieBound':
       case 'KeepDrop':
       case 'Sort':
       case 'CritThreshold':
@@ -871,6 +880,66 @@ export class Parser {
       target,
       start: target.start ?? token.position,
       end: condition.value.end ?? token.end,
+    };
+  }
+
+  private parseDieBound(target: ASTNode, token: Token): DieBoundNode {
+    this.rejectSuccessCountTarget(target, token);
+    this.rejectVersusTarget(target, token);
+
+    // Groups have no per-die clamp semantics — a group's "dice" are sub-roll
+    // subtotals. Must come before `containsDicePool`, which recurses into
+    // `Group`.
+    this.rejectGroupTarget(target, token, `apply '${token.value}' to`, 'INVALID_DIE_BOUND_TARGET');
+
+    // A clamp needs a dice pool to act on. Wrapping arithmetic (e.g.
+    // `(1d6+5)min3`) would silently drop user math.
+    if (!containsDicePool(target)) {
+      throw new ParseError(
+        `Die bound modifier requires a dice pool target`,
+        'INVALID_DIE_BOUND_TARGET',
+        token.position,
+        token,
+      );
+    }
+
+    // Fate dice roll a fixed {-1, 0, +1}; clamping those faces has no
+    // established semantics. Mirrors the Fate-explosion rejection.
+    if (containsFatePool(target)) {
+      throw new ParseError(
+        `Fate dice cannot be clamped`,
+        'INVALID_DIE_BOUND_TARGET',
+        token.position,
+        token,
+      );
+    }
+
+    // A bound must be explicit — bare `4d6min` has nothing to clamp to.
+    const nextToken = this.peek().type;
+    const hasExplicitValue =
+      nextToken === TokenType.NUMBER ||
+      nextToken === TokenType.LPAREN ||
+      nextToken === TokenType.AT;
+    if (!hasExplicitValue) {
+      throw new ParseError(
+        `Expected value after '${token.value}'`,
+        'EXPECTED_TOKEN',
+        token.position,
+        token,
+      );
+    }
+
+    const value = this.parseExpression(BP.DICE_LEFT);
+    this.rejectSuccessCountTarget(value, token);
+    this.rejectVersusTarget(value, token);
+
+    return {
+      type: 'DieBound',
+      bound: token.value === 'min' ? 'min' : 'max',
+      value,
+      target,
+      start: target.start ?? token.position,
+      end: value.end ?? token.end,
     };
   }
 
@@ -1212,10 +1281,13 @@ export class Parser {
       case TokenType.LESS_EQUAL:
       case TokenType.EQUAL:
         return BP.COMPARE;
+      // `min`/`max` double as postfix per-die clamps (`4d6min2`); every
+      // other function name terminates the expression like punctuation.
+      case TokenType.FUNCTION:
+        return token.value === 'min' || token.value === 'max' ? BP.MODIFIER : -1;
       case TokenType.RPAREN:
       case TokenType.EOF:
       case TokenType.COMMA:
-      case TokenType.FUNCTION:
       // `}` is consumed inside `parseGroup`, and a stray `{` after a complete
       // expression is an error — both must terminate the outer Pratt loop.
       case TokenType.LBRACE:

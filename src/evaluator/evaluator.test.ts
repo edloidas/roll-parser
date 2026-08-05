@@ -2369,6 +2369,42 @@ describe('evaluate', () => {
       expect(getDie(result.rolls, 0).result).toBe(5);
     });
 
+    test('sqrt of literal: sqrt(16)', () => {
+      const ast = parse('sqrt(16)');
+      const result = evaluate(ast, createMockRng([]));
+
+      expect(result.total).toBe(4);
+    });
+
+    test('sqrt of dice expression: sqrt(1d9) with roll=9', () => {
+      const ast = parse('sqrt(1d9)');
+      const result = evaluate(ast, createMockRng([9]));
+
+      expect(result.total).toBe(3);
+      expect(result.rolls).toHaveLength(1);
+    });
+
+    test('sqrt of a negative argument is non-finite: sqrt(0-4)', () => {
+      const ast = parse('sqrt(0-4)');
+
+      expectRollError(() => evaluate(ast, createMockRng([])), EvaluatorError, 'NON_FINITE_RESULT');
+    });
+
+    test('pow of literals: pow(2, 3)', () => {
+      const ast = parse('pow(2, 3)');
+      const result = evaluate(ast, createMockRng([]));
+
+      expect(result.total).toBe(8);
+    });
+
+    test('pow with dice exponent: pow(2, 1d4) with roll=3', () => {
+      const ast = parse('pow(2, 1d4)');
+      const result = evaluate(ast, createMockRng([3]));
+
+      expect(result.total).toBe(8);
+      expect(result.rolls).toHaveLength(1);
+    });
+
     test('max returns higher: max(1d6, 1d8) with rolls=[3, 7]', () => {
       const ast = parse('max(1d6, 1d8)');
       const result = evaluate(ast, createMockRng([3, 7]));
@@ -2434,7 +2470,7 @@ describe('evaluate', () => {
       // otherwise unreachable.
       const ast = {
         type: 'FunctionCall' as const,
-        name: 'sqrt',
+        name: 'nonesuch',
         args: [{ type: 'Literal' as const, value: 4 }],
       };
       expectRollError(() => evaluate(ast, createMockRng([])), EvaluatorError, 'UNKNOWN_FUNCTION');
@@ -3198,6 +3234,135 @@ describe('evaluate', () => {
       expect(result.rolls.map((d) => d.result)).toEqual([1, 3, 3, 3]);
       // All three 3s remain distinct DieResult objects; sort only reorders.
       expect(result.rolls.filter((d) => d.result === 3)).toHaveLength(3);
+    });
+  });
+
+  describe('die bound modifiers (min/max)', () => {
+    test('min lifts low dice and tags them: 4d6min2', () => {
+      const ast = parse('4d6min2');
+      const result = evaluate(ast, createMockRng([1, 3, 6, 2]));
+
+      expect(result.total).toBe(13);
+      expect(getDie(result.rolls, 0).result).toBe(2);
+      expect(getDie(result.rolls, 0).initialResult).toBe(1);
+      expect(getDie(result.rolls, 0).modifiers).toEqual(['kept', 'min']);
+      // Untouched dice carry no bound tag and no initialResult.
+      expect(getDie(result.rolls, 1).modifiers).toEqual(['kept']);
+      expect(getDie(result.rolls, 1).initialResult).toBeUndefined();
+    });
+
+    test('max lowers high dice: 4d6max5', () => {
+      const ast = parse('4d6max5');
+      const result = evaluate(ast, createMockRng([1, 3, 6, 2]));
+
+      expect(result.total).toBe(11);
+      expect(getDie(result.rolls, 2).result).toBe(5);
+      expect(getDie(result.rolls, 2).initialResult).toBe(6);
+      expect(getDie(result.rolls, 2).modifiers).toEqual(['kept', 'max']);
+    });
+
+    test('critical and fumble keep reflecting the natural face', () => {
+      const ast = parse('4d6min2max5');
+      const result = evaluate(ast, createMockRng([1, 3, 6, 2]));
+
+      // The lifted 1 is still a fumble; the capped 6 is still a critical.
+      expect(getDie(result.rolls, 0).fumble).toBe(true);
+      expect(getDie(result.rolls, 2).critical).toBe(true);
+      expect(result.total).toBe(12);
+    });
+
+    test('chained bounds clamp into the band: 4d6min2max5', () => {
+      const ast = parse('4d6min2max5');
+      const result = evaluate(ast, createMockRng([1, 3, 6, 2]));
+
+      expect(result.rolls.map((die) => die.result)).toEqual([2, 3, 5, 2]);
+    });
+
+    test('a min bound above the die size lifts every face: 2d6min7', () => {
+      const ast = parse('2d6min7');
+      const result = evaluate(ast, createMockRng([1, 6]));
+
+      expect(result.total).toBe(14);
+    });
+
+    test('computed bound draws after the pool: 2d6min(1d2)', () => {
+      const ast = parse('2d6min(1d2)');
+      // RNG draw order: pool dice first (1, 5), bound meta-die last (2).
+      // In `rolls`, meta dice merge into the parent context first.
+      const result = evaluate(ast, createMockRng([1, 5, 2]));
+
+      expect(result.total).toBe(7);
+      expect(result.rolls).toHaveLength(3);
+      expect(getDie(result.rolls, 0).modifiers).toContain('meta');
+      expect(result.rolls.map((die) => die.result)).toEqual([2, 2, 5]);
+      expect(result.expression).toBe('2d6min2');
+    });
+
+    test('bound applies after keep/drop selection: 4d6kh3min2', () => {
+      const ast = parse('4d6kh3min2');
+      const result = evaluate(ast, createMockRng([1, 3, 6, 2]));
+
+      // kh3 drops the natural 1; min2 then lifts it for display only.
+      expect(result.total).toBe(11);
+      expect(getDie(result.rolls, 0).modifiers).toContain('dropped');
+      expect(getDie(result.rolls, 0).result).toBe(2);
+    });
+
+    test('keep/drop after a bound selects on clamped values: 4d6min3kh1', () => {
+      const ast = parse('4d6min3kh1');
+      const result = evaluate(ast, createMockRng([1, 2, 2, 2]));
+
+      // All faces clamp to 3, so kh1 keeps a clamped 3.
+      expect(result.total).toBe(3);
+    });
+
+    test('compound explode keeps its first face through a later clamp: 1d6!!max5', () => {
+      const ast = parse('1d6!!max5');
+      const result = evaluate(ast, createMockRng([6, 3]));
+
+      const die = getDie(result.rolls, 0);
+      expect(die.result).toBe(5); // 6+3 accumulated, then capped
+      expect(die.initialResult).toBe(6); // first writer wins
+      expect(die.modifiers).toContain('max');
+    });
+
+    test('renders the bound code and the clamped pool', () => {
+      const ast = parse('4d6min2');
+      const result = evaluate(ast, createMockRng([1, 3, 6, 2]));
+
+      expect(result.expression).toBe('4d6min2');
+      expect(result.rendered).toBe('4d6min2[2, 3, 6, 2] = 13');
+    });
+
+    test('negative bounds render re-parseable: 4d6min(-1)', () => {
+      const ast = parse('4d6min(-1)');
+      const result = evaluate(ast, createMockRng([1, 3, 6, 2]));
+
+      expect(result.expression).toBe('4d6min(-1)');
+      expect(() => parse(result.expression)).not.toThrow();
+    });
+
+    test('builds a dieBound part with the resolved bound', () => {
+      const ast = parse('4d6min2');
+      const result = evaluate(ast, createMockRng([1, 3, 6, 2]));
+
+      expect(result.parts.type).toBe('dieBound');
+      if (result.parts.type === 'dieBound') {
+        expect(result.parts.bound).toBe('min');
+        expect(result.parts.value).toBe(2);
+        expect(result.parts.total).toBe(result.total);
+        expect(result.parts.target.type).toBe('dice');
+      }
+    });
+
+    test('non-finite bound throws INVALID_THRESHOLD', () => {
+      const ast = parse('2d6min(10**400)');
+
+      expectRollError(
+        () => evaluate(ast, createMockRng([1, 2])),
+        EvaluatorError,
+        'INVALID_THRESHOLD',
+      );
     });
   });
 

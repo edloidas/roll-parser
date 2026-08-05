@@ -205,6 +205,7 @@ function renderEquation(root: RollPart, notation: string): string {
       case 'keepDrop':
       case 'explode':
       case 'reroll':
+      case 'dieBound':
       case 'sort':
       case 'critThreshold':
       case 'successCount':

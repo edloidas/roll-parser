@@ -626,11 +626,40 @@ describe('roll() integration', () => {
     });
   });
 
+  describe('die bound modifiers', () => {
+    test('4d6min2 lifts low faces into the total', () => {
+      const result = roll('4d6min2', { rng: createMockRng([1, 3, 6, 2]) });
+      expect(result.total).toBe(13);
+      expect(result.rendered).toBe('4d6min2[2, 3, 6, 2] = 13');
+    });
+
+    test('Great Weapon Fighting style floor: 2d6min3+4', () => {
+      const result = roll('2d6min3+4', { rng: createMockRng([1, 5]) });
+      expect(result.total).toBe(12);
+    });
+
+    test('band clamp with explode: 3d6!min2max5', () => {
+      const result = roll('3d6!min2max5', { rng: createMockRng([6, 1, 4, 3]) });
+      // 6 explodes into 3; faces [6,1,4,3] clamp to [5,2,4,3].
+      expect(result.total).toBe(14);
+    });
+  });
+
   describe('math functions', () => {
     test('floor(1d6/3) with roll=5 → integer result', () => {
       const result = roll('floor(1d6/3)', { rng: createMockRng([5]) });
       expect(result.total).toBe(1);
       expect(result.rolls).toHaveLength(1);
+    });
+
+    test('sqrt(1d4+12) with roll=4 → 4', () => {
+      const result = roll('sqrt(1d4+12)', { rng: createMockRng([4]) });
+      expect(result.total).toBe(4);
+    });
+
+    test('pow(1d4, 2) with roll=3 → 9', () => {
+      const result = roll('pow(1d4, 2)', { rng: createMockRng([3]) });
+      expect(result.total).toBe(9);
     });
 
     test('ceil(1d6/3) with roll=5 → rounds up', () => {
