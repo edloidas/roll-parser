@@ -86,6 +86,10 @@ Types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `perf`, `bui
   <sub>[Claude Code session](<link>)</sub>
   ```
 
+`master` merges through a PR, must be up to date with it, and must pass the eight
+contexts the `protect-master` ruleset requires — that ruleset is the source of
+truth. Renaming a job leaves its old context pending forever.
+
 ## Releasing
 
 Order: update `CHANGELOG.md` via the local `release-changelog` skill → bump
