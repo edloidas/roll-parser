@@ -120,6 +120,10 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
+          # ! Both commands below end in a pipe. Without this, a failed deploy
+          # ! exits 0 and the step reports a publish that never happened.
+          set -o pipefail
+
           # Log outside the workspace so it cannot dirty the tree wrangler
           # inspects for the deployment's commit metadata.
           log="${RUNNER_TEMP}/deploy.log"
@@ -134,8 +138,17 @@ jobs:
             --commit-hash "${GITHUB_SHA}" \
             --commit-message "$(git log -1 --pretty=%s)" | tee "${log}"
 
+          # `|| true` leaves the no-match case to the guard below; `set -e`
+          # would otherwise end the step with no annotation.
+          urls="$(grep -oE 'https://[a-z0-9.-]+\.pages\.dev' "${log}" | sort -u || true)"
+
+          if [ -z "${urls}" ]; then
+            echo '::error::wrangler reported no deployment URL — the site was not published.'
+            exit 1
+          fi
+
           {
             echo "### Site deployed"
             echo
-            grep -oE 'https://[a-z0-9.-]+\.pages\.dev' "${log}" | sort -u | sed 's/^/- /'
+            echo "${urls}" | sed 's/^/- /'
           } >> "${GITHUB_STEP_SUMMARY}"
