@@ -710,14 +710,22 @@ export class Parser {
    * exactly as a bare one does.
    */
   private rejectVersusMetaOperand(operand: ASTNode, token: Token): void {
-    if (containsVersus(operand)) {
-      throw new ParseError(
-        `Versus cannot be used as a meta-expression`,
-        'NESTED_VERSUS',
-        token.position,
-        token,
-      );
-    }
+    if (containsVersus(operand)) Parser.throwVersusMetaExpression(token);
+  }
+
+  /**
+   * The wording the meta-expression rejections share. Not every `NESTED_VERSUS`
+   * throw — `parseVersus` says "Cannot chain versus operators" for `a vs b vs c`,
+   * a different condition. Routing that one through here would silently rewrite
+   * its message, and `expectRollError` asserts only the code.
+   */
+  private static throwVersusMetaExpression(token: Token): never {
+    throw new ParseError(
+      `Versus cannot be used as a meta-expression`,
+      'NESTED_VERSUS',
+      token.position,
+      token,
+    );
   }
 
   private rejectVersusTarget(target: ASTNode, token: Token): void {
@@ -728,14 +736,7 @@ export class Parser {
     // Narrow unwrap (only `Grouped`): `containsDicePool` does not recurse into
     // `Versus`, so `KeepDrop`/`Sort`/`CritThreshold` reject the wrap upstream.
     const node = unwrapGrouped(target);
-    if (node.type === 'Versus') {
-      throw new ParseError(
-        `Versus cannot be used as a meta-expression`,
-        'NESTED_VERSUS',
-        token.position,
-        token,
-      );
-    }
+    if (node.type === 'Versus') Parser.throwVersusMetaExpression(token);
     // ! `containsDicePool` recurses into a single-sub-roll Group via
     // ! `deepContainsDicePool`, which traverses Versus's `roll`/`dc` — so that
     // ! route gets a Versus past the shallow guards. Deep-walk for any descendant
@@ -743,14 +744,7 @@ export class Parser {
     // ! `4d6>={abs(1d20 vs 15)}` would parse while `(1d20 vs 15)cs>18` rejects.
     if (node.type === 'Group' && node.expressions.length === 1) {
       const inner = node.expressions[0];
-      if (inner != null && containsVersus(inner)) {
-        throw new ParseError(
-          `Versus cannot be used as a meta-expression`,
-          'NESTED_VERSUS',
-          token.position,
-          token,
-        );
-      }
+      if (inner != null && containsVersus(inner)) Parser.throwVersusMetaExpression(token);
     }
   }
 
