@@ -557,9 +557,22 @@ function evalFateDice(node: FateDiceNode, rng: RNG, ctx: EvalContext, env: EvalE
  * the same `RollResult`. No-op when `metadata` is `undefined`.
  *
  * Use this directly when the caller has already pushed (or transformed) `rolls`
- * itself — e.g. `evalSort`, `evalCritThreshold`, `evalGroupKeepDrop`. For the
- * default case where the child's raw rolls flow up unchanged, use
- * `mergeContext` instead.
+ * itself. For the default case where the child's raw rolls flow up unchanged,
+ * use `mergeContext` instead.
+ *
+ * Propagate only when the caller leaves `total` equal to the value the degree
+ * was resolved from — `evalVersus` computes `degree` once, against the total it
+ * saw. That rule, not an oversight, is why most postfix modifiers do not call
+ * this: `evalExplode` adds dice, `evalReroll` replaces them, `evalKeepDrop`
+ * removes them, and `evalSuccessCount` redefines `total` as a success tally, so
+ * a propagated `degree` would contradict the total beside it. `evalSort`
+ * (reorders) and `evalCritThreshold` (tags) leave the total alone and qualify.
+ * `evalGroupKeepDrop` applies the rule per sub-roll, propagating only from
+ * sub-rolls it kept.
+ *
+ * The membership reading — "every die still contributes" — is the trap here.
+ * It admits `evalDieBound`, which drops no dice yet re-sums after clamping and
+ * so ships a stale degree (see issue #260).
  */
 function propagateMetadata(parent: EvalContext, metadata: EvalContext['versusMetadata']): void {
   if (!metadata) return;
