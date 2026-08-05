@@ -1,26 +1,43 @@
 name: Deploy Site
 
-# Push-only, mirroring ci.yml: every branch push builds and verifies the site,
-# but only `master` publishes, through the `cloudflare-production` environment
-# that holds the Cloudflare credentials. Branch previews were dropped
-# deliberately — a push-event workflow executes the workflow file from the
-# pushed ref, so any branch that could reach the credentials could deploy
-# anywhere. Use `bun site:preview` locally instead.
+# Mirroring ci.yml: every branch push builds and verifies the site, but only
+# `master` publishes, through the `cloudflare-production` environment that holds
+# the Cloudflare credentials. Branch previews were dropped deliberately — a
+# push-event workflow executes the workflow file from the pushed ref, so any
+# branch that could reach the credentials could deploy anywhere. Use
+# `bun site:preview` locally instead.
+#
+# The pull_request trigger exists for fork PRs, whose pushes never reach this
+# repository, so `site:build` — the only place TypeDoc runs — is otherwise not a
+# check they can fail.
+#
+# ! A fork PR runs this file from its own merge ref, so it can rewrite every
+# ! guard below. What keeps that harmless is that fork pull_request runs get no
+# ! secrets and a read-only token, leaving `cloudflare-production` unreachable.
+# ! pull_request_target grants both and must not be used here.
 on:
   push:
     branches: ['**']
+  pull_request:
+    branches: [master, '[0-9]+.[0-9]+']
   workflow_dispatch:
 
+# PR events key on the PR number — `head_ref` is the bare fork branch name,
+# so same-named branches from different forks would cancel each other's runs.
 concurrency:
-  group: deploy-site-${{ github.ref }}
+  group: deploy-site-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
+  # Same-repo PR events are skipped, mirroring ci.yml's `check` gate: the push
+  # already built that head commit. `deploy` is unaffected — no PR event can
+  # satisfy its `refs/heads/master` guard.
   build:
     name: Build Site
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
