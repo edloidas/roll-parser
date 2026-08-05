@@ -1,0 +1,9 @@
+#!/bin/sh
+# Attributes commits made from the secondary `adiutriel` account. Guarded on the
+# committing email so clones by anyone else are left alone.
+[ "$(git config user.email)" = "adiutriel@gmail.com" ] || exit 0
+[ "$2" = "merge" ] && exit 0
+
+grep -qi '^Co-Authored-By:.*<edloidas@gmail.com>' "$1" && exit 0
+git interpret-trailers --in-place \
+  --trailer 'Co-Authored-By: Mikita Taukachou <edloidas@gmail.com>' "$1"
