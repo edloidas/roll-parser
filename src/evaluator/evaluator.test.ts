@@ -34,6 +34,11 @@ function getDie(rolls: DieResult[], index: number): DieResult {
   return die;
 }
 
+/** Literal node factory for the hand-built ASTs below. */
+function lit(value: number): ASTNode {
+  return { type: 'Literal', value };
+}
+
 /** Runs `fn`, returning whatever it threw. Fails when nothing is thrown. */
 function captureError(fn: () => unknown): unknown {
   try {
@@ -2131,7 +2136,6 @@ describe('evaluate', () => {
     // sums, selects, clamps, rerolls, explodes, or tallies its target's dice
     // reached across into the DC side.
     describe('DC dice are excluded from every pool operation (#262)', () => {
-      const lit = (value: number): ASTNode => ({ type: 'Literal', value });
       const diceDc = (): ASTNode => parse('1d20 vs 2d10');
 
       // Each case picks draws that would make the modifier *fire* on the DC
@@ -2334,7 +2338,6 @@ describe('evaluate', () => {
     // rolls but not `versusMetadata`. Before #267 the degree simply vanished on
     // a hand-built AST; now `evaluate()` raises the code `parse()` does.
     describe('versus in a meta position is rejected (#267)', () => {
-      const lit = (value: number): ASTNode => ({ type: 'Literal', value });
       const versus = (): ASTNode => parse('1d20 vs 15');
 
       const positions: ReadonlyArray<readonly [string, (v: ASTNode) => ASTNode]> = [
