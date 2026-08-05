@@ -19,6 +19,7 @@
 
 import type { DieResult, ResolvedCritThreshold } from '../../types.js';
 import { matchesCondition } from './compare.js';
+import { isVersusDc } from './flags.js';
 
 /**
  * Applies success/fail threshold arrays to a dice pool, overriding each
@@ -32,7 +33,7 @@ export function applyCritThresholds(
   failThresholds: ResolvedCritThreshold[],
 ): void {
   for (const die of dice) {
-    if (die.modifiers.includes('meta')) continue;
+    if (die.modifiers.includes('meta') || isVersusDc(die)) continue;
 
     die.critical = successThresholds.some((t) => matchesCrit(t, die));
     die.fumble = failThresholds.some((t) => matchesFumble(t, die));

@@ -52,7 +52,12 @@ import {
   buildShouldExplode,
   DEFAULT_MAX_EXPLODE_ITERATIONS,
 } from './modifiers/explode.js';
-import { rewriteFlags, SELECTION_AND_TALLY_FLAGS, SELECTION_FLAGS } from './modifiers/flags.js';
+import {
+  isVersusDc,
+  rewriteFlags,
+  SELECTION_AND_TALLY_FLAGS,
+  SELECTION_FLAGS,
+} from './modifiers/flags.js';
 import { markDroppedIndices, sumKeptDice } from './modifiers/keep-drop.js';
 import {
   applyRecursiveReroll,
@@ -1602,6 +1607,11 @@ function evalVersus(node: VersusNode, rng: RNG, ctx: EvalContext, env: EvalEnv):
     const degree = calculateDegree(rollResult.total, dcResult.total, natural);
 
     appendAll(ctx.rolls, rollCtx.rolls);
+    // ! Tag before merging: past this point the DC dice are indistinguishable
+    // ! from the roll side, and every pool modifier walks the merged array.
+    for (const die of dcCtx.rolls) {
+      die.modifiers.push('dc');
+    }
     appendAll(ctx.rolls, dcCtx.rolls);
 
     const rollExpr = rollCtx.expressionParts.join('');
@@ -1738,6 +1748,9 @@ function countTaggedDice(rolls: DieResult[]): { successes: number; failures: num
   let failures = 0;
 
   for (const die of rolls) {
+    // A success-count inside the DC sub-expression tags its own dice before
+    // `evalVersus` marks them `'dc'`, so they arrive here already tagged.
+    if (isVersusDc(die)) continue;
     if (die.modifiers.includes('success')) successes += 1;
     else if (die.modifiers.includes('failure')) failures += 1;
   }

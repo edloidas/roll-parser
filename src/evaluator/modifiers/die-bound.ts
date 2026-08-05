@@ -18,6 +18,7 @@
  */
 
 import type { DieResult } from '../../types.js';
+import { isVersusDc } from './flags.js';
 
 /**
  * Clamps every non-meta die in `dice` against `value`, in place.
@@ -26,7 +27,7 @@ import type { DieResult } from '../../types.js';
  */
 export function applyDieBound(dice: DieResult[], bound: 'min' | 'max', value: number): void {
   for (const die of dice) {
-    if (die.modifiers.includes('meta')) continue;
+    if (die.modifiers.includes('meta') || isVersusDc(die)) continue;
 
     const clamped = bound === 'min' ? Math.max(die.result, value) : Math.min(die.result, value);
     if (clamped === die.result) continue;

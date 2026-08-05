@@ -15,7 +15,7 @@ import type { CompareOp, DieResult } from '../../types.js';
 import { createDieResult, createFateDieResult } from '../die.js';
 import { chargeDie, type EvalEnv } from '../env.js';
 import { matchesCondition } from './compare.js';
-import { REROLL_SLOT_FLAGS, rewriteFlags } from './flags.js';
+import { isVersusDc, REROLL_SLOT_FLAGS, rewriteFlags } from './flags.js';
 
 /**
  * Default value of `EvaluationOptions.maxRerollIterations`: how many times a
@@ -55,7 +55,7 @@ function rerollLimitError(maxIterations: number): EvaluatorError {
  * keep/drop modifier) are left alone.
  */
 function canReroll(die: DieResult): boolean {
-  return !die.modifiers.includes('dropped');
+  return !die.modifiers.includes('dropped') && !isVersusDc(die);
 }
 
 /**
