@@ -874,25 +874,29 @@ precedes them. Errors go to stderr; only the result goes to stdout.
 
 | Notation | `lex` | `parse` | `roll` (end to end) |
 |----------|------:|--------:|--------------------:|
-| `1d20` | 0.15 µs | 0.35 µs | **1.5 µs** (~660k rolls/s) |
-| `2d6+3` | 0.21 µs | 0.53 µs | **2.5 µs** |
-| `4d6kh3` | 0.26 µs | 0.62 µs | **3.9 µs** |
-| `10d10>=6f1` | 0.35 µs | 0.83 µs | **5.6 µs** |
-| `100d6` | 0.14 µs | 0.36 µs | **12 µs** |
+| `1d20` | 86 ns | 165 ns | **0.52 µs** (~1.9M rolls/s) |
+| `2d6+3` | 99 ns | 217 ns | **0.82 µs** |
+| `4d6kh3` | 124 ns | 247 ns | **1.3 µs** |
+| `10d10>=6f1` | 161 ns | 339 ns | **2.2 µs** |
+| `100d6` | 83 ns | 168 ns | **5.3 µs** |
 
 The `roll` column pays for a fresh `SeededRNG` per call, which an injected RNG
 avoids. Every roll also builds the `parts` tree; there is no opt-out and these
-numbers include it. A 1000-die pool costs roughly 60x a `1d20` (~90 µs here),
-while lexing and parsing stay flat at ~0.14 / ~0.36 µs.
+numbers include it. A 1000-die pool costs roughly 96x a `1d20` (~49 µs here),
+while lexing and parsing stay flat at ~84 / ~168 ns.
 
 <details>
 <summary>Measurement protocol</summary>
 
 Values are **p50**, from
 [mitata](https://github.com/evanwashere/mitata) with forced per-iteration GC
-(`.gc('inner')`), averaged over two full `bun run bench:json` passes that agreed
-within 15%. Measured 2026-07-27 on Bun 1.3.11, Intel Xeon @ 2.80 GHz, 4 vCPU
-container. p50 rather than mean, because the mean here is effectively a GC-pause
+(`.gc('inner')`), taken as the per-record median of three full
+`bun run bench:json` passes agreeing within 5%. Measured 2026-08-05 on Bun
+1.3.14, Apple M2 Pro, macOS, idle and on AC power. Read them as two significant
+digits: another machine shifts every row, and a busy one inflates the heavy
+cases most.
+
+p50 rather than mean, because the mean here is effectively a GC-pause
 histogram and swings ±40% between processes. Every bench body is JIT-primed
 before measurement and pinned to mitata's batched sampling mode, so all cases
 are timed the same way — mitata otherwise picks the mode from cold calls and
