@@ -1332,8 +1332,9 @@ describe('Parser', () => {
     });
 
     // A single-sub-roll `{...}` Group passes its expression through, so a Versus
-    // inside one reaches sites the shallow `rejectVersusTarget` never looked at —
-    // every parens-form case above needs a `{...}`-form twin.
+    // inside one reaches target sites the shallow `rejectVersusTarget` never
+    // looked at. The meta-operand cases above now share the deep walk, so their
+    // `{...}` twins are no longer a separate bypass — they stay as coverage.
     it('should reject Versus inside parens-wrapped single-sub group as keep-modifier count: 4d6kh({1d20 vs 10})', () => {
       // `kh{...}` is not valid syntax — `kh` requires parens. `kh({...})` is the
       // real bypass route: parens around a single-sub Group around a Versus.
@@ -1363,6 +1364,44 @@ describe('Parser', () => {
       // BinaryOp propagates `versusMetadata` through `mergeContext`, so
       // arithmetic is not a meta-expression site.
       expect(() => parseAst('{1d20 vs 15}+5')).not.toThrow();
+    });
+
+    // The shallow guard unwrapped only `Grouped` and special-cased a single-sub
+    // Group, so a Versus behind a function call or arithmetic parsed and then
+    // lost its degree at `evalMetaOperand`. These all evaluated to a
+    // degree-less result before #267.
+    const wrapped = [
+      '4d6kh(floor(1d20 vs 15))',
+      '4d6kh((1d20 vs 15)+0)',
+      '4d6kh(floor((1d20 vs 15)/10)+1)',
+      '(floor(1d20 vs 15))d6',
+      '1d(floor(1d20 vs 15)+5)',
+      '(abs(1d20 vs 15))dF',
+      '(floor(1d20 vs 15))d%',
+      '4d6>=(floor(1d20 vs 15))',
+      '4d6>=6f(floor(1d20 vs 15))',
+      '4d6min(floor(1d20 vs 15))',
+      '4d6cs>(floor(1d20 vs 15))',
+      '4d6cs>18cf<(floor(1d20 vs 15))',
+      '1d6!>=(floor(1d20 vs 15))',
+      '1d6r<=(floor(1d20 vs 15))',
+      '4d6kh({floor(1d20 vs 15)})',
+    ];
+
+    for (const notation of wrapped) {
+      it(`should reject a wrapper-hidden Versus in a meta position: ${notation} (#267)`, () => {
+        expectRollError(() => parseAst(notation), ParseError, 'NESTED_VERSUS');
+      });
+    }
+
+    it('should still accept a multi-sub group with a Versus as a kh target (#267)', () => {
+      // The meta guard is deep, the target guard stays shallow —
+      // `evalGroupKeepDrop` propagates the degree from kept sub-rolls.
+      expect(() => parseAst('{1d20 vs 15, 1d6}kh1')).not.toThrow();
+    });
+
+    it('should still accept a wrapped Versus outside a meta position (#267)', () => {
+      expect(() => parseAst('floor(1d20 vs 15)+5')).not.toThrow();
     });
   });
 

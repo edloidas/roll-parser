@@ -27,6 +27,7 @@ import type {
   VersusNode,
 } from '../parser/ast.js';
 import { isKeepDrop } from '../parser/ast.js';
+import { containsVersus } from '../parser/guards.js';
 import type { RNG } from '../rng/types.js';
 import type {
   CompareOp,
@@ -266,6 +267,10 @@ function renderDie(result: number, modifiers: readonly DieModifier[]): string {
  * a SuccessCount leaking into a meta sub-expression (parser rejects all such
  * wrappings; this strip ensures a future parse regression cannot leak tags
  * into the top-level `successes`/`failures` scan).
+ *
+ * `versusMetadata` is deliberately not forwarded — a meta sub-expression
+ * resolves to a scalar. `evalMetaOperand` rejects a versus before reaching
+ * here, so nothing is lost by the omission.
  */
 // Exported rather than `@internal`: the tag strip above is unreachable through
 // any parseable notation, so pinning it needs a direct call with a hand-built
@@ -445,9 +450,29 @@ function evalVariable(node: VariableNode, ctx: EvalContext, env: EvalEnv): EvalR
  * — is answered from the node without allocating the throwaway context: a
  * literal draws no RNG, produces no rolls, and cannot throw, so the merge has
  * nothing to carry. Draw order is untouched (see README, Randomness).
+ *
+ * A versus operand is rejected rather than reduced to its total: this forwards
+ * rolls but not `versusMetadata`, so consuming one would drop the resolved
+ * `degree`/`natural` with no signal. `rejectVersusMetaOperand` refuses the same
+ * positions at parse time; this is the backstop for a hand-built AST.
+ *
+ * The scan is structural and runs first. Watching for surviving `versusMetadata`
+ * instead would miss a versus under a wrapper that voids it (`DieBound`,
+ * `KeepDrop`), lose the race to any other runtime error in the operand, and burn
+ * RNG draws before failing.
  */
 function evalMetaOperand(node: ASTNode, rng: RNG, ctx: EvalContext, env: EvalEnv): number {
   if (node.type === 'Literal') return node.value;
+
+  if (containsVersus(node)) {
+    const error = new EvaluatorError(
+      'Versus cannot be used as a meta-expression',
+      'NESTED_VERSUS',
+      'Versus',
+    );
+    if (node.start != null) stampEvaluatorSpan(error, node.start, node.end);
+    throw error;
+  }
 
   const metaCtx = createContext();
   const value = evalNode(node, rng, metaCtx, env).total;

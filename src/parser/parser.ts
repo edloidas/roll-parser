@@ -438,7 +438,7 @@ export class Parser {
   private parsePrefixDice(token: Token): DiceNode {
     const sides = this.parseExpression(BP.DICE_RIGHT);
     this.rejectSuccessCountTarget(sides, token);
-    this.rejectVersusTarget(sides, token);
+    this.rejectVersusMetaOperand(sides, token);
     return {
       type: 'Dice',
       count: Parser.syntheticLiteral(1, token),
@@ -450,11 +450,11 @@ export class Parser {
 
   private parseInfixDice(left: ASTNode, token: Token): DiceNode {
     this.rejectSuccessCountTarget(left, token);
-    this.rejectVersusTarget(left, token);
+    this.rejectVersusMetaOperand(left, token);
     this.rejectBareDiceChain(left, token);
     const sides = this.parseExpression(BP.DICE_RIGHT);
     this.rejectSuccessCountTarget(sides, token);
-    this.rejectVersusTarget(sides, token);
+    this.rejectVersusMetaOperand(sides, token);
     return {
       type: 'Dice',
       count: left,
@@ -476,7 +476,7 @@ export class Parser {
 
   private parseInfixDicePercent(left: ASTNode, token: Token): DiceNode {
     this.rejectSuccessCountTarget(left, token);
-    this.rejectVersusTarget(left, token);
+    this.rejectVersusMetaOperand(left, token);
     this.rejectBareDiceChain(left, token);
     return {
       type: 'Dice',
@@ -500,7 +500,7 @@ export class Parser {
     // No sides sub-parse, unlike `parseInfixDice`, so modifiers (`kh`, `dl`, …)
     // bind at the outer Pratt loop with no BP competition from a right operand.
     this.rejectSuccessCountTarget(left, token);
-    this.rejectVersusTarget(left, token);
+    this.rejectVersusMetaOperand(left, token);
     this.rejectBareDiceChain(left, token);
     return {
       type: 'FateDice',
@@ -700,11 +700,31 @@ export class Parser {
     throw new ParseError(`Cannot ${action} a group`, code, token.position, token);
   }
 
+  /**
+   * Rejects a Versus anywhere inside a meta operand — a dice count, dice sides,
+   * a modifier count, or a threshold/bound value.
+   *
+   * Deep, unlike {@link rejectVersusTarget}: `evalMetaOperand` reduces the
+   * operand to a scalar and forwards rolls but not `versusMetadata`, so
+   * `floor(1d20 vs 15)` or `(1d20 vs 15)+0` buried in a count loses the degree
+   * exactly as a bare one does.
+   */
+  private rejectVersusMetaOperand(operand: ASTNode, token: Token): void {
+    if (containsVersus(operand)) {
+      throw new ParseError(
+        `Versus cannot be used as a meta-expression`,
+        'NESTED_VERSUS',
+        token.position,
+        token,
+      );
+    }
+  }
+
   private rejectVersusTarget(target: ASTNode, token: Token): void {
-    // A Versus degree is a terminal scalar, never a valid dice count, sides, or
-    // threshold. Only the `mergeMetaRolls` sites need blocking, where
-    // `versusMetadata` would silently vanish; wrappers like `floor(vs)+0` still
-    // propagate it via `mergeContext`.
+    // A Versus degree is a terminal scalar, never a valid modifier target —
+    // every one of these modifiers drops `versusMetadata` on the way through.
+    // Shallow on purpose: a multi-sub group like `{1d20 vs 15, 1d6}kh1` is
+    // legal, and `evalGroupKeepDrop` propagates the degree from kept sub-rolls.
     // Narrow unwrap (only `Grouped`): `containsDicePool` does not recurse into
     // `Versus`, so `KeepDrop`/`Sort`/`CritThreshold` reject the wrap upstream.
     const node = unwrapGrouped(target);
@@ -770,7 +790,7 @@ export class Parser {
       ? this.parseExpression(BP.DICE_LEFT)
       : Parser.syntheticLiteral(1, token);
     this.rejectSuccessCountTarget(count, token);
-    this.rejectVersusTarget(count, token);
+    this.rejectVersusMetaOperand(count, token);
 
     return {
       type: 'KeepDrop',
@@ -931,7 +951,7 @@ export class Parser {
 
     const value = this.parseExpression(BP.DICE_LEFT);
     this.rejectSuccessCountTarget(value, token);
-    this.rejectVersusTarget(value, token);
+    this.rejectVersusMetaOperand(value, token);
 
     return {
       type: 'DieBound',
@@ -1086,7 +1106,7 @@ export class Parser {
     // Threshold binds at `BP.DICE_LEFT` — see `parseComparePoint` TSDoc.
     const value = this.parseExpression(BP.DICE_LEFT);
     this.rejectSuccessCountTarget(value, token);
-    this.rejectVersusTarget(value, token);
+    this.rejectVersusMetaOperand(value, token);
     const start = target.start ?? token.position;
     const end = value.end ?? token.end;
 
@@ -1114,7 +1134,7 @@ export class Parser {
     // Same threshold binding as `parseComparePoint` (BP.DICE_LEFT).
     const failValue = this.parseExpression(BP.DICE_LEFT);
     this.rejectSuccessCountTarget(failValue, token);
-    this.rejectVersusTarget(failValue, token);
+    this.rejectVersusMetaOperand(failValue, token);
 
     return { operator: '=', value: failValue };
   }
@@ -1186,7 +1206,7 @@ export class Parser {
 
     const value = this.parseExpression(BP.DICE_LEFT);
     this.rejectSuccessCountTarget(value, token);
-    this.rejectVersusTarget(value, token);
+    this.rejectVersusMetaOperand(value, token);
 
     return { operator, value };
   }
