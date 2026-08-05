@@ -66,6 +66,7 @@ export type ResolvedCritThreshold = ResolvedComparePoint | 'default';
  * | `'success'` | Met a success-count threshold (`>=6`). | `**n**` |
  * | `'failure'` | Met a failure threshold (`f1`). | `__n__` |
  * | `'meta'` | Rolled by a meta-expression rather than by the visible pool. | not shown |
+ * | `'dc'` | The DC side of a `vs` comparison. Never part of the roll-side pool. | plain |
  *
  * `'meta'` is the one tag with no counterpart in the notation. Dice counts,
  * sides, modifier counts and computed thresholds may themselves be dice
@@ -73,6 +74,11 @@ export type ResolvedCritThreshold = ResolvedComparePoint | 'default';
  * any pool, so they never appear in a {@link RollPart}; they are appended to
  * `RollResult.rolls` tagged `'meta'` so an audit log can still show what the
  * meta-expression rolled. Filter them out when summing or displaying a pool.
+ *
+ * `'dc'` marks the DC side of a `vs` comparison. Unlike `'meta'` these dice do
+ * render — `1d20[3] vs 2d10[5, 6]` shows both sides — but they are not part of
+ * the roll-side pool, so no modifier may sum, select, clamp, reroll, explode,
+ * or tally them. Filter them out when summing a pool, exactly as with `'meta'`.
  *
  * @category Results
  */
@@ -85,7 +91,8 @@ export type DieModifier =
   | 'max'
   | 'success'
   | 'failure'
-  | 'meta';
+  | 'meta'
+  | 'dc';
 
 /**
  * PF2e Degree of Success. Produced by the `vs` operator when comparing a

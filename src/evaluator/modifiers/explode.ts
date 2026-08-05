@@ -13,6 +13,7 @@ import type { RNG } from '../../rng/types.js';
 import type { CompareOp, DieResult } from '../../types.js';
 import { createDieResult } from '../die.js';
 import { chargeDie, type EvalEnv } from '../env.js';
+import { isVersusDc } from './flags.js';
 
 /**
  * Default value of `EvaluationOptions.maxExplodeIterations`: how many times a
@@ -84,6 +85,7 @@ function explodeLimitError(maxIterations: number): EvaluatorError {
  * can never be reached if a future AST path slips past the parser gate.
  */
 function canExplode(die: DieResult): boolean {
+  if (isVersusDc(die)) return false;
   if (die.modifiers.includes('dropped')) return false;
   if (die.sides < 1) return false;
   return true;

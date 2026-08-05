@@ -10,7 +10,20 @@
  * @module evaluator/modifiers/flags
  */
 
-import type { DieModifier } from '../../types.js';
+import type { DieModifier, DieResult } from '../../types.js';
+
+/**
+ * True when a die belongs to the DC side of a `vs` comparison.
+ *
+ * DC dice share the roll side's `rolls` array so they still render
+ * (`1d20[3] vs 2d10[5, 6]`), but they are not part of the pool a modifier
+ * operates on. Nothing may sum, select, clamp, reroll, explode, or tally them
+ * — a `d10` on the DC side must never come back clamped to 20, and
+ * `{1d20 vs 2d10, 1d4}>=5` must not count the DC faces as successes.
+ */
+export function isVersusDc(die: DieResult): boolean {
+  return die.modifiers.includes('dc');
+}
 
 /** Kept/dropped selection flags — rebuilt by every keep/drop pass. */
 export const SELECTION_FLAGS: readonly DieModifier[] = ['kept', 'dropped'];

@@ -5,6 +5,7 @@
  */
 
 import type { DieResult, KeepDropSpec } from '../../types.js';
+import { isVersusDc } from './flags.js';
 
 /** One selectable die: its rolled value and its slot in the original pool. */
 type EligibleDie = { result: number; index: number };
@@ -39,6 +40,7 @@ export function markDroppedIndices(
   for (let index = 0; index < dice.length; index++) {
     const die = dice[index];
     if (die == null) continue;
+    if (isVersusDc(die)) continue;
 
     if (die.modifiers.includes('dropped')) {
       droppedMask[index] = 1;
@@ -99,6 +101,7 @@ function markSingleExtreme(
   for (let index = 0; index < dice.length; index++) {
     const die = dice[index];
     if (die == null) continue;
+    if (isVersusDc(die)) continue;
 
     if (die.modifiers.includes('dropped')) {
       droppedMask[index] = 1;
@@ -138,6 +141,7 @@ export function sumKeptDice(dice: DieResult[]): number {
   let total = 0;
 
   for (const die of dice) {
+    if (isVersusDc(die)) continue;
     if (!die.modifiers.includes('dropped')) total += die.result;
   }
 

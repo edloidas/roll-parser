@@ -17,6 +17,7 @@
 
 import type { DieResult, ResolvedComparePoint } from '../../types.js';
 import { matchesCondition } from './compare.js';
+import { isVersusDc } from './flags.js';
 
 export type SuccessCountResult = {
   total: number;
@@ -33,6 +34,7 @@ export function countSuccesses(
   let failures = 0;
 
   for (const die of dice) {
+    if (isVersusDc(die)) continue;
     if (die.modifiers.includes('dropped')) continue;
 
     if (matchesCondition(die.result, threshold.operator, threshold.value)) {

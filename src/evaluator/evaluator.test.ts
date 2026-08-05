@@ -2126,6 +2126,210 @@ describe('evaluate', () => {
       });
     });
 
+    // `evalVersus` merges the roll dice and the DC dice into one `rolls` array
+    // so both render. Before #262 nothing told them apart, so any modifier that
+    // sums, selects, clamps, rerolls, explodes, or tallies its target's dice
+    // reached across into the DC side.
+    describe('DC dice are excluded from every pool operation (#262)', () => {
+      const lit = (value: number): ASTNode => ({ type: 'Literal', value });
+      const diceDc = (): ASTNode => parse('1d20 vs 2d10');
+
+      // Each case picks draws that would make the modifier *fire* on the DC
+      // dice if they were not excluded — a non-firing case passes either way.
+      // Draw order is roll side, then DC side, then any modifier draws.
+      const cases: ReadonlyArray<
+        readonly [string, (t: ASTNode) => ASTNode, number[], number, number[]]
+      > = [
+        // d20 20 explodes (max face); the DC 10 is also a max face and would
+        // explode too if it were in the pool. Roll side: 20 + 3.
+        [
+          'Explode',
+          (target) => ({ type: 'Explode', variant: 'standard', target }),
+          [20, 10, 6, 3],
+          23,
+          [10, 6],
+        ],
+        // `r<7` matches both DC dice (5, 6) but not the roll die (8).
+        [
+          'Reroll',
+          (target) => ({
+            type: 'Reroll',
+            once: true,
+            condition: { operator: '<', value: lit(7) },
+            target,
+          }),
+          [8, 5, 6, 9],
+          8,
+          [5, 6],
+        ],
+        // `min20` would clamp the d10s to a face a d10 cannot roll.
+        [
+          'DieBound',
+          (target) => ({ type: 'DieBound', bound: 'min', value: lit(20), target }),
+          [3, 5, 6],
+          20,
+          [5, 6],
+        ],
+        // `kh1` would pick the DC's 6 as the highest of {3, 5, 6}.
+        [
+          'KeepDrop',
+          (target) => ({
+            type: 'KeepDrop',
+            kind: 'keep',
+            selector: 'highest',
+            count: lit(1),
+            target,
+          }),
+          [3, 5, 6],
+          3,
+          [5, 6],
+        ],
+        // `cs>=5` would mark both DC dice critical.
+        [
+          'CritThreshold',
+          (target) => ({
+            type: 'CritThreshold',
+            successThresholds: [{ operator: '>=', value: lit(5) }],
+            failThresholds: [],
+            target,
+          }),
+          [3, 5, 6],
+          3,
+          [5, 6],
+        ],
+        ['Sort', (target) => ({ type: 'Sort', order: 'ascending', target }), [3, 5, 6], 3, [5, 6]],
+      ];
+
+      for (const [name, wrap, draws, expectedTotal, expectedDcFaces] of cases) {
+        test(`${name} leaves the DC dice untouched (#262)`, () => {
+          const result = evaluate(wrap(diceDc()), createMockRng(draws));
+
+          expect(result.total).toBe(expectedTotal);
+
+          const dcDice = result.rolls.filter((die) => die.sides === 10);
+          expect(dcDice).toHaveLength(2);
+          expect(dcDice.map((die) => die.result)).toEqual(expectedDcFaces);
+
+          for (const die of dcDice) {
+            expect(die.modifiers).toContain('dc');
+            // No clamp, no explosion, no reroll, no selection, no tally.
+            expect(die.initialResult).toBeUndefined();
+            // `critical` is a natural property of the face (`result === sides`)
+            // set at creation, so a DC d10 showing 10 is critical and stays so.
+            // What must never happen is a modifier rewriting it.
+            expect(die.critical).toBe(die.result === die.sides);
+            expect(die.modifiers).not.toContain('min');
+            expect(die.modifiers).not.toContain('max');
+            expect(die.modifiers).not.toContain('exploded');
+            expect(die.modifiers).not.toContain('rerolled');
+            expect(die.modifiers).not.toContain('dropped');
+            expect(die.modifiers).not.toContain('success');
+          }
+        });
+      }
+
+      const draws = () => createMockRng([3, 5, 6, 1, 1, 1]);
+
+      test('descending sort holds the DC dice in place (#262)', () => {
+        // Ascending with already-ordered draws would hide a reorder; descending
+        // is what exposes DC dice being pulled through the roll-side pool.
+        const result = evaluate(
+          { type: 'Sort', order: 'descending', target: diceDc() },
+          createMockRng([3, 5, 6]),
+        );
+
+        expect(result.rolls.map((die) => die.result)).toEqual([3, 5, 6]);
+        expect(result.rendered).toBe('1d20 vs 2d10sd[3, 5, 6] = Failure');
+      });
+
+      test('a success-count inside the DC does not reach the top-level tally (#262)', () => {
+        // The inner success-count tags its own dice before `evalVersus` marks
+        // them `'dc'`, so they arrive at the whole-roll scan already tagged.
+        const result = evaluate(
+          {
+            type: 'Versus',
+            roll: parse('1d20'),
+            dc: {
+              type: 'SuccessCount',
+              threshold: { operator: '>=', value: lit(5) },
+              target: parse('2d10'),
+            },
+          },
+          createMockRng([13, 5, 6]),
+        );
+
+        expect(result.successes).toBe(0);
+        expect(result.failures).toBe(0);
+      });
+
+      // The wrappers that defeated a shape-based guard. Tagging the dice makes
+      // the wrapping irrelevant.
+      test('a versus wrapped in arithmetic still shields its DC dice (#262)', () => {
+        const target: ASTNode = {
+          type: 'BinaryOp',
+          operator: '+',
+          left: diceDc(),
+          right: lit(0),
+        };
+        const result = evaluate(
+          {
+            type: 'KeepDrop',
+            kind: 'keep',
+            selector: 'highest',
+            count: lit(1),
+            target,
+          },
+          draws(),
+        );
+
+        // Kept the roll die (3), not the DC's 6.
+        expect(result.total).toBe(3);
+      });
+
+      test('a versus inside a multi-sub group still shields its DC dice (#262)', () => {
+        const result = evaluate(
+          {
+            type: 'DieBound',
+            bound: 'min',
+            value: lit(20),
+            target: { type: 'Group', expressions: [diceDc(), parse('1d4')] },
+          },
+          createMockRng([3, 5, 6, 2]),
+        );
+
+        // Both non-DC dice clamp to 20; the DC d10s stay 5 and 6.
+        expect(result.total).toBe(40);
+        expect(result.rolls.filter((die) => die.sides === 10).map((die) => die.result)).toEqual([
+          5, 6,
+        ]);
+      });
+    });
+
+    describe('success-count over a versus counts only the roll side (#262)', () => {
+      test('a dice DC no longer contributes successes (#262)', () => {
+        // d20 = 13 succeeds; the DC d10s (5, 6) must not be tallied, nor the d4.
+        const result = evaluate(parse('{1d20 vs 2d10, 1d4}>=5'), createMockRng([13, 5, 6, 2]));
+
+        expect(result.successes).toBe(1);
+        expect(result.total).toBe(1);
+      });
+
+      test('a literal DC keeps working unchanged (#262)', () => {
+        // Parse-legal today and correct today — this must not start throwing.
+        const result = evaluate(parse('{1d20 vs 15}>=10'), createMockRng([13]));
+
+        expect(result.successes).toBe(1);
+        expect(result.total).toBe(1);
+      });
+
+      test('a literal DC with a fail threshold keeps working (#262)', () => {
+        const result = evaluate(parse('{1d20 vs 15}>=10f<3'), createMockRng([13]));
+
+        expect(result.successes).toBe(1);
+        expect(result.total).toBe(1);
+      });
+    });
+
     test('No rolls at all: 10 vs 15 → natural undefined, Failure', () => {
       const ast = parse('10 vs 15');
       const rng = createMockRng([]);
