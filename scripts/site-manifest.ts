@@ -14,6 +14,14 @@
 /** A literal `from` → `to` substitution applied with `String.replaceAll`. */
 export type RewritePair = readonly [from: string, to: string];
 
+/**
+ * Source name (`main.ts`, `style.css`) → emitted basename (`main.a1b2c3d4.js`).
+ *
+ * The build fills this in from what it actually wrote, so a hash never has to be
+ * predicted twice.
+ */
+export type AssetNames = ReadonlyMap<string, string>;
+
 /** Directory names inside `site/dist/`. */
 export const ASSETS_DIR_NAME = 'assets';
 export const FONTS_DIR_NAME = 'fonts';
@@ -38,24 +46,27 @@ export const HTML_PAGES = ['index.html', 'reference.html', '404.html'];
 /** Single files copied from `site/public/` into the `dist/` root. */
 export const PUBLIC_FILES = ['favicon.svg'];
 
-/** `main.ts` → `main.js`; the bundler renames entrypoints on the way out. */
-function toBundleName(entrypoint: string): string {
-  return entrypoint.replace(/\.ts$/, '.js');
-}
-
 /**
  * Rewrites applied to every page in {@link HTML_PAGES}.
  *
  * No pattern is a prefix of another, so the order is not significant.
+ *
+ * Fonts and {@link PUBLIC_FILES} keep their source names — same name, same bytes.
  */
-export const HTML_REWRITES: RewritePair[] = [
-  ...STYLESHEETS.map((name): RewritePair => [`./src/${name}`, `./${ASSETS_DIR_NAME}/${name}`]),
-  ...SCRIPT_ENTRYPOINTS.map(
-    (name): RewritePair => [`./src/${name}`, `./${ASSETS_DIR_NAME}/${toBundleName(name)}`],
-  ),
-  [`./public/${FONTS_DIR_NAME}/`, `./${FONTS_DIR_NAME}/`],
-  ...PUBLIC_FILES.map((name): RewritePair => [`./public/${name}`, `./${name}`]),
-];
+export function htmlRewrites(assets: AssetNames): RewritePair[] {
+  const emitted = (name: string): RewritePair => {
+    const basename = assets.get(name);
+    if (basename === undefined) throw new Error(`no emitted name for "${name}"`);
+
+    return [`./src/${name}`, `./${ASSETS_DIR_NAME}/${basename}`];
+  };
+
+  return [
+    ...HASHED_ASSETS.map((asset) => emitted(asset.source)),
+    [`./public/${FONTS_DIR_NAME}/`, `./${FONTS_DIR_NAME}/`],
+    ...PUBLIC_FILES.map((name): RewritePair => [`./public/${name}`, `./${name}`]),
+  ];
+}
 
 /**
  * Rewrite applied to every stylesheet. The dev path is one level deeper than
@@ -65,11 +76,53 @@ export const CSS_REWRITES: RewritePair[] = [
   [`../public/${FONTS_DIR_NAME}/`, `../${FONTS_DIR_NAME}/`],
 ];
 
-/** Every file the build must emit, as a `dist`-relative path. */
+/**
+ * Every unhashed file the build must emit, as a `dist`-relative path.
+ *
+ * Bundles and stylesheets are absent by design — {@link HASHED_ASSETS} covers those.
+ */
 export const REQUIRED_FILES: string[] = [
   ...HTML_PAGES,
   ...PUBLIC_FILES,
-  ...SCRIPT_ENTRYPOINTS.map((name) => `${ASSETS_DIR_NAME}/${toBundleName(name)}`),
-  ...STYLESHEETS.map((name) => `${ASSETS_DIR_NAME}/${name}`),
   `${DOCS_DIR_NAME}/index.html`,
 ];
+
+/** An asset emitted into `assets/` as `<stem>.<hash>.<extension>`. */
+export type HashedAsset = {
+  readonly source: string;
+  readonly stem: string;
+  readonly extension: string;
+};
+
+/** What {@link SCRIPT_ENTRYPOINTS} becomes once bundled. */
+export const SCRIPT_ASSETS: readonly HashedAsset[] = SCRIPT_ENTRYPOINTS.map((source) =>
+  hashedAsset(source, 'js'),
+);
+
+/** {@link STYLESHEETS}, copied rather than bundled, so the extension is unchanged. */
+export const STYLE_ASSETS: readonly HashedAsset[] = STYLESHEETS.map((source) =>
+  hashedAsset(source, extensionOf(source)),
+);
+
+/** Every hashed file the build must emit exactly one of. */
+export const HASHED_ASSETS: readonly HashedAsset[] = [...SCRIPT_ASSETS, ...STYLE_ASSETS];
+
+/**
+ * Matches the single file the build emits for an asset. A stem keeps its inner
+ * dots, so leaving it unescaped would also match a sibling that differs there.
+ */
+export function hashedPattern({ stem, extension }: HashedAsset): RegExp {
+  return new RegExp(`^${escapeRegExp(stem)}\\.[0-9a-z]+\\.${escapeRegExp(extension)}$`);
+}
+
+function hashedAsset(source: string, extension: string): HashedAsset {
+  return { source, stem: source.replace(/\.[^.]+$/, ''), extension };
+}
+
+function extensionOf(source: string): string {
+  return source.slice(source.lastIndexOf('.') + 1);
+}
+
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}

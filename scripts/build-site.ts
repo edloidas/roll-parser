@@ -6,22 +6,27 @@
  * fonts, and rewrites both HTML files so every asset URL is relative
  * (`./assets/...`, `./fonts/...`) — required for hosting under the
  * `/roll-parser/` path on GitHub Pages. Exits non-zero on any failure.
+ *
+ * Bundles and stylesheets carry a content hash in their filename; fonts and
+ * `favicon.svg` do not, their bytes being fixed for a given name.
  */
 
 import { existsSync } from 'node:fs';
 import { readdir, rm } from 'node:fs/promises';
-import { join } from 'node:path';
-import type { RewritePair } from './site-manifest.js';
+import { basename, join } from 'node:path';
+import type { AssetNames, RewritePair } from './site-manifest.js';
 import {
   ASSETS_DIR_NAME,
   CSS_REWRITES,
   DOCS_DIR_NAME,
   FONTS_DIR_NAME,
   HTML_PAGES,
-  HTML_REWRITES,
+  hashedPattern,
+  htmlRewrites,
   PUBLIC_FILES,
+  SCRIPT_ASSETS,
   SCRIPT_ENTRYPOINTS,
-  STYLESHEETS,
+  STYLE_ASSETS,
 } from './site-manifest.js';
 
 const SITE_DIR = join(import.meta.dir, '..', 'site');
@@ -42,7 +47,7 @@ async function build(): Promise<void> {
     outdir: ASSETS_DIR,
     target: 'browser',
     minify: true,
-    naming: '[name].[ext]',
+    naming: '[name].[hash].[ext]',
   });
 
   if (!output.success) {
@@ -51,10 +56,11 @@ async function build(): Promise<void> {
     process.exit(1);
   }
 
-  await copyStyles();
+  const assets: AssetNames = new Map([...bundleNames(output), ...(await copyStyles())]);
+
   await copyFonts();
   await copyPublicFiles();
-  await writeHtml();
+  await writeHtml(assets);
 
   await generateDocs();
   await injectDocsThemeScript();
@@ -134,15 +140,52 @@ async function generateDocs(): Promise<void> {
 }
 
 /**
- * Copies the stylesheets into `assets/`, rewriting the dev-relative font path
- * (`../public/fonts/`) to its dist location (`../fonts/`) so `url(...)` still
- * resolves from the CSS file's new home in `assets/`.
+ * Pairs each entrypoint with the hashed basename Bun wrote for it, read back
+ * from the build output rather than predicted.
  */
-async function copyStyles(): Promise<void> {
-  for (const name of STYLESHEETS) {
-    const css = await Bun.file(join(SRC_DIR, name)).text();
-    await Bun.write(join(ASSETS_DIR, name), applyRewrites(css, CSS_REWRITES));
+function bundleNames(output: Bun.BuildOutput): [string, string][] {
+  const emitted = output.outputs
+    .filter((artifact) => artifact.kind === 'entry-point')
+    .map((artifact) => basename(artifact.path));
+
+  return SCRIPT_ASSETS.map((asset) => {
+    const pattern = hashedPattern(asset);
+    const matches = emitted.filter((file) => pattern.test(file));
+    const [bundle] = matches;
+
+    if (bundle === undefined || matches.length > 1) {
+      throw new Error(`expected one bundle matching ${pattern.source}, found ${matches.length}`);
+    }
+
+    return [asset.source, bundle];
+  });
+}
+
+/**
+ * Copies the stylesheets into `assets/` under hashed names, rewriting the
+ * dev-relative font path (`../public/fonts/`) to its dist location
+ * (`../fonts/`) so `url(...)` still resolves from the CSS file's new home.
+ *
+ * The hash covers the rewritten text, so a change to {@link CSS_REWRITES}
+ * moves the name too.
+ */
+async function copyStyles(): Promise<[string, string][]> {
+  const emitted: [string, string][] = [];
+
+  for (const { source, stem, extension } of STYLE_ASSETS) {
+    const css = applyRewrites(await Bun.file(join(SRC_DIR, source)).text(), CSS_REWRITES);
+    const hashed = `${stem}.${contentHash(css)}.${extension}`;
+
+    await Bun.write(join(ASSETS_DIR, hashed), css);
+    emitted.push([source, hashed]);
   }
+
+  return emitted;
+}
+
+/** Stands in for Bun's `[hash]` slot, which only covers what the bundler writes. */
+function contentHash(content: string): string {
+  return new Bun.CryptoHasher('sha256').update(content).digest('hex').slice(0, 8);
 }
 
 /** Copies the loose `public/` files that sit at the `dist/` root. */
@@ -164,10 +207,12 @@ async function copyFonts(): Promise<void> {
 }
 
 /** Rewrites each dev HTML file's asset paths to the built, relative ones. */
-async function writeHtml(): Promise<void> {
+async function writeHtml(assets: AssetNames): Promise<void> {
+  const rewrites = htmlRewrites(assets);
+
   for (const page of HTML_PAGES) {
     const html = await Bun.file(join(SITE_DIR, page)).text();
-    await Bun.write(join(DIST_DIR, page), applyRewrites(html, HTML_REWRITES));
+    await Bun.write(join(DIST_DIR, page), applyRewrites(html, rewrites));
   }
 }
 

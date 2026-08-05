@@ -12,7 +12,14 @@
 
 import { readdir } from 'node:fs/promises';
 import { join, normalize } from 'node:path';
-import { DOCS_DIR_NAME, FONTS_DIR_NAME, REQUIRED_FILES } from './site-manifest.js';
+import {
+  ASSETS_DIR_NAME,
+  DOCS_DIR_NAME,
+  FONTS_DIR_NAME,
+  HASHED_ASSETS,
+  hashedPattern,
+  REQUIRED_FILES,
+} from './site-manifest.js';
 
 const DIST_DIR = join(import.meta.dir, '..', 'site', 'dist');
 
@@ -29,6 +36,7 @@ const errors: string[] = [];
 
 async function main(): Promise<void> {
   await checkRequiredFiles();
+  await checkHashedAssets();
   await checkFontsPresent();
   await checkHtmlReferences();
 
@@ -45,6 +53,32 @@ async function checkRequiredFiles(): Promise<void> {
   for (const relative of REQUIRED_FILES) {
     if (!(await Bun.file(join(DIST_DIR, relative)).exists())) {
       errors.push(`missing required file: ${relative}`);
+    }
+  }
+}
+
+/**
+ * Bundles and stylesheets are named `<stem>.<hash>.<ext>`, which this process
+ * cannot predict — it counts matches per stem instead of resolving a path.
+ */
+async function checkHashedAssets(): Promise<void> {
+  let entries: string[];
+
+  try {
+    entries = await readdir(join(DIST_DIR, ASSETS_DIR_NAME));
+  } catch {
+    errors.push(`missing required directory: ${ASSETS_DIR_NAME}/`);
+    return;
+  }
+
+  for (const asset of HASHED_ASSETS) {
+    const pattern = hashedPattern(asset);
+    const matches = entries.filter((entry) => pattern.test(entry)).length;
+
+    if (matches !== 1) {
+      errors.push(
+        `expected exactly one ${ASSETS_DIR_NAME}/${asset.stem}.<hash>.${asset.extension}, found ${matches}`,
+      );
     }
   }
 }
