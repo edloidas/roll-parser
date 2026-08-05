@@ -112,7 +112,8 @@ jobs:
           echo "Dist-tag: $TAG"
 
       # The same gate `prepublishOnly` runs on a manual publish: check, build,
-      # package checks, size budgets, coverage, audit.
+      # package checks, size budgets, site build and check (TypeDoc), coverage,
+      # audit.
       - name: Run release gate
         run: bun run release:dry
 

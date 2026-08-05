@@ -14,7 +14,9 @@ edit the `.claude/` originals, never replace a symlink with a real file.
 bun check:fix   # Typecheck + biome check --write (lint + format + import sort) — use during
                 # iteration; the typecheck step rebuilds dist/ as a side effect
 bun test        # Run tests — not read-only: some suites rebuild dist/ in-process
-bun validate    # Full pre-release gate: check + build + check:package + check:size + test:ci
+bun validate    # Full pre-release gate: check + build + check:package + check:size +
+                # site:build + site:check + test:ci — site:build is what runs TypeDoc,
+                # so a TSDoc error that breaks the API reference fails here
 ```
 
 Demo site (`site/`, Cloudflare Pages): `site:dev` (no TypeDoc, so `/docs/` is
