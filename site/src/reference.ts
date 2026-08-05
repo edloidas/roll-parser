@@ -229,6 +229,44 @@ function tocMarkup(): string {
   return links;
 }
 
+/**
+ * Marks the TOC entry for the section under the top of the viewport. Sets
+ * `is-active` at every width — only the sidebar layout styles it.
+ */
+function initTocHighlight(toc: HTMLElement, guide: HTMLElement): void {
+  const sections = Array.from(guide.querySelectorAll<HTMLElement>('.ref-section'));
+  const links = new Map(
+    Array.from(toc.querySelectorAll<HTMLAnchorElement>('.toc-link')).map((link) => [
+      link.hash.slice(1),
+      link,
+    ]),
+  );
+  const onscreen = new Set<string>();
+  let active = '';
+
+  const observer = new IntersectionObserver(
+    (entries) => {
+      for (const entry of entries) {
+        const { id } = entry.target;
+        if (entry.isIntersecting) onscreen.add(id);
+        else onscreen.delete(id);
+      }
+
+      const current = sections.find((section) => onscreen.has(section.id));
+      if (current == null || current.id === active) return;
+
+      links.get(active)?.classList.remove('is-active');
+      links.get(current.id)?.classList.add('is-active');
+      active = current.id;
+    },
+    // ! Both insets must stay percentages. A px top against a % bottom inverts the
+    // ! band on a short viewport, and nothing ever intersects.
+    { rootMargin: '-12% 0px -70% 0px' },
+  );
+
+  for (const section of sections) observer.observe(section);
+}
+
 /** Reads the optional preset context stashed on a widget element. */
 function readContext(widget: HTMLElement): Record<string, number> | undefined {
   const raw = widget.dataset.context;
@@ -272,6 +310,8 @@ function mount(): void {
   toc.innerHTML = tocMarkup();
   guide.innerHTML = SECTIONS.map(sectionMarkup).join('');
   if (versionEl != null) versionEl.textContent = `v${VERSION}`;
+
+  initTocHighlight(toc, guide);
 
   const widgets = Array.from(guide.querySelectorAll<HTMLElement>('.widget'));
 

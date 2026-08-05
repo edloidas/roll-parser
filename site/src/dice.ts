@@ -29,13 +29,13 @@ function escapeAttr(value: string): string {
 
 /**
  * Builds the polygon `points` attribute for a regular N-gon centered at
- * (50, 50), oriented point-up.
+ * (50, 50), oriented point-up. `rotation` (radians) turns it off that axis.
  */
-function polygonPoints(sides: number, radius: number): string {
+function polygonPoints(sides: number, radius: number, rotation = 0): string {
   const points: string[] = [];
 
   for (let i = 0; i < sides; i++) {
-    const angle = (Math.PI * 2 * i) / sides - Math.PI / 2;
+    const angle = (Math.PI * 2 * i) / sides - Math.PI / 2 + rotation;
     const x = 50 + radius * Math.cos(angle);
     const y = 50 + radius * Math.sin(angle);
     points.push(`${x.toFixed(1)},${y.toFixed(1)}`);
@@ -70,13 +70,20 @@ function shapeFor(sides: number): string {
   }
 }
 
-/** The d12 inner-pentagon facet impression: five corner spokes + inner pentagon. */
-function pentagonFacets(): string {
-  const outer = polygonPoints(5, 46).split(' ');
-  const inner = polygonPoints(5, 30).split(' ');
-  const spokes = outer.map((o, i) => `M${o} L${inner[i]}`).join(' ');
+/** Half a pentagon step — the offset that turns the d12's inner face point-down. */
+const PENTAGON_HALF_STEP = Math.PI / 5;
 
-  return `<polygon points="${polygonPoints(5, 30)}" /><path d="${spokes}" />`;
+/** The d12 inner-pentagon facet impression: point-down inner face + five spokes. */
+function pentagonFacets(): string {
+  const innerRadius = 30;
+  const outer = polygonPoints(5, 46).split(' ');
+  const inner = polygonPoints(5, innerRadius, PENTAGON_HALF_STEP);
+  // Out of phase by half a step, so each outer vertex faces an inner *edge*, whose
+  // midpoint shares that angle at radius * cos(36°) — keeping all five spokes radial.
+  const midpoints = polygonPoints(5, innerRadius * Math.cos(PENTAGON_HALF_STEP)).split(' ');
+  const spokes = outer.map((o, i) => `M${o} L${midpoints[i]}`).join(' ');
+
+  return `<polygon points="${inner}" /><path d="${spokes}" />`;
 }
 
 /** The d20 facet pattern — reuses the logo's central-triangle geometry. */
@@ -94,8 +101,8 @@ function facetsFor(sides: number): string {
       // Three lines from each vertex meeting at the triangle centroid.
       return '<path d="M50,8 L50,61.3 M92,88 L50,61.3 M8,88 L50,61.3" />';
     case 8:
-      // Horizontal equator, gapped so the centered digit stays clear.
-      return '<path d="M6,50 L36,50 M64,50 L94,50" />';
+      // Equator plus spine, gapped around the digit — the octahedron seen edge-on.
+      return '<path d="M6,50 L36,50 M64,50 L94,50 M50,6 L50,26 M50,74 L50,94" />';
     case 10:
       // Kite shoulders converging on (50,62), then down to the bottom vertex.
       return '<path d="M10,42 L50,62 M90,42 L50,62 M50,62 L50,96" />';
@@ -106,6 +113,14 @@ function facetsFor(sides: number): string {
     default:
       return '';
   }
+}
+
+/**
+ * Vertical center for the value. The d10 alone sits high: its front kite face is
+ * above the shape's center, where the facet chevron converges.
+ */
+function valueYFor(sides: number): number {
+  return sides === 10 ? 42 : 50;
 }
 
 /** Human-facing label rendered inside the die shape. */
@@ -209,7 +224,7 @@ export function renderDie(die: DieResult, index: number, folded = false): string
     '<svg viewBox="0 0 100 100" aria-hidden="true">',
     `<g class="die-shape">${shapeFor(die.sides)}</g>`,
     facetGroup,
-    `<text class="die-value" x="50" y="50" text-anchor="middle" dominant-baseline="central" font-size="${fontSize}">${label}</text>`,
+    `<text class="die-value" x="50" y="${valueYFor(die.sides)}" text-anchor="middle" dominant-baseline="central" font-size="${fontSize}">${label}</text>`,
     '</svg>',
     badge,
     explodeBadge,
