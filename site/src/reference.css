@@ -72,7 +72,7 @@
 
 @media (min-width: 900px) {
   .ref-layout {
-    grid-template-columns: 220px minmax(0, 1fr);
+    grid-template-columns: 192px minmax(0, 1fr);
     gap: 2.75rem;
     align-items: start;
   }
@@ -138,7 +138,8 @@
   /* Sidebar links read as a list, not pills: no tracking, no gap — the padding
      carries the rhythm and doubles as the hover hit area. */
   .toc-link {
-    padding: 0.5rem 0.8rem;
+    position: relative;
+    padding: 0.5rem 0.85rem;
     font-size: 0.875rem;
     letter-spacing: normal;
     border-color: transparent;
@@ -148,6 +149,24 @@
 
   .toc-link:hover {
     background: var(--surface);
+  }
+
+  /* Pseudo-element, not a border or inset shadow: both trace the 999px pill radius
+     the mobile strip needs and ring the whole link. */
+  .toc-link.is-active {
+    color: var(--accent);
+    background: var(--surface);
+  }
+
+  .toc-link.is-active::before {
+    content: '';
+    position: absolute;
+    left: 6px;
+    top: 32%;
+    bottom: 36%;
+    width: 2px;
+    border-radius: 2px;
+    background: var(--accent);
   }
 }
 
