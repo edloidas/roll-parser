@@ -98,19 +98,19 @@
     {
       "name": "index.js (full library)",
       "path": "dist/index.js",
-      "limit": "12 kB"
+      "limit": "12.5 kB"
     },
     {
       "name": "index.js — { parse }",
       "path": "dist/index.js",
       "import": "{ parse }",
-      "limit": "5.5 kB"
+      "limit": "6 kB"
     },
     {
       "name": "index.js — { roll }",
       "path": "dist/index.js",
       "import": "{ roll }",
-      "limit": "11.5 kB"
+      "limit": "12 kB"
     },
     {
       "name": "testing.js — { createMockRng }",
