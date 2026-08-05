@@ -115,14 +115,6 @@ function facetsFor(sides: number): string {
   }
 }
 
-/**
- * Vertical center for the value. The d10 alone sits high: its front kite face is
- * above the shape's center, where the facet chevron converges.
- */
-function valueYFor(sides: number): number {
-  return sides === 10 ? 42 : 50;
-}
-
 /** Human-facing label rendered inside the die shape. */
 function labelFor(die: DieResult): string {
   if (die.sides === 0) {
@@ -224,7 +216,7 @@ export function renderDie(die: DieResult, index: number, folded = false): string
     '<svg viewBox="0 0 100 100" aria-hidden="true">',
     `<g class="die-shape">${shapeFor(die.sides)}</g>`,
     facetGroup,
-    `<text class="die-value" x="50" y="${valueYFor(die.sides)}" text-anchor="middle" dominant-baseline="central" font-size="${fontSize}">${label}</text>`,
+    `<text class="die-value" x="50" y="50" text-anchor="middle" dominant-baseline="central" font-size="${fontSize}">${label}</text>`,
     '</svg>',
     badge,
     explodeBadge,
