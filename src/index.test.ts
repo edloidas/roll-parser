@@ -33,6 +33,7 @@ const VALUE_EXPORTS = [
   'isBinaryOp',
   'isCritThreshold',
   'isDice',
+  'isDieBound',
   'isExplode',
   'isFateDice',
   'isFunctionCall',

@@ -46,6 +46,8 @@ const SECTIONS: Section[] = [
       { notation: 'ceil(1d6/2)', note: 'Round up to the nearest integer.' },
       { notation: 'round(1d6/2)', note: 'Round to the nearest integer.' },
       { notation: 'abs(1d6-4)', note: 'Absolute value of the result.' },
+      { notation: 'sqrt(1d4+12)', note: 'Square root of a sub-expression.' },
+      { notation: 'pow(2,1d4)', note: 'Exponentiation as a function — same as 2**1d4.' },
       { notation: 'max(1d20,1d20)', note: 'Advantage as a function — the larger of two rolls.' },
       { notation: 'min(1d20,1d20)', note: 'Disadvantage — the smaller of two rolls.' },
       { notation: '(1d4)d6', note: 'Computed dice: roll 1d4, then roll that many d6.' },
@@ -83,10 +85,12 @@ const SECTIONS: Section[] = [
   },
   {
     id: 'reroll',
-    title: 'Rerolls',
+    title: 'Rerolls & clamps',
     examples: [
       { notation: '2d6r<2', note: 'Reroll anything under 2, repeatedly.' },
       { notation: '2d6ro<3', note: 'Reroll once only — the "o" caps it at a single retry.' },
+      { notation: '2d6min3', note: 'Lift low faces to a floor — Great Weapon Fighting style.' },
+      { notation: '4d6max5', note: 'Cap high faces at a ceiling.' },
     ],
   },
   {

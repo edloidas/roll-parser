@@ -1,0 +1,27 @@
+{
+  "name": "roll-parser-competitor-bench",
+  "private": true,
+  "type": "module",
+  "description": "Cross-library comparison suite. Deliberately NOT a root workspace: installing the repo must never pull competitor packages (and their transitive mathjs) into the main dependency tree or audit surface. Run via `bun run bench:competitors` from the repo root, or `bun install && bun run all` here.",
+  "scripts": {
+    "matrix": "bun run matrix.ts",
+    "bench": "bun run bench.ts",
+    "errors": "bun run errors.ts",
+    "limits": "bun run limits.ts",
+    "footprint": "bun run footprint.ts",
+    "all": "bun run matrix.ts && bun run bench.ts"
+  },
+  "dependencies": {
+    "@airjp73/dice-notation": "2.2.2",
+    "@dice-roller/rpg-dice-roller": "5.5.1",
+    "@randsum/roller": "4.0.0",
+    "dice-roller-parser": "0.1.8",
+    "dice-typescript": "1.6.1",
+    "droll": "0.2.1",
+    "mitata": "1.0.34"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.14",
+    "esbuild": "0.28.1"
+  }
+}

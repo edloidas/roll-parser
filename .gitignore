@@ -19,5 +19,9 @@ src/**/*.js.map
 # Test coverage
 coverage/
 
+# Competitor-suite output
+bench/competitors/matrix-results.json
+bench/competitors/competitor-report.txt
+
 # macOS
 .DS_Store

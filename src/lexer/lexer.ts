@@ -87,6 +87,8 @@ const IDENTIFIER_KEYWORDS: Record<string, TokenType> = {
   ceil: TokenType.FUNCTION,
   round: TokenType.FUNCTION,
   abs: TokenType.FUNCTION,
+  sqrt: TokenType.FUNCTION,
+  pow: TokenType.FUNCTION,
   max: TokenType.FUNCTION,
   min: TokenType.FUNCTION,
   s: TokenType.SORT_ASC,
