@@ -84,8 +84,8 @@ function explodeLimitError(maxIterations: number): EvaluatorError {
  * never fire during normal flow. Keeping it ensures `rng.nextInt(1, 0)`
  * can never be reached if a future AST path slips past the parser gate.
  */
-function canExplode(die: DieResult): boolean {
-  if (isVersusDc(die)) return false;
+function canExplode(die: DieResult, hasVersusDc: boolean): boolean {
+  if (hasVersusDc && isVersusDc(die)) return false;
   if (die.modifiers.includes('dropped')) return false;
   if (die.sides < 1) return false;
   return true;
@@ -111,7 +111,7 @@ function applyAppendingExplode(
 
   for (const original of pool) {
     result.push(original);
-    if (!canExplode(original)) continue;
+    if (!canExplode(original, env.hasVersusDc)) continue;
 
     const sides = original.sides;
     let lastRaw = original.result;
@@ -172,7 +172,7 @@ export function applyCompoundExplode(
   env: EvalEnv,
 ): DieResult[] {
   for (const original of pool) {
-    if (!canExplode(original)) continue;
+    if (!canExplode(original, env.hasVersusDc)) continue;
 
     const sides = original.sides;
     let accumulated = original.result;

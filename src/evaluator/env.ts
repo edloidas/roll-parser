@@ -36,6 +36,17 @@ export type EvalEnv = {
    */
   insideVersus: boolean;
   /**
+   * `true` once a `vs` has tagged its DC dice `'dc'`. Lets every pool
+   * operation skip its per-die `isVersusDc` check outright — the tag exists in
+   * a small minority of notation, and the call inside the loop cost 11-38% on
+   * keep/drop, success, and sort notation that can never carry one (#281).
+   *
+   * ! Monotonic: set by `evalVersus`, never cleared. `insideVersus` is not a
+   * ! model for it — that flag resets in a `finally`, and it is false exactly
+   * ! when the tagged DC dice become visible to the enclosing pool.
+   */
+  hasVersusDc: boolean;
+  /**
    * User-supplied variable map for `@name` / `@{name}` references. Always
    * defined — `evaluate()` defaults to an empty object so lookups can be
    * branch-free on presence.
