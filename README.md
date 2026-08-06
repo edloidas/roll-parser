@@ -12,8 +12,7 @@ Dice notation for tabletop RPGs, rolled into structured results.
   <a href="https://www.npmjs.com/package/roll-parser"><img src="https://img.shields.io/npm/v/roll-parser?color=cb3837" alt="npm version"></a>
   <a href="https://github.com/edloidas/roll-parser/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/edloidas/roll-parser/ci.yml?branch=master&label=CI" alt="CI status"></a>
   <a href="https://github.com/edloidas/roll-parser/blob/master/LICENSE"><img src="https://img.shields.io/npm/l/roll-parser?color=blue" alt="MIT license"></a>
-  <!-- TODO: switch to img.shields.io/node/v/roll-parser once 3.0.0 is npm `latest` — until then it reads 2.x engines -->
-  <a href="https://nodejs.org/"><img src="https://img.shields.io/badge/node-%3E%3D22.12-5fa04e" alt="Node.js >= 22.12"></a>
+  <a href="https://nodejs.org/"><img src="https://img.shields.io/node/v/roll-parser?color=5fa04e" alt="Node.js >= 22.12"></a>
 </p>
 
 <p align="center">
