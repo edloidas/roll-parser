@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-08-06
+
+First stable release of the v3 rewrite. This section covers what changed since
+`3.0.0-beta.0`; the two pre-release sections below carry the rest of the rewrite.
+Upgrading from 2.x starts at [MIGRATION.md](MIGRATION.md) — no 2.x API carries
+over.
+
 ### Added
 
 - CLI `--json` flag that emits the complete `RollResult`, including the structured `parts` tree, as compact JSON on stdout. `DegreeOfSuccess` serializes as its numeric value; diagnostics stay plain text on stderr, so scripts can branch on the exit code before parsing ([#136](https://github.com/edloidas/roll-parser/issues/136))
@@ -176,6 +183,7 @@ Dice mechanics (Stage 2):
 - Dice count safety limit via `maxDice` option (default 10,000), enforced across the whole expression to prevent DoS via additive groups like `5000d6+5000d6` ([#19](https://github.com/edloidas/roll-parser/issues/19))
 - Parser and evaluator correctness: duplicate `kept` modifier entries, implicit modifier count defaulting to 1 (`4d6kh` → `4d6kh1`), `critical` flag suppression when `sides === 1`, negative `--seed` CLI values ([#21](https://github.com/edloidas/roll-parser/issues/21))
 
-[Unreleased]: https://github.com/edloidas/roll-parser/compare/v3.0.0-beta.0...HEAD
+[Unreleased]: https://github.com/edloidas/roll-parser/compare/v3.0.0...HEAD
+[3.0.0]: https://github.com/edloidas/roll-parser/releases/tag/v3.0.0
 [3.0.0-beta.0]: https://github.com/edloidas/roll-parser/releases/tag/v3.0.0-beta.0
 [3.0.0-alpha.0]: https://github.com/edloidas/roll-parser/releases/tag/v3.0.0-alpha.0
