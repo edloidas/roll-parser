@@ -933,8 +933,10 @@ mis-times mid-weight cases by 10-30x.
 Run `bun run bench` for the full suite, or `bench:lex` / `bench:parse` /
 `bench:evaluate` / `bench:roll` for one stage. Cross-library numbers live in
 the [competitor suite](https://github.com/edloidas/roll-parser/tree/master/bench/competitors)
-(`bun run bench:competitors`). Bundle size is gated in CI by `size-limit`; the
-budgets live in `package.json`.
+(`bun run bench:competitors`). Every push to `master` publishes its p50s to a
+[trend chart](https://edloidas.io/roll-parser/dev/bench/), and CI comments on
+any commit that regresses a case past 1.75x. Bundle size is gated in CI by
+`size-limit`; the budgets live in `package.json`.
 
 ## Known limitations
 
