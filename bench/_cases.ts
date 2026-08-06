@@ -60,6 +60,11 @@ export const BENCH_CASES: BenchCase[] = [
   { id: '{1d6+2}kh1', notation: '{1d6+2}kh1', tier: 'common' },
   { id: '2d20kh1 vs 15', notation: '2d20kh1 vs 15', tier: 'common' },
   { id: '10d10>=6f1', notation: '10d10>=6f1', tier: 'common' },
+  { id: '4d6sd', notation: '4d6sd', tier: 'common' },
+  { id: '10d10sd', notation: '10d10sd', tier: 'common' },
+  // Sort composed with a success pool — the two pool passes that cost the most
+  // per die, so the shape most exposed to a per-die regression in either (#281).
+  { id: '10d10sd>=6f1', notation: '10d10sd>=6f1', tier: 'common' },
   { id: '4d6r<2', notation: '4d6r<2', tier: 'common', variableWork: true },
   { id: 'floor((1d4+1)*2/3)', notation: 'floor((1d4+1)*2/3)', tier: 'common' },
   { id: '@atk+1d20', notation: '@atk+1d20', tier: 'common', context: { atk: 7 } },
@@ -74,6 +79,7 @@ export const BENCH_CASES: BenchCase[] = [
   { id: 'sum-20-terms', notation: FLAT_SUM_NOTATION, tier: 'heavy' },
   { id: '100d6', notation: '100d6', tier: 'heavy' },
   { id: '100d6kh1', notation: '100d6kh1', tier: 'heavy' },
+  { id: '100d6sa', notation: '100d6sa', tier: 'heavy' },
 
   { id: '1000d6', notation: '1000d6', tier: 'pathological' },
 ];

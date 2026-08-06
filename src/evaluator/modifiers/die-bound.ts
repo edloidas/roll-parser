@@ -25,9 +25,15 @@ import { isVersusDc } from './flags.js';
  * `bound: 'min'` lifts lower results up to `value`; `'max'` caps higher
  * results down to it. Untouched dice keep their tags.
  */
-export function applyDieBound(dice: DieResult[], bound: 'min' | 'max', value: number): void {
+export function applyDieBound(
+  dice: DieResult[],
+  bound: 'min' | 'max',
+  value: number,
+  hasVersusDc: boolean,
+): void {
   for (const die of dice) {
-    if (die.modifiers.includes('meta') || isVersusDc(die)) continue;
+    if (die.modifiers.includes('meta')) continue;
+    if (hasVersusDc && isVersusDc(die)) continue;
 
     const clamped = bound === 'min' ? Math.max(die.result, value) : Math.min(die.result, value);
     if (clamped === die.result) continue;

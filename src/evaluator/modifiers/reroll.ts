@@ -54,8 +54,9 @@ function rerollLimitError(maxIterations: number): EvaluatorError {
  * True for dice eligible to start rerolling. Dropped dice (from a preceding
  * keep/drop modifier) are left alone.
  */
-function canReroll(die: DieResult): boolean {
-  return !die.modifiers.includes('dropped') && !isVersusDc(die);
+function canReroll(die: DieResult, hasVersusDc: boolean): boolean {
+  if (hasVersusDc && isVersusDc(die)) return false;
+  return !die.modifiers.includes('dropped');
 }
 
 /**
@@ -76,7 +77,7 @@ export function applyRecursiveReroll(
   const result: DieResult[] = [];
 
   for (const original of pool) {
-    if (!canReroll(original)) {
+    if (!canReroll(original, env.hasVersusDc)) {
       result.push(original);
       continue;
     }
@@ -120,7 +121,7 @@ export function applyRerollOnce(
   const result: DieResult[] = [];
 
   for (const original of pool) {
-    if (!canReroll(original)) {
+    if (!canReroll(original, env.hasVersusDc)) {
       result.push(original);
       continue;
     }

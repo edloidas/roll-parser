@@ -29,9 +29,10 @@ export function markDroppedIndices(
   kind: KeepDropSpec['kind'],
   selector: KeepDropSpec['selector'],
   droppedMask: Uint8Array,
+  hasVersusDc: boolean,
 ): void {
   if (count === 1) {
-    markSingleExtreme(dice, kind, selector, droppedMask);
+    markSingleExtreme(dice, kind, selector, droppedMask, hasVersusDc);
     return;
   }
 
@@ -40,7 +41,7 @@ export function markDroppedIndices(
   for (let index = 0; index < dice.length; index++) {
     const die = dice[index];
     if (die == null) continue;
-    if (isVersusDc(die)) continue;
+    if (hasVersusDc && isVersusDc(die)) continue;
 
     if (die.modifiers.includes('dropped')) {
       droppedMask[index] = 1;
@@ -91,6 +92,7 @@ function markSingleExtreme(
   kind: KeepDropSpec['kind'],
   selector: KeepDropSpec['selector'],
   droppedMask: Uint8Array,
+  hasVersusDc: boolean,
 ): void {
   const isKeep = kind === 'keep';
   const wantHighest = selector === 'highest';
@@ -101,7 +103,7 @@ function markSingleExtreme(
   for (let index = 0; index < dice.length; index++) {
     const die = dice[index];
     if (die == null) continue;
-    if (isVersusDc(die)) continue;
+    if (hasVersusDc && isVersusDc(die)) continue;
 
     if (die.modifiers.includes('dropped')) {
       droppedMask[index] = 1;
@@ -135,13 +137,15 @@ function markSingleExtreme(
  * Calculates total from dice, excluding dropped dice.
  *
  * @param dice - Array of die results
+ * @param hasVersusDc - Shared env flag; skips the DC exclusion when no `vs` has
+ *   tagged anything
  * @returns Sum of non-dropped dice
  */
-export function sumKeptDice(dice: DieResult[]): number {
+export function sumKeptDice(dice: DieResult[], hasVersusDc: boolean): number {
   let total = 0;
 
   for (const die of dice) {
-    if (isVersusDc(die)) continue;
+    if (hasVersusDc && isVersusDc(die)) continue;
     if (!die.modifiers.includes('dropped')) total += die.result;
   }
 

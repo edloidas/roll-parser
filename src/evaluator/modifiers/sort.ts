@@ -26,17 +26,23 @@ import { isVersusDc } from './flags.js';
  * Relies on `Array.prototype.sort` being stable — equal-valued dice retain
  * their original insertion order.
  */
-export function sortDice(dice: DieResult[], order: 'ascending' | 'descending'): DieResult[] {
+export function sortDice(
+  dice: DieResult[],
+  order: 'ascending' | 'descending',
+  hasVersusDc: boolean,
+): DieResult[] {
   const cmp =
     order === 'ascending'
       ? (a: DieResult, b: DieResult) => a.result - b.result
       : (a: DieResult, b: DieResult) => b.result - a.result;
 
-  const sortable = dice.filter((die) => !isVersusDc(die));
-  if (sortable.length === dice.length) return [...dice].sort(cmp);
+  // Scan before allocating: the `filter` this replaced built a throwaway array
+  // on every sort to serve a case only a `vs` can produce (#281).
+  if (!hasVersusDc || !dice.some(isVersusDc)) return [...dice].sort(cmp);
 
   // Sort only the pool members, then lay them back into the slots they came
   // from, leaving every DC die exactly where it was.
+  const sortable = dice.filter((die) => !isVersusDc(die));
   sortable.sort(cmp);
   let next = 0;
   return dice.map((die) => (isVersusDc(die) ? die : (sortable[next++] as DieResult)));

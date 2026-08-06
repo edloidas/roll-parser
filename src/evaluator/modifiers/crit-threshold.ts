@@ -31,9 +31,11 @@ export function applyCritThresholds(
   dice: DieResult[],
   successThresholds: ResolvedCritThreshold[],
   failThresholds: ResolvedCritThreshold[],
+  hasVersusDc: boolean,
 ): void {
   for (const die of dice) {
-    if (die.modifiers.includes('meta') || isVersusDc(die)) continue;
+    if (die.modifiers.includes('meta')) continue;
+    if (hasVersusDc && isVersusDc(die)) continue;
 
     die.critical = successThresholds.some((t) => matchesCrit(t, die));
     die.fumble = failThresholds.some((t) => matchesFumble(t, die));

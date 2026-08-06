@@ -952,11 +952,15 @@ function flattenKeepDropChain(
  * selects against the unmodified pool: `markDroppedIndices` reads results and
  * writes only into `droppedMask`, so no spec can observe another's outcome.
  */
-function mergeDropSets(baseDice: DieResult[], specs: KeepDropChainEntry[]): DieResult[] {
+function mergeDropSets(
+  baseDice: DieResult[],
+  specs: KeepDropChainEntry[],
+  hasVersusDc: boolean,
+): DieResult[] {
   const droppedMask = new Uint8Array(baseDice.length);
 
   for (const spec of specs) {
-    markDroppedIndices(baseDice, spec.count, spec.kind, spec.selector, droppedMask);
+    markDroppedIndices(baseDice, spec.count, spec.kind, spec.selector, droppedMask, hasVersusDc);
   }
 
   for (let index = 0; index < baseDice.length; index++) {
@@ -1050,7 +1054,7 @@ function evalExplode(node: ExplodeNode, rng: RNG, ctx: EvalContext, env: EvalEnv
   // are self-evident, explosion origin is otherwise invisible.
   ctx.renderedParts.push(`${targetExpr}${code}${renderDice(expanded)}`);
 
-  const total = sumKeptDice(expanded);
+  const total = sumKeptDice(expanded, env.hasVersusDc);
   return { total, part: buildPart(total) };
 }
 
@@ -1071,7 +1075,7 @@ function evalReroll(node: RerollNode, rng: RNG, ctx: EvalContext, env: EvalEnv):
   if (targetCtx.rolls.length === 0) {
     ctx.expressionParts.push(`${targetExpr}${code}`);
     ctx.renderedParts.push(`${targetExpr}${code}`);
-    const total = sumKeptDice(targetCtx.rolls);
+    const total = sumKeptDice(targetCtx.rolls, env.hasVersusDc);
     return {
       total,
       part: {
@@ -1093,7 +1097,7 @@ function evalReroll(node: RerollNode, rng: RNG, ctx: EvalContext, env: EvalEnv):
   ctx.expressionParts.push(`${targetExpr}${code}`);
   ctx.renderedParts.push(`${targetExpr}${code}${renderDice(pool)}`);
 
-  const total = sumKeptDice(pool);
+  const total = sumKeptDice(pool, env.hasVersusDc);
   return {
     total,
     part: {
@@ -1126,7 +1130,7 @@ function evalDieBound(node: DieBoundNode, rng: RNG, ctx: EvalContext, env: EvalE
     );
   }
 
-  applyDieBound(targetCtx.rolls, node.bound, boundValue);
+  applyDieBound(targetCtx.rolls, node.bound, boundValue, env.hasVersusDc);
 
   appendAll(ctx.rolls, targetCtx.rolls);
   // ! No `propagateMetadata` here: clamping re-sums, so a propagated `degree`
@@ -1141,7 +1145,7 @@ function evalDieBound(node: DieBoundNode, rng: RNG, ctx: EvalContext, env: EvalE
   ctx.expressionParts.push(`${targetExpr}${code}`);
   ctx.renderedParts.push(`${targetExpr}${code}${renderDice(targetCtx.rolls)}`);
 
-  const total = sumKeptDice(targetCtx.rolls);
+  const total = sumKeptDice(targetCtx.rolls, env.hasVersusDc);
   return {
     total,
     part: {
@@ -1175,7 +1179,7 @@ function evalSort(node: SortNode, rng: RNG, ctx: EvalContext, env: EvalEnv): Eva
   const targetCtx = createContext();
   const target = evalNode(node.target, rng, targetCtx, env);
 
-  const sortedRolls = sortDice(targetCtx.rolls, node.order);
+  const sortedRolls = sortDice(targetCtx.rolls, node.order, env.hasVersusDc);
 
   appendAll(ctx.rolls, sortedRolls);
   propagateMetadata(ctx, targetCtx.versusMetadata);
@@ -1233,7 +1237,7 @@ function evalCritThreshold(
     successResolved.length > 0 ? successResolved : ['default'];
   const failApplied: ResolvedCritThreshold[] = failResolved.length > 0 ? failResolved : ['default'];
 
-  applyCritThresholds(targetCtx.rolls, successApplied, failApplied);
+  applyCritThresholds(targetCtx.rolls, successApplied, failApplied, env.hasVersusDc);
 
   appendAll(ctx.rolls, targetCtx.rolls);
   propagateMetadata(ctx, targetCtx.versusMetadata);
@@ -1296,11 +1300,11 @@ function evalKeepDrop(node: KeepDropNode, rng: RNG, ctx: EvalContext, env: EvalE
   const targetCtx = createContext();
   const target = evalNode(baseTarget, rng, targetCtx, env);
 
-  const mergedDice = mergeDropSets(targetCtx.rolls, specs);
+  const mergedDice = mergeDropSets(targetCtx.rolls, specs, env.hasVersusDc);
 
   appendAll(ctx.rolls, mergedDice);
 
-  const total = sumKeptDice(mergedDice);
+  const total = sumKeptDice(mergedDice, env.hasVersusDc);
 
   const targetExpr = targetCtx.expressionParts.join('');
   const keepDropCodes = specs.map((s) => `${s.code}${s.count}`).join('');
@@ -1383,7 +1387,7 @@ function evalGroupKeepDrop(
     fumble: false,
   }));
 
-  const mergedSynthetic = mergeDropSets(syntheticDice, specs);
+  const mergedSynthetic = mergeDropSets(syntheticDice, specs, env.hasVersusDc);
 
   const outerRendered: string[] = [];
   const keptIndices: number[] = [];
@@ -1541,6 +1545,7 @@ function evalSuccessCount(
     failValue != null && node.failThreshold != null
       ? { operator: node.failThreshold.operator, value: failValue }
       : undefined,
+    env.hasVersusDc,
   );
 
   appendAll(ctx.rolls, targetCtx.rolls);
@@ -1637,6 +1642,8 @@ function evalVersus(node: VersusNode, rng: RNG, ctx: EvalContext, env: EvalEnv):
     for (const die of dcCtx.rolls) {
       die.modifiers.push('dc');
     }
+    // Arms the exclusion checks every enclosing pool operation skips by default.
+    if (dcCtx.rolls.length > 0) env.hasVersusDc = true;
     appendAll(ctx.rolls, dcCtx.rolls);
 
     const rollExpr = rollCtx.expressionParts.join('');
@@ -1730,6 +1737,7 @@ export function evaluate(ast: ASTNode, rng: RNG, options: EvaluateOptions = {}):
     totalDiceRolled: 0,
     hasSuccessCount: false,
     insideVersus: false,
+    hasVersusDc: false,
     context,
     onMissingVariable,
   };
@@ -1761,21 +1769,24 @@ export function evaluate(ast: ASTNode, rng: RNG, options: EvaluateOptions = {}):
     rendered,
     rolls: ctx.rolls,
     parts: part,
-    ...(env.hasSuccessCount ? countTaggedDice(ctx.rolls) : {}),
+    ...(env.hasSuccessCount ? countTaggedDice(ctx.rolls, env.hasVersusDc) : {}),
     ...(versus ? { degree: versus.degree } : {}),
     ...(versus?.natural != null ? { natural: versus.natural } : {}),
   };
 }
 
 /** Tallies the `'success'` / `'failure'` tags across a whole roll. */
-function countTaggedDice(rolls: DieResult[]): { successes: number; failures: number } {
+function countTaggedDice(
+  rolls: DieResult[],
+  hasVersusDc: boolean,
+): { successes: number; failures: number } {
   let successes = 0;
   let failures = 0;
 
   for (const die of rolls) {
     // A success-count inside the DC sub-expression tags its own dice before
     // `evalVersus` marks them `'dc'`, so they arrive here already tagged.
-    if (isVersusDc(die)) continue;
+    if (hasVersusDc && isVersusDc(die)) continue;
     if (die.modifiers.includes('success')) successes += 1;
     else if (die.modifiers.includes('failure')) failures += 1;
   }

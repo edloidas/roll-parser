@@ -20,6 +20,10 @@ import type { DieModifier, DieResult } from '../../types.js';
  * operates on. Nothing may sum, select, clamp, reroll, explode, or tally them
  * — a `d10` on the DC side must never come back clamped to 20, and
  * `{1d20 vs 2d10, 1d4}>=5` must not count the DC faces as successes.
+ *
+ * ! Call this behind the shared `hasVersusDc` env flag, never bare. Unguarded
+ * ! inside a per-die loop it cost 11-38% on notation that cannot carry the tag
+ * ! (#281); the flag is `false` until a `vs` has actually tagged something.
  */
 export function isVersusDc(die: DieResult): boolean {
   return die.modifiers.includes('dc');
