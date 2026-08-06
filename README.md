@@ -69,8 +69,8 @@ roll('4d6kh3', { rng: createMockRng([3, 6, 2, 5]) }).total; // 14, every run
 - **Safe on untrusted input.** Dice count, explosion depth, reroll depth, and
   parse depth are all bounded, and every failure is a typed error with a stable
   code and a source span.
-- **Small and fast.** ≈11.8 kB brotli for the whole library, ≈5.5 kB for just
-  `parse`, ≈215 B for the testing entry point. Zero runtime dependencies, zero
+- **Small and fast.** ≈11.9 kB brotli for the whole library, ≈5.5 kB for just
+  `parse`, ≈213 B for the testing entry point. Zero runtime dependencies, zero
   `node:` imports. A `1d20` round trip takes about 0.5 µs.
 - **Tested.** 1,500+ tests behind CI-enforced coverage floors — 100% of
   functions, 98% of lines — including every code example in this README, which
@@ -890,8 +890,8 @@ precedes them. Errors go to stderr; only the result goes to stdout.
 |----------|------:|--------:|--------------------:|
 | `1d20` | 85 ns | 164 ns | **0.49 µs** (~2.0M rolls/s) |
 | `2d6+3` | 98 ns | 215 ns | **0.77 µs** |
-| `4d6kh3` | 122 ns | 245 ns | **1.1 µs** |
-| `10d10>=6f1` | 161 ns | 336 ns | **1.6 µs** |
+| `4d6kh3` | 122 ns | 245 ns | **1.2 µs** |
+| `10d10>=6f1` | 161 ns | 336 ns | **2.0 µs** |
 | `100d6` | 82 ns | 168 ns | **2.6 µs** |
 
 The `roll` column pays for a fresh `SeededRNG` per call, which an injected RNG
@@ -907,9 +907,12 @@ Values are **p50**, from
 (`.gc('inner')`), taken as the per-record median of four full
 `bun run bench:json` passes, every row agreeing within 5% except
 `lex / 4d6kh3` at 7%. Measured 2026-08-05 on Bun
-1.3.14, Apple M2 Pro, macOS, idle and on AC power. Read them as two significant
-digits: another machine shifts every row, and a busy one inflates the heavy
-cases most.
+1.3.14, Apple M2 Pro, macOS, idle and on AC power. The `4d6kh3` and
+`10d10>=6f1` `roll` figures were re-measured 2026-08-06 over three passes
+agreeing within 4%, after per-die `'dc'` tag checks entered the keep/drop and
+success-count paths; the remaining rows re-measured within noise. Read them as
+two significant digits: another machine shifts every row, and a busy one
+inflates the heavy cases most.
 
 p50 rather than mean, because the mean here is effectively a GC-pause
 histogram and swings ±40% between processes. Every bench body is JIT-primed

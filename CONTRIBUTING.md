@@ -112,7 +112,15 @@ Maintainers only.
    on their own as `chore: release v<version>` — `check:version` fails the
    release if `src/version.ts` is stale. Never tag a pre-existing unrelated
    commit.
-3. Tag that commit `v<version>` and push the tag; `.github/workflows/release.yml`
+3. Push that commit to `master` **before** the tag. The workflow's `precheck`
+   job resolves the tagged SHA with `git branch -r --contains` and refuses to
+   release a commit that is not on `master` or a version branch, so a tag that
+   arrives first fails the run.
+4. Tag that commit `v<version>` and push the tag; `.github/workflows/release.yml`
    takes it from there.
 
 `bun run release:dry` runs the whole gate locally first.
+
+Both pushes need the admin bypass on the `protect-master` and `release-tags`
+rulesets — `release-tags` restricts creating `refs/tags/v*`, so an account with
+only write access cannot push a release tag at all.
