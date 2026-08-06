@@ -1,0 +1,77 @@
+name: Deploy Pages
+
+# Publishes the `gh-pages` branch to GitHub Pages. The demo site and the API
+# reference live on Cloudflare Pages (deploy-site.yml); all this branch carries
+# is the `github-action-benchmark` trend chart under `dev/bench/`, plus a root
+# redirect to the Cloudflare site.
+#
+# This exists because the legacy Jekyll builder was timing out: `dev/bench/
+# data.js` grows on every master push, and the last successful legacy build
+# took 586s against a 600s ceiling. Serving the branch as a static artifact
+# skips the Jekyll stage entirely, so build time no longer tracks that file.
+#
+# `workflow_run` rather than `on: push: branches: [gh-pages]` — a push event
+# runs the workflow file from the pushed ref, and `gh-pages` is an orphan
+# branch that carries no workflows. `workflow_run` always executes the default
+# branch's copy, which keeps this file reviewable on `master` alongside the
+# `bench-trend` job in ci.yml that writes the branch.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [master]
+  # Deploys whatever is on `gh-pages` right now, without running benchmarks —
+  # this is the path for a hand-edited branch commit.
+  workflow_dispatch:
+
+# Never cancel in flight: a cancelled deploy can leave Pages serving a partial
+# artifact, and the queued run behind it publishes the same branch anyway.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy gh-pages
+    # A cancelled CI run means a newer push is already mid-flight and will
+    # deploy this branch itself. `failure` still deploys: `bench-trend` is
+    # `continue-on-error`, so it can have pushed to `gh-pages` in a run that
+    # some unrelated job failed.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      contains(fromJSON('["success", "failure"]'), github.event.workflow_run.conclusion)
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      # Into `_site/` rather than the workspace root so the `.git` directory
+      # below is the only thing that has to be removed before upload — the
+      # artifact is the directory verbatim, with no ignore mechanism.
+      - name: Checkout gh-pages
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: gh-pages
+          path: _site
+          persist-credentials: false
+
+      - name: Strip repository metadata
+        run: rm -rf _site/.git
+
+      - name: Configure Pages
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+
+      - name: Upload branch as artifact
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0
