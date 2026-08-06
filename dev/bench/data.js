@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786019294303,
+  "lastUpdate": 1786024114997,
   "repoUrl": "https://github.com/edloidas/roll-parser",
   "entries": {
     "roll-parser": [
@@ -47449,6 +47449,835 @@ window.BENCHMARK_DATA = {
             "range": "± 790.6 ns",
             "unit": "ns",
             "extra": "group=roll (injected RNG) case=1000d6 p50=35731.02ns p75=36521.62ns mode=batch"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "edloidas@gmail.com",
+            "name": "Mikita Taukachou",
+            "username": "edloidas"
+          },
+          "committer": {
+            "email": "edloidas@gmail.com",
+            "name": "Mikita Taukachou",
+            "username": "edloidas"
+          },
+          "distinct": true,
+          "id": "3460d704e0a82d28d731e2faf24e2b19e5fb80c8",
+          "message": "perf: recover the pool-operation cost of the versus DC exclusion #281\n\nAdded `hasVersusDc` to `EvalEnv`, set once by `evalVersus` when it tags DC\ndice, so all eleven `isVersusDc` call sites skip the per-die check for\nnotation that cannot carry the tag.\nRewrote `sortDice` to scan before allocating, dropping the unconditional\n`filter` the common path never needed.\nExcluded DC dice in `countSuccesses` by filtering up front instead of\nguarding inside the loop.\nAdded `4d6sd`, `10d10sd`, `100d6sa`, and `10d10sd>=6f1` bench cases — sort\nnotation had no coverage, which is why the regression shipped unseen.\nRestated the `10d10>=6f1` `roll` figure and added a `4d6sd` row to the\nREADME performance table.\n\nEvery regressed case now measures inside its pre-#262 range and clear of\nthe released build: `4d6kh3` -12%, `4d6sd` -12%, `10d10sd` -21%,\n`100d6sa` -18%, `10d10sd>=6f1` -24%, `10d10>=6f1` -21%. Costs 70 B on\n`index.js` and `{ roll }`, inside the existing budgets.\n\nThe residual the issue left open, +8.7-11.5% on `>=6f1` attributed to\ncross-build layout or JIT variance, turned out to be the guard itself:\nrestoring the original `countSuccesses` loop body cleared it entirely, so\nthat one site filters rather than branches while the other ten short-circuit\nin place. `10d10>=6f1` and `10d10sd` read bimodally across passes with\nroughly 10% between the two modes, so the recovery is stated as range\noverlap rather than a point delta.\n\nCo-Authored-By: Mikita Taukachou <edloidas@gmail.com>",
+          "timestamp": "2026-08-06T15:44:55+02:00",
+          "tree_id": "b7304c55fbbb38dce6489e05ec978d3254fd8403",
+          "url": "https://github.com/edloidas/roll-parser/commit/3460d704e0a82d28d731e2faf24e2b19e5fb80c8"
+        },
+        "date": 1786024113995,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "lex / 1d20",
+            "value": 140.07,
+            "range": "± 108.23 ns",
+            "unit": "ns",
+            "extra": "group=lex case=1d20 p50=140.07ns p75=248.3ns mode=batch"
+          },
+          {
+            "name": "lex / 1d20+5",
+            "value": 175.26,
+            "range": "± 2.83 ns",
+            "unit": "ns",
+            "extra": "group=lex case=1d20+5 p50=175.26ns p75=178.09ns mode=batch"
+          },
+          {
+            "name": "lex / 3d6",
+            "value": 112.52,
+            "range": "± 6.42 ns",
+            "unit": "ns",
+            "extra": "group=lex case=3d6 p50=112.52ns p75=118.93ns mode=batch"
+          },
+          {
+            "name": "lex / 2d6+3",
+            "value": 157.27,
+            "range": "± 2.78 ns",
+            "unit": "ns",
+            "extra": "group=lex case=2d6+3 p50=157.27ns p75=160.05ns mode=batch"
+          },
+          {
+            "name": "lex / 4dF",
+            "value": 84.71,
+            "range": "± 59.63 ns",
+            "unit": "ns",
+            "extra": "group=lex case=4dF p50=84.71ns p75=144.34ns mode=batch"
+          },
+          {
+            "name": "lex / 4d6kh3",
+            "value": 197.23,
+            "range": "± 1.12 ns",
+            "unit": "ns",
+            "extra": "group=lex case=4d6kh3 p50=197.23ns p75=198.35ns mode=batch"
+          },
+          {
+            "name": "lex / {1d6+2}kh1",
+            "value": 268.84,
+            "range": "± 2.47 ns",
+            "unit": "ns",
+            "extra": "group=lex case={1d6+2}kh1 p50=268.84ns p75=271.32ns mode=batch"
+          },
+          {
+            "name": "lex / 2d20kh1 vs 15",
+            "value": 330.61,
+            "range": "± 2.74 ns",
+            "unit": "ns",
+            "extra": "group=lex case=2d20kh1 vs 15 p50=330.61ns p75=333.35ns mode=batch"
+          },
+          {
+            "name": "lex / 10d10>=6f1",
+            "value": 256.39,
+            "range": "± 2.26 ns",
+            "unit": "ns",
+            "extra": "group=lex case=10d10>=6f1 p50=256.39ns p75=258.65ns mode=batch"
+          },
+          {
+            "name": "lex / 4d6sd",
+            "value": 170.47,
+            "range": "± 2.45 ns",
+            "unit": "ns",
+            "extra": "group=lex case=4d6sd p50=170.47ns p75=172.92ns mode=batch"
+          },
+          {
+            "name": "lex / 10d10sd",
+            "value": 214.91,
+            "range": "± 0.84 ns",
+            "unit": "ns",
+            "extra": "group=lex case=10d10sd p50=214.91ns p75=215.74ns mode=batch"
+          },
+          {
+            "name": "lex / 10d10sd>=6f1",
+            "value": 313.08,
+            "range": "± 1.89 ns",
+            "unit": "ns",
+            "extra": "group=lex case=10d10sd>=6f1 p50=313.08ns p75=314.97ns mode=batch"
+          },
+          {
+            "name": "lex / 4d6r<2",
+            "value": 192.79,
+            "range": "± 0.8 ns",
+            "unit": "ns",
+            "extra": "group=lex case=4d6r<2 p50=192.79ns p75=193.59ns mode=batch"
+          },
+          {
+            "name": "lex / floor((1d4+1)*2/3)",
+            "value": 497.18,
+            "range": "± 6.15 ns",
+            "unit": "ns",
+            "extra": "group=lex case=floor((1d4+1)*2/3) p50=497.18ns p75=503.34ns mode=batch"
+          },
+          {
+            "name": "lex / @atk+1d20",
+            "value": 216.68,
+            "range": "± 2.13 ns",
+            "unit": "ns",
+            "extra": "group=lex case=@atk+1d20 p50=216.68ns p75=218.81ns mode=batch"
+          },
+          {
+            "name": "lex / 10d6!kh3",
+            "value": 245.24,
+            "range": "± 2.22 ns",
+            "unit": "ns",
+            "extra": "group=lex case=10d6!kh3 p50=245.24ns p75=247.46ns mode=batch"
+          },
+          {
+            "name": "lex / {2d20kh1+5, 3d8!}kh1",
+            "value": 506.84,
+            "range": "± 2.64 ns",
+            "unit": "ns",
+            "extra": "group=lex case={2d20kh1+5, 3d8!}kh1 p50=506.84ns p75=509.48ns mode=batch"
+          },
+          {
+            "name": "lex / sum-20-terms",
+            "value": 1147.68,
+            "range": "± 8.57 ns",
+            "unit": "ns",
+            "extra": "group=lex case=sum-20-terms p50=1147.68ns p75=1156.25ns mode=batch"
+          },
+          {
+            "name": "lex / 100d6",
+            "value": 136.03,
+            "range": "± 2.8 ns",
+            "unit": "ns",
+            "extra": "group=lex case=100d6 p50=136.03ns p75=138.83ns mode=batch"
+          },
+          {
+            "name": "lex / 100d6kh1",
+            "value": 220.69,
+            "range": "± 0.77 ns",
+            "unit": "ns",
+            "extra": "group=lex case=100d6kh1 p50=220.69ns p75=221.46ns mode=batch"
+          },
+          {
+            "name": "lex / 100d6sa",
+            "value": 190.06,
+            "range": "± 1.72 ns",
+            "unit": "ns",
+            "extra": "group=lex case=100d6sa p50=190.06ns p75=191.78ns mode=batch"
+          },
+          {
+            "name": "lex / 1000d6",
+            "value": 138.59,
+            "range": "± 2.3 ns",
+            "unit": "ns",
+            "extra": "group=lex case=1000d6 p50=138.59ns p75=140.9ns mode=batch"
+          },
+          {
+            "name": "parse / 1d20",
+            "value": 314.02,
+            "range": "± 2.83 ns",
+            "unit": "ns",
+            "extra": "group=parse case=1d20 p50=314.02ns p75=316.85ns mode=batch"
+          },
+          {
+            "name": "parse / 1d20+5",
+            "value": 433.85,
+            "range": "± 1.73 ns",
+            "unit": "ns",
+            "extra": "group=parse case=1d20+5 p50=433.85ns p75=435.58ns mode=batch"
+          },
+          {
+            "name": "parse / 3d6",
+            "value": 235.32,
+            "range": "± 2.09 ns",
+            "unit": "ns",
+            "extra": "group=parse case=3d6 p50=235.32ns p75=237.41ns mode=batch"
+          },
+          {
+            "name": "parse / 2d6+3",
+            "value": 378.37,
+            "range": "± 3.17 ns",
+            "unit": "ns",
+            "extra": "group=parse case=2d6+3 p50=378.37ns p75=381.53ns mode=batch"
+          },
+          {
+            "name": "parse / 4dF",
+            "value": 163.08,
+            "range": "± 2.4 ns",
+            "unit": "ns",
+            "extra": "group=parse case=4dF p50=163.08ns p75=165.48ns mode=batch"
+          },
+          {
+            "name": "parse / 4d6kh3",
+            "value": 444.33,
+            "range": "± 2.66 ns",
+            "unit": "ns",
+            "extra": "group=parse case=4d6kh3 p50=444.33ns p75=446.99ns mode=batch"
+          },
+          {
+            "name": "parse / {1d6+2}kh1",
+            "value": 785.93,
+            "range": "± 4.35 ns",
+            "unit": "ns",
+            "extra": "group=parse case={1d6+2}kh1 p50=785.93ns p75=790.28ns mode=batch"
+          },
+          {
+            "name": "parse / 2d20kh1 vs 15",
+            "value": 752.16,
+            "range": "± 3.07 ns",
+            "unit": "ns",
+            "extra": "group=parse case=2d20kh1 vs 15 p50=752.16ns p75=755.23ns mode=batch"
+          },
+          {
+            "name": "parse / 10d10>=6f1",
+            "value": 630.04,
+            "range": "± 2.8 ns",
+            "unit": "ns",
+            "extra": "group=parse case=10d10>=6f1 p50=630.04ns p75=632.83ns mode=batch"
+          },
+          {
+            "name": "parse / 4d6sd",
+            "value": 416.59,
+            "range": "± 2.16 ns",
+            "unit": "ns",
+            "extra": "group=parse case=4d6sd p50=416.59ns p75=418.75ns mode=batch"
+          },
+          {
+            "name": "parse / 10d10sd",
+            "value": 464.97,
+            "range": "± 2.72 ns",
+            "unit": "ns",
+            "extra": "group=parse case=10d10sd p50=464.97ns p75=467.69ns mode=batch"
+          },
+          {
+            "name": "parse / 10d10sd>=6f1",
+            "value": 775.13,
+            "range": "± 6.52 ns",
+            "unit": "ns",
+            "extra": "group=parse case=10d10sd>=6f1 p50=775.13ns p75=781.65ns mode=batch"
+          },
+          {
+            "name": "parse / 4d6r<2",
+            "value": 481.67,
+            "range": "± 3.31 ns",
+            "unit": "ns",
+            "extra": "group=parse case=4d6r<2 p50=481.67ns p75=484.98ns mode=batch"
+          },
+          {
+            "name": "parse / floor((1d4+1)*2/3)",
+            "value": 1053.59,
+            "range": "± 5.04 ns",
+            "unit": "ns",
+            "extra": "group=parse case=floor((1d4+1)*2/3) p50=1053.59ns p75=1058.62ns mode=batch"
+          },
+          {
+            "name": "parse / @atk+1d20",
+            "value": 504.88,
+            "range": "± 2.54 ns",
+            "unit": "ns",
+            "extra": "group=parse case=@atk+1d20 p50=504.88ns p75=507.42ns mode=batch"
+          },
+          {
+            "name": "parse / 10d6!kh3",
+            "value": 614.21,
+            "range": "± 2.96 ns",
+            "unit": "ns",
+            "extra": "group=parse case=10d6!kh3 p50=614.21ns p75=617.17ns mode=batch"
+          },
+          {
+            "name": "parse / {2d20kh1+5, 3d8!}kh1",
+            "value": 1301.07,
+            "range": "± 5.78 ns",
+            "unit": "ns",
+            "extra": "group=parse case={2d20kh1+5, 3d8!}kh1 p50=1301.07ns p75=1306.85ns mode=batch"
+          },
+          {
+            "name": "parse / sum-20-terms",
+            "value": 2743.24,
+            "range": "± 15.77 ns",
+            "unit": "ns",
+            "extra": "group=parse case=sum-20-terms p50=2743.24ns p75=2759.01ns mode=batch"
+          },
+          {
+            "name": "parse / 100d6",
+            "value": 325.61,
+            "range": "± 2 ns",
+            "unit": "ns",
+            "extra": "group=parse case=100d6 p50=325.61ns p75=327.61ns mode=batch"
+          },
+          {
+            "name": "parse / 100d6kh1",
+            "value": 542.71,
+            "range": "± 2.85 ns",
+            "unit": "ns",
+            "extra": "group=parse case=100d6kh1 p50=542.71ns p75=545.56ns mode=batch"
+          },
+          {
+            "name": "parse / 100d6sa",
+            "value": 457.89,
+            "range": "± 2.06 ns",
+            "unit": "ns",
+            "extra": "group=parse case=100d6sa p50=457.89ns p75=459.95ns mode=batch"
+          },
+          {
+            "name": "parse / 1000d6",
+            "value": 287.23,
+            "range": "± 2.58 ns",
+            "unit": "ns",
+            "extra": "group=parse case=1000d6 p50=287.23ns p75=289.8ns mode=batch"
+          },
+          {
+            "name": "evaluate / 1d20",
+            "value": 474.98,
+            "range": "± 3.66 ns",
+            "unit": "ns",
+            "extra": "group=evaluate case=1d20 p50=474.98ns p75=478.64ns mode=batch"
+          },
+          {
+            "name": "evaluate / 1d20+5",
+            "value": 905.13,
+            "range": "± 8.38 ns",
+            "unit": "ns",
+            "extra": "group=evaluate case=1d20+5 p50=905.13ns p75=913.51ns mode=batch"
+          },
+          {
+            "name": "evaluate / 3d6",
+            "value": 542.44,
+            "range": "± 5.04 ns",
+            "unit": "ns",
+            "extra": "group=evaluate case=3d6 p50=542.44ns p75=547.49ns mode=batch"
+          },
+          {
+            "name": "evaluate / 2d6+3",
+            "value": 952.66,
+            "range": "± 12.29 ns",
+            "unit": "ns",
+            "extra": "group=evaluate case=2d6+3 p50=952.66ns p75=964.94ns mode=batch"
+          },
+          {
+            "name": "evaluate / 4dF",
+            "value": 547.74,
+            "range": "± 3.38 ns",
+            "unit": "ns",
+            "extra": "group=evaluate case=4dF p50=547.74ns p75=551.12ns mode=batch"
+          },
+          {
+            "name": "evaluate / 4d6kh3",
+            "value": 1606.06,
+            "range": "± 18.28 ns",
+            "unit": "ns",
+            "extra": "group=evaluate case=4d6kh3 p50=1606.06ns p75=1624.34ns mode=batch"
+          },
+          {
+            "name": "evaluate / {1d6+2}kh1",
+            "value": 1827.51,
+            "range": "± 27.9 ns",
+            "unit": "ns",
+            "extra": "group=evaluate case={1d6+2}kh1 p50=1827.51ns p75=1855.42ns mode=batch"
+          },
+          {
+            "name": "evaluate / 2d20kh1 vs 15",
+            "value": 1882.67,
+            "range": "± 23.48 ns",
+            "unit": "ns",
+            "extra": "group=evaluate case=2d20kh1 vs 15 p50=1882.67ns p75=1906.15ns mode=batch"
+          },
+          {
+            "name": "evaluate / 10d10>=6f1",
+            "value": 2269.88,
+            "range": "± 23.27 ns",
+            "unit": "ns",
+            "extra": "group=evaluate case=10d10>=6f1 p50=2269.88ns p75=2293.16ns mode=batch"
+          },
+          {
+            "name": "evaluate / 4d6sd",
+            "value": 1113.55,
+            "range": "± 14.18 ns",
+            "unit": "ns",
+            "extra": "group=evaluate case=4d6sd p50=1113.55ns p75=1127.73ns mode=batch"
+          },
+          {
+            "name": "evaluate / 10d10sd",
+            "value": 1904.52,
+            "range": "± 42.61 ns",
+            "unit": "ns",
+            "extra": "group=evaluate case=10d10sd p50=1904.52ns p75=1947.13ns mode=batch"
+          },
+          {
+            "name": "evaluate / 10d10sd>=6f1",
+            "value": 3321.22,
+            "range": "± 28.56 ns",
+            "unit": "ns",
+            "extra": "group=evaluate case=10d10sd>=6f1 p50=3321.22ns p75=3349.78ns mode=batch"
+          },
+          {
+            "name": "evaluate / 4d6r<2",
+            "value": 1583.66,
+            "range": "± 13.95 ns",
+            "unit": "ns",
+            "extra": "group=evaluate case=4d6r<2 p50=1583.66ns p75=1597.61ns mode=batch"
+          },
+          {
+            "name": "evaluate / floor((1d4+1)*2/3)",
+            "value": 2299.92,
+            "range": "± 42.48 ns",
+            "unit": "ns",
+            "extra": "group=evaluate case=floor((1d4+1)*2/3) p50=2299.92ns p75=2342.39ns mode=batch"
+          },
+          {
+            "name": "evaluate / @atk+1d20",
+            "value": 981.19,
+            "range": "± 7.32 ns",
+            "unit": "ns",
+            "extra": "group=evaluate case=@atk+1d20 p50=981.19ns p75=988.51ns mode=batch"
+          },
+          {
+            "name": "evaluate / 10d6!kh3",
+            "value": 4302.44,
+            "range": "± 25.05 ns",
+            "unit": "ns",
+            "extra": "group=evaluate case=10d6!kh3 p50=4302.44ns p75=4327.49ns mode=batch"
+          },
+          {
+            "name": "evaluate / {2d20kh1+5, 3d8!}kh1",
+            "value": 5121.7,
+            "range": "± 103.02 ns",
+            "unit": "ns",
+            "extra": "group=evaluate case={2d20kh1+5, 3d8!}kh1 p50=5121.7ns p75=5224.72ns mode=batch"
+          },
+          {
+            "name": "evaluate / sum-20-terms",
+            "value": 6686.23,
+            "range": "± 27.8 ns",
+            "unit": "ns",
+            "extra": "group=evaluate case=sum-20-terms p50=6686.23ns p75=6714.03ns mode=batch"
+          },
+          {
+            "name": "evaluate / 100d6",
+            "value": 4002.96,
+            "range": "± 33.37 ns",
+            "unit": "ns",
+            "extra": "group=evaluate case=100d6 p50=4002.96ns p75=4036.33ns mode=batch"
+          },
+          {
+            "name": "evaluate / 100d6kh1",
+            "value": 18962.54,
+            "range": "± 17.74 ns",
+            "unit": "ns",
+            "extra": "group=evaluate case=100d6kh1 p50=18962.54ns p75=18980.28ns mode=batch"
+          },
+          {
+            "name": "evaluate / 100d6sa",
+            "value": 13036.24,
+            "range": "± 48.55 ns",
+            "unit": "ns",
+            "extra": "group=evaluate case=100d6sa p50=13036.24ns p75=13084.8ns mode=batch"
+          },
+          {
+            "name": "evaluate / 1000d6",
+            "value": 35237.71,
+            "range": "± 163.63 ns",
+            "unit": "ns",
+            "extra": "group=evaluate case=1000d6 p50=35237.71ns p75=35401.34ns mode=batch"
+          },
+          {
+            "name": "evaluate — pool scaling / 1d6",
+            "value": 519.39,
+            "range": "± 4 ns",
+            "unit": "ns",
+            "extra": "group=evaluate — pool scaling case=1d6 p50=519.39ns p75=523.39ns mode=batch"
+          },
+          {
+            "name": "evaluate — pool scaling / 10d6",
+            "value": 917.96,
+            "range": "± 6.69 ns",
+            "unit": "ns",
+            "extra": "group=evaluate — pool scaling case=10d6 p50=917.96ns p75=924.65ns mode=batch"
+          },
+          {
+            "name": "evaluate — pool scaling / 100d6",
+            "value": 4014.27,
+            "range": "± 45 ns",
+            "unit": "ns",
+            "extra": "group=evaluate — pool scaling case=100d6 p50=4014.27ns p75=4059.27ns mode=batch"
+          },
+          {
+            "name": "evaluate — pool scaling / 1000d6",
+            "value": 34784.69,
+            "range": "± 139.12 ns",
+            "unit": "ns",
+            "extra": "group=evaluate — pool scaling case=1000d6 p50=34784.69ns p75=34923.81ns mode=batch"
+          },
+          {
+            "name": "evaluate — pool scaling / 1d6kh(n/2)",
+            "value": 1153.33,
+            "range": "± 12.39 ns",
+            "unit": "ns",
+            "extra": "group=evaluate — pool scaling case=1d6kh(n/2) p50=1153.33ns p75=1165.72ns mode=batch"
+          },
+          {
+            "name": "evaluate — pool scaling / 10d6kh(n/2)",
+            "value": 3345.9,
+            "range": "± 13.18 ns",
+            "unit": "ns",
+            "extra": "group=evaluate — pool scaling case=10d6kh(n/2) p50=3345.9ns p75=3359.07ns mode=batch"
+          },
+          {
+            "name": "evaluate — pool scaling / 100d6kh(n/2)",
+            "value": 21095.87,
+            "range": "± 176.48 ns",
+            "unit": "ns",
+            "extra": "group=evaluate — pool scaling case=100d6kh(n/2) p50=21095.87ns p75=21272.34ns mode=batch"
+          },
+          {
+            "name": "evaluate — pool scaling / 1000d6kh(n/2)",
+            "value": 216958.66,
+            "range": "± 323.09 ns",
+            "unit": "ns",
+            "extra": "group=evaluate — pool scaling case=1000d6kh(n/2) p50=216958.66ns p75=217281.75ns mode=batch"
+          },
+          {
+            "name": "roll (seeded) / 1d20",
+            "value": 1055.14,
+            "range": "± 33.45 ns",
+            "unit": "ns",
+            "extra": "group=roll (seeded) case=1d20 p50=1055.14ns p75=1088.58ns mode=batch"
+          },
+          {
+            "name": "roll (seeded) / 1d20+5",
+            "value": 1672.94,
+            "range": "± 10.04 ns",
+            "unit": "ns",
+            "extra": "group=roll (seeded) case=1d20+5 p50=1672.94ns p75=1682.98ns mode=batch"
+          },
+          {
+            "name": "roll (seeded) / 3d6",
+            "value": 1104.43,
+            "range": "± 9.86 ns",
+            "unit": "ns",
+            "extra": "group=roll (seeded) case=3d6 p50=1104.43ns p75=1114.29ns mode=batch"
+          },
+          {
+            "name": "roll (seeded) / 2d6+3",
+            "value": 1660.47,
+            "range": "± 13.72 ns",
+            "unit": "ns",
+            "extra": "group=roll (seeded) case=2d6+3 p50=1660.47ns p75=1674.2ns mode=batch"
+          },
+          {
+            "name": "roll (seeded) / 4dF",
+            "value": 987.23,
+            "range": "± 8.9 ns",
+            "unit": "ns",
+            "extra": "group=roll (seeded) case=4dF p50=987.23ns p75=996.13ns mode=batch"
+          },
+          {
+            "name": "roll (seeded) / 4d6kh3",
+            "value": 2557.64,
+            "range": "± 24.32 ns",
+            "unit": "ns",
+            "extra": "group=roll (seeded) case=4d6kh3 p50=2557.64ns p75=2581.96ns mode=batch"
+          },
+          {
+            "name": "roll (seeded) / {1d6+2}kh1",
+            "value": 3006.46,
+            "range": "± 14.3 ns",
+            "unit": "ns",
+            "extra": "group=roll (seeded) case={1d6+2}kh1 p50=3006.46ns p75=3020.77ns mode=batch"
+          },
+          {
+            "name": "roll (seeded) / 2d20kh1 vs 15",
+            "value": 3121.77,
+            "range": "± 34.78 ns",
+            "unit": "ns",
+            "extra": "group=roll (seeded) case=2d20kh1 vs 15 p50=3121.77ns p75=3156.56ns mode=batch"
+          },
+          {
+            "name": "roll (seeded) / 10d10>=6f1",
+            "value": 3305.65,
+            "range": "± 23.48 ns",
+            "unit": "ns",
+            "extra": "group=roll (seeded) case=10d10>=6f1 p50=3305.65ns p75=3329.14ns mode=batch"
+          },
+          {
+            "name": "roll (seeded) / 4d6sd",
+            "value": 1866.29,
+            "range": "± 20.01 ns",
+            "unit": "ns",
+            "extra": "group=roll (seeded) case=4d6sd p50=1866.29ns p75=1886.3ns mode=batch"
+          },
+          {
+            "name": "roll (seeded) / 10d10sd",
+            "value": 2760.9,
+            "range": "± 18.73 ns",
+            "unit": "ns",
+            "extra": "group=roll (seeded) case=10d10sd p50=2760.9ns p75=2779.63ns mode=batch"
+          },
+          {
+            "name": "roll (seeded) / 10d10sd>=6f1",
+            "value": 4543.46,
+            "range": "± 37.66 ns",
+            "unit": "ns",
+            "extra": "group=roll (seeded) case=10d10sd>=6f1 p50=4543.46ns p75=4581.12ns mode=batch"
+          },
+          {
+            "name": "roll (seeded) / 4d6r<2",
+            "value": 2477.43,
+            "range": "± 12.4 ns",
+            "unit": "ns",
+            "extra": "group=roll (seeded) case=4d6r<2 p50=2477.43ns p75=2489.83ns mode=batch"
+          },
+          {
+            "name": "roll (seeded) / floor((1d4+1)*2/3)",
+            "value": 3793.21,
+            "range": "± 21.25 ns",
+            "unit": "ns",
+            "extra": "group=roll (seeded) case=floor((1d4+1)*2/3) p50=3793.21ns p75=3814.47ns mode=batch"
+          },
+          {
+            "name": "roll (seeded) / @atk+1d20",
+            "value": 1968.38,
+            "range": "± 20.06 ns",
+            "unit": "ns",
+            "extra": "group=roll (seeded) case=@atk+1d20 p50=1968.38ns p75=1988.44ns mode=batch"
+          },
+          {
+            "name": "roll (seeded) / 10d6!kh3",
+            "value": 5618.19,
+            "range": "± 21.95 ns",
+            "unit": "ns",
+            "extra": "group=roll (seeded) case=10d6!kh3 p50=5618.19ns p75=5640.15ns mode=batch"
+          },
+          {
+            "name": "roll (seeded) / {2d20kh1+5, 3d8!}kh1",
+            "value": 7098.77,
+            "range": "± 49.23 ns",
+            "unit": "ns",
+            "extra": "group=roll (seeded) case={2d20kh1+5, 3d8!}kh1 p50=7098.77ns p75=7148.01ns mode=batch"
+          },
+          {
+            "name": "roll (seeded) / sum-20-terms",
+            "value": 10139.48,
+            "range": "± 27.7 ns",
+            "unit": "ns",
+            "extra": "group=roll (seeded) case=sum-20-terms p50=10139.48ns p75=10167.17ns mode=batch"
+          },
+          {
+            "name": "roll (seeded) / 100d6",
+            "value": 4675.39,
+            "range": "± 59.21 ns",
+            "unit": "ns",
+            "extra": "group=roll (seeded) case=100d6 p50=4675.39ns p75=4734.61ns mode=batch"
+          },
+          {
+            "name": "roll (seeded) / 100d6kh1",
+            "value": 19861.9,
+            "range": "± 16.81 ns",
+            "unit": "ns",
+            "extra": "group=roll (seeded) case=100d6kh1 p50=19861.9ns p75=19878.72ns mode=batch"
+          },
+          {
+            "name": "roll (seeded) / 100d6sa",
+            "value": 13941.85,
+            "range": "± 63.19 ns",
+            "unit": "ns",
+            "extra": "group=roll (seeded) case=100d6sa p50=13941.85ns p75=14005.04ns mode=batch"
+          },
+          {
+            "name": "roll (seeded) / 1000d6",
+            "value": 35202,
+            "range": "± 85.79 ns",
+            "unit": "ns",
+            "extra": "group=roll (seeded) case=1000d6 p50=35202ns p75=35287.79ns mode=batch"
+          },
+          {
+            "name": "roll (injected RNG) / 1d20",
+            "value": 1003.3,
+            "range": "± 11.01 ns",
+            "unit": "ns",
+            "extra": "group=roll (injected RNG) case=1d20 p50=1003.3ns p75=1014.31ns mode=batch"
+          },
+          {
+            "name": "roll (injected RNG) / 1d20+5",
+            "value": 1604.18,
+            "range": "± 12.31 ns",
+            "unit": "ns",
+            "extra": "group=roll (injected RNG) case=1d20+5 p50=1604.18ns p75=1616.49ns mode=batch"
+          },
+          {
+            "name": "roll (injected RNG) / 3d6",
+            "value": 1052.43,
+            "range": "± 10.72 ns",
+            "unit": "ns",
+            "extra": "group=roll (injected RNG) case=3d6 p50=1052.43ns p75=1063.16ns mode=batch"
+          },
+          {
+            "name": "roll (injected RNG) / 2d6+3",
+            "value": 1606.15,
+            "range": "± 17.94 ns",
+            "unit": "ns",
+            "extra": "group=roll (injected RNG) case=2d6+3 p50=1606.15ns p75=1624.09ns mode=batch"
+          },
+          {
+            "name": "roll (injected RNG) / 4dF",
+            "value": 930.42,
+            "range": "± 13.38 ns",
+            "unit": "ns",
+            "extra": "group=roll (injected RNG) case=4dF p50=930.42ns p75=943.8ns mode=batch"
+          },
+          {
+            "name": "roll (injected RNG) / 4d6kh3",
+            "value": 2520.82,
+            "range": "± 27.56 ns",
+            "unit": "ns",
+            "extra": "group=roll (injected RNG) case=4d6kh3 p50=2520.82ns p75=2548.38ns mode=batch"
+          },
+          {
+            "name": "roll (injected RNG) / {1d6+2}kh1",
+            "value": 2928.92,
+            "range": "± 33.23 ns",
+            "unit": "ns",
+            "extra": "group=roll (injected RNG) case={1d6+2}kh1 p50=2928.92ns p75=2962.15ns mode=batch"
+          },
+          {
+            "name": "roll (injected RNG) / 2d20kh1 vs 15",
+            "value": 3144.57,
+            "range": "± 48.22 ns",
+            "unit": "ns",
+            "extra": "group=roll (injected RNG) case=2d20kh1 vs 15 p50=3144.57ns p75=3192.79ns mode=batch"
+          },
+          {
+            "name": "roll (injected RNG) / 10d10>=6f1",
+            "value": 3679.77,
+            "range": "± 45.06 ns",
+            "unit": "ns",
+            "extra": "group=roll (injected RNG) case=10d10>=6f1 p50=3679.77ns p75=3724.84ns mode=batch"
+          },
+          {
+            "name": "roll (injected RNG) / 4d6sd",
+            "value": 1846.18,
+            "range": "± 30.7 ns",
+            "unit": "ns",
+            "extra": "group=roll (injected RNG) case=4d6sd p50=1846.18ns p75=1876.88ns mode=batch"
+          },
+          {
+            "name": "roll (injected RNG) / 10d10sd",
+            "value": 2804.71,
+            "range": "± 26.14 ns",
+            "unit": "ns",
+            "extra": "group=roll (injected RNG) case=10d10sd p50=2804.71ns p75=2830.85ns mode=batch"
+          },
+          {
+            "name": "roll (injected RNG) / 10d10sd>=6f1",
+            "value": 4870.87,
+            "range": "± 28.23 ns",
+            "unit": "ns",
+            "extra": "group=roll (injected RNG) case=10d10sd>=6f1 p50=4870.87ns p75=4899.1ns mode=batch"
+          },
+          {
+            "name": "roll (injected RNG) / floor((1d4+1)*2/3)",
+            "value": 3704.54,
+            "range": "± 29.07 ns",
+            "unit": "ns",
+            "extra": "group=roll (injected RNG) case=floor((1d4+1)*2/3) p50=3704.54ns p75=3733.61ns mode=batch"
+          },
+          {
+            "name": "roll (injected RNG) / @atk+1d20",
+            "value": 1805.98,
+            "range": "± 14.03 ns",
+            "unit": "ns",
+            "extra": "group=roll (injected RNG) case=@atk+1d20 p50=1805.98ns p75=1820.01ns mode=batch"
+          },
+          {
+            "name": "roll (injected RNG) / sum-20-terms",
+            "value": 10130.83,
+            "range": "± 53.51 ns",
+            "unit": "ns",
+            "extra": "group=roll (injected RNG) case=sum-20-terms p50=10130.83ns p75=10184.34ns mode=batch"
+          },
+          {
+            "name": "roll (injected RNG) / 100d6",
+            "value": 5134.32,
+            "range": "± 49.76 ns",
+            "unit": "ns",
+            "extra": "group=roll (injected RNG) case=100d6 p50=5134.32ns p75=5184.08ns mode=batch"
+          },
+          {
+            "name": "roll (injected RNG) / 100d6kh1",
+            "value": 20231.9,
+            "range": "± 84.06 ns",
+            "unit": "ns",
+            "extra": "group=roll (injected RNG) case=100d6kh1 p50=20231.9ns p75=20315.96ns mode=batch"
+          },
+          {
+            "name": "roll (injected RNG) / 100d6sa",
+            "value": 16370.78,
+            "range": "± 37.15 ns",
+            "unit": "ns",
+            "extra": "group=roll (injected RNG) case=100d6sa p50=16370.78ns p75=16407.93ns mode=batch"
+          },
+          {
+            "name": "roll (injected RNG) / 1000d6",
+            "value": 36455.06,
+            "range": "± 269.78 ns",
+            "unit": "ns",
+            "extra": "group=roll (injected RNG) case=1000d6 p50=36455.06ns p75=36724.84ns mode=batch"
           }
         ]
       }
