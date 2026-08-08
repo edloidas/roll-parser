@@ -1,8 +1,79 @@
 # Migration notes
 
-Newest first. [Upgrading from 3.0.0 to 3.1.0](#upgrading-from-300-to-310) ·
+Newest first. [Upgrading from 3.1.0 to 3.2.0](#upgrading-from-310-to-320) ·
+[Upgrading from 3.0.0 to 3.1.0](#upgrading-from-300-to-310) ·
 [Migrating from v2 to v3](#migrating-from-v2-to-v3) ·
 [Upgrading from a v3 pre-release](#upgrading-from-a-v3-pre-release)
+
+## Upgrading from 3.1.0 to 3.2.0
+
+Nothing was removed and no type changed, and the seed → dice mapping is
+untouched — the same seed and notation roll the same faces they did in 3.1.0.
+The whole of this section is one fix to penetrating explode and the three
+places its output is visible.
+
+**`!p` continuation dice now carry `initialResult`.** A penetrating explosion
+stores `raw - 1` on each die it appends, and used to record the face it
+replaced nowhere, so the `initialResult ?? result` idiom `DieResult` documents
+returned the decremented value and a natural 20 was indistinguishable from a
+19.
+
+```typescript
+import { roll } from 'roll-parser';
+import { createMockRng } from 'roll-parser/testing';
+
+const die = roll('1d20!p', { rng: createMockRng([20, 20, 5]) }).rolls[1];
+
+die.result; // 19
+die.initialResult; // 20 — was `undefined`
+```
+
+Standard `!` is unchanged: its appended dice store what they rolled, so they
+still carry no `initialResult`. Two things can bite:
+
+- **Deep-equality assertions against a `!p` pool fail.** The appended dice gain
+  a field. Assert on what you care about, or add `initialResult` to the
+  expected die.
+- **`--json` and `JSON.stringify(result)` payloads grow** by one number per
+  appended `!p` die. Expressions without `!p` are unchanged.
+
+**Bare `cs`/`cf` judges a `!p` die by the face it rolled.** The side you do not
+override reads the natural face, which now exists on these dice — so a
+continuation that rolled its maximum is critical even though it displays one
+less, matching the flags plain `1d6!p` already set.
+
+```typescript
+import { roll } from 'roll-parser';
+import { createMockRng } from 'roll-parser/testing';
+
+const result = roll('1d6!pcf>5', { rng: createMockRng([6, 6, 3]) });
+
+result.rendered; // '1d6!pcf>5[6, 5, 2] = 13'
+result.rolls[1].critical; // true — was `false`, judged by the stored 5
+```
+
+`1d6cf>5!p` and `1d6!pcf>5` now agree. 3.1.0's README documented them as
+disagreeing, and [Modifiers](README.md#modifiers) is rewritten to match: an
+explicit threshold is still a predicate over a die's current `result`, so `!!`,
+`minN`, and `maxN` remain order-sensitive.
+
+**One `vs` case stops discarding its natural face.** A clamped explosion
+continuation used to be counted as a second primary d20, and two primaries
+suppress the natural 20 / natural 1 step.
+
+```typescript
+import { DegreeOfSuccess, roll } from 'roll-parser';
+import { createMockRng } from 'roll-parser/testing';
+
+const result = roll('1d20!min5 vs 30', { rng: createMockRng([20, 2, 12]) });
+
+result.natural; // 20 — was `undefined`
+result.degree === DegreeOfSuccess.Success; // true — was `Failure`
+```
+
+This needs a `vs` whose roll side both appends explosion dice and clamps them.
+Without the clamp — `1d20! vs 30` — the continuation never looked like a
+primary, and those degrees are unchanged.
 
 ## Upgrading from 3.0.0 to 3.1.0
 
