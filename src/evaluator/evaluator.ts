@@ -1028,10 +1028,11 @@ function evalExplode(node: ExplodeNode, rng: RNG, ctx: EvalContext, env: EvalEnv
 
   const code = formatExplodeCode(node.variant, node.threshold, thresholdValue);
 
-  const buildPart = (total: number): RollPart => {
+  const buildPart = (total: number, rolls: DieResult[]): RollPart => {
     const part: RollPart = {
       type: 'explode',
       variant: node.variant,
+      rolls,
       target: target.part,
       total,
       ...partSpan(node),
@@ -1046,7 +1047,7 @@ function evalExplode(node: ExplodeNode, rng: RNG, ctx: EvalContext, env: EvalEnv
   if (targetCtx.rolls.length === 0) {
     ctx.expressionParts.push(`${targetExpr}${code}`);
     ctx.renderedParts.push(`${targetExpr}${code}`);
-    return { total: target.total, part: buildPart(target.total) };
+    return { total: target.total, part: buildPart(target.total, targetCtx.rolls) };
   }
 
   const shouldExplode = buildShouldExplode(node.threshold?.operator, thresholdValue);
@@ -1060,7 +1061,7 @@ function evalExplode(node: ExplodeNode, rng: RNG, ctx: EvalContext, env: EvalEnv
   ctx.renderedParts.push(`${targetExpr}${code}${renderDice(expanded)}`);
 
   const total = sumKeptDice(expanded, env.hasVersusDc);
-  return { total, part: buildPart(total) };
+  return { total, part: buildPart(total, expanded) };
 }
 
 function evalReroll(node: RerollNode, rng: RNG, ctx: EvalContext, env: EvalEnv): EvalResult {
@@ -1087,6 +1088,7 @@ function evalReroll(node: RerollNode, rng: RNG, ctx: EvalContext, env: EvalEnv):
         type: 'reroll',
         once: node.once,
         condition,
+        rolls: targetCtx.rolls,
         target: target.part,
         total,
         ...partSpan(node),
@@ -1109,6 +1111,7 @@ function evalReroll(node: RerollNode, rng: RNG, ctx: EvalContext, env: EvalEnv):
       type: 'reroll',
       once: node.once,
       condition,
+      rolls: pool,
       target: target.part,
       total,
       ...partSpan(node),
@@ -1527,6 +1530,7 @@ function evalSuccessCount(
     const part: RollPart = {
       type: 'successCount',
       threshold: { operator: node.threshold.operator, value: thresholdValue },
+      rolls: targetCtx.rolls,
       target: target.part,
       successes,
       failures,

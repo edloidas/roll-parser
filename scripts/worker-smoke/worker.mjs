@@ -1,4 +1,5 @@
 import { SeededRNG, VERSION, roll } from 'roll-parser';
+import { renderBreakdown } from 'roll-parser/render';
 import { createMockRng } from 'roll-parser/testing';
 
 // ! Rolling per request, not at module scope: workerd evaluates the top level in
@@ -13,6 +14,7 @@ export default {
       version: VERSION,
       pinned: pinned.total,
       seeded: seeded.total,
+      rendered: renderBreakdown(pinned, { dropped: (die, text) => `(${text})` }),
     });
   },
 };

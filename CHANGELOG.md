@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `roll-parser/render`, a subpath export holding `renderBreakdown(result, marks?)`, `DieMarks`, and `MARKDOWN_MARKS`. It rebuilds the `RollResult.rendered` breakdown from `RollResult.parts` with markers the caller chooses, so consumers targeting anything other than Discord markdown no longer regex-parse the baked string. Six slots — `dropped`, `success`, `failure`, `critical`, `fumble`, and `droppedGroup` — compose in a fixed order; `critical`/`fumble` read the `DieResult` booleans, which `rendered` has no marker for. With no `marks` the output is byte-identical to `rendered`, pinned by a property test. Budgeted separately at 2 kB, leaving the `index.js` and `{ roll }` budgets to the library ([#292](https://github.com/edloidas/roll-parser/issues/292))
+
+### Changed
+
+- The `explode`, `reroll`, and `successCount` members of `RollPart` now carry `rolls: DieResult[]`, the pool the modifier produced — mirroring what `sort` already did. Standard and penetrating explosions and both reroll forms append dice that appear nowhere under `target`, so the part tree could not previously describe its own output ([#292](https://github.com/edloidas/roll-parser/issues/292))
+
+  Reading `parts` is unaffected. Three things do change:
+
+  - Code that **constructs** one of those three parts stops compiling — `TS2322: Property 'rolls' is missing in type … but required`. Add the pool, or widen the annotation.
+  - Deep-equality assertions against those parts need the new field.
+  - `--json` and `JSON.stringify(result)` payloads grow for expressions using explode, reroll, or success counting, since the pool is serialized on the modifier as well as its target — roughly +40% to +96% depending on pool size. Expressions without those modifiers are unchanged.
+
+### Fixed
+
+- CLI `--verbose` no longer mangles a dropped group sub-roll nested inside another dropped group sub-roll. `{{1d6, 1d8}kh1, {1d10, 1d12}kh1}kh1` rendered as `({)1d10[1](, 1d12[3]})`; the marker rewrite was a regex over the flat string and stopped at the first inner `~~`. It now reads the structure and emits `({(1d10[1]), 1d12[3]})` ([#292](https://github.com/edloidas/roll-parser/issues/292))
+
 ## [3.0.0] - 2026-08-06
 
 First stable release of the v3 rewrite. This section covers what changed since

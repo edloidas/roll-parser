@@ -19,6 +19,8 @@ import type {
   RollResult,
 } from 'roll-parser';
 import { DegreeOfSuccess, parse, RollParserError, roll, SeededRNG, VERSION } from 'roll-parser';
+import type { DieMarks } from 'roll-parser/render';
+import { MARKDOWN_MARKS, renderBreakdown } from 'roll-parser/render';
 import { createMockRng, MockRNGExhaustedError } from 'roll-parser/testing';
 
 type IsAny<T> = 0 extends 1 & T ? true : false;
@@ -31,6 +33,7 @@ export type PartResolved = Assert<NotAny<RollPart>>;
 export type AstResolved = Assert<NotAny<ASTNode>>;
 export type DieResolved = Assert<NotAny<DieResult>>;
 export type SpecResolved = Assert<NotAny<KeepDropSpec>>;
+export type MarksResolved = Assert<NotAny<DieMarks>>;
 
 const rng: RNG = createMockRng([3, 6, 2, 5]);
 const result: RollResult = roll('4d6kh3', { rng });
@@ -39,6 +42,8 @@ const rendered: string = result.rendered;
 const version: string = VERSION;
 const seeded: RNG = new SeededRNG('ci');
 const ast: ASTNode = parse('2d6');
+const marks: DieMarks = { ...MARKDOWN_MARKS, critical: (die, text) => `${text}/${die.sides}` };
+const breakdown: string = renderBreakdown(result, marks);
 
 /** Narrowing on the discriminant must survive resolution, not collapse to `any`. */
 function describe(part: RollPart): string {
@@ -67,6 +72,7 @@ const unknownPartType: RollPartType = 'nope';
 export const checks = [
   total,
   rendered,
+  breakdown,
   version,
   describe(result.parts),
   ast.type,

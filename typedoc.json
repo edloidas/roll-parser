@@ -1,6 +1,6 @@
 {
   "$schema": "https://typedoc.org/schema.json",
-  "entryPoints": ["src/index.ts", "src/testing.ts"],
+  "entryPoints": ["src/index.ts", "src/render.ts", "src/testing.ts"],
   "tsconfig": "tsconfig.json",
   "out": "site/dist/docs",
   "name": "roll-parser",
@@ -13,7 +13,7 @@
     "inherited": true
   },
   "categorizeByGroup": false,
-  "categoryOrder": ["Core", "Results", "AST", "Errors", "RNG", "Limits", "Testing", "*"],
+  "categoryOrder": ["Core", "Results", "Rendering", "AST", "Errors", "RNG", "Limits", "Testing", "*"],
   "defaultCategory": "Other",
   "navigation": {
     "includeCategories": true,

@@ -380,6 +380,36 @@ success-count modifiers, but **not** keep/drop — `4d6kh3` renders as `4d6[…]
 while `8d6!` renders as `8d6![…]`. Read `result.expression` when you need the
 modifier back.
 
+#### Custom markers
+
+Markdown is one dialect, and `rendered` bakes it in. `roll-parser/render` is a
+≈1.4 kB entry point that rebuilds the same breakdown from `result.parts` with
+markers you choose — no regex round-trip through the baked string.
+
+```typescript
+import { renderBreakdown } from 'roll-parser/render';
+
+const result = roll('4d6kh3', { seed: 'demo' });
+
+renderBreakdown(result); // '4d6[1, 6, ~~1~~, 3] = 10'
+renderBreakdown(result, {}); // '4d6[1, 6, 1, 3] = 10'
+renderBreakdown(result, {
+  dropped: (_die, text) => `<s>${text}</s>`,
+  critical: (_die, text) => `<b>${text}</b>`,
+}); // '4d6[1, <b>6</b>, <s>1</s>, 3] = 10'
+```
+
+Six slots are available — `dropped`, `success`, `failure`, `critical`,
+`fumble`, and `droppedGroup` for a whole sub-roll struck by `{…}kh1`. An
+omitted slot renders plain, so pass `{}` to strip markup entirely or spread
+`MARKDOWN_MARKS` to keep the rest. `critical` and `fumble` read the
+`DieResult` booleans, which `rendered` has no marker for at all.
+
+Marks compose in a fixed order: `critical` then `fumble` innermost, then
+exactly one of `dropped`, `success`, or `failure` — a dropped die is never
+also shown as a success. With no marks the output is byte-identical to
+`result.rendered`; a property test pins that.
+
 ## Randomness
 
 Every die is drawn through the `RNG` interface — no roll path bypasses the RNG

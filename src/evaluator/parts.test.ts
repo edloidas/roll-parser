@@ -188,27 +188,49 @@ describe('RollResult.parts', () => {
 
     test('1d6!! — compound explode mutation visible through shared refs', () => {
       const result = roll('1d6!!', { rng: createMockRng([6, 3]) });
+      const compoundDie = {
+        sides: 6,
+        result: 9,
+        initialResult: 6,
+        modifiers: ['kept', 'exploded'],
+        critical: true,
+        fumble: false,
+      };
       expect(stripSpans(result.parts)).toEqual({
         type: 'explode',
         variant: 'compound',
+        // Compound accumulates in place, so the expanded pool is the same die
+        // the target carries — unlike standard/penetrating, which append.
+        rolls: [compoundDie],
         target: {
           type: 'dice',
           count: 1,
           sides: 6,
-          rolls: [
-            {
-              sides: 6,
-              result: 9,
-              initialResult: 6,
-              modifiers: ['kept', 'exploded'],
-              critical: true,
-              fumble: false,
-            },
-          ],
+          rolls: [compoundDie],
           total: 6,
         },
         total: 9,
       });
+    });
+
+    test('1d6! — appended explosion die is only on the explode part (#292)', () => {
+      const result = roll('1d6!', { rng: createMockRng([6, 3]) });
+      const part = result.parts as Extract<RollPart, { type: 'explode' }>;
+      const target = part.target as Extract<RollPart, { type: 'dice' }>;
+
+      expect(part.rolls.map((die) => die.result)).toEqual([6, 3]);
+      expect(target.rolls.map((die) => die.result)).toEqual([6]);
+      expect(part.rolls[0]).toBe(target.rolls[0] as (typeof part.rolls)[number]);
+    });
+
+    test('1d6r<3 — discarded die and replacement are only on the reroll part (#292)', () => {
+      const result = roll('1d6r<3', { rng: createMockRng([1, 5]) });
+      const part = result.parts as Extract<RollPart, { type: 'reroll' }>;
+      const target = part.target as Extract<RollPart, { type: 'dice' }>;
+
+      expect(part.rolls.map((die) => die.result)).toEqual([1, 5]);
+      expect(part.rolls[0]?.modifiers).toEqual(['rerolled', 'dropped']);
+      expect(target.rolls.map((die) => die.result)).toEqual([1]);
     });
   });
 

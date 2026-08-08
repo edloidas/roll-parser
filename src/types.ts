@@ -73,10 +73,14 @@ export type ResolvedCritThreshold = ResolvedComparePoint | 'default';
  *
  * `'meta'` is the one tag with no counterpart in the notation. Dice counts,
  * sides, modifier counts and computed thresholds may themselves be dice
- * (`(1d4)d6`, `4d6kh(1d2)`, `1d6!>(1d2+3)`). Those inner dice are not part of
- * any pool, so they never appear in a {@link RollPart}; they are appended to
- * `RollResult.rolls` tagged `'meta'` so an audit log can still show what the
- * meta-expression rolled. Filter them out when summing or displaying a pool.
+ * (`(1d4)d6`, `4d6kh(1d2)`, `1d6!>(1d2+3)`). Those inner dice belong to no
+ * pool: they never appear on a `dice` or `fateDice` part, and they are
+ * appended to `RollResult.rolls` tagged `'meta'` so an audit log can still
+ * show what the meta-expression rolled.
+ *
+ * The four whole-pool views — `sort`, `explode`, `reroll`, and `successCount`
+ * `rolls` — are snapshots of an evaluation context rather than of a pool, so
+ * they do carry meta dice. Filter them out when summing or displaying a pool.
  *
  * `'dc'` marks the DC side of a `vs` comparison. Unlike `'meta'` these dice do
  * render — `1d20[3] vs 2d10[5, 6]` shows both sides — but they are not part of
@@ -312,12 +316,30 @@ export type RollPart =
       type: 'explode';
       variant: 'standard' | 'compound' | 'penetrating';
       threshold?: ResolvedComparePoint;
+      /**
+       * The expanded pool. Standard and penetrating explosions append dice
+       * that exist nowhere under `target`, so this is the only view of the
+       * pool the modifier actually produced. Compound explosions accumulate
+       * in place, making it the same dice as `target` carries.
+       *
+       * Like `RollResult.rolls` — and unlike the pool under `target` — this
+       * keeps `'meta'` dice. Filter them out before counting or displaying.
+       */
+      rolls: DieResult[];
       target: RollPart;
     })
   | (RollPartBase & {
       type: 'reroll';
       once: boolean;
       condition: ResolvedComparePoint;
+      /**
+       * The post-reroll pool: discarded intermediates (`'rerolled'` +
+       * `'dropped'`) alongside their replacements. Both are appended rather
+       * than substituted, so neither appears under `target`.
+       *
+       * Keeps `'meta'` dice, as `RollResult.rolls` does.
+       */
+      rolls: DieResult[];
       target: RollPart;
     })
   | (RollPartBase & { type: 'dieBound'; bound: 'min' | 'max'; value: number; target: RollPart })
@@ -325,6 +347,11 @@ export type RollPart =
       type: 'successCount';
       threshold: ResolvedComparePoint;
       failThreshold?: ResolvedComparePoint;
+      /**
+       * The tallied pool, sharing `DieResult` references with `target`.
+       * Keeps `'meta'` dice, as `RollResult.rolls` does.
+       */
+      rolls: DieResult[];
       target: RollPart;
       successes: number;
       failures: number;

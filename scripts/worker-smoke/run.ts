@@ -14,6 +14,7 @@ import { createServer } from 'node:net';
 import { join } from 'node:path';
 
 const EXPECTED_PINNED = 14;
+const EXPECTED_RENDERED = '4d6[3, 6, (2), 5] = 14';
 const BOOT_TIMEOUT_MS = 120_000;
 const REQUEST_TIMEOUT_MS = 10_000;
 const POLL_INTERVAL_MS = 250;
@@ -104,7 +105,12 @@ if (!response.ok) {
   fail(`workerd returned ${response.status}: ${await response.text()}`);
 }
 
-const body = (await response.json()) as { version?: unknown; pinned?: unknown; seeded?: unknown };
+const body = (await response.json()) as {
+  version?: unknown;
+  pinned?: unknown;
+  seeded?: unknown;
+  rendered?: unknown;
+};
 
 if (typeof body.version !== 'string' || body.version.length === 0) {
   fail(`VERSION did not cross the Worker boundary: ${JSON.stringify(body.version)}`);
@@ -119,6 +125,10 @@ if (
   body.seeded > 12
 ) {
   fail(`seeded 2d6 total outside 2-12: ${JSON.stringify(body.seeded)}`);
+}
+
+if (body.rendered !== EXPECTED_RENDERED) {
+  fail(`rendered ${JSON.stringify(body.rendered)}, expected ${JSON.stringify(EXPECTED_RENDERED)}`);
 }
 
 stop();

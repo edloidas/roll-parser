@@ -12,6 +12,10 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./render": {
+      "types": "./dist/render.d.ts",
+      "default": "./dist/render.js"
+    },
     "./testing": {
       "types": "./dist/testing.d.ts",
       "default": "./dist/testing.js"
@@ -111,6 +115,12 @@
       "path": "dist/index.js",
       "import": "{ roll }",
       "limit": "12 kB"
+    },
+    {
+      "name": "render.js — { renderBreakdown }",
+      "path": "dist/render.js",
+      "import": "{ renderBreakdown }",
+      "limit": "2 kB"
     },
     {
       "name": "testing.js — { createMockRng }",
