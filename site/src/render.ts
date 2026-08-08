@@ -162,12 +162,18 @@ function renderEquation(root: RollPart, notation: string): string {
     return `<span class="brace-grp" style="--i:${chipIndex++}"><span class="eq-paren">{</span>${items}<span class="eq-paren">}</span>${tail}</span>`;
   }
 
-  /** Renders a modifier-family part as one chip, unwrapping to the dice it decorates. */
+  /**
+   * Renders a modifier-family part as one chip, unwrapping to the dice it
+   * decorates. `sort`, `explode`, `reroll` and `successCount` each carry the
+   * pool they produced, which is what `rendered` shows — the outermost of them
+   * wins, and the `dice` pool underneath is only a fallback for the modifiers
+   * that rewrite dice in place.
+   */
   function modifierLike(part: RollPart, isOutermost: boolean): string {
     let core: RollPart = part;
-    let sortedRolls: DieResult[] | undefined;
+    let pool: DieResult[] | undefined;
     while ('target' in core) {
-      if (core.type === 'sort') sortedRolls ??= core.rolls;
+      if ('rolls' in core) pool ??= core.rolls;
       core = core.target;
     }
 
@@ -176,7 +182,7 @@ function renderEquation(root: RollPart, notation: string): string {
     if (core.type === 'dice' || core.type === 'fateDice') {
       return groupChip(
         label || fallbackDiceLabel(core),
-        sortedRolls ?? core.rolls,
+        pool ?? core.rolls,
         subtotalText(part),
         isOutermost,
       );

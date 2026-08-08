@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    // Tests run under Bun, so they need its ambient types. The browser sources
+    // they import stay guarded — `tsconfig.json` still checks every one of them
+    // with `types: []`, so a stray `Bun.*` in a site source fails there.
+    "types": ["@types/bun"]
+  },
+  "include": ["src/**/*.test.ts"],
+  "exclude": ["node_modules", "dist"]
+}
