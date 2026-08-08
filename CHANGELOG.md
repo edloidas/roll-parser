@@ -7,11 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.0] - 2026-08-08
+
 ### Added
 
 - `roll-parser/render`, a subpath export holding `renderBreakdown(result, marks?)`, `DieMarks`, and `MARKDOWN_MARKS`. It rebuilds the `RollResult.rendered` breakdown from `RollResult.parts` with markers the caller chooses, so consumers targeting anything other than Discord markdown no longer regex-parse the baked string. Six slots — `dropped`, `success`, `failure`, `critical`, `fumble`, and `droppedGroup` — compose in a fixed order; `critical`/`fumble` read the `DieResult` booleans, which `rendered` has no marker for. With no `marks` the output is byte-identical to `rendered`, pinned by a property test. Budgeted separately at 2 kB, leaving the `index.js` and `{ roll }` budgets to the library ([#292](https://github.com/edloidas/roll-parser/issues/292))
-
-- `MIGRATION.md` gains a 3.0.0 → 3.1.0 section covering the `RollPart` field, the three ways it can surface, and the new render subpath; the file is now ordered newest-first and `README.md` points at it for every upgrade path rather than only for 2.x ([#292](https://github.com/edloidas/roll-parser/issues/292))
 
 ### Changed
 
@@ -23,9 +23,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Deep-equality assertions against those parts need the new field.
   - `--json` and `JSON.stringify(result)` payloads grow for expressions using explode, reroll, or success counting, since the pool is serialized on the modifier as well as its target — roughly +40% to +96% depending on pool size. Expressions without those modifiers are unchanged.
 
+- performance: the per-die `isVersusDc` check is now skipped entirely for notation that cannot carry a `'dc'` tag, `sortDice` scans before allocating instead of running an unconditional `filter`, and `countSuccesses` filters DC dice up front rather than guarding inside the loop. Sort notation had no benchmark coverage, which is why the regression shipped unseen; `4d6sd`, `10d10sd`, `100d6sa`, and `10d10sd>=6f1` now have bench cases ([#281](https://github.com/edloidas/roll-parser/issues/281))
+
 ### Fixed
 
+- Bare `cs`/`cf` now judge the natural face (`initialResult ?? result`) rather than a value a preceding modifier rewrote, matching what the documentation always claimed. Compound explode also stopped clobbering the raw face recorded by an earlier `minN`/`maxN` clamp, which made `1d6min6!!cs` report a false critical. Explicit thresholds deliberately keep reading `result`, so the two kinds can disagree on one die ([#288](https://github.com/edloidas/roll-parser/issues/288))
+- `cs`/`cf` thresholds now apply to dice minted by explode and reroll, which previously fell back to the built-in default rule. Each resolved rule is recorded per die and inherited by appended and replacement dice, so a further explode or reroll inherits it in turn. Overriding one side no longer moves the other: `1d6cf>5!p` keeps the `critical` that plain `1d6!p` gives the appended die ([#289](https://github.com/edloidas/roll-parser/issues/289))
+- Chained same-kind bounds (`1d6min2min3`) no longer push duplicate `'min'`/`'max'` modifiers onto a die, and `initialResult` still comes from the first bound that moved it. The same duplication is fixed for `'success'`/`'failure'` on a group counted after its members (`{4d6>=5}>=1`) and for `'meta'` on nested meta operands (`((1d2)d4)d6`) ([#290](https://github.com/edloidas/roll-parser/issues/290))
 - CLI `--verbose` no longer mangles a dropped group sub-roll nested inside another dropped group sub-roll. `{{1d6, 1d8}kh1, {1d10, 1d12}kh1}kh1` rendered as `({)1d10[1](, 1d12[3]})`; the marker rewrite was a regex over the flat string and stopped at the first inner `~~`. It now reads the structure and emits `({(1d10[1]), 1d12[3]})` ([#292](https://github.com/edloidas/roll-parser/issues/292))
+- Demo site: fractional totals are rounded to four decimals — falling back to exponential where rounding would show a non-zero total as `0` — with the exact value on a `title` attribute, instead of overflowing the result card ([#285](https://github.com/edloidas/roll-parser/issues/285))
+- Demo site: the total count-up is gated on `Number.isSafeInteger`, so an astronomical total lands without animating rather than interpolating through to `0` ([#286](https://github.com/edloidas/roll-parser/issues/286))
+
+### Documentation
+
+- `MIGRATION.md` gains a 3.0.0 → 3.1.0 section covering the `RollPart` field, the three ways it can surface, and the new render subpath. The file is now ordered newest-first with an index, and `README.md` points at it for every upgrade path rather than only for 2.x ([#292](https://github.com/edloidas/roll-parser/issues/292))
+- `DieResult.critical` and `DieResult.fumble` now scope the max-face/1 default to `sides > 1`, so neither claims to fire on `d1` or Fate dice, and the `FateDiceNode` / `createFateDieResult` TSDoc no longer states the flags are never set on Fate dice — an explicit `4dFcs>0` or `4dFcf=-1` does set them ([#291](https://github.com/edloidas/roll-parser/issues/291))
+- The README no longer implies success counting rejects every enclosing expression — it is terminal only against direct wrapping
+- The README performance table gained a `4d6sd` row and links the published benchmark trend, and the Node badge reads from the published `engines` range
 
 ## [3.0.0] - 2026-08-06
 
@@ -203,7 +217,8 @@ Dice mechanics (Stage 2):
 - Dice count safety limit via `maxDice` option (default 10,000), enforced across the whole expression to prevent DoS via additive groups like `5000d6+5000d6` ([#19](https://github.com/edloidas/roll-parser/issues/19))
 - Parser and evaluator correctness: duplicate `kept` modifier entries, implicit modifier count defaulting to 1 (`4d6kh` → `4d6kh1`), `critical` flag suppression when `sides === 1`, negative `--seed` CLI values ([#21](https://github.com/edloidas/roll-parser/issues/21))
 
-[Unreleased]: https://github.com/edloidas/roll-parser/compare/v3.0.0...HEAD
+[Unreleased]: https://github.com/edloidas/roll-parser/compare/v3.1.0...HEAD
+[3.1.0]: https://github.com/edloidas/roll-parser/releases/tag/v3.1.0
 [3.0.0]: https://github.com/edloidas/roll-parser/releases/tag/v3.0.0
 [3.0.0-beta.0]: https://github.com/edloidas/roll-parser/releases/tag/v3.0.0-beta.0
 [3.0.0-alpha.0]: https://github.com/edloidas/roll-parser/releases/tag/v3.0.0-alpha.0
