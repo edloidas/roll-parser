@@ -240,8 +240,10 @@ than they rolled, the side you *don't* override moves with position —
 | `{a+b}khN` | Single-sub-roll group: keep/drop selects across the flattened pool |
 
 > [!IMPORTANT]
-> Success counting is **terminal** — nothing may wrap it, so `10d10>=6 + 2` is
-> a parse error. Put the arithmetic inside the threshold: `10d10>=(4+2)`.
+> Success counting is **terminal** — no modifier or arithmetic applies to it
+> directly, so `10d10>=6 + 2` is a parse error. Put the arithmetic inside the
+> threshold, `10d10>=(4+2)`, or wrap the count in group braces to operate on its
+> result: `{10d10>=6}+2`.
 
 > [!WARNING]
 > A bare `d` after a dice expression is rejected: `4d6d1` throws
@@ -960,7 +962,7 @@ any commit that regresses a case past 1.75x. Bundle size is gated in CI by
 - **Threshold comparisons bind tight.** `1d6!>=5+2` parses as `(1d6!>=5)+2`;
   parenthesize for a computed threshold, `1d6!>=(5+2)`. Success counts bind the
   same way but are terminal, so `1d6>=5+2` errors outright — write
-  `1d6>=(5+2)`.
+  `1d6>=(5+2)`, or `{1d6>=5}+2` to add to the count itself.
 - **`result.expression` substitutes meta-expressions with their resolved
   values,** so it does not round-trip through `parse` when they are present:
   `roll('(1d4)d6').expression` is `'4d6'` when the `1d4` rolled 4, and
