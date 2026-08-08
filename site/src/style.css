@@ -1231,6 +1231,9 @@ button.die-overflow:hover {
 .total {
   /* fit-content keeps the gradient box tight to the digits. */
   width: fit-content;
+  /* Wrap, never clip — a truncated number reads as a different number. */
+  max-width: 100%;
+  overflow-wrap: anywhere;
   margin: 0 auto;
   font-family: var(--font-num);
   font-size: clamp(3rem, 12vw, 5.5rem);
