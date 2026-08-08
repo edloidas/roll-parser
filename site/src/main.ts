@@ -72,8 +72,9 @@ function prefersReducedMotion(): boolean {
 
 /**
  * Eases the big total from {@link lastTotal} up to `to` over {@link COUNT_UP_MS}.
- * Skips (sets the final value immediately) under reduced motion or for
- * non-integer totals, and no-ops when the panel shows counts instead of a sum.
+ * Skips (sets the final value immediately) under reduced motion or for totals
+ * the interpolation cannot represent, and no-ops when the panel shows counts
+ * instead of a sum.
  */
 function animateTotal(to: number): void {
   const el = result.querySelector<HTMLElement>('.total');
@@ -82,7 +83,11 @@ function animateTotal(to: number): void {
 
   if (el == null) return;
 
-  if (prefersReducedMotion() || !Number.isInteger(to) || from === to) {
+  // ! Past `MAX_SAFE_INTEGER` the interpolation swallows the target whole:
+  // ! `1e20 + (13 - 1e20)` is `0`, so the last frame would land on zero.
+  const animatable = Number.isSafeInteger(from) && Number.isSafeInteger(to);
+
+  if (prefersReducedMotion() || !animatable || from === to) {
     el.textContent = formatTotal(to);
     return;
   }
