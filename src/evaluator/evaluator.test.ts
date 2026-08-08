@@ -1840,6 +1840,14 @@ describe('evaluate', () => {
       expect(result.failures).toBe(0);
     });
 
+    test('a group whose pool rolls nothing scores 0, not its sum — {3, 0d6}>=4 (#304)', () => {
+      const result = evaluate(parse('{3, 0d6}>=4'), createMockRng([]));
+
+      expect(result.total).toBe(0);
+      expect(result.successes).toBe(0);
+      expect(result.failures).toBe(0);
+    });
+
     test('empty pool success is numeric — 0d10>=6 arithmetic does not NaN', () => {
       const ast = parse('0d10>=6');
       const rng = createMockRng([]);

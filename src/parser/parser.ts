@@ -32,6 +32,7 @@ import type {
 } from './ast.js';
 import { isCritThreshold, isSuccessCount } from './ast.js';
 import {
+  containsDice,
   containsDicePool,
   containsFatePool,
   containsMultiSubGroup,
@@ -1087,7 +1088,12 @@ export class Parser {
     // Success counting reads a raw pool, so arithmetic or composition wrappers
     // (`1>=3`, `(1+2)>=3`, `(1d6*2)>=10`, `(1d20 vs 15)>=1`) would be silently
     // ignored.
-    if (!containsDicePool(target)) {
+    //
+    // ! Both checks are load-bearing. `containsDicePool` rejects those wrappers
+    // ! despite the dice; `containsDice` rejects a group holding none
+    // ! (`{3, 5, 7}>=4`), which the multi-sub-roll rule accepts — that rule is
+    // ! written for keep/drop, whose units are subtotals, not dice.
+    if (!containsDicePool(target) || !containsDice(target)) {
       throw new ParseError(
         `Success counting requires a dice pool target`,
         'INVALID_SUCCESS_COUNT_TARGET',

@@ -9,8 +9,8 @@ Newest first. [Upgrading from 3.1.0 to 3.2.0](#upgrading-from-310-to-320) ·
 
 Nothing was removed and no type changed, and the seed → dice mapping is
 untouched — the same seed and notation roll the same faces they did in 3.1.0.
-The whole of this section is one fix to penetrating explode and the three
-places its output is visible.
+Two fixes: penetrating explode and the three places its output is visible, and
+a success-count target that never rolled anything.
 
 **`!p` continuation dice now carry `initialResult`.** A penetrating explosion
 stores `raw - 1` on each die it appends, and used to record the face it
@@ -74,6 +74,24 @@ result.degree === DegreeOfSuccess.Success; // true — was `Failure`
 This needs a `vs` whose roll side both appends explosion dice and clamps them.
 Without the clamp — `1d20! vs 30` — the continuation never looked like a
 primary, and those degrees are unchanged.
+
+**Success counting a dice-less group is now a parse error.** `{3, 5, 7}>=4`
+used to return the group's sum with `successes: 0`, so the
+`successCount.total === successes - failures` invariant the README offers read
+`15 === 0`. There are no dice to tally, and whether a group's units should be
+its subtotals is undecided, so the form is refused instead.
+
+```typescript
+import { roll } from 'roll-parser';
+
+roll('{3, 5, 7}>=4'); // throws 'INVALID_SUCCESS_COUNT_TARGET' — was 15
+roll('{3, 5, 7}kh1>=4'); // throws 'INVALID_SUCCESS_COUNT_TARGET' — was 7
+```
+
+Groups holding at least one pool are untouched — `{3, 1d6}>=4` counts the `1d6`
+exactly as it did. `0d6>=4` also still parses and totals 0; only targets that
+can never roll a die are rejected. One related total moved: a group whose pool
+turns out empty at run time, `{3, 0d6}>=4`, now totals 0 rather than 3.
 
 ## Upgrading from 3.0.0 to 3.1.0
 

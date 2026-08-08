@@ -1026,6 +1026,12 @@ any commit that regresses a case past 1.75x. Bundle size is gated in CI by
   within each sub-roll, then sub-rolls by total — and the evaluator only
   flat-sorts, so the syntax is refused rather than shipped wrong. Single
   sub-roll groups (`{2d6+1d8}s`) still work as the flat-pool escape hatch.
+- **Success counting a group that rolls no dice is rejected.** `{3, 5, 7}>=4`
+  throws `INVALID_SUCCESS_COUNT_TARGET`. A success count tallies dice, and a
+  literal-only group has none — whether its units should be the subtotals is
+  undecided, so the syntax is refused rather than answered wrongly. Groups with
+  at least one pool (`{3, 1d6}>=4`) count as before, and a pool that is merely
+  empty at run time (`0d6>=4`) still totals 0.
 - **Division does not floor.** `7/2` totals `3.5`, not `3` — arithmetic is plain
   IEEE-754 throughout. Wrap it when you need an integer: `floor(7/2)` totals `3`.
 - **The power operator has no overflow guard.** `2**999` totals `5.357…e+300`.
