@@ -44,6 +44,19 @@ export const SELECTION_AND_TALLY_FLAGS: readonly DieModifier[] = [
   'failure',
 ];
 
+/**
+ * {@link SELECTION_AND_TALLY_FLAGS} plus `'meta'`, for a meta context merging
+ * into a parent. Meta operands nest (`((1d2)d4)d6`), so a die passes through
+ * the merge once per level and the tag must be rebuilt, not appended.
+ */
+export const META_MERGE_FLAGS: readonly DieModifier[] = [
+  'kept',
+  'dropped',
+  'success',
+  'failure',
+  'meta',
+];
+
 /** Selection flags plus `rerolled` — reassigned on every reroll pass. */
 export const REROLL_SLOT_FLAGS: readonly DieModifier[] = ['kept', 'dropped', 'rerolled'];
 

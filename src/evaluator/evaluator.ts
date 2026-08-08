@@ -55,6 +55,7 @@ import {
 } from './modifiers/explode.js';
 import {
   isVersusDc,
+  META_MERGE_FLAGS,
   rewriteFlags,
   SELECTION_AND_TALLY_FLAGS,
   SELECTION_FLAGS,
@@ -263,6 +264,10 @@ function renderDie(result: number, modifiers: readonly DieModifier[]): string {
  * `sumKeptDice`; `'meta'` lets renderers hide them and lets callers
  * distinguish them from ordinary pool dice.
  *
+ * `'meta'` is stripped before being re-added: meta operands nest
+ * (`((1d2)d4)d6`), so the innermost dice pass through here once per level and
+ * an append-only rewrite would leave them carrying the tag once per level.
+ *
  * `'success'`/`'failure'` tags are stripped here as defense-in-depth against
  * a SuccessCount leaking into a meta sub-expression (parser rejects all such
  * wrappings; this strip ensures a future parse regression cannot leak tags
@@ -279,7 +284,7 @@ export function mergeMetaRolls(parent: EvalContext, source: EvalContext): void {
   for (const die of source.rolls) {
     parent.rolls.push({
       ...die,
-      modifiers: rewriteFlags(die.modifiers, SELECTION_AND_TALLY_FLAGS, 'meta', 'dropped'),
+      modifiers: rewriteFlags(die.modifiers, META_MERGE_FLAGS, 'meta', 'dropped'),
     });
   }
 }
@@ -1643,6 +1648,8 @@ function evalVersus(node: VersusNode, rng: RNG, ctx: EvalContext, env: EvalEnv):
     appendAll(ctx.rolls, rollCtx.rolls);
     // ! Tag before merging: past this point the DC dice are indistinguishable
     // ! from the roll side, and every pool modifier walks the merged array.
+    // ! Bare push, deliberately: `insideVersus` above rejects every nesting, so
+    // ! each die reaches exactly one `dcCtx` and cannot be tagged twice.
     for (const die of dcCtx.rolls) {
       die.modifiers.push('dc');
     }

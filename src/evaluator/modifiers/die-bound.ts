@@ -6,7 +6,8 @@
  * `initialResult` (first writer wins, so a compound-explode accumulation
  * that was clamped afterwards still reports its original first roll), and
  * the die is tagged `'min'` / `'max'` so parts consumers can tell a clamped
- * value from a natural one.
+ * value from a natural one. The tag is written at most once, so a chain of
+ * same-kind bounds (`4d6min3min4`) leaves a die carrying a single `'min'`.
  *
  * `critical` / `fumble` keep reflecting the natural face — a clamped 1 is
  * still a fumble, matching the raw-face crit semantics used everywhere else.
@@ -42,6 +43,6 @@ export function applyDieBound(
 
     die.initialResult ??= die.result;
     die.result = clamped;
-    die.modifiers.push(bound);
+    if (!die.modifiers.includes(bound)) die.modifiers.push(bound);
   }
 }

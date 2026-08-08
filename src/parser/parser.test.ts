@@ -1706,6 +1706,14 @@ describe('Parser', () => {
       it('should reject bound after success counting: 10d10>=6min2', () => {
         expectRollError(() => parseAst('10d10>=6min2'), ParseError, 'INVALID_SUCCESS_COUNT_TARGET');
       });
+
+      it('should reject success counting after success counting: 4d6>=5>=4 (#290)', () => {
+        expectRollError(() => parseAst('4d6>=5>=4'), ParseError, 'INVALID_SUCCESS_COUNT_TARGET');
+      });
+
+      it('should reject success counting after a fail threshold: 4d6>=5f1>=4 (#290)', () => {
+        expectRollError(() => parseAst('4d6>=5f1>=4'), ParseError, 'INVALID_SUCCESS_COUNT_TARGET');
+      });
     });
   });
 

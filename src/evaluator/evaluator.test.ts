@@ -11,7 +11,7 @@ import { parse } from '../parser/parser.js';
 import { createMockRng } from '../rng/mock.js';
 import { SeededRNG } from '../rng/seeded.js';
 import { expectRollError } from '../test-helpers.js';
-import type { DieResult } from '../types.js';
+import type { DieModifier, DieResult } from '../types.js';
 import { DegreeOfSuccess } from '../types.js';
 import type { EvalContext } from './evaluator.js';
 import {
@@ -1738,6 +1738,27 @@ describe('evaluate', () => {
       }
     });
 
+    test('a group counted after its members tags each die once: {4d6>=5}>=1 (#290)', () => {
+      // A group bypasses the parse-time reject that blocks a direct `4d6>=5>=4`,
+      // so `countSuccesses` runs twice over the same dice.
+      const ast = parse('{4d6>=5}>=1');
+      const result = evaluate(ast, createMockRng([1, 2, 5, 6]));
+
+      for (const die of result.rolls) {
+        expect(die.modifiers).toEqual(['kept', 'success']);
+      }
+      expect(result.successes).toBe(4);
+    });
+
+    test('a group counted after its members tags failures once: {4d6>=5f1}>=5f1 (#290)', () => {
+      const ast = parse('{4d6>=5f1}>=5f1');
+      const result = evaluate(ast, createMockRng([1, 2, 5, 6]));
+
+      expect(getDie(result.rolls, 0).modifiers).toEqual(['kept', 'failure']);
+      expect(getDie(result.rolls, 2).modifiers).toEqual(['kept', 'success']);
+      expect(getDie(result.rolls, 3).modifiers).toEqual(['kept', 'success']);
+    });
+
     test('rendered output uses ** and __ markers', () => {
       const ast = parse('3d6>=5f1');
       const rng = createMockRng([1, 5, 3]);
@@ -3076,6 +3097,21 @@ describe('evaluate', () => {
         expect(die.modifiers).not.toContain('kept');
       }
     });
+
+    test('nested meta operands tag a die once: ((1d2)d4)d6 (#290)', () => {
+      // The innermost die merges upward once per level, so an append-only
+      // rewrite left it carrying `'meta'` twice.
+      const ast = parse('((1d2)d4)d6');
+      const result = evaluate(ast, createMockRng([2, 1, 2, 3, 4, 5]));
+
+      expect(getDie(result.rolls, 0).modifiers).toEqual(['meta', 'dropped']);
+      const meta = result.rolls.filter((die) => die.modifiers.includes('meta'));
+      expect(meta).toHaveLength(3);
+      for (const die of meta) {
+        expect(die.modifiers).toEqual(['meta', 'dropped']);
+      }
+      expect(result.total).toBe(12);
+    });
   });
 
   describe('variables', () => {
@@ -3672,6 +3708,40 @@ describe('evaluate', () => {
       const result = evaluate(ast, createMockRng([1, 3, 6, 2]));
 
       expect(result.rolls.map((die) => die.result)).toEqual([2, 3, 5, 2]);
+    });
+
+    test('chained min bounds tag a die once: 4d6min3min4 (#290)', () => {
+      const ast = parse('4d6min3min4');
+      const result = evaluate(ast, createMockRng([1, 2, 5, 6]));
+
+      expect(result.rendered).toBe('4d6min3min4[4, 4, 5, 6] = 19');
+      expect(getDie(result.rolls, 0).modifiers).toEqual(['kept', 'min']);
+      expect(getDie(result.rolls, 1).modifiers).toEqual(['kept', 'min']);
+      // The first bound that moved the die owns `initialResult`, not the last.
+      expect(getDie(result.rolls, 0).initialResult).toBe(1);
+      expect(getDie(result.rolls, 1).initialResult).toBe(2);
+    });
+
+    test('chained max bounds tag a die once: 4d6max4max3 (#290)', () => {
+      const ast = parse('4d6max4max3');
+      const result = evaluate(ast, createMockRng([1, 2, 5, 6]));
+
+      expect(result.rendered).toBe('4d6max4max3[1, 2, 3, 3] = 9');
+      expect(getDie(result.rolls, 2).modifiers).toEqual(['kept', 'max']);
+      expect(getDie(result.rolls, 3).modifiers).toEqual(['kept', 'max']);
+      expect(getDie(result.rolls, 2).initialResult).toBe(5);
+      expect(getDie(result.rolls, 3).initialResult).toBe(6);
+    });
+
+    test('mixed-kind chains still carry both tags: 4d6min2max5 (#290)', () => {
+      const ast = parse('4d6min2max5');
+      const result = evaluate(ast, createMockRng([1, 3, 6, 2]));
+
+      expect(result.rendered).toBe('4d6min2max5[2, 3, 5, 2] = 12');
+      expect(getDie(result.rolls, 0).modifiers).toEqual(['kept', 'min']);
+      expect(getDie(result.rolls, 2).modifiers).toEqual(['kept', 'max']);
+      expect(getDie(result.rolls, 0).initialResult).toBe(1);
+      expect(getDie(result.rolls, 2).initialResult).toBe(6);
     });
 
     test('a min bound above the die size lifts every face: 2d6min7', () => {
@@ -4517,5 +4587,37 @@ describe('evaluate', () => {
       expect(isRollParserError(error)).toBe(true);
       expect((error as EvaluatorError).code).toBe('NON_FINITE_RESULT');
     });
+  });
+
+  describe('die modifier tags', () => {
+    // The `Record<DieModifier, …>` annotation is the completeness gate: adding a
+    // tag to the union without a provoking case is a type error. Where a tag can
+    // be written by more than one pass, the notation chains those passes so a
+    // non-idempotent write shows up as a duplicate.
+    const TAG_CASES: Record<DieModifier, { notation: string; rolls: number[] }> = {
+      kept: { notation: '4d6', rolls: [1, 2, 5, 6] },
+      dropped: { notation: '4d6kh2', rolls: [1, 2, 5, 6] },
+      exploded: { notation: '1d6!', rolls: [6, 6, 3] },
+      rerolled: { notation: '1d6r<3', rolls: [1, 2, 5] },
+      min: { notation: '4d6min3min4', rolls: [1, 2, 5, 6] },
+      max: { notation: '4d6max4max3', rolls: [1, 2, 5, 6] },
+      success: { notation: '{4d6>=5}>=1', rolls: [1, 2, 5, 6] },
+      failure: { notation: '{4d6>=5f1}>=5f1', rolls: [1, 2, 5, 6] },
+      meta: { notation: '((1d2)d4)d6', rolls: [2, 1, 2, 3, 4, 5] },
+      dc: { notation: '1d20 vs 2d10', rolls: [15, 5, 6] },
+    };
+
+    for (const tag of Object.keys(TAG_CASES) as DieModifier[]) {
+      const { notation, rolls } = TAG_CASES[tag];
+
+      test(`${tag} is reachable and written at most once: ${notation}`, () => {
+        const result = evaluate(parse(notation), createMockRng(rolls));
+
+        expect(result.rolls.some((die) => die.modifiers.includes(tag))).toBe(true);
+        for (const die of result.rolls) {
+          expect(die.modifiers).toHaveLength(new Set(die.modifiers).size);
+        }
+      });
+    }
   });
 });
