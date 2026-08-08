@@ -871,4 +871,41 @@ describe('roll() integration', () => {
       expect(() => roll('{1d6, 2d8}cs>5', { rng: createMockRng([]) })).toThrow(ParseError);
     });
   });
+
+  describe('re-parseable normalized expressions (#299)', () => {
+    // Bare `cs`, `cf`, `s`, and `sd` end an identifier the lexer would extend
+    // into the next code, so the emitted form keeps the separator.
+    const separated: [notation: string, expression: string][] = [
+      ['1d20cs cf', '1d20cs cf'],
+      ['4d6 s kh2', '4d6s kh2'],
+      ['4d6 s dh1', '4d6s dh1'],
+      ['4d6 sd kh2', '4d6sd kh2'],
+      ['4d6 s s', '4d6s s'],
+      ['4d6 cs cf s', '4d6cs cf s'],
+      ['4dF s kh2', '4dFs kh2'],
+      ['4d6 s min2', '4d6s min2'],
+      ['4d6 s r<2', '4d6s r<2'],
+    ];
+
+    for (const [notation, expression] of separated) {
+      test(`separates the modifiers ${notation} normalizes to`, () => {
+        const result = roll(notation, { seed: 'reparse' });
+
+        expect(result.expression).toBe(expression);
+        expect(roll(result.expression, { seed: 'reparse' }).expression).toBe(expression);
+      });
+    }
+
+    // `dF` and `!p` end in letters but are scanned as their own tokens, so
+    // gluing the next code to them still re-parses.
+    const glued = ['4dFcs>2', '4d6!pkh2', '4d6kh2s', '4d6cs>4cf<2'];
+
+    for (const notation of glued) {
+      test(`leaves ${notation} unseparated`, () => {
+        const result = roll(notation, { seed: 'reparse' });
+
+        expect(result.expression).toBe(notation);
+      });
+    }
+  });
 });
