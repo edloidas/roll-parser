@@ -67,7 +67,7 @@
   "workspaces": ["scripts/browser-smoke", "scripts/docs"],
   "scripts": {
     "prepare": "git rev-parse --git-dir > /dev/null 2>&1 && git config core.hooksPath .githooks || exit 0",
-    "typecheck": "tsc --noEmit && bun run build && tsc --noEmit -p site/tsconfig.json && tsc --noEmit -p scripts/tsconfig.json && tsc --noEmit -p bench/tsconfig.json",
+    "typecheck": "tsc --noEmit && bun run build && tsc --noEmit -p site/tsconfig.json && tsc --noEmit -p site/tsconfig.test.json && tsc --noEmit -p scripts/tsconfig.json && tsc --noEmit -p bench/tsconfig.json",
     "check": "bun typecheck && biome check .",
     "check:fix": "bun typecheck && biome check --write .",
     "check:version": "bun scripts/check-version.ts",
