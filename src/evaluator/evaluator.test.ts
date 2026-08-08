@@ -1890,6 +1890,112 @@ describe('evaluate', () => {
       expect(result.failures).toBe(0);
     });
 
+    test('a multi-sub group counts subtotals, not dice — {2d6, 2d6}>=10 (#303)', () => {
+      // Subtotals are 11 and 3; every individual face is under 10.
+      const result = evaluate(parse('{2d6, 2d6}>=10'), createMockRng([6, 5, 2, 1]));
+
+      expect(result.successes).toBe(1);
+      expect(result.failures).toBe(0);
+      expect(result.total).toBe(1);
+      expect(result.rendered).toBe('{2d6[6, 5], 2d6[2, 1]}>=10 = 1');
+    });
+
+    test("Roll20's grouped example — {4d6+2d8, 3d20+3, 5d10+1}>=40f<=10 (#303)", () => {
+      // Faces pinned so the subtotals are 40, 63 and 6. Roll20's target numbers
+      // are inclusive, so its `>40` is this library's `>=40` and the 40 counts.
+      const result = evaluate(
+        parse('{4d6+2d8, 3d20+3, 5d10+1}>=40f<=10'),
+        createMockRng([6, 6, 6, 6, 8, 8, 20, 20, 20, 1, 1, 1, 1, 1]),
+      );
+
+      expect(result.successes).toBe(2);
+      expect(result.failures).toBe(1);
+      expect(result.total).toBe(1);
+    });
+
+    test('subtotal counting leaves the dice untagged — {2d6, 2d6}>=10 (#303)', () => {
+      // The units are subtotals, which no die carries, so tagging a face would
+      // claim a verdict on something this count never compared.
+      const result = evaluate(parse('{2d6, 2d6}>=10'), createMockRng([6, 5, 2, 1]));
+
+      for (const die of result.rolls) {
+        expect(die.modifiers).toEqual(['kept']);
+      }
+    });
+
+    test('a dropped die still renders struck inside a counted group (#303)', () => {
+      const result = evaluate(parse('{4d6kh3, 1d8}>=10'), createMockRng([1, 6, 1, 3, 7]));
+
+      expect(result.successes).toBe(1);
+      expect(result.rendered).toBe('{4d6[1, 6, ~~1~~, 3], 1d8[7]}>=10 = 1');
+    });
+
+    test('an inner count releases its dice to the outer one — {4d6>=5, 1d8}>=5 (#303)', () => {
+      // Subtotals are 2 (the inner count) and 7. The inner tags have to go, or
+      // the top-level tally adds them to the two subtotal verdicts.
+      const result = evaluate(parse('{4d6>=5, 1d8}>=5'), createMockRng([1, 2, 5, 6, 7]));
+
+      expect(result.successes).toBe(1);
+      expect(result.total).toBe(1);
+      for (const die of result.rolls) {
+        expect(die.modifiers).toEqual(['kept']);
+      }
+      expect(result.rendered).toBe('{4d6>=5[1, 2, 5, 6], 1d8[7]}>=5 = 1');
+    });
+
+    test('a nested subtotal count is re-scored, not added — {{2d6, 2d6}>=10, 1d8}>=1 (#303)', () => {
+      // The inner count scores 1 on subtotals 11 and 3; the outer re-scores that
+      // whole sub-roll as the subtotal 1, alongside the d8's 7. Keeping both
+      // tallies would report 3 successes against a total of 2.
+      const result = evaluate(parse('{{2d6, 2d6}>=10, 1d8}>=1'), createMockRng([6, 5, 2, 1, 7]));
+
+      expect(result.successes).toBe(2);
+      expect(result.failures).toBe(0);
+      expect(result.total).toBe(2);
+    });
+
+    test('a dropped sub-roll takes its subtotal count with it (#303)', () => {
+      // `kh1` keeps the literal 20. A flat inner count loses its tags to the
+      // drop's `SELECTION_AND_TALLY_FLAGS` rewrite; a subtotal one tagged no die
+      // to lose, so its verdicts have to be revoked directly.
+      const result = evaluate(parse('{{2d6, 2d6}>=10, 20}kh1'), createMockRng([6, 5, 2, 1]));
+
+      expect(result.total).toBe(20);
+      expect(result.successes).toBe(0);
+    });
+
+    test('a subtotal count in a meta operand scores nothing (#303)', () => {
+      // The operand resolves to a scalar keep count, and `mergeMetaRolls` strips
+      // tally flags off its dice for the same reason.
+      const result = evaluate(
+        parse('4d6kh({{2d6, 2d6}>=10})'),
+        createMockRng([6, 5, 2, 1, 1, 2, 3, 4]),
+      );
+
+      expect(result.successes).toBe(0);
+    });
+
+    test('a released DC tag takes its marker with it (#303)', () => {
+      // The marker strip works on rendered text and cannot spare DC dice, so the
+      // tag strip must not either — the two have to agree or `renderBreakdown`
+      // rebuilds `**5**, **6**` against a string that has neither.
+      const result = evaluate(parse('{1d20 vs {2d10>=5}, 1d8}>=1'), createMockRng([13, 5, 6, 7]));
+
+      expect(result.rendered).toBe('{1d20[13] vs {2d10>=5[5, 6]}, 1d8[7]}>=1 = 2');
+      for (const die of result.rolls) {
+        expect(die.modifiers).not.toContain('success');
+      }
+    });
+
+    test('a subtotal count on a versus DC stays out of the tally (#303)', () => {
+      // No pool pass may tally the DC side, which is why `countTaggedDice` skips
+      // its dice — a subtotal count there has no dice to skip.
+      const result = evaluate(parse('1d20 vs {{2d6, 2d6}>=10}'), createMockRng([15, 6, 5, 2, 1]));
+
+      expect(result.successes).toBe(0);
+      expect(result.failures).toBe(0);
+    });
+
     test('empty pool success is numeric — 0d10>=6 arithmetic does not NaN', () => {
       const ast = parse('0d10>=6');
       const rng = createMockRng([]);
@@ -2406,11 +2512,23 @@ describe('evaluate', () => {
 
     describe('success-count over a versus counts only the roll side (#262)', () => {
       test('a dice DC no longer contributes successes (#262)', () => {
-        // d20 = 13 succeeds; the DC d10s (5, 6) must not be tallied, nor the d4.
+        // Subtotals are 13 (the versus roll side, DC excluded) and 2. The DC d10s
+        // are 5 and 6 — both over the threshold, so a count that reached them
+        // would show it.
         const result = evaluate(parse('{1d20 vs 2d10, 1d4}>=5'), createMockRng([13, 5, 6, 2]));
 
         expect(result.successes).toBe(1);
         expect(result.total).toBe(1);
+      });
+
+      test('a dice DC is skipped by the flat count too — {1d20 vs 2d10}>=5 (#262)', () => {
+        // Single-sub group, so the count reads dice rather than subtotals and it
+        // is `countSuccesses` itself that has to drop the DC pair.
+        const result = evaluate(parse('{1d20 vs 2d10}>=5'), createMockRng([13, 5, 6]));
+
+        expect(result.successes).toBe(1);
+        expect(result.total).toBe(1);
+        expect(result.rendered).toBe('{1d20 vs 2d10}>=5[**13**, 5, 6] = 1');
       });
 
       test('a literal DC keeps working unchanged (#262)', () => {

@@ -208,6 +208,45 @@ export function sumsToKeptFaces(node: ASTNode): boolean {
 }
 
 /**
+ * Returns `true` when comparing this node's dice one face at a time is faithful
+ * to what it totals. Shaped like `sumsToKeptFaces` but answering a different
+ * question, so the two differ on three node types:
+ *
+ * - `SuccessCount` passes — a nested count re-scores the very same faces.
+ * - `Versus` looks only at its roll side — no pool pass ever counts a DC.
+ * - a multi-sub-roll `Group` fails everywhere, because its units are subtotals.
+ *   `sumsToKeptFaces` accepts one, a sum of subtotals still being a face sum.
+ *
+ * Guards the flat success-count path, whose units are individual dice. The
+ * subtotal path takes a direct multi-sub-roll `Group` before this is consulted.
+ */
+export function countsPerDie(node: ASTNode): boolean {
+  switch (node.type) {
+    case 'Dice':
+    case 'FateDice':
+      return true;
+    case 'KeepDrop':
+    case 'Explode':
+    case 'Reroll':
+    case 'DieBound':
+    case 'Sort':
+    case 'CritThreshold':
+    case 'SuccessCount':
+      return countsPerDie(node.target);
+    case 'Versus':
+      return countsPerDie(node.roll);
+    case 'Grouped':
+      return countsPerDie(node.expression);
+    case 'Group':
+      return node.expressions.length === 1 && node.expressions.every(countsPerDie);
+    case 'BinaryOp':
+      return node.operator === '+' && countsPerDie(node.left) && countsPerDie(node.right);
+    default:
+      return false;
+  }
+}
+
+/**
  * Deep-walks a node to find any descendant `Dice` or `FateDice`. Unlike
  * `deepContainsDicePool`, a multi-sub-roll `Group` is not a hit in its own
  * right — only real dice are.

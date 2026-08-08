@@ -44,6 +44,14 @@ export type EvalEnv = {
    */
   hasSuccessCount: boolean;
   /**
+   * What a multi-sub-roll group count (`{2d6, 2d6}>=10`) scored. Its units are
+   * subtotals, which exist only as throwaway synthetic dice, so these verdicts
+   * reach the top-level tally here rather than as tags on a die. Every path
+   * that releases `TALLY_FLAGS` releases these too.
+   */
+  subtotalSuccesses: number;
+  subtotalFailures: number;
+  /**
    * `true` while the evaluator is inside a `VersusNode`'s roll or DC
    * sub-evaluation. `evalVersus` rejects nesting via this flag — catches
    * paren-nested versus (`1d20 vs (5 vs 3)`) that slip past the parser's
