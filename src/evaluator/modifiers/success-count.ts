@@ -10,7 +10,10 @@
  * excluded from counting and are never tagged.
  *
  * Mutates the input pool in place to add `'success'` / `'failure'` modifier
- * flags — mirrors the mutation pattern of explode and reroll modifiers.
+ * flags — mirrors the mutation pattern of explode and reroll modifiers. Each
+ * tag is written at most once per die: a group counted after its members
+ * (`{4d6>=5}>=1`) runs this pass twice over the same dice, and the parse-time
+ * reject that blocks a direct `4d6>=5>=4` does not reach through a group.
  *
  * @module evaluator/modifiers/success-count
  */
@@ -42,11 +45,15 @@ export function countSuccesses(
   // ! `'success'` / `'failure'` tags written below still land on the pool.
   const pool = hasVersusDc ? dice.filter((die) => !isVersusDc(die)) : dice;
 
+  // ! The guards below only stop the *same* tag being written twice. A nested
+  // ! count with a different threshold still appends to the first pass's tags,
+  // ! so a die can end up both `'success'` and `'failure'`, and the returned
+  // ! counts then disagree with the tags in `rolls`.
   for (const die of pool) {
     if (die.modifiers.includes('dropped')) continue;
 
     if (matchesCondition(die.result, threshold.operator, threshold.value)) {
-      die.modifiers.push('success');
+      if (!die.modifiers.includes('success')) die.modifiers.push('success');
       successes += 1;
       continue;
     }
@@ -55,7 +62,7 @@ export function countSuccesses(
       failThreshold != null &&
       matchesCondition(die.result, failThreshold.operator, failThreshold.value)
     ) {
-      die.modifiers.push('failure');
+      if (!die.modifiers.includes('failure')) die.modifiers.push('failure');
       failures += 1;
     }
   }
