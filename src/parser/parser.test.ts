@@ -1451,6 +1451,89 @@ describe('Parser', () => {
       });
     });
 
+    describe('keep/drop rejects single-sub groups that do not sum to their faces', () => {
+      // The flat-pool path totals `sumKeptDice`, so a sub-roll term that is not
+      // an added die face is discarded from the total without a marker.
+
+      it('rejects {2d6+3}kh2 (#302)', () => {
+        expectRollError(() => parseAst('{2d6+3}kh2'), ParseError, 'INVALID_KEEP_DROP_TARGET');
+      });
+
+      it('rejects {2d6-1d4}kh3 (#302)', () => {
+        expectRollError(() => parseAst('{2d6-1d4}kh3'), ParseError, 'INVALID_KEEP_DROP_TARGET');
+      });
+
+      it('rejects {2d6*2}kh2 (#302)', () => {
+        expectRollError(() => parseAst('{2d6*2}kh2'), ParseError, 'INVALID_KEEP_DROP_TARGET');
+      });
+
+      it('rejects {floor(2d6/2)}kh2 (#302)', () => {
+        expectRollError(
+          () => parseAst('{floor(2d6/2)}kh2'),
+          ParseError,
+          'INVALID_KEEP_DROP_TARGET',
+        );
+      });
+
+      it('rejects {-1d6+2d6}kh2 (#302)', () => {
+        expectRollError(() => parseAst('{-1d6+2d6}kh2'), ParseError, 'INVALID_KEEP_DROP_TARGET');
+      });
+
+      it('rejects {2d6+0}kh2 — an added literal counts even at zero (#302)', () => {
+        expectRollError(() => parseAst('{2d6+0}kh2'), ParseError, 'INVALID_KEEP_DROP_TARGET');
+      });
+
+      // Routed to the success-count code, not the keep/drop one, so the brace form
+      // reports what `(4d6>=5)kh1` has always reported for the same condition.
+      it('rejects {4d6>=5}kh1 — a success count is a tally, not a face sum (#302)', () => {
+        expectRollError(() => parseAst('{4d6>=5}kh1'), ParseError, 'INVALID_SUCCESS_COUNT_TARGET');
+      });
+
+      it.each(['{(4d6>=5)}kh1', '{{4d6>=5}}kh1', '{({4d6>=5})}kh1'])(
+        'rejects %s with the same code at any brace depth (#302)',
+        (notation) => {
+          expectRollError(() => parseAst(notation), ParseError, 'INVALID_SUCCESS_COUNT_TARGET');
+        },
+      );
+
+      it('rejects {{1d6, 1d8}+3}kh2 — the literal survives the nested group (#302)', () => {
+        expectRollError(
+          () => parseAst('{{1d6, 1d8}+3}kh2'),
+          ParseError,
+          'INVALID_KEEP_DROP_TARGET',
+        );
+      });
+
+      it('rejects ({2d6+3})kh2 through the Grouped wrapper (#302)', () => {
+        expectRollError(() => parseAst('({2d6+3})kh2'), ParseError, 'INVALID_KEEP_DROP_TARGET');
+      });
+
+      it('rejects {2d6+3}sd kh2 through the Sort wrapper (#302)', () => {
+        expectRollError(() => parseAst('{2d6+3}sd kh2'), ParseError, 'INVALID_KEEP_DROP_TARGET');
+      });
+
+      it.each([
+        '{4d6}kh2',
+        '{4d6+2d8}kh3',
+        '{4d10+5d6}kh2',
+        '{2d6kh1+1d8}kh2',
+        '{2d6!+1d8}kh2',
+        '{{1d6, 1d8}+2d6}kh2',
+        '{1d20}kh1cs>18',
+        '{4dF+2d6}kh2',
+      ])('still accepts %s — added dice terms only (#302)', (notation) => {
+        expect(() => parseAst(notation)).not.toThrow();
+      });
+
+      it('still accepts {2d6+3, 1d8}kh1 — multi-sub groups keep/drop subtotals (#302)', () => {
+        expect(() => parseAst('{2d6+3, 1d8}kh1')).not.toThrow();
+      });
+
+      it('still accepts {3, 5, 7}kh1 — literal-only multi-sub group (#302)', () => {
+        expect(() => parseAst('{3, 5, 7}kh1')).not.toThrow();
+      });
+    });
+
     describe('explode rejects non-pool targets', () => {
       it('should reject (1d6+5)!', () => {
         expectRollError(() => parseAst('(1d6+5)!'), ParseError, 'INVALID_EXPLODE_TARGET');
