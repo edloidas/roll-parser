@@ -314,9 +314,10 @@ export type SortNode = NodeSpan & {
 };
 
 /**
- * Sentinel for bare `cs` / `cf` without a ComparePoint. Resolved to
- * `result === sides` (for critical) or `result === 1` (for fumble) at
- * evaluation time, using each die's own `sides`.
+ * Sentinel for bare `cs` / `cf` without a ComparePoint. Resolved at
+ * evaluation time against each die's own `sides` and its natural face
+ * (`initialResult ?? result`): critical when that face equals `sides`,
+ * fumble when it equals 1.
  *
  * @category AST
  */

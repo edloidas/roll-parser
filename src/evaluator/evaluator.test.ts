@@ -3910,6 +3910,95 @@ describe('evaluate', () => {
       expect(result.rolls.every((d) => d.critical === false)).toBe(true);
     });
 
+    test('default cs after compound explode reads the natural face (#288)', () => {
+      // [6, 6, 2]: the 6 compounds twice into result 14, initialResult 6.
+      const ast = parse('1d6!!cs');
+      const result = evaluate(ast, createMockRng([6, 6, 2]));
+
+      expect(result.rendered).toBe('1d6!!cs[14] = 14');
+      expect(getDie(result.rolls, 0).critical).toBe(true);
+    });
+
+    test('default cs is order-independent across compound explode (#288)', () => {
+      const before = evaluate(parse('1d6cs!!'), createMockRng([6, 6, 2]));
+      const after = evaluate(parse('1d6!!cs'), createMockRng([6, 6, 2]));
+
+      // Same faces, same total — only the modifier order in the expression
+      // differs, so the flags must not.
+      expect(after.total).toBe(before.total);
+      expect(getDie(after.rolls, 0).critical).toBe(getDie(before.rolls, 0).critical);
+      expect(getDie(after.rolls, 0).fumble).toBe(getDie(before.rolls, 0).fumble);
+    });
+
+    test('default cf after a min clamp reads the natural face (#288)', () => {
+      // min5 lifts the natural 1 to 5 and stores 1 in initialResult.
+      const ast = parse('1d6min5cf');
+      const result = evaluate(ast, createMockRng([1]));
+
+      expect(result.total).toBe(5);
+      expect(getDie(result.rolls, 0).fumble).toBe(true);
+    });
+
+    test('default cs after a max clamp reads the natural face (#288)', () => {
+      const ast = parse('1d6max3cs');
+      const result = evaluate(ast, createMockRng([6]));
+
+      expect(result.total).toBe(3);
+      expect(getDie(result.rolls, 0).critical).toBe(true);
+    });
+
+    test('explicit threshold still reads the accumulated result (#288)', () => {
+      // Deliberate asymmetry: `cs>6` is a predicate over the die's value, so
+      // it matches the compounded 14 rather than the natural 6.
+      const ast = parse('1d6!!cs>6');
+      const result = evaluate(ast, createMockRng([6, 6, 2]));
+
+      expect(result.total).toBe(14);
+      expect(getDie(result.rolls, 0).critical).toBe(true);
+    });
+
+    test('cf after compound explode leaves an untouched die alone (#288)', () => {
+      // A 1 never triggers the explosion, so `result` is still the raw face.
+      const ast = parse('1d6!!cf');
+      const result = evaluate(ast, createMockRng([1, 1, 2]));
+
+      expect(result.total).toBe(1);
+      expect(getDie(result.rolls, 0).fumble).toBe(true);
+      expect(getDie(result.rolls, 0).initialResult).toBeUndefined();
+    });
+
+    test('default cf after an accumulating compound explode (#288)', () => {
+      // `!!<2` triggers on the 1, so the fumble branch sees an accumulated
+      // result (4) over a natural 1 — the only way to reach it via explode.
+      const ast = parse('1d6!!<2cf');
+      const result = evaluate(ast, createMockRng([1, 1, 2]));
+
+      expect(result.total).toBe(4);
+      expect(getDie(result.rolls, 0).initialResult).toBe(1);
+      expect(getDie(result.rolls, 0).fumble).toBe(true);
+    });
+
+    test('a clamp before a compound explode keeps the raw face (#288)', () => {
+      // min6 lifts the natural 2 to 6, which then compounds. The default rule
+      // must see the 2, not the clamp that manufactured the max face.
+      const ast = parse('1d6min6!!cs');
+      const result = evaluate(ast, createMockRng([2, 3]));
+
+      expect(result.total).toBe(9);
+      expect(getDie(result.rolls, 0).initialResult).toBe(2);
+      expect(getDie(result.rolls, 0).critical).toBe(false);
+    });
+
+    test('explicit cs and default cf can disagree on a clamped die (#288)', () => {
+      // Pins the deliberate asymmetry: `cs>4` reads the clamped 5, the
+      // implicit `cf` reads the natural 1, so die 0 is both.
+      const ast = parse('4d6min5cs>4');
+      const result = evaluate(ast, createMockRng([1, 2, 5, 6]));
+
+      expect(result.rolls.map((d) => d.critical)).toEqual([true, true, true, true]);
+      expect(result.rolls.map((d) => d.fumble)).toEqual([true, false, false, false]);
+    });
+
     test('cs after sort — flags applied on sorted pool', () => {
       const ast = parse('4d6s cs>4');
       const rng = createMockRng([5, 2, 6, 3]);

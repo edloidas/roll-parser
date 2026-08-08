@@ -194,8 +194,9 @@ export function applyCompoundExplode(
     if (!exploded) continue;
 
     // `critical` and `fumble` keep referring to the original triggering
-    // roll — after compounding the `result` is a sum.
-    original.initialResult = original.result;
+    // roll — after compounding the `result` is a sum. First writer wins, so
+    // a preceding `minN`/`maxN` clamp keeps its record of the raw face.
+    original.initialResult ??= original.result;
     original.result = accumulated;
     if (!original.modifiers.includes('exploded')) {
       original.modifiers = [...original.modifiers, 'exploded'];

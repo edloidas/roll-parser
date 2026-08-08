@@ -1214,8 +1214,8 @@ function evalSort(node: SortNode, rng: RNG, ctx: EvalContext, env: EvalEnv): Eva
  * crit criteria and `cf` thresholds replace only the fumble criteria. When a
  * side has no explicit threshold, the `'default'` rule applies — so
  * `1d20cf<3` keeps the default nat-20 crit. Bare `cs`/`cf` uses the
- * `'default'` sentinel resolved per-die to `result === sides` or
- * `result === 1`.
+ * `'default'` sentinel, resolved per-die against the natural face
+ * (`initialResult ?? result`) rather than the possibly-rewritten `result`.
  *
  * Renders `<targetExpr><codes>[<dice>]`, mirroring `evalSort`/`evalExplode`.
  */
