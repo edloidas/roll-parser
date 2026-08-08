@@ -1192,6 +1192,30 @@ describe('Parser', () => {
       expectRollError(() => parseAst('(1d6*2)>=10'), ParseError, 'INVALID_SUCCESS_COUNT_TARGET');
     });
 
+    it('rejects a literal-only group target: {3, 5, 7}>=4 (#304)', () => {
+      expectRollError(() => parseAst('{3, 5, 7}>=4'), ParseError, 'INVALID_SUCCESS_COUNT_TARGET');
+    });
+
+    it('rejects a literal-only group with a fail threshold: {3, 5, 7}>=4f1 (#304)', () => {
+      expectRollError(() => parseAst('{3, 5, 7}>=4f1'), ParseError, 'INVALID_SUCCESS_COUNT_TARGET');
+    });
+
+    it('rejects a kept literal-only group: {3, 5, 7}kh1>=4 (#304)', () => {
+      expectRollError(
+        () => parseAst('{3, 5, 7}kh1>=4'),
+        ParseError,
+        'INVALID_SUCCESS_COUNT_TARGET',
+      );
+    });
+
+    it('rejects a single-expression literal group: {3}>=4 (#304)', () => {
+      expectRollError(() => parseAst('{3}>=4'), ParseError, 'INVALID_SUCCESS_COUNT_TARGET');
+    });
+
+    it('accepts a group with one real pool among literals: {3, 1d6}>=4 (#304)', () => {
+      expect(parseAst('{3, 1d6}>=4').type).toBe('SuccessCount');
+    });
+
     it('should reject versus inside success-count target: (1d20 vs 15)>=1', () => {
       expectRollError(
         () => parseAst('(1d20 vs 15)>=1'),

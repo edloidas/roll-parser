@@ -112,6 +112,9 @@ const isDicePoolHit = (current: ASTNode): boolean =>
 
 const isFateDiceHit = (current: ASTNode): boolean => current.type === 'FateDice';
 
+const isDiceHit = (current: ASTNode): boolean =>
+  current.type === 'Dice' || current.type === 'FateDice';
+
 const isMultiSubGroupHit = (current: ASTNode): boolean =>
   current.type === 'Group' && current.expressions.length >= 2;
 
@@ -166,6 +169,19 @@ export function containsDicePool(node: ASTNode): boolean {
  */
 export function deepContainsDicePool(node: ASTNode): boolean {
   return someDescendant(node, isDicePoolHit);
+}
+
+/**
+ * Deep-walks a node to find any descendant `Dice` or `FateDice`. Unlike
+ * `deepContainsDicePool`, a multi-sub-roll `Group` is not a hit in its own
+ * right — only real dice are.
+ *
+ * Used by the success-count parser guard, which tallies individual dice rather
+ * than subtotals: a literal-only group satisfies `containsDicePool` yet rolls
+ * nothing to tally.
+ */
+export function containsDice(node: ASTNode): boolean {
+  return someDescendant(node, isDiceHit);
 }
 
 /**

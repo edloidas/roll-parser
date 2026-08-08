@@ -1543,13 +1543,15 @@ function evalSuccessCount(
     return part;
   };
 
-  // No-op when the target produced no dice (`0d6>=4`); `containsDicePool`
-  // should already reject dice-less targets at parse time. `target.total` is 0
-  // for an empty pool, so `total === successes - failures` still holds.
+  // An empty pool (`0d6>=4`, `{3, 0d6}>=4`) scores zero of both, so its total
+  // is 0 — never `target.total`, which for a group is the sum of its
+  // sub-rolls and would break `total === successes - failures`. Reachable only
+  // through a zero-count pool — a target holding no dice node at all is
+  // rejected at parse time.
   if (targetCtx.rolls.length === 0) {
     ctx.expressionParts.push(`${targetExpr}${code}`);
     ctx.renderedParts.push(`${targetExpr}${code}`);
-    return { total: target.total, part: buildPart(target.total, 0, 0) };
+    return { total: 0, part: buildPart(0, 0, 0) };
   }
 
   const result = countSuccesses(
