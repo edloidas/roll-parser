@@ -1,4 +1,76 @@
-# Migrating from v2 to v3
+# Migration notes
+
+Newest first. [Upgrading from 3.0.0 to 3.1.0](#upgrading-from-300-to-310) ·
+[Migrating from v2 to v3](#migrating-from-v2-to-v3) ·
+[Upgrading from a v3 pre-release](#upgrading-from-a-v3-pre-release)
+
+## Upgrading from 3.0.0 to 3.1.0
+
+Nothing was removed and no behaviour changed: `total`, `expression`, `rendered`,
+`rolls`, and `degree` are byte-identical to 3.0.0 for every expression. The
+whole of this section is about one added field.
+
+**`RollPart` gained `rolls` on three variants.** The `explode`, `reroll`, and
+`successCount` members now carry `rolls: DieResult[]` — the pool the modifier
+produced — joining `sort`, which always had it. They needed it: standard and
+penetrating explosions and both reroll forms *append* dice, and those dice
+appeared nowhere in the part tree, so a part could not describe its own output.
+
+<!-- readme-test: skip -->
+```typescript
+// 3.0.0 — the explosion die is missing from the tree
+roll('2d6!').parts.target.rolls.length; // 2, but `rendered` shows three dice
+
+// 3.1.0 — the modifier carries the pool it actually rendered
+roll('2d6!').parts.rolls.length; // 3
+```
+
+Per the [versioning policy](README.md#versioning), adding a field to a returned
+object is a minor. Reading `parts` is unaffected and needs no change. Three
+things can still bite:
+
+- **Constructing one of those parts stops compiling** — `TS2322: Property
+  'rolls' is missing in type … but required`. This is only reachable in test
+  fixtures and mocks, since no library function accepts a `RollPart`. Add the
+  pool, or widen the annotation.
+- **Deep-equality assertions against those parts fail.** Add `rolls` to the
+  expected object, or assert on the fields you care about instead of the whole
+  part.
+- **`--json` and `JSON.stringify(result)` payloads grow** for expressions using
+  explode, reroll, or success counting, because the pool is serialized on the
+  modifier as well as on its target — roughly +40% to +96% depending on pool
+  size. Expressions without those modifiers are unchanged. Budget for it if you
+  log, cache, or ship results over a wire.
+
+**The CLI renders nested dropped sub-rolls correctly.** `--verbose` on a dropped
+group sub-roll nested inside another one used to emit mismatched delimiters —
+`{{(1d6[1]), 1d8[4]}, ({)1d10[1](, 1d12[3]})}`. It now emits
+`{{(1d6[1]), 1d8[4]}, ({(1d10[1]), 1d12[3]})}`. Anything parsing that output
+should be reading `--json` instead.
+
+**New, optional: `roll-parser/render`.** A subpath export whose
+`renderBreakdown(result, marks?)` rebuilds the breakdown from `result.parts`
+with markers you choose, so you no longer have to regex the markdown out of
+`rendered`. With no marks its output is byte-identical to `rendered`, which
+makes it a drop-in starting point:
+
+```typescript
+import { roll } from 'roll-parser';
+import { renderBreakdown } from 'roll-parser/render';
+import { createMockRng } from 'roll-parser/testing';
+
+const result = roll('4d6kh3', { rng: createMockRng([3, 6, 2, 5]) });
+
+renderBreakdown(result) === result.rendered; // true
+renderBreakdown(result, { dropped: (_die, text) => `(${text})` });
+// '4d6[3, 6, (2), 5] = 14'
+```
+
+See [Custom markers](README.md#custom-markers) for the six slots and the order
+they compose in. Nothing forces you to adopt it — `rendered` is unchanged and
+is not deprecated.
+
+## Migrating from v2 to v3
 
 v3 is a full rewrite. Nothing in the 2.x API carries over — the entry points,
 the result shape, the error behaviour, and parts of the notation all changed. To
