@@ -172,6 +172,42 @@ export function deepContainsDicePool(node: ASTNode): boolean {
 }
 
 /**
+ * Returns `true` when this node's total provably equals the sum of its kept
+ * dice faces: a pool, a chain of pool modifiers over one, or an addition of
+ * those. A multi-sub-roll `Group` qualifies when every sub-roll does, since its
+ * total is their sum and `evalGroupKeepDrop` re-flags dropped sub-rolls' dice.
+ *
+ * Guards the single-sub-roll `Group` keep/drop target, whose flat-pool path
+ * totals `sumKeptDice`. Anything else in there — a literal, a subtracted or
+ * scaled dice term, a function call, a success count — contributes to the
+ * group's own total but not to that face sum, so `{2d6+3}kh2` would lose the
+ * `+3` and `{2d6-1d4}kh3` would flip the `1d4` from `-3` to `+3` while dropping
+ * nothing.
+ */
+export function sumsToKeptFaces(node: ASTNode): boolean {
+  switch (node.type) {
+    case 'Dice':
+    case 'FateDice':
+      return true;
+    case 'KeepDrop':
+    case 'Explode':
+    case 'Reroll':
+    case 'DieBound':
+    case 'Sort':
+    case 'CritThreshold':
+      return sumsToKeptFaces(node.target);
+    case 'Grouped':
+      return sumsToKeptFaces(node.expression);
+    case 'Group':
+      return node.expressions.every(sumsToKeptFaces);
+    case 'BinaryOp':
+      return node.operator === '+' && sumsToKeptFaces(node.left) && sumsToKeptFaces(node.right);
+    default:
+      return false;
+  }
+}
+
+/**
  * Deep-walks a node to find any descendant `Dice` or `FateDice`. Unlike
  * `deepContainsDicePool`, a multi-sub-roll `Group` is not a hit in its own
  * right — only real dice are.

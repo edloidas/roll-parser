@@ -57,7 +57,7 @@ export const BENCH_CASES: BenchCase[] = [
   { id: '4dF', notation: '4dF', tier: 'simple' },
 
   { id: '4d6kh3', notation: '4d6kh3', tier: 'common' },
-  { id: '{1d6+2}kh1', notation: '{1d6+2}kh1', tier: 'common' },
+  { id: '{1d6+1d8}kh1', notation: '{1d6+1d8}kh1', tier: 'common' },
   { id: '2d20kh1 vs 15', notation: '2d20kh1 vs 15', tier: 'common' },
   { id: '10d10>=6f1', notation: '10d10>=6f1', tier: 'common' },
   { id: '4d6sd', notation: '4d6sd', tier: 'common' },

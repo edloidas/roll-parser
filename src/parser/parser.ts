@@ -38,6 +38,7 @@ import {
   containsMultiSubGroup,
   containsVersus,
   deepContainsDicePool,
+  sumsToKeptFaces,
   unwrapAllTransparent,
   unwrapGrouped,
 } from './guards.js';
@@ -766,6 +767,39 @@ export class Parser {
         token.position,
         token,
       );
+    }
+
+    // ! A single-sub-roll Group is the flat-pool escape hatch, so `containsDicePool`
+    // ! deep-walks the arithmetic that `(1d6+5)kh1` rejects outright — but the flat
+    // ! path totals `sumKeptDice`, faces only. `{2d6+3}kh2` and `{2d6-1d4}kh3` are
+    // ! exactly the drop that reject exists to prevent.
+    const base = unwrapAllTransparent(target);
+    if (base.type === 'Group' && base.expressions.length === 1) {
+      const inner = base.expressions[0];
+      if (inner != null) {
+        // Single-sub Groups hide a count from the shallow reject at the top of this
+        // method, so peel them to any depth and `{4d6>=5}kh1`, `{{4d6>=5}}kh1`, and
+        // `(4d6>=5)kh1` all report one code. Peeling only picks which error the
+        // caller sees — `sumsToKeptFaces` below refuses a count either way.
+        let innermost = inner;
+        while (true) {
+          const peeled = unwrapGrouped(innermost);
+          if (peeled.type !== 'Group' || peeled.expressions.length !== 1) break;
+          const next = peeled.expressions[0];
+          if (next == null) break;
+          innermost = next;
+        }
+        this.rejectSuccessCountTarget(innermost, token);
+
+        if (!sumsToKeptFaces(inner)) {
+          throw new ParseError(
+            `Keep/drop on a single-sub-roll group requires added dice terms only`,
+            'INVALID_KEEP_DROP_TARGET',
+            token.position,
+            token,
+          );
+        }
+      }
     }
 
     const kind =

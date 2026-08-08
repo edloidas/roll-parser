@@ -9,9 +9,9 @@ Newest first. [Upgrading from 3.1.0 to 3.2.0](#upgrading-from-310-to-320) ·
 
 Nothing was removed and no type changed, and the seed → dice mapping is
 untouched — the same seed and notation roll the same faces they did in 3.1.0.
-Three fixes: penetrating explode and the three places its output is visible, a
-success-count target that never rolled anything, and a success count wrapped in
-another one.
+Four fixes: penetrating explode and the three places its output is visible, a
+success-count target that never rolled anything, a success count wrapped in
+another one, and keep/drop on a single-sub-roll group.
 
 **`!p` continuation dice now carry `initialResult`.** A penetrating explosion
 stores `raw - 1` on each die it appends, and used to record the face it
@@ -119,6 +119,40 @@ with it, so `successCount.total === successes - failures` holds again. A lone
 count is untouched, and so is a nested pair whose thresholds agree
 (`{4d6>=5}>=5`). Dropped dice come out untagged; only the DC side of a `vs`
 keeps tags from an inner count, since no pool pass may tally it.
+
+**Keep/drop on a single-sub-roll group now takes added dice terms only.** The
+flat-pool form totals the faces it kept, so any term in the sub-roll that is not
+an added die face was discarded from the total with no error and no marker.
+`{2d6+3}kh2` lost the `+3`, and `{2d6-1d4}kh3` — which drops nothing — flipped
+the `1d4` from `-3` to `+3`. The parser already refused `(2d6+3)kh2` for exactly
+this reason; the brace form now does too.
+
+```typescript
+import { roll } from 'roll-parser';
+import { createMockRng } from 'roll-parser/testing';
+
+roll('{2d6+3}kh2', { rng: createMockRng([4, 5]) }); // throws 'INVALID_KEEP_DROP_TARGET' — was 9
+roll('{2d6-1d4}kh3', { rng: createMockRng([4, 5, 3]) }); // throws 'INVALID_KEEP_DROP_TARGET' — was 12
+roll('{4d6+2d8}kh3', { rng: createMockRng([6, 6, 6, 1, 8, 1]) }).total; // 20 — unchanged
+```
+
+Also newly rejected, same cause: a scaled or function-wrapped pool (`{2d6*2}kh2`,
+`{abs(1d6-1d8)}kh1`), and a success count, which returned the face sum rather
+than the tally. `{4d6>=5}kh1` throws `INVALID_SUCCESS_COUNT_TARGET`, not the
+keep/drop code — a single-sub-roll group used to hide the count from the reject
+that `(4d6>=5)kh1` has always hit, and both spellings now report the same thing.
+
+The check is structural rather than arithmetic, so a term that happened to be an
+identity is refused along with the rest even though its total was already right:
+`{2d6+0}kh2`, `{2d6*1}kh2`, and `{2d6+1d8-0}kh3` all throw now. Widening the rule
+to evaluate the term first would accept `{2d6+0}kh2` and still reject
+`{2d6+3}kh2`, which is a worse contract to build notation against.
+
+Additive pools are the form this syntax exists for and are untouched —
+`{4d6+2d8}kh3`, `{2d6kh1+1d8}kh2`, `{{1d6, 1d8}+2d6}kh2`. Multi-sub-roll groups
+never had the bug, since keep/drop compares subtotals there: `{2d6+3, 1d8}kh1`
+still works. To keep a rejected expression, move the arithmetic outside the
+selection (`{2d6}kh2+3`) or give each term its own sub-roll.
 
 ## Upgrading from 3.0.0 to 3.1.0
 

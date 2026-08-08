@@ -3463,6 +3463,37 @@ describe('evaluate', () => {
         const kept = result.rolls.filter((d) => !d.modifiers.includes('dropped'));
         expect(kept).toHaveLength(2);
       });
+
+      // The forms that survive the `sumsToKeptFaces` reject must actually hold
+      // the property it asserts — otherwise the guard's accept set is wrong.
+      const FLAT_POOL_CASES: [string, number[]][] = [
+        ['{4d6+2d8}kh3', [6, 6, 6, 1, 8, 1]],
+        ['{2d6kh1+1d8}kh2', [4, 5, 3]],
+        ['{2d6!+1d8}kh2', [6, 4, 5, 3]],
+        ['{{1d6, 1d8}+2d6}kh2', [4, 5, 3, 2]],
+      ];
+
+      test.each(FLAT_POOL_CASES)(
+        '%s totals the sum of its kept faces (#302)',
+        (notation, faces) => {
+          const result = evaluate(parse(notation), createMockRng(faces));
+          const kept = result.rolls.filter((d) => !d.modifiers.includes('dropped'));
+
+          expect(result.total).toBe(kept.reduce((sum, die) => sum + die.result, 0));
+        },
+      );
+
+      test('a keep-everything selection agrees with the bare group (#302)', () => {
+        const faces = [6, 6, 6, 1, 8, 1];
+        const bare = evaluate(parse('{4d6+2d8}'), createMockRng(faces));
+        const keptAll = evaluate(parse('{4d6+2d8}kh6'), createMockRng(faces));
+
+        expect(keptAll.total).toBe(bare.total);
+        expect(keptAll.parts.type).toBe('keepDrop');
+        if (keptAll.parts.type === 'keepDrop') {
+          expect(keptAll.parts.target.total).toBe(keptAll.parts.total);
+        }
+      });
     });
 
     describe('sub-roll mode (multi sub-roll with keep/drop)', () => {

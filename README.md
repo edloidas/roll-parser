@@ -237,7 +237,7 @@ compounded 15. The side you *don't* override always reads the natural face, so
 | `fT` / `f<cmp>T` | Subtract dice meeting the failure threshold — `10d10>=6f1`, `10d10>=6f<=2` |
 | `<roll> vs <dc>` | PF2e degree of success, with nat-20/nat-1 upgrade and downgrade |
 | `{a, b}khN` | Grouped roll: each sub-roll's subtotal competes as one compound die |
-| `{a+b}khN` | Single-sub-roll group: keep/drop selects across the flattened pool |
+| `{a+b}khN` | Single-sub-roll group: keep/drop selects across the flattened pool — added dice terms only |
 
 > [!IMPORTANT]
 > Success counting is **terminal** — no modifier or arithmetic applies to it
@@ -1032,6 +1032,18 @@ any commit that regresses a case past 1.75x. Bundle size is gated in CI by
   within each sub-roll, then sub-rolls by total — and the evaluator only
   flat-sorts, so the syntax is refused rather than shipped wrong. Single
   sub-roll groups (`{2d6+1d8}s`) still work as the flat-pool escape hatch.
+- **Keep/drop on a single-sub-roll group takes added dice terms only.**
+  `{4d6+2d8}kh3` selects across the six faces and totals them, which is the
+  whole point of the form. A term that contributes to the group's total without
+  contributing a face — a literal, a subtracted or scaled pool, a function call —
+  has nowhere to go in that sum, so `{2d6+3}kh2`, `{2d6-1d4}kh3`, and
+  `{2d6*2}kh2` throw `INVALID_KEEP_DROP_TARGET` instead of quietly returning the
+  face sum, and `{4d6>=5}kh1` throws `INVALID_SUCCESS_COUNT_TARGET` like the
+  `(4d6>=5)kh1` it brackets. The check is structural, not arithmetic, so an
+  identity term is refused with the rest — `{2d6+0}kh2` reads the same as
+  `{2d6+3}kh2` here. Put the arithmetic outside the selection (`{2d6}kh2+3`) or
+  give each term its own sub-roll (`{2d6+3, 1d8}kh1`), where keep/drop compares
+  subtotals.
 - **Success counting a group that rolls no dice is rejected.** `{3, 5, 7}>=4`
   throws `INVALID_SUCCESS_COUNT_TARGET`. A success count tallies dice, and a
   literal-only group has none — whether its units should be the subtotals is
