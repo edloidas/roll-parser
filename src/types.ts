@@ -458,8 +458,12 @@ export type RollResult = Readonly<{
    * The outermost count owns the outcome: it re-scores the pool against its own
    * thresholds, so no die is ever both a success and a failure, and dice it
    * does not count come out untagged rather than keeping the inner count's
-   * tags. The one exception is the DC side of a `vs`, which sits outside every
-   * pool pass and so keeps whatever tagged it.
+   * tags. The DC side of a `vs` is the exception a flat re-score makes: it sits
+   * outside every pool pass, so it keeps whatever tagged it. A count on
+   * sub-roll subtotals (`{1d20 vs {2d10>=5}, 1d8}>=1`) releases it along with
+   * the rest — its verdicts live on no die, so the tags have to go for
+   * `rendered` to keep describing them. Either way a DC never reaches this
+   * tally.
    */
   successes?: number;
   /**

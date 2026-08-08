@@ -328,7 +328,11 @@ function renderPart(part: RollPart, marks: DieMarks, plain: boolean): string {
         plain,
       );
     case 'successCount':
-      return renderModifier(part.target, successCountCode(part), part.rolls, marks, plain);
+      // Subtotal counting renders through the group, which shows each sub-roll's
+      // own dice; only the flat form collapses into one bracket.
+      return part.target.type === 'group' && part.target.parts.length >= 2
+        ? `${renderPart(part.target, marks, plain)}${successCountCode(part)}`
+        : renderModifier(part.target, successCountCode(part), part.rolls, marks, plain);
     case 'dieBound':
       return `${joinModifierCode(expr(part.target), dieBoundCode(part))}${renderPool(poolOf(part.target), marks, plain)}`;
     case 'sort':

@@ -157,8 +157,9 @@ wherever the two overlap: `kh`/`kl`/`dh`/`dl`, `!`/`!!`/`!p`, `r`/`ro`, success
 and failure counting, `cs`/`cf`, grouped rolls, and `floor`/`ceil`/`round`/`abs`
 all use Roll20's spelling and semantics. It is not a strict superset — sorting
 (`s`), PF2e `vs` checks, `max`/`min`, and computed dice counts and sides are
-additions, and two Roll20 forms are deliberately rejected (`4d6d1`, arithmetic
-after a success count) — see [Known limitations](#known-limitations).
+additions, and three Roll20 forms are deliberately rejected (`4d6d1`, arithmetic
+after a success count, and a counted single-sub-roll group folding its own math
+into each die, `{3d20+5}>=21`) — see [Known limitations](#known-limitations).
 
 Notation is case-insensitive and whitespace-tolerant — `2 D 20 KH 1` and
 `2d20kh1` are the same expression, newlines included. The one exception is
@@ -238,6 +239,8 @@ compounded 15. The side you *don't* override always reads the natural face, so
 | `<roll> vs <dc>` | PF2e degree of success, with nat-20/nat-1 upgrade and downgrade |
 | `{a, b}khN` | Grouped roll: each sub-roll's subtotal competes as one compound die |
 | `{a+b}khN` | Single-sub-roll group: keep/drop selects across the flattened pool — added dice terms only |
+| `{a, b}<cmp>T` | Grouped roll: each sub-roll's subtotal is counted, not its dice — `{2d6, 2d6}>=10` |
+| `{a+b}<cmp>T` | Single-sub-roll group: counts across the flattened pool — added dice terms only |
 
 > [!IMPORTANT]
 > Success counting is **terminal** — no modifier or arithmetic applies to it
@@ -1045,11 +1048,24 @@ any commit that regresses a case past 1.75x. Bundle size is gated in CI by
   give each term its own sub-roll (`{2d6+3, 1d8}kh1`), where keep/drop compares
   subtotals.
 - **Success counting a group that rolls no dice is rejected.** `{3, 5, 7}>=4`
-  throws `INVALID_SUCCESS_COUNT_TARGET`. A success count tallies dice, and a
-  literal-only group has none — whether its units should be the subtotals is
-  undecided, so the syntax is refused rather than answered wrongly. Groups with
-  at least one pool (`{3, 1d6}>=4`) count as before, and a pool that is merely
-  empty at run time (`0d6>=4`) still totals 0.
+  throws `INVALID_SUCCESS_COUNT_TARGET`. A count needs a pool to score, and a
+  literal-only group has none, so the syntax is refused rather than answered
+  wrongly. Groups holding at least one pool (`{3, 1d6}>=4`) count their
+  subtotals, and a pool that is merely empty at run time (`0d6>=4`) still
+  totals 0.
+- **Only a direct multi-sub-roll group counts subtotals.** Subtotals exist while
+  `evalSuccessCount` holds the group itself, so reaching one any other way —
+  `{{2d6, 2d8}}>=4`, `({2d6, 2d8})>=4`, `{2d6, 2d8}kh1>=4` — throws
+  `INVALID_SUCCESS_COUNT_TARGET` rather than falling back to loose faces. The DC
+  side of a `vs` is free of the rule (`{1d20 vs {2d6, 2d8}}>=5` counts the d20),
+  since no pool pass tallies a DC.
+- **A single-sub-roll group counts added dice terms only.** `{3d20+5}>=21`,
+  `{2d6-1d4}>=3`, `{2d6*2}>=4`, and `{floor(2d6/2)}>=2` throw
+  `INVALID_SUCCESS_COUNT_TARGET`. That form compares dice one face at a time, so
+  a scalar, a subtracted term, a scale factor, or a function wrapper never
+  reaches the comparison — the same restriction keep/drop has on `{2d6+3}kh2`.
+  Roll20 folds the remaining math into each roll instead, which is only well
+  defined for `pool ± scalar`. Adding pools (`{2d6+1d8}>=5`) still works.
 - **Division does not floor.** `7/2` totals `3.5`, not `3` — arithmetic is plain
   IEEE-754 throughout. Wrap it when you need an integer: `floor(7/2)` totals `3`.
 - **The power operator has no overflow guard.** `2**999` totals `5.357…e+300`.

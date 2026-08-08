@@ -37,6 +37,7 @@ import {
   containsFatePool,
   containsMultiSubGroup,
   containsVersus,
+  countsPerDie,
   deepContainsDicePool,
   sumsToKeptFaces,
   unwrapAllTransparent,
@@ -1130,6 +1131,20 @@ export class Parser {
     if (!containsDicePool(target) || !containsDice(target)) {
       throw new ParseError(
         `Success counting requires a dice pool target`,
+        'INVALID_SUCCESS_COUNT_TARGET',
+        token.position,
+        token,
+      );
+    }
+
+    // ! A multi-sub-roll group is counted by subtotal, and only `evalSuccessCount`
+    // ! knows how — it needs the group as its direct target. Reached any other way
+    // ! (`{{2d6, 2d8}}>=4`, `({2d6, 2d8})>=4`, `{2d6, 2d8}kh1>=4`) the subtotals are
+    // ! gone by the time the count runs, leaving loose faces to compare.
+    const isSubtotalGroup = target.type === 'Group' && target.expressions.length >= 2;
+    if (!isSubtotalGroup && !countsPerDie(target)) {
+      throw new ParseError(
+        `Success counting requires a target whose dice can be counted one face at a time`,
         'INVALID_SUCCESS_COUNT_TARGET',
         token.position,
         token,

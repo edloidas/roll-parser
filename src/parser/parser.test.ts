@@ -1216,6 +1216,59 @@ describe('Parser', () => {
       expect(parseAst('{3, 1d6}>=4').type).toBe('SuccessCount');
     });
 
+    it('rejects a single-sub group hiding a scalar term: {3d20+5}>=21 (#303)', () => {
+      expectRollError(() => parseAst('{3d20+5}>=21'), ParseError, 'INVALID_SUCCESS_COUNT_TARGET');
+    });
+
+    it('rejects a single-sub group with a subtracted pool: {2d6-1d4}>=3 (#303)', () => {
+      expectRollError(() => parseAst('{2d6-1d4}>=3'), ParseError, 'INVALID_SUCCESS_COUNT_TARGET');
+    });
+
+    it('rejects a multi-sub group under keep/drop: {2d6, 2d8}kh1>=4 (#303)', () => {
+      expectRollError(
+        () => parseAst('{2d6, 2d8}kh1>=4'),
+        ParseError,
+        'INVALID_SUCCESS_COUNT_TARGET',
+      );
+    });
+
+    it('rejects a nested multi-sub group: {{2d6, 2d8}}>=4 (#303)', () => {
+      expectRollError(
+        () => parseAst('{{2d6, 2d8}}>=4'),
+        ParseError,
+        'INVALID_SUCCESS_COUNT_TARGET',
+      );
+    });
+
+    it('rejects a parenthesized multi-sub group: ({2d6, 2d8})>=4 (#303)', () => {
+      expectRollError(
+        () => parseAst('({2d6, 2d8})>=4'),
+        ParseError,
+        'INVALID_SUCCESS_COUNT_TARGET',
+      );
+    });
+
+    it('accepts a direct multi-sub group: {2d6, 2d8}>=4 (#303)', () => {
+      expect(parseAst('{2d6, 2d8}>=4').type).toBe('SuccessCount');
+    });
+
+    it('accepts a single-sub group adding pools: {2d6+1d8}>=5 (#303)', () => {
+      expect(parseAst('{2d6+1d8}>=5').type).toBe('SuccessCount');
+    });
+
+    it('accepts a multi-sub group on a versus DC: {1d20 vs {2d6, 2d8}}>=5 (#303)', () => {
+      // No pool pass counts a DC, so its subtotals are never the units of
+      // anything — the multi-sub rule has nothing to say about that side.
+      expect(parseAst('{1d20 vs {2d6, 2d8}}>=5').type).toBe('SuccessCount');
+    });
+
+    it('accepts a sorted inner count: {2d6>=4}s>=4 (#303)', () => {
+      // Sort reorders and `cs` tags; neither touches a face, so the outer count
+      // compares exactly what the accepted `{2d6>=4}>=4` compares.
+      expect(parseAst('{2d6>=4}s>=4').type).toBe('SuccessCount');
+      expect(parseAst('{2d6>=4}cs>=5>=4').type).toBe('SuccessCount');
+    });
+
     it('should reject versus inside success-count target: (1d20 vs 15)>=1', () => {
       expectRollError(
         () => parseAst('(1d20 vs 15)>=1'),

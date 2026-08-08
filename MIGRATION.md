@@ -9,9 +9,10 @@ Newest first. [Upgrading from 3.1.0 to 3.2.0](#upgrading-from-310-to-320) ·
 
 Nothing was removed and no type changed, and the seed → dice mapping is
 untouched — the same seed and notation roll the same faces they did in 3.1.0.
-Four fixes: penetrating explode and the three places its output is visible, a
+Five fixes: penetrating explode and the three places its output is visible, a
 success-count target that never rolled anything, a success count wrapped in
-another one, and keep/drop on a single-sub-roll group.
+another one, keep/drop on a single-sub-roll group, and success counting on a
+grouped roll.
 
 **`!p` continuation dice now carry `initialResult`.** A penetrating explosion
 stores `raw - 1` on each die it appends, and used to record the face it
@@ -153,6 +154,55 @@ Additive pools are the form this syntax exists for and are untouched —
 never had the bug, since keep/drop compares subtotals there: `{2d6+3, 1d8}kh1`
 still works. To keep a rejected expression, move the arithmetic outside the
 selection (`{2d6}kh2+3`) or give each term its own sub-roll.
+
+**Success counting a multi-sub-roll group now scores subtotals, not dice.**
+`{2d6, 2d6}>=10` used to compare all four faces against 10 and find nothing,
+while `{2d6, 2d6}kh1` on the same node saw two compound dice worth 11 and 3.
+Roll20 counts one success per sub-roll total, and that is what the count does
+now.
+
+```typescript
+import { roll } from 'roll-parser';
+import { createMockRng } from 'roll-parser/testing';
+
+const result = roll('{2d6, 2d6}>=10', { rng: createMockRng([6, 5, 2, 1]) });
+
+result.total; // 1 — was 0
+result.successes; // 1 — was 0
+result.rendered; // '{2d6[6, 5], 2d6[2, 1]}>=10 = 1'
+```
+
+Four things move with it. `rendered` shows each sub-roll's own bracket instead
+of one flat pool, since the dice no longer are the units. The dice come back
+untagged — no `'success'` or `'failure'` in `rolls[].modifiers` — for the same
+reason. A `fT` threshold now scores subtotals too, so `{4d6+2d8, 3d20+3,
+5d10+1}>=40f<=10` reports 2 successes and 1 failure rather than a per-face
+tally. And a literal sub-roll is a subtotal like any other, so it is now scored
+rather than skipped: `{3, 1d6}>=4f<=3` with face `[6]` reports one success and
+one failure where it used to report one success alone. Single-sub-roll groups
+(`{4d6}>=5`, `{2d6+1d8}>=5`) are the flat-pool form and are unchanged.
+
+**Two group spellings of a success count are now parse errors.** Both used to
+reach the flat counter with the subtotals already gone.
+
+```typescript
+import { roll } from 'roll-parser';
+
+roll('{3d20+5}>=21'); // throws 'INVALID_SUCCESS_COUNT_TARGET' — was a count of bare faces
+roll('{2d6, 2d8}kh1>=4'); // throws 'INVALID_SUCCESS_COUNT_TARGET' — was a count of loose dice
+```
+
+The first is the single-sub-roll rule keep/drop already has: that form compares
+one face at a time, so a scalar term never reaches the comparison. A scaled or
+function-wrapped pool goes with it — `{2d6*2}>=4` and `{floor(2d6/2)}>=2` throw
+too, exactly as `{2d6*2}kh2` does. Roll20 folds the remaining math into each
+roll instead, which is only well defined for `pool ± scalar`, so the form is
+refused rather than half-implemented. The second
+covers every way a multi-sub-roll group can arrive somewhere other than as the
+count's direct target — `{{2d6, 2d8}}>=4` and `({2d6, 2d8})>=4` throw the same
+code. To keep a rejected expression, fold the scalar into the threshold —
+`3d20>=16` counts the same dice `{3d20+5}>=21` was meant to — or, for the
+selection case, count the group directly (`{2d6, 2d8}>=4`).
 
 ## Upgrading from 3.0.0 to 3.1.0
 

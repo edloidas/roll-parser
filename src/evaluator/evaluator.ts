@@ -60,6 +60,8 @@ import {
   rewriteFlags,
   SELECTION_AND_TALLY_FLAGS,
   SELECTION_FLAGS,
+  stripFlags,
+  TALLY_FLAGS,
 } from './modifiers/flags.js';
 import { markDroppedIndices, sumKeptDice } from './modifiers/keep-drop.js';
 import {
@@ -481,7 +483,13 @@ function evalMetaOperand(node: ASTNode, rng: RNG, ctx: EvalContext, env: EvalEnv
   }
 
   const metaCtx = createContext();
+  // A meta operand resolves to a scalar, so its verdicts are released with its
+  // dice — the tally counterpart of the `TALLY_FLAGS` strip in `mergeMetaRolls`.
+  const successTally = env.subtotalSuccesses;
+  const failureTally = env.subtotalFailures;
   const value = evalNode(node, rng, metaCtx, env).total;
+  env.subtotalSuccesses = successTally;
+  env.subtotalFailures = failureTally;
   mergeMetaRolls(ctx, metaCtx);
   return value;
 }
@@ -1344,10 +1352,17 @@ function evalKeepDrop(node: KeepDropNode, rng: RNG, ctx: EvalContext, env: EvalE
  * success highlights inside a dropped span.
  */
 function stripInnerMarkers(rendered: string): string {
-  return rendered
-    .replace(/\*\*(-?\d+)\*\*/g, '$1')
-    .replace(/__(-?\d+)__/g, '$1')
-    .replace(/~~(-?\d+)~~/g, '$1');
+  return stripTallyMarkers(rendered).replace(/~~(-?\d+)~~/g, '$1');
+}
+
+/**
+ * Strips success (`**`) and failure (`__`) markers from an already-rendered
+ * sub-roll, leaving dropped dice struck. Pairs with a `TALLY_FLAGS` strip: the
+ * tags and the text they produced have to go together, or `renderBreakdown`
+ * stops reproducing `rendered`.
+ */
+function stripTallyMarkers(rendered: string): string {
+  return rendered.replace(/\*\*(-?\d+)\*\*/g, '$1').replace(/__(-?\d+)__/g, '$1');
 }
 
 /**
@@ -1374,10 +1389,16 @@ function evalGroupKeepDrop(
     expr: string;
     rendered: string;
     versusMetadata: EvalContext['versusMetadata'];
+    scoredSuccesses: number;
+    scoredFailures: number;
   };
 
   const subRolls: SubRoll[] = group.expressions.map((expr) => {
     const subCtx = createContext();
+    // What a subtotal count inside this sub-roll scored, so a drop can take it
+    // back — the tally counterpart of the `TALLY_FLAGS` rewrite below.
+    const successTally = env.subtotalSuccesses;
+    const failureTally = env.subtotalFailures;
     const sub = evalNode(expr, rng, subCtx, env);
     return {
       subtotal: sub.total,
@@ -1386,6 +1407,8 @@ function evalGroupKeepDrop(
       expr: subCtx.expressionParts.join(''),
       rendered: subCtx.renderedParts.join(''),
       versusMetadata: subCtx.versusMetadata,
+      scoredSuccesses: env.subtotalSuccesses - successTally,
+      scoredFailures: env.subtotalFailures - failureTally,
     };
   });
 
@@ -1418,6 +1441,10 @@ function evalGroupKeepDrop(
       for (const die of sub.rolls) {
         die.modifiers = rewriteFlags(die.modifiers, SELECTION_AND_TALLY_FLAGS, 'dropped');
       }
+      // A count on subtotals left no tag for the rewrite above to strip, so its
+      // verdicts come back from the env tally instead.
+      env.subtotalSuccesses -= sub.scoredSuccesses;
+      env.subtotalFailures -= sub.scoredFailures;
       appendAll(ctx.rolls, sub.rolls);
       outerRendered.push(`~~${stripInnerMarkers(sub.rendered)}~~`);
     } else {
@@ -1505,6 +1532,12 @@ function evalSuccessCount(
   ctx: EvalContext,
   env: EvalEnv,
 ): EvalResult {
+  // Rolled back below, so a subtotal count nested in the target
+  // (`{{2d6, 2d6}>=10, 1d8}>=1`) is not reported alongside the subtotal this
+  // pass re-scores it into.
+  const successTallyBefore = env.subtotalSuccesses;
+  const failureTallyBefore = env.subtotalFailures;
+
   const targetCtx = createContext();
   const target = evalNode(node.target, rng, targetCtx, env);
   const targetExpr = targetCtx.expressionParts.join('');
@@ -1547,30 +1580,66 @@ function evalSuccessCount(
     return part;
   };
 
-  // An empty pool (`0d6>=4`, `{3, 0d6}>=4`) scores zero of both, so its total
-  // is 0 — never `target.total`, which for a group is the sum of its
-  // sub-rolls and would break `total === successes - failures`. Reachable only
-  // through a zero-count pool — a target holding no dice node at all is
-  // rejected at parse time.
-  if (targetCtx.rolls.length === 0) {
+  // Multi-sub-roll group: the units are sub-roll subtotals, not dice. The
+  // `sides = 0` synthetics are `evalGroupKeepDrop`'s sentinel and never reach
+  // `ctx.rolls`. Only a direct group target arrives here — the parser refuses
+  // every form that would reach the count with the subtotals already gone.
+  const bySubtotal = node.target.type === 'Group' && node.target.expressions.length >= 2;
+  const pool: DieResult[] = bySubtotal
+    ? (target.part as Extract<RollPart, { type: 'group' }>).parts.map((sub) => ({
+        sides: 0,
+        result: sub.total,
+        modifiers: [],
+        critical: false,
+        fumble: false,
+      }))
+    : targetCtx.rolls;
+
+  // ! Releases every die an inner count tagged, `vs` DC dice included, though
+  // ! `countSuccesses` spares those. The marker strip below reads rendered text
+  // ! and cannot tell a DC die apart, so sparing one here leaves a tag whose
+  // ! `**` is already gone and `renderBreakdown` stops reproducing `rendered`.
+  if (bySubtotal && poolAlreadyCounted) {
+    for (const die of targetCtx.rolls) {
+      die.modifiers = stripFlags(die.modifiers, TALLY_FLAGS);
+    }
+  }
+
+  // An empty pool (`0d6>=4`) scores zero of both, so its total is 0 — never
+  // `target.total`, which would break `total === successes - failures`.
+  // Reachable only through a zero-count pool — a target holding no dice node at
+  // all is rejected at parse time.
+  if (pool.length === 0) {
     ctx.expressionParts.push(`${targetExpr}${code}`);
     ctx.renderedParts.push(`${targetExpr}${code}`);
     return { total: 0, part: buildPart(0, 0, 0) };
   }
 
   const result = countSuccesses(
-    targetCtx.rolls,
+    pool,
     { operator: node.threshold.operator, value: thresholdValue },
     failValue != null && node.failThreshold != null
       ? { operator: node.failThreshold.operator, value: failValue }
       : undefined,
-    env.hasVersusDc,
-    poolAlreadyCounted,
+    !bySubtotal && env.hasVersusDc,
+    !bySubtotal && poolAlreadyCounted,
   );
+
+  if (bySubtotal) {
+    env.subtotalSuccesses = successTallyBefore + result.successes;
+    env.subtotalFailures = failureTallyBefore + result.failures;
+  }
 
   appendAll(ctx.rolls, targetCtx.rolls);
   ctx.expressionParts.push(`${targetExpr}${code}`);
-  ctx.renderedParts.push(`${targetExpr}${code}${renderDice(targetCtx.rolls)}`);
+  // A subtotal count renders through the group — its sub-rolls carry their own
+  // brackets, and one flat bracket would spell out the units it never used. The
+  // strip pairs with the tag release above: markers and tags go together.
+  ctx.renderedParts.push(
+    bySubtotal
+      ? `${stripTallyMarkers(targetCtx.renderedParts.join(''))}${code}`
+      : `${targetExpr}${code}${renderDice(targetCtx.rolls)}`,
+  );
 
   return {
     total: result.total,
@@ -1648,7 +1717,14 @@ function evalVersus(node: VersusNode, rng: RNG, ctx: EvalContext, env: EvalEnv):
     const natural = extractNatural(rollCtx.rolls, env);
 
     const dcCtx = createContext();
+    // A subtotal count on the DC side (`1d20 vs {{2d6, 2d6}>=10}`) is rolled
+    // back for the same reason `countTaggedDice` skips DC dice: no pool pass
+    // may tally that side, so its verdicts stay out of the top-level counts.
+    const dcSuccessTally = env.subtotalSuccesses;
+    const dcFailureTally = env.subtotalFailures;
     const dcResult = evalNode(node.dc, rng, dcCtx, env);
+    env.subtotalSuccesses = dcSuccessTally;
+    env.subtotalFailures = dcFailureTally;
 
     const degree = calculateDegree(rollResult.total, dcResult.total, natural);
 
@@ -1754,6 +1830,8 @@ export function evaluate(ast: ASTNode, rng: RNG, options: EvaluateOptions = {}):
     maxRerollIterations,
     totalDiceRolled: 0,
     hasSuccessCount: false,
+    subtotalSuccesses: 0,
+    subtotalFailures: 0,
     insideVersus: false,
     hasVersusDc: false,
     critRules: undefined,
@@ -1789,24 +1867,27 @@ export function evaluate(ast: ASTNode, rng: RNG, options: EvaluateOptions = {}):
     rendered,
     rolls: ctx.rolls,
     parts: part,
-    ...(env.hasSuccessCount ? countTaggedDice(ctx.rolls, env.hasVersusDc) : {}),
+    ...(env.hasSuccessCount ? countTaggedDice(ctx.rolls, env) : {}),
     ...(versus ? { degree: versus.degree } : {}),
     ...(versus?.natural != null ? { natural: versus.natural } : {}),
   };
 }
 
-/** Tallies the `'success'` / `'failure'` tags across a whole roll. */
+/**
+ * Tallies the `'success'` / `'failure'` tags across a whole roll, on top of
+ * what a group count scored on subtotals — those carry no tag to find.
+ */
 function countTaggedDice(
   rolls: DieResult[],
-  hasVersusDc: boolean,
+  env: EvalEnv,
 ): { successes: number; failures: number } {
-  let successes = 0;
-  let failures = 0;
+  let successes = env.subtotalSuccesses;
+  let failures = env.subtotalFailures;
 
   for (const die of rolls) {
     // A success-count inside the DC sub-expression tags its own dice before
     // `evalVersus` marks them `'dc'`, so they arrive here already tagged.
-    if (hasVersusDc && isVersusDc(die)) continue;
+    if (env.hasVersusDc && isVersusDc(die)) continue;
     if (die.modifiers.includes('success')) successes += 1;
     else if (die.modifiers.includes('failure')) failures += 1;
   }
