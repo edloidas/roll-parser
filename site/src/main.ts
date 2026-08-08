@@ -7,7 +7,7 @@
 
 import { isRollParserError, roll, VERSION } from 'roll-parser';
 import { initTrayToggle, renderLegend, renderTray } from './dice.js';
-import { renderErrorSlot, renderResultPanel } from './render.js';
+import { formatTotal, renderErrorSlot, renderResultPanel } from './render.js';
 import { initTheme } from './theme.js';
 import { readUrlState, writeUrlState } from './url.js';
 
@@ -83,7 +83,7 @@ function animateTotal(to: number): void {
   if (el == null) return;
 
   if (prefersReducedMotion() || !Number.isInteger(to) || from === to) {
-    el.textContent = String(to);
+    el.textContent = formatTotal(to);
     return;
   }
 

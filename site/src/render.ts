@@ -21,6 +21,22 @@ const MAX_BREAKDOWN_DICE = 500;
 /** Above this many itemizable dice the structured equation is too busy — fall back. */
 const MAX_EQUATION_DICE = 60;
 
+/** Decimals kept when a total is fractional — `sqrt(1d4+12)` is 17 digits raw. */
+const MAX_DECIMALS = 4;
+
+/**
+ * Formats a total for display. Floats from `sqrt` and `/` carry a full
+ * IEEE-754 expansion that overflows the panel, so they are rounded — to
+ * exponential when rounding would show a non-zero total as `0`.
+ */
+export function formatTotal(value: number): string {
+  if (Number.isInteger(value)) return String(value);
+
+  const rounded = Number(value.toFixed(MAX_DECIMALS));
+
+  return rounded === 0 ? value.toExponential(2) : String(rounded);
+}
+
 /** Escapes the five HTML-significant characters. */
 function escapeHtml(value: string): string {
   return value
@@ -102,7 +118,7 @@ function renderEquation(root: RollPart, notation: string): string {
     if (part.type === 'successCount') {
       return `${part.successes} success${part.successes === 1 ? '' : 'es'}`;
     }
-    return String(part.total);
+    return formatTotal(part.total);
   }
 
   function fallbackDiceLabel(part: RollPart): string {
@@ -276,9 +292,11 @@ function expressionNote(result: RollResult): string {
 export function renderResultPanel(result: RollResult): string {
   // Success counting reframes the roll — lead with the counts, not the sum.
   const emphasizeCounts = result.successes != null;
+  const shown = formatTotal(result.total);
+  const exact = shown === String(result.total) ? '' : ` title="${result.total}"`;
   const totalBlock = emphasizeCounts
     ? successSummary(result)
-    : `<div class="total" aria-label="total">${result.total}</div>`;
+    : `<div class="total" aria-label="total"${exact}>${shown}</div>`;
 
   return [degreeBadge(result), totalBlock, breakdownBlock(result), expressionNote(result)].join('');
 }
