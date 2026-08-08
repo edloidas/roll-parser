@@ -235,7 +235,10 @@ export type RollPartBase = {
  * - `literal.total === value` and `variable.total === value`.
  * - Each part's `rolls[]` shares `DieResult` references with
  *   `RollResult.rolls[]`; both reflect post-evaluation state (explode
- *   accumulation, reroll flags, keep/drop flags). No deep clone.
+ *   accumulation, reroll flags, keep/drop flags, success/failure tags). No deep
+ *   clone. A part's own numbers record what that part computed, so an inner
+ *   `successCount` re-scored by an outer one (`{4d6>=5}<=2f5`) keeps its
+ *   tally while the dice it shares show the outer count's tags.
  *
  * Meta-expression sub-trees (`4d6kh(1d2)`, `(1+1)d6` counts/sides, computed
  * thresholds) are not surfaced as nested parts — their resolved numbers
@@ -450,6 +453,13 @@ export type RollResult = Readonly<{
    * arithmetic on top of a success count (e.g. `{5d6>=5}+2`) affects `total`
    * but not `successes`. Success counts are terminal, so the group braces are
    * required: `5d6>=5 * 2` is an `INVALID_SUCCESS_COUNT_TARGET` parse error.
+   *
+   * Braces also let a second count re-count the same pool (`{4d6>=5}<=2f5`).
+   * The outermost count owns the outcome: it re-scores the pool against its own
+   * thresholds, so no die is ever both a success and a failure, and dice it
+   * does not count come out untagged rather than keeping the inner count's
+   * tags. The one exception is the DC side of a `vs`, which sits outside every
+   * pool pass and so keeps whatever tagged it.
    */
   successes?: number;
   /**

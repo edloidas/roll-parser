@@ -1505,13 +1505,17 @@ function evalSuccessCount(
   ctx: EvalContext,
   env: EvalEnv,
 ): EvalResult {
-  // Flag tracks syntactic presence of success-count notation, not pool size —
-  // set before any early return so empty pools still populate successes/failures.
-  env.hasSuccessCount = true;
-
   const targetCtx = createContext();
   const target = evalNode(node.target, rng, targetCtx, env);
   const targetExpr = targetCtx.expressionParts.join('');
+
+  // True once any count has run: an inner one that tagged this very pool (only
+  // a group can arrange that — `{4d6>=5}<=2f5`), or an unrelated earlier one,
+  // which costs a redundant strip over dice nothing tagged. The flag otherwise
+  // tracks syntactic presence of success-count notation, not pool size — set
+  // before any early return so empty pools still populate successes/failures.
+  const poolAlreadyCounted = env.hasSuccessCount;
+  env.hasSuccessCount = true;
 
   const thresholdValue = resolveThreshold(node.threshold.value, rng, ctx, env, 'threshold');
   const failValue =
@@ -1561,6 +1565,7 @@ function evalSuccessCount(
       ? { operator: node.failThreshold.operator, value: failValue }
       : undefined,
     env.hasVersusDc,
+    poolAlreadyCounted,
   );
 
   appendAll(ctx.rolls, targetCtx.rolls);

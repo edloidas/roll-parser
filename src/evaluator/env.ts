@@ -37,6 +37,10 @@ export type EvalEnv = {
    * Set to `true` by `evalSuccessCount`. Propagates through the shared env
    * so `evaluate()` can include `successes`/`failures` fields even when no
    * die was tagged (impossible threshold).
+   *
+   * ! Set *after* the target is evaluated, not before. `evalSuccessCount` reads
+   * ! the pre-set value to learn whether an inner count already tagged its pool
+   * ! — moving the assignment back to the top makes it read its own write.
    */
   hasSuccessCount: boolean;
   /**
