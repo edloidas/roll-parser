@@ -169,9 +169,19 @@ export type DieResult = {
   initialResult?: number;
   /** Modifiers applied to this die */
   modifiers: DieModifier[];
-  /** True if rolled the maximum value (always false for Fate dice) */
+  /**
+   * True if the die met its critical criteria — by default, rolling the
+   * maximum face on a die with more than one side. That default never fires
+   * on `d1` or on Fate dice (`sides = 0` has no maximum face), but an
+   * explicit `cs` threshold does: `4dFcs>0` flags every `+1`.
+   */
   critical: boolean;
-  /** True if rolled 1 (always false for Fate dice) */
+  /**
+   * True if the die met its fumble criteria — by default, rolling a 1 on a
+   * die with more than one side. As with {@link DieResult.critical}, the
+   * default never fires on `d1` or Fate dice, while an explicit `cf`
+   * threshold does: `4dFcf=-1` flags every `-1`.
+   */
   fumble: boolean;
 };
 

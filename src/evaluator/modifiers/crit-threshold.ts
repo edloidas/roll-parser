@@ -19,6 +19,13 @@
  * see the clamped faces. The two can therefore disagree on one die —
  * `4d6min5cs>4` flags a clamped natural 1 as both critical and fumble.
  *
+ * They also diverge on Fate dice. `'default'` carries a `sides > 1` guard, so
+ * it never fires on a `sides = 0` pool; an explicit threshold has none and
+ * compares the raw {-1, 0, +1} face, so `4dFcs>0` and `4dFcf=-1` do set the
+ * flags. The missing guard is deliberate — the parser rejects the bare
+ * `cs`/`cf` forms instead, since they would resolve to `'default'` and
+ * silently do nothing.
+ *
  * ! Penetrating explode is not covered: it stores `raw - 1` in `result`
  * ! without recording `initialResult`, so `1d6!pcs` still judges a natural
  * ! 6 by its decremented 5. An *inherited* rule is handed the raw roll

@@ -37,7 +37,8 @@ export function createDieResult(
 
 /**
  * Creates a Fate/Fudge die result. Uses `sides = 0` as a sentinel — Fate dice
- * have no max-face concept, so `critical` and `fumble` are always `false`.
+ * have no max-face concept, so `critical` and `fumble` start `false` and the
+ * default rule never sets them. An explicit `cs`/`cf` threshold still can.
  */
 export function createFateDieResult(result: number, modifiers: DieModifier[]): DieResult {
   return {

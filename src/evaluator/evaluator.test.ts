@@ -4193,6 +4193,16 @@ describe('evaluate', () => {
       expect(result.rolls.map((d) => d.fumble)).toEqual([false, false, false, false]);
     });
 
+    test('cf on Fate dice flags a -1 the default rule never reaches', () => {
+      const ast = parse('4dFcf=-1');
+      const rng = createMockRng([1, -1, 0, 1]);
+      const result = evaluate(ast, rng);
+
+      expect(result.total).toBe(1);
+      expect(result.rolls.map((d) => d.fumble)).toEqual([false, true, false, false]);
+      expect(result.rolls.map((d) => d.critical)).toEqual([false, false, false, false]);
+    });
+
     test('SuccessCount wrapping CritThreshold leaves success tags independent of crit flags', () => {
       const ast = parse('10d10cs>8>=6');
       const rng = createMockRng([10, 9, 8, 7, 6, 5, 4, 3, 2, 1]);

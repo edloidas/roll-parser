@@ -61,8 +61,11 @@ export type DiceNode = NodeSpan & {
  * Fate/Fudge dice node (`dF`).
  * Each die produces a result in {-1, 0, +1}. No configurable sides.
  *
- * Fate dice carry `sides: 0` as a sentinel in their `DieResult`, and are
- * never `critical` or `fumble` — there is no maximum face to hit.
+ * Fate dice carry `sides: 0` as a sentinel in their `DieResult`, so the
+ * default `critical`/`fumble` rule never fires — it is guarded on `sides > 1`,
+ * which also stops a `+1` face from reading as a fumbled 1. An explicit
+ * threshold still applies: `4dFcs>0` and `4dFcf=-1` set the flags, while the
+ * bare `cs`/`cf` forms are rejected at parse time.
  *
  * @category AST
  */
