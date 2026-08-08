@@ -244,6 +244,12 @@ compounded 15. The side you *don't* override always reads the natural face, so
 > directly, so `10d10>=6 + 2` is a parse error. Put the arithmetic inside the
 > threshold, `10d10>=(4+2)`, or wrap the count in group braces to operate on its
 > result: `{10d10>=6}+2`.
+>
+> Braces also let a second count re-score the same pool — `{4d6>=5}<=2f5`. The
+> outermost count wins outright: every die is judged against its thresholds
+> alone, so `successes`, `failures`, and the rendered markers agree with it, and
+> dice it does not count come out untagged. The one exception is the DC side of
+> a `vs`, which sits outside every pool pass and keeps whatever tagged it.
 
 > [!WARNING]
 > A bare `d` after a dice expression is rejected: `4d6d1` throws

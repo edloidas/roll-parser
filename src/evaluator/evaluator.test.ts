@@ -1783,6 +1783,48 @@ describe('evaluate', () => {
       expect(getDie(result.rolls, 3).modifiers).toEqual(['kept', 'success']);
     });
 
+    test('the outer count re-scores the pool: {4d6>=5f1}<=2f6 (#297)', () => {
+      // Differing thresholds — the inner pass tags 6 and 5 as successes and 1 as
+      // a failure, the outer one scores every die the other way round.
+      const ast = parse('{4d6>=5f1}<=2f6');
+      const result = evaluate(ast, createMockRng([6, 5, 2, 1]));
+
+      expect(getDie(result.rolls, 0).modifiers).toEqual(['kept', 'failure']);
+      expect(getDie(result.rolls, 1).modifiers).toEqual(['kept']);
+      expect(getDie(result.rolls, 2).modifiers).toEqual(['kept', 'success']);
+      expect(getDie(result.rolls, 3).modifiers).toEqual(['kept', 'success']);
+
+      expect(result.successes).toBe(2);
+      expect(result.failures).toBe(1);
+      expect(result.total).toBe(1);
+      expect(result.rendered).toBe('{4d6>=5f1}<=2f6[__6__, 5, **2**, **1**] = 1');
+    });
+
+    test('a re-scored die loses the inner success tag: {4d6>=5}<=2f5 (#297)', () => {
+      const ast = parse('{4d6>=5}<=2f5');
+      const result = evaluate(ast, createMockRng([5, 2, 3, 6]));
+
+      expect(getDie(result.rolls, 0).modifiers).toEqual(['kept', 'failure']);
+      expect(result.rendered).toContain('__5__');
+
+      expect(result.successes).toBe(1);
+      expect(result.failures).toBe(1);
+      expect(result.total).toBe(0);
+    });
+
+    test('no die carries both tally tags after a nested count (#297)', () => {
+      for (const notation of ['{4d6>=5f1}<=2f6', '{4d6>=5}<=2f5', '{4d6>=5f1}>=5f1']) {
+        const result = evaluate(parse(notation), createMockRng([6, 5, 2, 1]));
+
+        for (const die of result.rolls) {
+          expect(die.modifiers.includes('success') && die.modifiers.includes('failure')).toBe(
+            false,
+          );
+        }
+        expect(result.total).toBe((result.successes ?? 0) - (result.failures ?? 0));
+      }
+    });
+
     test('rendered output uses ** and __ markers', () => {
       const ast = parse('3d6>=5f1');
       const rng = createMockRng([1, 5, 3]);

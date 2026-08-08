@@ -9,8 +9,9 @@ Newest first. [Upgrading from 3.1.0 to 3.2.0](#upgrading-from-310-to-320) ·
 
 Nothing was removed and no type changed, and the seed → dice mapping is
 untouched — the same seed and notation roll the same faces they did in 3.1.0.
-Two fixes: penetrating explode and the three places its output is visible, and
-a success-count target that never rolled anything.
+Three fixes: penetrating explode and the three places its output is visible, a
+success-count target that never rolled anything, and a success count wrapped in
+another one.
 
 **`!p` continuation dice now carry `initialResult`.** A penetrating explosion
 stores `raw - 1` on each die it appends, and used to record the face it
@@ -92,6 +93,32 @@ Groups holding at least one pool are untouched — `{3, 1d6}>=4` counts the `1d6
 exactly as it did. `0d6>=4` also still parses and totals 0; only targets that
 can never roll a die are rejected. One related total moved: a group whose pool
 turns out empty at run time, `{3, 0d6}>=4`, now totals 0 rather than 3.
+
+**A second success count re-scores the pool instead of adding to it.** Group
+braces let one count wrap another (`{4d6>=5f1}<=2f6`), which the parse-time
+reject on a direct `4d6>=5>=1` never reached. The inner pass used to leave its
+tags behind, so a die could come back both `'success'` and `'failure'` and the
+top-level counts stopped describing the total. The outermost count now owns the
+tags outright.
+
+```typescript
+import { roll } from 'roll-parser';
+import { createMockRng } from 'roll-parser/testing';
+
+const result = roll('{4d6>=5f1}<=2f6', { rng: createMockRng([6, 5, 2, 1]) });
+
+result.total; // 1
+result.successes; // 2 — was 4
+result.failures; // 1 — was 0
+result.rendered; // '{4d6>=5f1}<=2f6[__6__, 5, **2**, **1**] = 1'
+```
+
+`total` never moved — it always came from the outermost count. What changed is
+`successes`, `failures`, `rolls[].modifiers`, and `rendered`, which now agree
+with it, so `successCount.total === successes - failures` holds again. A lone
+count is untouched, and so is a nested pair whose thresholds agree
+(`{4d6>=5}>=5`). Dropped dice come out untagged; only the DC side of a `vs`
+keeps tags from an inner count, since no pool pass may tally it.
 
 ## Upgrading from 3.0.0 to 3.1.0
 

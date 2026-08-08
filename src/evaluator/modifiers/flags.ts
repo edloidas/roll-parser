@@ -33,15 +33,21 @@ export function isVersusDc(die: DieResult): boolean {
 export const SELECTION_FLAGS: readonly DieModifier[] = ['kept', 'dropped'];
 
 /**
+ * Success-count tally flags — rebuilt by every counting pass. A group lets a
+ * second count reach a pool the first one already tagged (`{4d6>=5}<=2f5`);
+ * stripping these first is what keeps the outermost count the only one the
+ * tags describe.
+ */
+export const TALLY_FLAGS: readonly DieModifier[] = ['success', 'failure'];
+
+/**
  * Selection flags plus the success-count tally flags. Stripped when a die
  * leaves the pool that tagged it (meta sub-expressions, dropped group
  * sub-rolls) so the top-level successes/failures scan cannot count it.
  */
 export const SELECTION_AND_TALLY_FLAGS: readonly DieModifier[] = [
-  'kept',
-  'dropped',
-  'success',
-  'failure',
+  ...SELECTION_FLAGS,
+  ...TALLY_FLAGS,
 ];
 
 /**
@@ -49,13 +55,7 @@ export const SELECTION_AND_TALLY_FLAGS: readonly DieModifier[] = [
  * into a parent. Meta operands nest (`((1d2)d4)d6`), so a die passes through
  * the merge once per level and the tag must be rebuilt, not appended.
  */
-export const META_MERGE_FLAGS: readonly DieModifier[] = [
-  'kept',
-  'dropped',
-  'success',
-  'failure',
-  'meta',
-];
+export const META_MERGE_FLAGS: readonly DieModifier[] = [...SELECTION_AND_TALLY_FLAGS, 'meta'];
 
 /** Selection flags plus `rerolled` — reassigned on every reroll pass. */
 export const REROLL_SLOT_FLAGS: readonly DieModifier[] = ['kept', 'dropped', 'rerolled'];

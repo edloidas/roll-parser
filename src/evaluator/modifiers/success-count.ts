@@ -10,17 +10,18 @@
  * excluded from counting and are never tagged.
  *
  * Mutates the input pool in place to add `'success'` / `'failure'` modifier
- * flags — mirrors the mutation pattern of explode and reroll modifiers. Each
- * tag is written at most once per die: a group counted after its members
- * (`{4d6>=5}>=1`) runs this pass twice over the same dice, and the parse-time
- * reject that blocks a direct `4d6>=5>=4` does not reach through a group.
+ * flags — mirrors the mutation pattern of explode and reroll modifiers. The
+ * tags are rebuilt, not appended: a group counted after its members
+ * (`{4d6>=5}<=2f5`) runs this pass twice over the same dice, and the outermost
+ * pass is the one whose arithmetic `RollResult.successes` / `failures` and the
+ * rendered markers report.
  *
  * @module evaluator/modifiers/success-count
  */
 
 import type { DieResult, ResolvedComparePoint } from '../../types.js';
 import { matchesCondition } from './compare.js';
-import { isVersusDc } from './flags.js';
+import { isVersusDc, stripFlags, TALLY_FLAGS } from './flags.js';
 
 export type SuccessCountResult = {
   total: number;
@@ -33,6 +34,7 @@ export function countSuccesses(
   threshold: ResolvedComparePoint,
   failThreshold: ResolvedComparePoint | undefined,
   hasVersusDc: boolean,
+  poolAlreadyCounted: boolean,
 ): SuccessCountResult {
   let successes = 0;
   let failures = 0;
@@ -45,15 +47,20 @@ export function countSuccesses(
   // ! `'success'` / `'failure'` tags written below still land on the pool.
   const pool = hasVersusDc ? dice.filter((die) => !isVersusDc(die)) : dice;
 
-  // ! The guards below only stop the *same* tag being written twice. A nested
-  // ! count with a different threshold still appends to the first pass's tags,
-  // ! so a die can end up both `'success'` and `'failure'`, and the returned
-  // ! counts then disagree with the tags in `rolls`.
+  // ! Dropped dice are stripped too, not just the ones re-tagged below. This
+  // ! pass skips them, so an inner count's tag would otherwise survive into the
+  // ! top-level successes/failures scan and break `total === successes - failures`.
+  if (poolAlreadyCounted) {
+    for (const die of pool) {
+      die.modifiers = stripFlags(die.modifiers, TALLY_FLAGS);
+    }
+  }
+
   for (const die of pool) {
     if (die.modifiers.includes('dropped')) continue;
 
     if (matchesCondition(die.result, threshold.operator, threshold.value)) {
-      if (!die.modifiers.includes('success')) die.modifiers.push('success');
+      die.modifiers.push('success');
       successes += 1;
       continue;
     }
@@ -62,7 +69,7 @@ export function countSuccesses(
       failThreshold != null &&
       matchesCondition(die.result, failThreshold.operator, failThreshold.value)
     ) {
-      if (!die.modifiers.includes('failure')) die.modifiers.push('failure');
+      die.modifiers.push('failure');
       failures += 1;
     }
   }
