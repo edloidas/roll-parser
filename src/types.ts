@@ -42,9 +42,12 @@ export type ResolvedComparePoint = {
 };
 
 /**
- * A resolved crit threshold — `'default'` means the per-die default rule
- * (`result === sides` for critical, `result === 1` for fumble), which is what
- * bare `cs` / `cf` produce.
+ * A resolved crit threshold — `'default'` means the per-die default rule,
+ * which is what bare `cs` / `cf` produce. It reads the natural face
+ * (`initialResult ?? result`): critical when it equals `sides`, fumble when
+ * it equals 1, both only for `sides > 1`. An explicit ComparePoint instead
+ * reads the die's current `result`, so a preceding modifier that rewrote it
+ * is visible to the comparison.
  *
  * @category Results
  */

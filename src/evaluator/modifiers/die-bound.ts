@@ -10,6 +10,8 @@
  *
  * `critical` / `fumble` keep reflecting the natural face — a clamped 1 is
  * still a fumble, matching the raw-face crit semantics used everywhere else.
+ * A following bare `cs`/`cf` agrees; a following *explicit* threshold
+ * (`4d6min5cs>4`) is a predicate over the clamped value and overrides it.
  * Meta dice (rolled to compute counts/sides/modifier args) are skipped.
  * Dropped dice are clamped too — they are excluded from totals anyway, and
  * clamping them keeps the rendered pool consistent.
