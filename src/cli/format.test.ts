@@ -27,7 +27,7 @@ describe('formatResult', () => {
       expect(formatResult(result, { verbose: true })).toBe('2d6[3, 5] + 3 = 11');
     });
 
-    test('replaces markdown strikethrough with parentheses for dropped dice', () => {
+    test('parenthesizes dropped dice', () => {
       const result = roll('4d6kh3', { rng: createMockRng([3, 1, 5, 4]) });
       expect(formatResult(result, { verbose: true })).toContain('(1)');
       expect(formatResult(result, { verbose: true })).not.toContain('~~');
@@ -45,7 +45,7 @@ describe('formatResult', () => {
       expect(formatResult(result, { verbose: true })).toBe('1d20[15] = 15');
     });
 
-    test('replaces strikethrough around negative values (dropped fate dice)', () => {
+    test('parenthesizes dropped fate dice, negative faces included', () => {
       const result = roll('4dFkh2', { rng: createMockRng([-1, 0, 1, 1]) });
       const output = formatResult(result, { verbose: true });
 
@@ -55,7 +55,7 @@ describe('formatResult', () => {
       expect(output).toBe('4dF[(-1), (0), 1, 1] = 2');
     });
 
-    test('converts intermediate rerolled dice to terminal-friendly parentheses', () => {
+    test('parenthesizes intermediate rerolled dice', () => {
       // 2d6r<2 with RNG [1, 5, 3] — die 0 rerolls 1 → 3.
       const result = roll('2d6r<2', { rng: createMockRng([1, 5, 3]) });
       const output = formatResult(result, { verbose: true });
@@ -65,7 +65,7 @@ describe('formatResult', () => {
       expect(output).toContain('= 8');
     });
 
-    test('converts success/failure markers to brackets and braces', () => {
+    test('brackets successes and braces failures', () => {
       const result = roll('3d6>=5f1', { rng: createMockRng([1, 5, 3]) });
       const output = formatResult(result, { verbose: true });
 
@@ -75,13 +75,28 @@ describe('formatResult', () => {
       expect(output).not.toContain('__');
     });
 
-    test('converts compound dropped sub-roll spans from group keep', () => {
-      // The dropped sub-roll strikethrough wraps notation (`~~1d8[2]~~`), not just a number.
+    test('parenthesizes a whole sub-roll dropped by group keep', () => {
+      // The wrapper spans notation, not just a number — `(1d8[2])`.
       const result = roll('{1d8, 1d10}kh1', { rng: createMockRng([2, 7]) });
       const output = formatResult(result, { verbose: true });
 
       expect(output).toBe('{(1d8[2]), 1d10[7]} = 7');
       expect(output).not.toContain('~~');
+    });
+
+    test('nests a dropped sub-roll that itself contains a dropped sub-roll (#292)', () => {
+      // The marker span here is `~~{~~1d10[1]~~, 1d12[3]}~~` — nested, because
+      // `stripInnerMarkers` only unwraps markers around bare numbers. Reading
+      // it structurally is what makes the nesting come out paired; the regex
+      // this replaced stopped at the first inner `~~` and emitted `({)1d10[1](,
+      // 1d12[3]})`.
+      const result = roll('{{1d6, 1d8}kh1, {1d10, 1d12}kh1}kh1', {
+        rng: createMockRng([1, 4, 1, 3]),
+      });
+
+      expect(formatResult(result, { verbose: true })).toBe(
+        '{{(1d6[1]), 1d8[4]}, ({(1d10[1]), 1d12[3]})} = 4',
+      );
     });
   });
 

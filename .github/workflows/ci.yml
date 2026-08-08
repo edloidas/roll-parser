@@ -359,6 +359,11 @@ jobs:
         run: |
           node --input-type=module -e "import { roll, VERSION } from 'roll-parser'; import { createMockRng, MockRNGExhaustedError } from 'roll-parser/testing'; const r = roll('4d6kh3', { rng: createMockRng([3, 6, 2, 5]) }); if (r.total !== 14) throw new Error('pinned total ' + r.total); if (typeof MockRNGExhaustedError !== 'function') throw new Error('missing error export'); console.log('ESM OK:', VERSION, r.total)"
 
+      - name: Test render subpath
+        working-directory: ${{ runner.temp }}/smoke
+        run: |
+          node --input-type=module -e "import { roll } from 'roll-parser'; import { renderBreakdown } from 'roll-parser/render'; import { createMockRng } from 'roll-parser/testing'; const r = roll('4d6kh3', { rng: createMockRng([3, 6, 2, 5]) }); const shown = renderBreakdown(r, { dropped: (die, text) => '(' + text + ')' }); if (shown !== '4d6[3, 6, (2), 5] = 14') throw new Error('render ' + shown); console.log('render OK:', shown)"
+
       - name: Test require(esm) import
         # ESM-only package — require() works on Node >=22.12 via require(esm).
         working-directory: ${{ runner.temp }}/smoke
@@ -390,7 +395,7 @@ jobs:
 
   # The published types on the TypeScript versions consumers actually run.
   # Typechecks `scripts/ts-compat/consumer.ts` against the packed tarball, so
-  # the `exports` map, both entry points, and the emitted `.d.ts` all take
+  # the `exports` map, all three entry points, and the emitted `.d.ts` all take
   # part — `tsc` resolves here exactly the way a consumer's does. Node-only:
   # no Bun setup and no root install, since the fixture depends on the tarball
   # and one matrix TypeScript, nothing else.
@@ -581,16 +586,19 @@ jobs:
           npm init -y > /dev/null
           npm install --no-audit --no-fund "$RUNNER_TEMP"/tarball/roll-parser-*.tgz
 
-      - name: Write browser fixture importing both entry points
+      - name: Write browser fixture importing every entry point
         working-directory: ${{ runner.temp }}/browser-smoke
         run: |
           printf '%s\n' \
             "import { roll, SeededRNG, VERSION } from 'roll-parser';" \
+            "import { renderBreakdown } from 'roll-parser/render';" \
             "import { createMockRng } from 'roll-parser/testing';" \
             "const pinned = roll('4d6kh3', { rng: createMockRng([3, 6, 2, 5]) });" \
             "if (pinned.total !== 14) throw new Error('pinned total ' + pinned.total);" \
+            "const shown = renderBreakdown(pinned, { dropped: (die, text) => '(' + text + ')' });" \
+            "if (shown !== '4d6[3, 6, (2), 5] = 14') throw new Error('render ' + shown);" \
             "const seeded = roll('2d6', { rng: new SeededRNG('ci') });" \
-            "console.log('browser-smoke OK', VERSION, pinned.total, seeded.total);" \
+            "console.log('browser-smoke OK', VERSION, pinned.total, seeded.total, shown);" \
             > fixture.mjs
 
       - name: Bundle fixture for the browser
@@ -685,7 +693,7 @@ jobs:
         run: node scripts/browser-smoke/run.ts "$RUNNER_TEMP/browser-run/bundle.js"
 
   # Deno's npm compatibility layer resolves `exports` through its own
-  # implementation, so the dual entry points are the part most likely to break.
+  # implementation, so the three entry points are the part most likely to break.
   # Neutrality is not what this proves — Deno provides `node:` builtins — the
   # claim under test is that the published package resolves and runs there.
   deno-smoke:
@@ -723,18 +731,21 @@ jobs:
           npm init -y > /dev/null
           npm install --no-audit --no-fund "$RUNNER_TEMP"/tarball/roll-parser-*.tgz
 
-      - name: Write Deno fixture importing both entry points
+      - name: Write Deno fixture importing every entry point
         working-directory: ${{ runner.temp }}/deno-smoke
         run: |
           printf '%s\n' \
             "import { roll, SeededRNG, VERSION } from 'roll-parser';" \
+            "import { renderBreakdown } from 'roll-parser/render';" \
             "import { createMockRng } from 'roll-parser/testing';" \
             "const pinned = roll('4d6kh3', { rng: createMockRng([3, 6, 2, 5]) });" \
             "if (pinned.total !== 14) throw new Error('pinned total ' + pinned.total);" \
+            "const shown = renderBreakdown(pinned, { dropped: (die, text) => '(' + text + ')' });" \
+            "if (shown !== '4d6[3, 6, (2), 5] = 14') throw new Error('render ' + shown);" \
             "const seeded = roll('2d6', { rng: new SeededRNG('ci') });" \
             "if (!Number.isInteger(seeded.total) || seeded.total < 2 || seeded.total > 12) throw new Error('seeded total ' + seeded.total);" \
             "if (typeof VERSION !== 'string' || VERSION.length === 0) throw new Error('missing VERSION');" \
-            "console.log('deno-smoke OK', VERSION, pinned.total, seeded.total);" \
+            "console.log('deno-smoke OK', VERSION, pinned.total, seeded.total, shown);" \
             > fixture.mjs
 
       # `manual` keeps Deno on the node_modules npm just wrote instead of

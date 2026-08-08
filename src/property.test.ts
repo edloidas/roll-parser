@@ -18,10 +18,12 @@
  * shuffles test order; it does not configure fast-check.)
  */
 
-import { describe, test } from 'bun:test';
+import { describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
 import { isRollParserError } from './errors.js';
+import { renderBreakdown } from './render.js';
 import { roll } from './roll.js';
+import type { RollResult } from './types.js';
 
 /**
  * Seed generator for properties that compare two rolls on the same random
@@ -274,6 +276,152 @@ describe('property-based invariants', () => {
         ),
         { numRuns: 200 },
       );
+    });
+  });
+
+  describe('rendered breakdown round-trip', () => {
+    /**
+     * `renderBreakdown` is a second implementation of the same output as
+     * `RollResult.rendered`, so the two can drift apart silently. This is the
+     * gate that turns that drift into a CI failure — it is the reason two
+     * implementations are acceptable at all.
+     */
+    const notationCount = fc.integer({ min: 0, max: 4 });
+
+    // Slot order is the order the parser accepts a chain in.
+    const EXPLODE = ['!', '!!', '!p', '!>4'];
+    const REROLL = ['r<2', 'ro<2', 'r=1'];
+    const BOUND = ['min2', 'max5', 'min(-2)'];
+    const CRIT = ['cs>4', 'cf<2', 'cs', 'cf', 'cs>5cf<2'];
+    const SORT = ['s', 'sd'];
+    const KEEP_DROP = ['kh2', 'kl1', 'dh1', 'dl1', 'kh(1d2)'];
+
+    /**
+     * Joins modifiers with spaces. Several adjacent pairs are otherwise
+     * unlexable — `sd` followed by `kl1` reads as one identifier — and the
+     * evaluator drops the spaces when rebuilding the expression, so the
+     * rendered form is the same either way.
+     */
+    function chainModifiers(pool: string, modifiers: string[]): string {
+      return [pool, ...modifiers.filter((modifier) => modifier !== '')].join(' ');
+    }
+
+    function withModifiers(pool: fc.Arbitrary<string>, slots: string[][]): fc.Arbitrary<string> {
+      const slotArbs = slots.map((slot) => fc.option(fc.constantFrom(...slot), { nil: '' }));
+      return fc
+        .tuple(pool, fc.tuple(...slotArbs))
+        .map(([base, modifiers]) => chainModifiers(base, [...modifiers]));
+    }
+
+    /**
+     * A pool carrying exactly one modifier.
+     *
+     * ! Do not fold this into `withModifiers`. Only the outermost modifier of
+     * ! a chain renders its own pool — every inner one is re-rendered by its
+     * ! wrapper — so a generator that always stacks five optional slots leaves
+     * ! each individual modifier outermost about 0.03% of the time, and the
+     * ! explode and reroll pools go effectively untested.
+     */
+    function withOneModifier(pool: fc.Arbitrary<string>, slots: string[][]): fc.Arbitrary<string> {
+      return fc
+        .tuple(pool, fc.constantFrom(...slots.flat()))
+        .map(([base, modifier]) => chainModifiers(base, [modifier]));
+    }
+
+    const numericPool = fc
+      .tuple(notationCount, fc.constantFrom('4', '6', '8', '10', '20', '%'))
+      .map(([count, sides]) => `${count}d${sides}`);
+    const fatePool = notationCount.map((count) => `${count}dF`);
+
+    const NUMERIC_SLOTS = [EXPLODE, REROLL, BOUND, CRIT, SORT, KEEP_DROP];
+    // Fate dice reject explode, reroll and clamping, so they get a smaller
+    // slot list rather than generating notation that can only be discarded.
+    const FATE_SLOTS = [CRIT, SORT, KEEP_DROP];
+
+    const modifiedPool = fc.oneof(
+      { weight: 4, arbitrary: withOneModifier(numericPool, NUMERIC_SLOTS) },
+      { weight: 4, arbitrary: withModifiers(numericPool, NUMERIC_SLOTS) },
+      { weight: 1, arbitrary: withOneModifier(fatePool, FATE_SLOTS) },
+      { weight: 1, arbitrary: withModifiers(fatePool, FATE_SLOTS) },
+    );
+
+    const termArb = fc.letrec((tie) => ({
+      term: fc.oneof(
+        { maxDepth: 2, withCrossShrink: true },
+        modifiedPool,
+        fc.integer({ min: 0, max: 9 }).map(String),
+        fc.constantFrom('@str', '@{my stat}'),
+        tie('term').map((inner) => `(${inner})`),
+        fc
+          .tuple(fc.constantFrom('floor', 'ceil', 'round', 'abs', 'sqrt'), tie('term'))
+          .map(([name, inner]) => `${name}(${inner})`),
+        fc
+          .tuple(fc.constantFrom('min', 'max'), tie('term'), tie('term'))
+          .map(([name, left, right]) => `${name}(${left}, ${right})`),
+        fc.array(tie('term'), { minLength: 1, maxLength: 3 }).map((subs) => `{${subs.join(', ')}}`),
+        // Sub-roll selection — the only notation that produces a group part
+        // with `keptIndices`, and so the only one that strikes a whole
+        // sub-roll instead of a die. Two or more sub-rolls, or the evaluator
+        // takes the flat-pool path and no selection happens.
+        fc
+          .tuple(
+            fc.array(tie('term'), { minLength: 2, maxLength: 3 }),
+            fc.constantFrom('kh', 'kl', 'dh', 'dl'),
+            fc.integer({ min: 1, max: 2 }),
+          )
+          .map(([subs, code, count]) => `{${subs.join(', ')}}${code}${count}`),
+        fc
+          .tuple(tie('term'), fc.constantFrom('+', '-', '*', '/', '%', '**'), tie('term'))
+          .map(([left, operator, right]) => `${left} ${operator} ${right}`),
+      ),
+    })).term;
+
+    // Success counting is terminal, so it is generated at the top level (or
+    // braced) rather than as a term the arithmetic layer can wrap.
+    const successArb = fc
+      .tuple(
+        modifiedPool,
+        fc.constantFrom('>=4', '>3', '<3', '=4'),
+        fc.option(fc.constantFrom('f1', 'f<2', 'f>=5'), { nil: '' }),
+      )
+      .map(([pool, threshold, fail]) => `${pool}${threshold}${fail}`);
+
+    const notationArb = fc.oneof(
+      { weight: 6, arbitrary: termArb },
+      { weight: 2, arbitrary: successArb },
+      { weight: 2, arbitrary: successArb.map((counted) => `{${counted}} + 1`) },
+      { weight: 2, arbitrary: fc.tuple(termArb, termArb).map(([a, b]) => `${a} vs ${b}`) },
+    );
+
+    test('renderBreakdown with default marks reproduces result.rendered', () => {
+      const NUM_RUNS = 1000;
+      let evaluated = 0;
+
+      fc.assert(
+        fc.property(notationArb, seedArb, (notation, seed) => {
+          let result: RollResult;
+          try {
+            result = roll(notation, {
+              seed,
+              context: { str: 3, 'my stat': 4 },
+              maxDice: 200,
+            });
+          } catch (error) {
+            // Notation the grammar produced but the parser or evaluator
+            // rejects proves nothing about rendering — only an untyped
+            // escape would be a failure, and that is pinned separately.
+            return isRollParserError(error);
+          }
+
+          evaluated += 1;
+          return renderBreakdown(result) === result.rendered;
+        }),
+        { numRuns: NUM_RUNS },
+      );
+
+      // Without this the property would still pass if the grammar drifted
+      // into emitting notation nothing can evaluate.
+      expect(evaluated).toBeGreaterThan(NUM_RUNS / 2);
     });
   });
 

@@ -6,7 +6,21 @@
  * @module cli/format
  */
 
+import { type DieMarks, renderBreakdown } from '../render.js';
 import type { RollResult } from '../types.js';
+
+/**
+ * Terminal stand-ins for the markdown markers `RollResult.rendered` uses:
+ * dropped dice become `(value)`, successes `[value]`, failures `{value}`, so
+ * the per-die classification stays visible with no markup dependency. A
+ * dropped group sub-roll takes the same parentheses as a dropped die.
+ */
+const TERMINAL_MARKS: DieMarks = {
+  dropped: (_die, text) => `(${text})`,
+  success: (_die, text) => `[${text}]`,
+  failure: (_die, text) => `{${text}}`,
+  droppedGroup: (inner) => `(${inner})`,
+};
 
 /**
  * Output mode selectors for {@link formatResult}.
@@ -42,27 +56,5 @@ export function formatResult(result: RollResult, options: FormatOptions = {}): s
     return String(result.total);
   }
 
-  return formatRendered(result.rendered);
-}
-
-/**
- * Converts markdown-style dice markers to terminal-friendly forms.
- *
- * The evaluator uses markdown syntax in the rendered field:
- *   `~~value~~` — dropped dice or dropped group sub-rolls
- *   `**value**` — dice counted as success
- *   `__value__` — dice counted as failure
- *
- * For plain terminals these become `(value)`, `[value]`, and `{value}` so
- * the per-die classification stays visible without any markup dependency.
- * Dropped spans can wrap a whole sub-roll (e.g. `~~1d8[2]~~` from
- * `{1d8, 1d10}kh1`), so the strikethrough pattern accepts any tilde-free
- * content, not just a single number. The evaluator never nests `~~`
- * (see `stripInnerMarkers`), so the tilde-free span match is safe.
- */
-function formatRendered(rendered: string): string {
-  return rendered
-    .replace(/\*\*(-?\d+)\*\*/g, '[$1]')
-    .replace(/__(-?\d+)__/g, '{$1}')
-    .replace(/~~([^~]+)~~/g, '($1)');
+  return renderBreakdown(result, TERMINAL_MARKS);
 }

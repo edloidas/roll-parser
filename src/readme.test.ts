@@ -248,8 +248,13 @@ beforeAll(async () => {
   // ! on a fresh clone, where `dist/` (the self-reference target) does not exist yet.
   const packageName = 'roll-parser';
   const api = (await import(packageName)) as Record<string, unknown>;
+  const render = (await import(`${packageName}/render`)) as Record<string, unknown>;
   const testing = (await import(`${packageName}/testing`)) as Record<string, unknown>;
-  namespaces = { [packageName]: api, [`${packageName}/testing`]: testing };
+  namespaces = {
+    [packageName]: api,
+    [`${packageName}/render`]: render,
+    [`${packageName}/testing`]: testing,
+  };
 
   const roll = api.roll as (notation: string) => unknown;
   const notation = '2d6+1d0+3';
@@ -262,6 +267,7 @@ beforeAll(async () => {
 
   scope = {
     ...api,
+    ...render,
     ...testing,
     // Free variables the samples use without declaring.
     userInput: '2d20kh1+5',
