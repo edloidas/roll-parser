@@ -21,6 +21,7 @@
 import { describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
 import { isRollParserError } from './errors.js';
+import { parse } from './parser/parser.js';
 import { renderBreakdown } from './render.js';
 import { roll } from './roll.js';
 import type { RollResult } from './types.js';
@@ -299,8 +300,8 @@ describe('property-based invariants', () => {
     /**
      * Joins modifiers with spaces. Several adjacent pairs are otherwise
      * unlexable — `sd` followed by `kl1` reads as one identifier — and the
-     * evaluator drops the spaces when rebuilding the expression, so the
-     * rendered form is the same either way.
+     * evaluator keeps a space exactly where one is needed, so the emitted
+     * form differs from the input only in the redundant separators.
      */
     function chainModifiers(pool: string, modifiers: string[]): string {
       return [pool, ...modifiers.filter((modifier) => modifier !== '')].join(' ');
@@ -421,6 +422,37 @@ describe('property-based invariants', () => {
 
       // Without this the property would still pass if the grammar drifted
       // into emitting notation nothing can evaluate.
+      expect(evaluated).toBeGreaterThan(NUM_RUNS / 2);
+    });
+
+    /**
+     * Reuses the breakdown grammar above — it is the one generator that covers
+     * every modifier adjacency the serializer can emit.
+     */
+    test('result.expression parses (#299)', () => {
+      const NUM_RUNS = 1000;
+      let evaluated = 0;
+
+      fc.assert(
+        fc.property(notationArb, seedArb, (notation, seed) => {
+          const options = { seed, context: { str: 3, 'my stat': 4 }, maxDice: 200 };
+
+          let result: RollResult;
+          try {
+            result = roll(notation, options);
+          } catch (error) {
+            return isRollParserError(error);
+          }
+
+          evaluated += 1;
+          // Meta-expressions are substituted with their resolved values, so
+          // only re-parseability holds — not an identical total.
+          parse(result.expression);
+          return true;
+        }),
+        { numRuns: NUM_RUNS },
+      );
+
       expect(evaluated).toBeGreaterThan(NUM_RUNS / 2);
     });
   });

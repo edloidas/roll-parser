@@ -5,6 +5,7 @@
  */
 
 import { describeValue, EvaluatorError, RollParserError, stampEvaluatorSpan } from '../errors.js';
+import { joinModifierCode } from '../notation.js';
 import type {
   ASTNode,
   BinaryOpNode,
@@ -1067,11 +1068,11 @@ function evalExplode(node: ExplodeNode, rng: RNG, ctx: EvalContext, env: EvalEnv
 function evalReroll(node: RerollNode, rng: RNG, ctx: EvalContext, env: EvalEnv): EvalResult {
   const targetCtx = createContext();
   const target = evalNode(node.target, rng, targetCtx, env);
-  const targetExpr = targetCtx.expressionParts.join('');
 
   const thresholdValue = evalMetaOperand(node.condition.value, rng, ctx, env);
 
   const code = `${node.once ? 'ro' : 'r'}${node.condition.operator}${thresholdValue}`;
+  const modifierExpr = joinModifierCode(targetCtx.expressionParts.join(''), code);
   const condition: ResolvedComparePoint = {
     operator: node.condition.operator,
     value: thresholdValue,
@@ -1079,8 +1080,8 @@ function evalReroll(node: RerollNode, rng: RNG, ctx: EvalContext, env: EvalEnv):
 
   // No-op when the target produced no dice (e.g., `(1+2)r<5`).
   if (targetCtx.rolls.length === 0) {
-    ctx.expressionParts.push(`${targetExpr}${code}`);
-    ctx.renderedParts.push(`${targetExpr}${code}`);
+    ctx.expressionParts.push(modifierExpr);
+    ctx.renderedParts.push(modifierExpr);
     const total = sumKeptDice(targetCtx.rolls, env.hasVersusDc);
     return {
       total,
@@ -1101,8 +1102,8 @@ function evalReroll(node: RerollNode, rng: RNG, ctx: EvalContext, env: EvalEnv):
     : applyRecursiveReroll(targetCtx.rolls, node.condition.operator, thresholdValue, rng, env);
 
   appendAll(ctx.rolls, pool);
-  ctx.expressionParts.push(`${targetExpr}${code}`);
-  ctx.renderedParts.push(`${targetExpr}${code}${renderDice(pool)}`);
+  ctx.expressionParts.push(modifierExpr);
+  ctx.renderedParts.push(`${modifierExpr}${renderDice(pool)}`);
 
   const total = sumKeptDice(pool, env.hasVersusDc);
   return {
@@ -1145,13 +1146,13 @@ function evalDieBound(node: DieBoundNode, rng: RNG, ctx: EvalContext, env: EvalE
   // ! would have been resolved against a total this node just replaced.
   // ! See the rule on `propagateMetadata`.
 
-  const targetExpr = targetCtx.expressionParts.join('');
   // Negative bounds render parenthesized so `result.expression` re-parses
   // (`4d6min-2` is a syntax error; `4d6min(-2)` is not).
   const code = boundValue < 0 ? `${node.bound}(${boundValue})` : `${node.bound}${boundValue}`;
+  const modifierExpr = joinModifierCode(targetCtx.expressionParts.join(''), code);
 
-  ctx.expressionParts.push(`${targetExpr}${code}`);
-  ctx.renderedParts.push(`${targetExpr}${code}${renderDice(targetCtx.rolls)}`);
+  ctx.expressionParts.push(modifierExpr);
+  ctx.renderedParts.push(`${modifierExpr}${renderDice(targetCtx.rolls)}`);
 
   const total = sumKeptDice(targetCtx.rolls, env.hasVersusDc);
   return {
@@ -1193,10 +1194,10 @@ function evalSort(node: SortNode, rng: RNG, ctx: EvalContext, env: EvalEnv): Eva
   propagateMetadata(ctx, targetCtx.versusMetadata);
 
   const code = node.order === 'ascending' ? 's' : 'sd';
-  const targetExpr = targetCtx.expressionParts.join('');
+  const modifierExpr = joinModifierCode(targetCtx.expressionParts.join(''), code);
 
-  ctx.expressionParts.push(`${targetExpr}${code}`);
-  ctx.renderedParts.push(`${targetExpr}${code}${renderDice(sortedRolls)}`);
+  ctx.expressionParts.push(modifierExpr);
+  ctx.renderedParts.push(`${modifierExpr}${renderDice(sortedRolls)}`);
 
   return {
     total: target.total,
@@ -1254,14 +1255,13 @@ function evalCritThreshold(
   appendAll(ctx.rolls, targetCtx.rolls);
   propagateMetadata(ctx, targetCtx.versusMetadata);
 
-  const targetExpr = targetCtx.expressionParts.join('');
-  const codes = [
+  const modifierExpr = [
     ...successResolved.map((t) => (t === 'default' ? 'cs' : `cs${t.operator}${t.value}`)),
     ...failResolved.map((t) => (t === 'default' ? 'cf' : `cf${t.operator}${t.value}`)),
-  ].join('');
+  ].reduce(joinModifierCode, targetCtx.expressionParts.join(''));
 
-  ctx.expressionParts.push(`${targetExpr}${codes}`);
-  ctx.renderedParts.push(`${targetExpr}${codes}${renderDice(targetCtx.rolls)}`);
+  ctx.expressionParts.push(modifierExpr);
+  ctx.renderedParts.push(`${modifierExpr}${renderDice(targetCtx.rolls)}`);
 
   return {
     total: target.total,
@@ -1321,7 +1321,7 @@ function evalKeepDrop(node: KeepDropNode, rng: RNG, ctx: EvalContext, env: EvalE
   const targetExpr = targetCtx.expressionParts.join('');
   const keepDropCodes = specs.map((s) => `${s.code}${s.count}`).join('');
 
-  ctx.expressionParts.push(`${targetExpr}${keepDropCodes}`);
+  ctx.expressionParts.push(joinModifierCode(targetExpr, keepDropCodes));
   ctx.renderedParts.push(`${targetExpr}${renderDice(mergedDice)}`);
 
   return {

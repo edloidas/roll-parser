@@ -9,6 +9,7 @@
  * @module render
  */
 
+import { joinModifierCode } from './notation.js';
 import type {
   DieResult,
   KeepDropSpec,
@@ -140,17 +141,20 @@ function expr(part: RollPart): string {
     case 'functionCall':
       return `${part.name}(${part.args.map(expr).join(', ')})`;
     case 'keepDrop':
-      return `${expr(part.target)}${part.specs.map(keepDropCode).join('')}`;
+      return joinModifierCode(expr(part.target), part.specs.map(keepDropCode).join(''));
     case 'explode':
       return `${expr(part.target)}${explodeCode(part)}`;
     case 'reroll':
-      return `${expr(part.target)}${part.once ? 'ro' : 'r'}${comparePointCode(part.condition)}`;
+      return joinModifierCode(
+        expr(part.target),
+        `${part.once ? 'ro' : 'r'}${comparePointCode(part.condition)}`,
+      );
     case 'dieBound':
-      return `${expr(part.target)}${dieBoundCode(part)}`;
+      return joinModifierCode(expr(part.target), dieBoundCode(part));
     case 'sort':
-      return `${expr(part.target)}${part.order === 'ascending' ? 's' : 'sd'}`;
+      return joinModifierCode(expr(part.target), part.order === 'ascending' ? 's' : 'sd');
     case 'critThreshold':
-      return `${expr(part.target)}${critThresholdCode(part)}`;
+      return joinModifierCode(expr(part.target), critThresholdCode(part));
     case 'successCount':
       return `${expr(part.target)}${successCountCode(part)}`;
     case 'versus':
@@ -172,7 +176,7 @@ function critThresholdCode(part: Extract<RollPart, { type: 'critThreshold' }>): 
   return [
     ...part.successThresholds.map((threshold) => critCode('cs', threshold)),
     ...part.failThresholds.map((threshold) => critCode('cf', threshold)),
-  ].join('');
+  ].reduce(joinModifierCode, '');
 }
 
 function successCountCode(part: Extract<RollPart, { type: 'successCount' }>): string {
@@ -279,7 +283,7 @@ function renderModifier(
   plain: boolean,
 ): string {
   const pool = dice.length === 0 ? '' : renderPool(dice, marks, plain);
-  return `${expr(target)}${code}${pool}`;
+  return `${joinModifierCode(expr(target), code)}${pool}`;
 }
 
 function renderPart(part: RollPart, marks: DieMarks, plain: boolean): string {
@@ -326,11 +330,11 @@ function renderPart(part: RollPart, marks: DieMarks, plain: boolean): string {
     case 'successCount':
       return renderModifier(part.target, successCountCode(part), part.rolls, marks, plain);
     case 'dieBound':
-      return `${expr(part.target)}${dieBoundCode(part)}${renderPool(poolOf(part.target), marks, plain)}`;
+      return `${joinModifierCode(expr(part.target), dieBoundCode(part))}${renderPool(poolOf(part.target), marks, plain)}`;
     case 'sort':
-      return `${expr(part.target)}${part.order === 'ascending' ? 's' : 'sd'}${renderPool(part.rolls, marks, plain)}`;
+      return `${joinModifierCode(expr(part.target), part.order === 'ascending' ? 's' : 'sd')}${renderPool(part.rolls, marks, plain)}`;
     case 'critThreshold':
-      return `${expr(part.target)}${critThresholdCode(part)}${renderPool(poolOf(part.target), marks, plain)}`;
+      return `${joinModifierCode(expr(part.target), critThresholdCode(part))}${renderPool(poolOf(part.target), marks, plain)}`;
   }
 }
 

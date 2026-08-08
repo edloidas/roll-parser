@@ -1011,6 +1011,11 @@ any commit that regresses a case past 1.75x. Bundle size is gated in CI by
   values,** so it does not round-trip through `parse` when they are present:
   `roll('(1d4)d6').expression` is `'4d6'` when the `1d4` rolled 4, and
   `roll('1d6!>(1d2+3)').expression` is `'1d6!>5'`.
+- **Adjacent bare modifiers keep a space.** `cs`, `cf`, `s`, and `sd` without a
+  threshold or count end an identifier the lexer would extend into whatever
+  follows, so `expression` and `rendered` separate them the way the input had
+  to: `roll('1d20cs cf').expression` is `'1d20cs cf'`, and `4d6 s kh2` comes
+  back as `'4d6s kh2'`. Everything else stays flush — `4d6cs>4cf<2`.
 - **Sort flattens additive pools.** `(2d6+1d8)s` renders as one combined sorted
   list, `(2d6 + 1d8)s[2, 3, 6] = 11`, rather than `2d6[2, 6] + 1d8[3]`. Totals
   are unaffected; only the breakdown loses pool boundaries.

@@ -4089,25 +4089,27 @@ describe('evaluate', () => {
       expect(result.rendered).toBe('0d6cs>3[] = 0');
     });
 
-    test('renders expression with default-sentinel codes', () => {
+    test('keeps the space between default-sentinel codes (#299)', () => {
       // `cscf` would lex as one unknown identifier — whitespace is what separates
-      // the two bare modifiers.
+      // the two bare modifiers, in the emitted form as much as in the input.
       const ast = parse('1d20cs cf');
       const rng = createMockRng([10]);
       const result = evaluate(ast, rng);
 
-      expect(result.expression).toBe('1d20cscf');
-      expect(result.rendered).toBe('1d20cscf[10] = 10');
+      expect(result.expression).toBe('1d20cs cf');
+      expect(result.rendered).toBe('1d20cs cf[10] = 10');
+      expect(evaluate(parse(result.expression), createMockRng([10])).expression).toBe('1d20cs cf');
     });
 
     test('renders expression with mixed defaults and compare points', () => {
       // Rendered order is all success thresholds first, then all fail thresholds —
-      // input `cs` + `cf<3` + `cs=10` comes back as `cscs=10cf<3`.
+      // input `cs` + `cf<3` + `cs=10` comes back as `cs cs=10cf<3`; only the bare
+      // `cs` needs the separator.
       const ast = parse('1d20cs cf<3cs=10');
       const rng = createMockRng([10]);
       const result = evaluate(ast, rng);
 
-      expect(result.expression).toBe('1d20cscs=10cf<3');
+      expect(result.expression).toBe('1d20cs cs=10cf<3');
     });
 
     test('computed threshold via parens evaluates correctly', () => {
