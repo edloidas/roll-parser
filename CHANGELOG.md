@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `roll-parser/render`, a subpath export holding `renderBreakdown(result, marks?)`, `DieMarks`, and `MARKDOWN_MARKS`. It rebuilds the `RollResult.rendered` breakdown from `RollResult.parts` with markers the caller chooses, so consumers targeting anything other than Discord markdown no longer regex-parse the baked string. Six slots — `dropped`, `success`, `failure`, `critical`, `fumble`, and `droppedGroup` — compose in a fixed order; `critical`/`fumble` read the `DieResult` booleans, which `rendered` has no marker for. With no `marks` the output is byte-identical to `rendered`, pinned by a property test. Budgeted separately at 2 kB, leaving the `index.js` and `{ roll }` budgets to the library ([#292](https://github.com/edloidas/roll-parser/issues/292))
 
+- `MIGRATION.md` gains a 3.0.0 → 3.1.0 section covering the `RollPart` field, the three ways it can surface, and the new render subpath; the file is now ordered newest-first and `README.md` points at it for every upgrade path rather than only for 2.x ([#292](https://github.com/edloidas/roll-parser/issues/292))
+
 ### Changed
 
 - The `explode`, `reroll`, and `successCount` members of `RollPart` now carry `rolls: DieResult[]`, the pool the modifier produced — mirroring what `sort` already did. Standard and penetrating explosions and both reroll forms append dice that appear nowhere under `target`, so the part tree could not previously describe its own output ([#292](https://github.com/edloidas/roll-parser/issues/292))

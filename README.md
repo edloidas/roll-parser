@@ -97,7 +97,7 @@ roll('4d6kh3', { rng: createMockRng([3, 6, 2, 5]) }).total; // 14, every run
 - [Performance](#performance)
 - [Known limitations](#known-limitations)
 - [Versioning](#versioning)
-- [Upgrading from 2.x](#upgrading-from-2x)
+- [Upgrading](#upgrading)
 - [Contributing](#contributing)
 - [License](#license)
 
@@ -143,10 +143,11 @@ as one request:
 `https://esm.sh/roll-parser` works the same way. Raw file URLs
 (`unpkg.com/roll-parser`) also work but fetch each module separately.
 
-### Upgrading from 2.x
+### Upgrading
 
-v3 is a complete rewrite and the API is not compatible — see
-[MIGRATION.md](MIGRATION.md). To stay on the old line, pin `roll-parser@2.3.2`.
+[MIGRATION.md](MIGRATION.md) covers every upgrade path, newest first — 3.0.0 to
+3.1.0, v2 to v3, and the v3 pre-releases. v3 is a complete rewrite and the 2.x
+API is not compatible; to stay on the old line, pin `roll-parser@2.3.2`.
 
 ## Notation reference
 
@@ -353,9 +354,22 @@ describe(roll('4d6kh3 + 2', { rng: createMockRng([3, 6, 2, 5]) }).parts);
 
 Invariants worth relying on: `result.parts.total === result.total`,
 `successCount.total === successes - failures`, and every part's `rolls[]`
-sharing references with `result.rolls`. A `sort` part's `rolls[]` is its
-target's pool in sorted order — chained sorts (`4d6s sd`) nest, and the
-outermost one holds the order `rendered` shows.
+sharing references with `result.rolls`.
+
+Four variants carry a `rolls[]` of their own, holding the pool the modifier
+produced rather than the one its target rolled — read those instead of
+descending into `target` when you want what was rendered:
+
+- `sort` — the target's pool in sorted order. Chained sorts (`4d6s sd`) nest,
+  and the outermost one holds the order `rendered` shows.
+- `explode` — the expanded pool. Standard and penetrating explosions append
+  dice that exist nowhere under `target`.
+- `reroll` — discarded intermediates and their replacements, both appended
+  rather than substituted.
+- `successCount` — the tallied pool.
+
+Unlike the pool on a `dice` part, those four keep `'meta'` dice, so filter them
+before counting or displaying.
 
 Meta-expressions do **not** appear as nested parts. `(1d4)d6`, `4d6kh(1d2)`, and
 `1d6!>(1d2+3)` surface only their resolved numbers in the owning part; their
