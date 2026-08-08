@@ -4185,6 +4185,108 @@ describe('evaluate', () => {
       expect(result.rolls.map((d) => d.fumble)).toEqual([true]);
       expect(result.expression).toBe('{1d6}kh1cf<2');
     });
+
+    test('cs before explode governs the appended dice (#289)', () => {
+      const result = evaluate(parse('1d6cs<2!'), createMockRng([6, 6, 3]));
+
+      expect(result.rendered).toBe('1d6cs<2![6, 6, 3] = 15');
+      // The appended 6 used to report the default-rule crit the `cs<2` overrode.
+      expect(result.rolls.map((d) => d.critical)).toEqual([false, false, false]);
+    });
+
+    test('cs before reroll governs the kept replacement (#289)', () => {
+      const result = evaluate(parse('1d6cs<2r<4'), createMockRng([3, 6]));
+
+      expect(result.rendered).toBe('1d6cs<2r<4[~~3~~, 6] = 6');
+      expect(result.rolls.map((d) => d.critical)).toEqual([false, false]);
+    });
+
+    test('cs before reroll-once governs the replacement (#289)', () => {
+      const result = evaluate(parse('1d6cs<2ro<4'), createMockRng([3, 6]));
+
+      expect(result.rolls.map((d) => d.critical)).toEqual([false, false]);
+    });
+
+    test('cs reaches explode across an intervening sort (#289)', () => {
+      // The rule travels with the dice, not with the crit node's parent, so a
+      // pass-through modifier between `cs` and `!` changes nothing.
+      const result = evaluate(parse('1d6cs<2s!'), createMockRng([6, 6, 3]));
+
+      expect(result.rolls.map((d) => d.critical)).toEqual([false, false, false]);
+    });
+
+    test('cs governs a reroll replacement of an exploded die (#289)', () => {
+      // The replacement descends from an exploded die that itself inherited.
+      const result = evaluate(parse('1d6cs<2!r<4'), createMockRng([6, 6, 3, 5]));
+
+      expect(result.rendered).toBe('1d6cs<2!r<4[6, 6, ~~3~~, 5] = 17');
+      expect(result.rolls.map((d) => d.critical)).toEqual([false, false, false, false]);
+    });
+
+    test('cf before penetrating explode leaves the crit side where 1d6!p had it (#289)', () => {
+      // Only the fumble side is overridden, so the appended die's `critical`
+      // must still come from the raw 6 `createDieResult` judged — not from the
+      // 5 it stores.
+      const overridden = evaluate(parse('1d6cf>5!p'), createMockRng([6, 6, 3]));
+      const plain = evaluate(parse('1d6!p'), createMockRng([6, 6, 3]));
+
+      expect(overridden.rolls.map((d) => d.critical)).toEqual(plain.rolls.map((d) => d.critical));
+      expect(overridden.rolls.map((d) => d.critical)).toEqual([true, true, false]);
+    });
+
+    test('cs before penetrating explode leaves the fumble side alone (#289)', () => {
+      // Mirror of the above: overriding the success side must not invent a
+      // fumble on the appended die, whose stored 1 came from a raw 2.
+      const overridden = evaluate(parse('1d6cs<9!p'), createMockRng([6, 2]));
+      const plain = evaluate(parse('1d6!p'), createMockRng([6, 2]));
+
+      expect(overridden.rolls.map((d) => d.fumble)).toEqual(plain.rolls.map((d) => d.fumble));
+      expect(overridden.rolls.map((d) => d.fumble)).toEqual([false, false]);
+    });
+
+    test('cs is order-independent across penetrating explode (#289)', () => {
+      const before = evaluate(parse('1d6cs<2!p'), createMockRng([6, 6, 3]));
+      const after = evaluate(parse('1d6!pcs<2'), createMockRng([6, 6, 3]));
+
+      // Appended dice store `raw - 1`, and an explicit threshold reads the
+      // stored value on both sides of the chain.
+      expect(before.rendered).toBe('1d6cs<2!p[6, 5, 2] = 13');
+      expect(before.rolls.map((d) => d.critical)).toEqual(after.rolls.map((d) => d.critical));
+    });
+
+    test('cf before explode governs the appended dice (#289)', () => {
+      const result = evaluate(parse('1d6cf>5!'), createMockRng([6, 6, 3]));
+
+      expect(result.rolls.map((d) => d.fumble)).toEqual([true, true, false]);
+      // Untouched cs side keeps the default rule on both 6s.
+      expect(result.rolls.map((d) => d.critical)).toEqual([true, true, false]);
+    });
+
+    test('cs governs a Fate reroll replacement (#289)', () => {
+      const result = evaluate(parse('1dFcs<2r<0'), createMockRng([-1, 1]));
+
+      // `createFateDieResult` hard-codes both flags false; an explicit
+      // threshold still applies, as it does for `1dFcs<2`.
+      expect(result.rolls.map((d) => d.critical)).toEqual([true, true]);
+    });
+
+    test('a crit rule does not leak into an unrelated pool (#289)', () => {
+      const result = evaluate(parse('1d6cs<2 + 1d6!'), createMockRng([6, 6, 3]));
+
+      expect(result.rendered).toBe('1d6cs<2[6] + 1d6![6, 3] = 15');
+      // Only the first die is governed by `cs<2`; the second pool's exploded 6
+      // keeps the default rule.
+      expect(result.rolls.map((d) => d.critical)).toEqual([false, true, false]);
+    });
+
+    test('compound explode keeps its pre-accumulation flags (#289)', () => {
+      // `!!` mints no die, so the rule stays applied where the crit node ran —
+      // the accumulated 15 keeps the crit its natural 6 earned under `cs=6`.
+      const result = evaluate(parse('1d6cs=6!!'), createMockRng([6, 6, 3]));
+
+      expect(result.rendered).toBe('1d6cs=6!![15] = 15');
+      expect(result.rolls.map((d) => d.critical)).toEqual([true]);
+    });
   });
 
   describe('cross-family modifier combinations (#134)', () => {

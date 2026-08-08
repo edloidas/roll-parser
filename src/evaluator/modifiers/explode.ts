@@ -13,6 +13,7 @@ import type { RNG } from '../../rng/types.js';
 import type { CompareOp, DieResult } from '../../types.js';
 import { createDieResult } from '../die.js';
 import { chargeDie, type EvalEnv } from '../env.js';
+import { inheritCritRule } from './crit-threshold.js';
 import { isVersusDc } from './flags.js';
 
 /**
@@ -99,6 +100,9 @@ function canExplode(die: DieResult, hasVersusDc: boolean): boolean {
  *
  * `critical`/`fumble` are likewise derived from the raw roll — a penetrating
  * die that rolled its max face is still a crit even though it stores one less.
+ * An inherited `cs`/`cf` keeps that: it is applied after `storeResult`, so an
+ * explicit threshold reads the stored value, while the raw roll is handed over
+ * for the `'default'` sentinel to read.
  */
 function applyAppendingExplode(
   pool: DieResult[],
@@ -124,6 +128,7 @@ function applyAppendingExplode(
       const raw = rollExplosion(sides, rng, env);
       const die = createDieResult(sides, raw, ['exploded', 'kept']);
       die.result = storeResult(raw);
+      inheritCritRule(env, original, die, raw);
       result.push(die);
       lastRaw = raw;
       iterations += 1;
