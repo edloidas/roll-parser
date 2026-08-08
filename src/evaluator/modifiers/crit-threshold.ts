@@ -11,13 +11,13 @@
  *
  * The two threshold kinds deliberately read different values. `'default'`
  * reads `initialResult ?? result`, the same source as the versus `natural`,
- * so "rolled the maximum face" survives the two modifiers that overwrite
- * `result` while recording the face they replaced — compound explode and
- * `minN`/`maxN`. An explicit threshold (`cs>4`, `cf<=2`) reads the die's
- * current `result`: it is a predicate over the die's value, and postfix
- * modifiers are order-sensitive by design, so `4d6min5cs>4` is meant to
- * see the clamped faces. The two can therefore disagree on one die —
- * `4d6min5cs>4` flags a clamped natural 1 as both critical and fumble.
+ * so "rolled the maximum face" survives every modifier that overwrites
+ * `result` while recording the face it replaced — compound explode,
+ * penetrating explode, and `minN`/`maxN`. An explicit threshold (`cs>4`,
+ * `cf<=2`) reads the die's current `result`: it is a predicate over the die's
+ * value, and postfix modifiers are order-sensitive by design, so `4d6min5cs>4`
+ * is meant to see the clamped faces. The two can therefore disagree on one
+ * die — `4d6min5cs>4` flags a clamped natural 1 as both critical and fumble.
  *
  * They also diverge on Fate dice. `'default'` carries a `sides > 1` guard, so
  * it never fires on a `sides = 0` pool; an explicit threshold has none and
@@ -25,15 +25,6 @@
  * flags. The missing guard is deliberate — the parser rejects the bare
  * `cs`/`cf` forms instead, since they would resolve to `'default'` and
  * silently do nothing.
- *
- * ! Penetrating explode is not covered: it stores `raw - 1` in `result`
- * ! without recording `initialResult`, so `1d6!pcs` still judges a natural
- * ! 6 by its decremented 5. An *inherited* rule is handed the raw roll
- * ! instead, which keeps `1d6cf>5!p` agreeing with `1d6!p` on the side the
- * ! user never overrode — at the cost of `1d6cf>5!p` and `1d6!pcf>5`
- * ! disagreeing on it. Recording `initialResult` here would settle both, but
- * ! `extractNatural` reads that field to tell an appended explosion die from
- * ! a compounded one, and would start counting these as versus primaries.
  *
  * The rule is recorded per die on `env.critRules`, so dice that explode and
  * reroll mint *after* the crit node has run inherit it from the die they
@@ -102,26 +93,18 @@ function applyCritRule(die: DieResult, rule: CritRule, natural: number): void {
  * reroll inherits it in turn. No-op when no `cs`/`cf` governs `parent`, which
  * leaves the `createDieResult` default rule in place.
  *
- * `natural` is the face the `'default'` sentinel reads, defaulting to the
- * child's own. Penetrating explode passes its raw roll — see the module note.
- *
- * ! Call this only once the child's final `result` is stored — an explicit
- * ! threshold is a predicate over `result`, so a penetrating die is judged by
- * ! its decremented value, matching `1d6!pcs<2`.
+ * ! Call this only once the child's final `result` and `initialResult` are
+ * ! stored — an explicit threshold is a predicate over `result`, so a
+ * ! penetrating die is judged by its decremented value, matching `1d6!pcs<2`.
  */
-export function inheritCritRule(
-  env: EvalEnv,
-  parent: DieResult,
-  child: DieResult,
-  natural = child.initialResult ?? child.result,
-): void {
+export function inheritCritRule(env: EvalEnv, parent: DieResult, child: DieResult): void {
   const rules = env.critRules;
   if (rules === undefined) return;
 
   const rule = rules.get(parent);
   if (rule === undefined) return;
 
-  applyCritRule(child, rule, natural);
+  applyCritRule(child, rule, child.initialResult ?? child.result);
   rules.set(child, rule);
 }
 

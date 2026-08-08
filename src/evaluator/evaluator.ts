@@ -1581,22 +1581,18 @@ function evalSuccessCount(
  * `undefined`.
  *
  * Excludes dropped (`kh`/`kl`/`dh`/`dl`/`r`/`ro`) dice — these aren't the
- * final kept result. Explosion continuation dice (appended by standard/
- * penetrating explode, tagged `'exploded'` with no `initialResult`) are not
- * primaries either — `1d20! vs DC` keeps the natural from the original d20.
- * Compound explode accumulates into the original die and sets
- * `initialResult`, so it stays a primary and the raw first face is used.
- * Multiple primary kept d20s (e.g., `1d20+1d20`) yield `undefined` so no
- * ambiguous upgrade/downgrade is applied.
+ * final kept result — and the continuation dice `env.explosionDice` marks, so
+ * `1d20! vs DC` keeps the natural from the original d20. A compound explode
+ * accumulates into that original instead of appending, so it stays a primary
+ * and its raw first face is used. Multiple primary kept d20s (e.g.,
+ * `1d20+1d20`) yield `undefined` so no ambiguous upgrade/downgrade is applied.
  */
-function extractNatural(rolls: DieResult[]): number | undefined {
+function extractNatural(rolls: DieResult[], env: EvalEnv): number | undefined {
   // Rerolled intermediates are always stamped `['rerolled', 'dropped']`
   // (see `modifiers/reroll.ts`), so filtering by `'dropped'` covers them.
+  const appended = env.explosionDice;
   const primaries = rolls.filter(
-    (d) =>
-      d.sides === 20 &&
-      !d.modifiers.includes('dropped') &&
-      !(d.modifiers.includes('exploded') && d.initialResult == null),
+    (d) => d.sides === 20 && !d.modifiers.includes('dropped') && !appended?.has(d),
   );
   if (primaries.length !== 1) return undefined;
   const die = primaries[0];
@@ -1642,7 +1638,7 @@ function evalVersus(node: VersusNode, rng: RNG, ctx: EvalContext, env: EvalEnv):
   try {
     const rollCtx = createContext();
     const rollResult = evalNode(node.roll, rng, rollCtx, env);
-    const natural = extractNatural(rollCtx.rolls);
+    const natural = extractNatural(rollCtx.rolls, env);
 
     const dcCtx = createContext();
     const dcResult = evalNode(node.dc, rng, dcCtx, env);
@@ -1754,6 +1750,7 @@ export function evaluate(ast: ASTNode, rng: RNG, options: EvaluateOptions = {}):
     insideVersus: false,
     hasVersusDc: false,
     critRules: undefined,
+    explosionDice: undefined,
     context,
     onMissingVariable,
   };

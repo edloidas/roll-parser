@@ -165,8 +165,9 @@ export type DieResult = {
   /** The rolled value */
   result: number;
   /**
-   * Raw first roll before any mutation (e.g., compound-explode accumulation).
-   * Only populated when `result` has been overwritten with a computed value.
+   * Raw first roll before any mutation — compound-explode accumulation, the
+   * `!p` decrement, or a `minN`/`maxN` clamp. Only populated when `result` has
+   * been overwritten with a computed value.
    * Consumers that need the original face (nat-20 / nat-1 detection) should
    * read `initialResult ?? result`.
    */

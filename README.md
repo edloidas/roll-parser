@@ -221,14 +221,13 @@ specs applied independently to the same pool, with the dropped sets unioned —
 the Roll20 rule.
 
 `cs` / `cf` covers the whole pool, including dice that `!`, `!p`, `r`, and `ro`
-add after it — `1d6cs<2!` and `1d6!cs<2` flag the same dice. Two cases stay
-order-sensitive. Modifiers that rewrite a die's value rather than add one (`!!`,
-`minN`, `maxN`) are judged on whatever that value is when the threshold runs:
-with `[6, 6, 3]`, `1d6cs>10!!` reports no critical while `1d6!!cs>10` reports
-one, judging the compounded 15. And because `!p`'s added dice store one less
-than they rolled, the side you *don't* override moves with position —
-`1d6cf>5!p` keeps the critical that plain `1d6!p` gives the added 6, where
-`1d6!pcf>5` does not.
+add after it — `1d6cs<2!` and `1d6!cs<2` flag the same dice. One case stays
+order-sensitive: an explicit threshold reads a die's current value, so
+modifiers that rewrite it rather than add a die (`!!`, `minN`, `maxN`) are
+judged on whatever that value is when the threshold runs. With `[6, 6, 3]`,
+`1d6cs>10!!` reports no critical while `1d6!!cs>10` reports one, judging the
+compounded 15. The side you *don't* override always reads the natural face, so
+`1d6cf>5!p` and `1d6!pcf>5` agree with plain `1d6!p` on the added 6.
 
 ### Pools and checks
 

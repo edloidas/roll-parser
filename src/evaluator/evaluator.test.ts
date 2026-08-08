@@ -1253,6 +1253,30 @@ describe('evaluate', () => {
         expect(getDie(result.rolls, 1).result).toBe(5);
         expect(getDie(result.rolls, 2).result).toBe(1);
       });
+
+      test('appended dice keep their raw face in initialResult (#300)', () => {
+        const result = evaluate(parse('1d20!p'), createMockRng([20, 20, 5]));
+
+        expect(result.rolls.map((d) => d.result)).toEqual([20, 19, 4]);
+        expect(result.rolls.map((d) => d.initialResult)).toEqual([undefined, 20, 5]);
+        expect(result.rolls.map((d) => d.initialResult ?? d.result)).toEqual([20, 20, 5]);
+        expect(result.rolls.map((d) => d.critical)).toEqual([true, true, false]);
+      });
+
+      test('a penetrating die that rolls 1 records it (#300)', () => {
+        const result = evaluate(parse('1d6!p'), createMockRng([6, 1]));
+
+        const die = getDie(result.rolls, 1);
+        expect(die.result).toBe(0);
+        expect(die.initialResult).toBe(1);
+        expect(die.fumble).toBe(true);
+      });
+
+      test('standard explode leaves initialResult unset (#300)', () => {
+        const result = evaluate(parse('1d6!'), createMockRng([6, 3]));
+
+        expect(result.rolls.map((d) => d.initialResult)).toEqual([undefined, undefined]);
+      });
     });
 
     describe('thresholds', () => {
@@ -2712,6 +2736,26 @@ describe('evaluate', () => {
       expect(result.total).toBe(24);
       expect(result.natural).toBe(20);
       expect(result.degree).toBe(DegreeOfSuccess.Failure);
+    });
+
+    test('Penetrating continuations carrying initialResult stay non-primary (#300)', () => {
+      // Both appended dice record a raw face, and must still not count as
+      // primaries alongside the original d20.
+      const result = evaluate(parse('1d20!p vs 35'), createMockRng([20, 20, 5]));
+
+      expect(result.total).toBe(43);
+      expect(result.natural).toBe(20);
+      expect(result.degree).toBe(DegreeOfSuccess.CriticalSuccess);
+    });
+
+    test('A clamped continuation die is still not a primary (#300)', () => {
+      // `min5` lifts the appended 2 and records its raw face — which must not
+      // make a continuation die a second primary and suppress the nat-20 step.
+      const result = evaluate(parse('1d20!min5 vs 30'), createMockRng([20, 2, 12]));
+
+      expect(result.rendered).toBe('1d20!min5[20, 5] vs 30 = Success');
+      expect(result.natural).toBe(20);
+      expect(result.degree).toBe(DegreeOfSuccess.Success);
     });
 
     test('Exploded pool plus separate d20 stays ambiguous: 1d20!+1d20 vs 50 → natural undefined', () => {
@@ -4334,6 +4378,16 @@ describe('evaluate', () => {
       // stored value on both sides of the chain.
       expect(before.rendered).toBe('1d6cs<2!p[6, 5, 2] = 13');
       expect(before.rolls.map((d) => d.critical)).toEqual(after.rolls.map((d) => d.critical));
+    });
+
+    test('cf is order-independent across penetrating explode (#300)', () => {
+      // The crit side keeps the `'default'` rule, which reads the raw face on
+      // both sides of the chain.
+      const before = evaluate(parse('1d6cf>5!p'), createMockRng([6, 6, 3]));
+      const after = evaluate(parse('1d6!pcf>5'), createMockRng([6, 6, 3]));
+
+      expect(before.rolls.map((d) => d.critical)).toEqual(after.rolls.map((d) => d.critical));
+      expect(after.rolls.map((d) => d.critical)).toEqual([true, true, false]);
     });
 
     test('cf before explode governs the appended dice (#289)', () => {
