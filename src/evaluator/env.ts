@@ -10,6 +10,17 @@
 
 import { EvaluatorError } from '../errors.js';
 import type { ASTNode } from '../parser/ast.js';
+import type { DieResult, ResolvedCritThreshold } from '../types.js';
+
+/**
+ * A resolved `cs`/`cf` pair, recorded per die so that dice minted later by
+ * explode or reroll can be judged by the rule the user declared instead of
+ * the built-in default.
+ */
+export type CritRule = {
+  readonly success: readonly ResolvedCritThreshold[];
+  readonly fail: readonly ResolvedCritThreshold[];
+};
 
 /**
  * Per-evaluation shared environment (created once, shared across all branches).
@@ -46,6 +57,16 @@ export type EvalEnv = {
    * ! when the tagged DC dice become visible to the enclosing pool.
    */
   hasVersusDc: boolean;
+  /**
+   * Crit rule per die, keyed on the `DieResult` object itself. Populated by
+   * `applyCritThresholds`; read by explode and reroll so a die they mint
+   * inherits the rule of the die it descended from.
+   *
+   * Out of band rather than a `DieResult` field because `DieResult` is public
+   * and serialized. `undefined` until the first `cs`/`cf` node — declared here
+   * so the shape stays stable for notation that has none.
+   */
+  critRules: WeakMap<DieResult, CritRule> | undefined;
   /**
    * User-supplied variable map for `@name` / `@{name}` references. Always
    * defined — `evaluate()` defaults to an empty object so lookups can be

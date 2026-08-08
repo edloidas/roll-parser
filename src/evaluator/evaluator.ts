@@ -1217,6 +1217,10 @@ function evalSort(node: SortNode, rng: RNG, ctx: EvalContext, env: EvalEnv): Eva
  * `'default'` sentinel, resolved per-die against the natural face
  * (`initialResult ?? result`) rather than the possibly-rewritten `result`.
  *
+ * The resolved rule is recorded per die, so an enclosing explode or reroll
+ * judges the dice it mints by it too — `1d6cs<2!` no longer reports the
+ * default-rule crit the user overrode.
+ *
  * Renders `<targetExpr><codes>[<dice>]`, mirroring `evalSort`/`evalExplode`.
  */
 function evalCritThreshold(
@@ -1237,7 +1241,7 @@ function evalCritThreshold(
     successResolved.length > 0 ? successResolved : ['default'];
   const failApplied: ResolvedCritThreshold[] = failResolved.length > 0 ? failResolved : ['default'];
 
-  applyCritThresholds(targetCtx.rolls, successApplied, failApplied, env.hasVersusDc);
+  applyCritThresholds(targetCtx.rolls, successApplied, failApplied, env);
 
   appendAll(ctx.rolls, targetCtx.rolls);
   propagateMetadata(ctx, targetCtx.versusMetadata);
@@ -1738,6 +1742,7 @@ export function evaluate(ast: ASTNode, rng: RNG, options: EvaluateOptions = {}):
     hasSuccessCount: false,
     insideVersus: false,
     hasVersusDc: false,
+    critRules: undefined,
     context,
     onMissingVariable,
   };

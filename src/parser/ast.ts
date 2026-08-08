@@ -326,8 +326,9 @@ export type CritThreshold = ComparePoint | 'default';
 /**
  * Critical threshold modifier node (`cs`, `cf`).
  *
- * Overrides the default `critical`/`fumble` flag logic for the dice
- * produced by `target`. Bare `cs`/`cf` uses the `'default'` sentinel
+ * Overrides the default `critical`/`fumble` flag logic for `target`'s dice
+ * pool — including dice an enclosing `!` or `r` adds to it afterwards, which
+ * `target` never produced. Bare `cs`/`cf` uses the `'default'` sentinel
  * (max face / 1). Custom thresholds accept any ComparePoint. Chaining
  * collapses into a single node — `1d20cs=20cs=1cf>18` has two success
  * and one fail threshold. Display-only: does not change `total`,

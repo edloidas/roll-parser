@@ -219,6 +219,16 @@ Chained keep/drop modifiers do **not** nest. `4d6kh3dl1` flattens into two
 specs applied independently to the same pool, with the dropped sets unioned —
 the Roll20 rule.
 
+`cs` / `cf` covers the whole pool, including dice that `!`, `!p`, `r`, and `ro`
+add after it — `1d6cs<2!` and `1d6!cs<2` flag the same dice. Two cases stay
+order-sensitive. Modifiers that rewrite a die's value rather than add one (`!!`,
+`minN`, `maxN`) are judged on whatever that value is when the threshold runs:
+with `[6, 6, 3]`, `1d6cs>10!!` reports no critical while `1d6!!cs>10` reports
+one, judging the compounded 15. And because `!p`'s added dice store one less
+than they rolled, the side you *don't* override moves with position —
+`1d6cf>5!p` keeps the critical that plain `1d6!p` gives the added 6, where
+`1d6!pcf>5` does not.
+
 ### Pools and checks
 
 | Notation | Meaning |

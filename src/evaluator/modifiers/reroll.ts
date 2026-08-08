@@ -15,6 +15,7 @@ import type { CompareOp, DieResult } from '../../types.js';
 import { createDieResult, createFateDieResult } from '../die.js';
 import { chargeDie, type EvalEnv } from '../env.js';
 import { matchesCondition } from './compare.js';
+import { inheritCritRule } from './crit-threshold.js';
 import { isVersusDc, REROLL_SLOT_FLAGS, rewriteFlags } from './flags.js';
 
 /**
@@ -31,15 +32,22 @@ import { isVersusDc, REROLL_SLOT_FLAGS, rewriteFlags } from './flags.js';
 export const DEFAULT_MAX_REROLL_ITERATIONS = 1_000;
 
 /**
- * Rolls a replacement die for the given sides, charging it against the global
- * dice limit. Fate dice (sides === 0) re-roll on the {-1, 0, +1} range.
+ * Rolls a replacement for `parent`, charging it against the global dice limit.
+ * Fate dice (sides === 0) re-roll on the {-1, 0, +1} range. Any `cs`/`cf`
+ * governing `parent` carries over, so a replacement is judged by the rule the
+ * user declared rather than the built-in default.
  */
-function rollReplacement(sides: number, rng: RNG, env: EvalEnv): DieResult {
+function rollReplacement(parent: DieResult, rng: RNG, env: EvalEnv): DieResult {
   chargeDie(env, 'Reroll');
 
-  if (sides === 0) return createFateDieResult(rng.nextInt(-1, 1), []);
+  const sides = parent.sides;
+  const die =
+    sides === 0
+      ? createFateDieResult(rng.nextInt(-1, 1), [])
+      : createDieResult(sides, rng.nextInt(1, sides), []);
 
-  return createDieResult(sides, rng.nextInt(1, sides), []);
+  inheritCritRule(env, parent, die);
+  return die;
 }
 
 function rerollLimitError(maxIterations: number): EvaluatorError {
@@ -95,7 +103,7 @@ export function applyRecursiveReroll(
       current.modifiers = rewriteFlags(current.modifiers, REROLL_SLOT_FLAGS, 'rerolled', 'dropped');
       result.push(current);
 
-      current = rollReplacement(current.sides, rng, env);
+      current = rollReplacement(current, rng, env);
       iterations += 1;
     }
 
@@ -136,7 +144,7 @@ export function applyRerollOnce(
     original.modifiers = rewriteFlags(original.modifiers, REROLL_SLOT_FLAGS, 'rerolled', 'dropped');
     result.push(original);
 
-    const replacement = rollReplacement(original.sides, rng, env);
+    const replacement = rollReplacement(original, rng, env);
     replacement.modifiers = rewriteFlags(replacement.modifiers, REROLL_SLOT_FLAGS, 'kept');
     result.push(replacement);
   }
