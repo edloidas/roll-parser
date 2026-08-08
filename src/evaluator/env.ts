@@ -68,6 +68,20 @@ export type EvalEnv = {
    */
   critRules: WeakMap<DieResult, CritRule> | undefined;
   /**
+   * Dice minted as explosion continuations by `!` / `!p`, keyed on the
+   * `DieResult` object itself. Read by `extractNatural`, which counts them out
+   * of the versus primaries — the `'exploded'` tag cannot say it alone, since
+   * a compound explode stamps it on the original die it accumulated into.
+   *
+   * Out of band for the same reason as {@link EvalEnv.critRules}: `DieResult`
+   * is public and serialized.
+   *
+   * ! Only populated while {@link EvalEnv.insideVersus} — nothing outside a
+   * ! `vs` reads it, and the `add` per appended die is not free. Any new
+   * ! reader must be on a versus path too.
+   */
+  explosionDice: WeakSet<DieResult> | undefined;
+  /**
    * User-supplied variable map for `@name` / `@{name}` references. Always
    * defined — `evaluate()` defaults to an empty object so lookups can be
    * branch-free on presence.

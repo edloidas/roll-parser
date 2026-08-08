@@ -98,11 +98,14 @@ function canExplode(die: DieResult, hasVersusDc: boolean): boolean {
  * the value recorded on the appended die, which is the only thing standard
  * and penetrating explosions disagree about.
  *
+ * A die whose stored value differs from its raw roll records the raw face in
+ * `initialResult`, so `initialResult ?? result` recovers what was rolled.
+ *
  * `critical`/`fumble` are likewise derived from the raw roll — a penetrating
  * die that rolled its max face is still a crit even though it stores one less.
- * An inherited `cs`/`cf` keeps that: it is applied after `storeResult`, so an
- * explicit threshold reads the stored value, while the raw roll is handed over
- * for the `'default'` sentinel to read.
+ * A `cs`/`cf` rule keeps that: it is applied after `storeResult`, so an
+ * explicit threshold reads the stored value while the `'default'` sentinel
+ * reads `initialResult`.
  */
 function applyAppendingExplode(
   pool: DieResult[],
@@ -128,7 +131,13 @@ function applyAppendingExplode(
       const raw = rollExplosion(sides, rng, env);
       const die = createDieResult(sides, raw, ['exploded', 'kept']);
       die.result = storeResult(raw);
-      inheritCritRule(env, original, die, raw);
+      if (die.result !== raw) die.initialResult = raw;
+      // Only `extractNatural` reads this, and only inside a `vs`.
+      if (env.insideVersus) {
+        env.explosionDice ??= new WeakSet();
+        env.explosionDice.add(die);
+      }
+      inheritCritRule(env, original, die);
       result.push(die);
       lastRaw = raw;
       iterations += 1;
