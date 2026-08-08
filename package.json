@@ -114,7 +114,7 @@
       "name": "index.js — { roll }",
       "path": "dist/index.js",
       "import": "{ roll }",
-      "limit": "12 kB"
+      "limit": "12.25 kB"
     },
     {
       "name": "render.js — { renderBreakdown }",

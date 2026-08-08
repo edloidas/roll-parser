@@ -68,7 +68,7 @@ roll('4d6kh3', { rng: createMockRng([3, 6, 2, 5]) }).total; // 14, every run
 - **Safe on untrusted input.** Dice count, explosion depth, reroll depth, and
   parse depth are all bounded, and every failure is a typed error with a stable
   code and a source span.
-- **Small and fast.** ≈11.9 kB brotli for the whole library, ≈5.5 kB for just
+- **Small and fast.** ≈12.3 kB brotli for the whole library, ≈5.5 kB for just
   `parse`, ≈213 B for the testing entry point. Zero runtime dependencies, zero
   `node:` imports. A `1d20` round trip takes about 0.5 µs.
 - **Tested.** 1,500+ tests behind CI-enforced coverage floors — 100% of
