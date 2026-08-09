@@ -77,17 +77,14 @@ Types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `perf`, `bui
 - **Title**: `<type>: <description> #<number>`
 - **Body**: concise, no emojis, separate all sections with one blank line
 - Multiple issues go on one `Closes` line: `Closes #1 #23 #456`
-- The session link is informational: one `<sub>`-wrapped line, last in the body
-- Never append a second generated footer, `---` rule, or promotional line — the
-  `<sub>` session line is the only attribution. Applies to PRs created from the
-  web too, where these instructions are the only source of truth.
+- Never append a generated footer, `---` rule, session link, `<sub>` attribution,
+  or promotional line. Applies to PRs created from the web too, where these
+  instructions are the only source of truth.
 
   ```
   <summary of changes>
 
   Closes #<issue1> #<issue2>
-
-  <sub>[Claude Code session](<link>)</sub>
   ```
 
 `master` merges through a PR, must be up to date with it, and must pass the eight
