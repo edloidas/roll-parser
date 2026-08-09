@@ -61,7 +61,7 @@ export function unwrapAllTransparent(node: ASTNode): ASTNode {
  * Returns `true` when `node` or any descendant satisfies `isHit`. Recurses
  * directly through the entire node vocabulary: arithmetic operands,
  * modifier-chain targets, `Versus` sides, function arguments, and group
- * sub-expressions. This is the shared driver behind the four deep walkers
+ * sub-expressions. This is the shared driver behind the deep walkers
  * below. The shallow walkers (`containsDicePool`, `containsFatePool`) stay
  * hand-written because their rejection semantics deliberately stop at
  * arithmetic boundaries.

@@ -1,18 +1,22 @@
 # Migration notes
 
-Newest first. [Upgrading from 3.1.0 to 3.2.0](#upgrading-from-310-to-320) ·
-[Upgrading from 3.0.0 to 3.1.0](#upgrading-from-300-to-310) ·
-[Migrating from v2 to v3](#migrating-from-v2-to-v3) ·
-[Upgrading from a v3 pre-release](#upgrading-from-a-v3-pre-release)
+Newest first.
+
+- [Upgrading from 3.1.0 to 3.2.0](#upgrading-from-310-to-320)
+- [Upgrading from 3.0.0 to 3.1.0](#upgrading-from-300-to-310)
+- [Migrating from v2 to v3](#migrating-from-v2-to-v3)
+- [Upgrading from a v3 pre-release](#upgrading-from-a-v3-pre-release)
 
 ## Upgrading from 3.1.0 to 3.2.0
 
-Nothing was removed and no type changed, and the seed → dice mapping is
-untouched — the same seed and notation roll the same faces they did in 3.1.0.
-Five fixes: penetrating explode and the three places its output is visible, a
-success-count target that never rolled anything, a success count wrapped in
-another one, keep/drop on a single-sub-roll group, and success counting on a
-grouped roll.
+Nothing was removed from the API, no type changed, and the seed → dice mapping
+is untouched — the same seed and notation roll the same faces they did in
+3.1.0. What moves falls in two buckets. Several group forms that used to
+evaluate now throw a parse error — `{3, 5, 7}>=4`, `{2d6+3}kh2`, `{2d6*2}kh2`,
+`{3d20+5}>=21`, and `{2d6, 2d8}kh1>=4` — each listed below with a rewrite. The
+rest are values that moved: `initialResult` on `!p` dice, one `vs` degree, the
+`expression` and `rendered` strings, and the totals and tags of nested and
+grouped success counts.
 
 **`!p` continuation dice now carry `initialResult`.** A penetrating explosion
 stores `raw - 1` on each die it appends, and used to record the face it
@@ -45,27 +49,43 @@ continuation that rolled its maximum is critical even though it displays one
 less, matching the flags plain `1d6!p` already set.
 
 ```typescript
-import { roll } from 'roll-parser';
-import { createMockRng } from 'roll-parser/testing';
-
 const result = roll('1d6!pcf>5', { rng: createMockRng([6, 6, 3]) });
 
 result.rendered; // '1d6!pcf>5[6, 5, 2] = 13'
 result.rolls[1].critical; // true — was `false`, judged by the stored 5
 ```
 
-`1d6cf>5!p` and `1d6!pcf>5` now agree. 3.1.0's README documented them as
-disagreeing, and [Modifiers](README.md#modifiers) is rewritten to match: an
+If you assert `critical` or `fumble` on `!p` continuation dice, re-derive the
+expected flag from `initialResult ?? result`. Order stops mattering here:
+`1d6cf>5!p` and `1d6!pcf>5` now agree, where 3.1.0's README documented them as
+disagreeing, and [Modifiers](README.md#modifiers) is rewritten to match. An
 explicit threshold is still a predicate over a die's current `result`, so `!!`,
 `minN`, and `maxN` remain order-sensitive.
 
-**One `vs` case stops discarding its natural face.** A clamped explosion
-continuation used to be counted as a second primary d20, and two primaries
-suppress the natural 20 / natural 1 step.
+**Adjacent bare modifiers keep a space in `expression` and `rendered`.** `cs`,
+`cf`, `s`, and `sd` with no threshold or count end in a letter the lexer scans
+as an identifier, so the normalized form used to re-lex as one token and no
+longer round-tripped through `parse`.
 
 ```typescript
-import { DegreeOfSuccess, roll } from 'roll-parser';
-import { createMockRng } from 'roll-parser/testing';
+roll('1d20cs cf', { rng: createMockRng([20]) }).expression; // '1d20cs cf' — was '1d20cscf'
+roll('4d6 s kh2', { rng: createMockRng([1, 2, 3, 4]) }).rendered;
+// '4d6s[~~1~~, ~~2~~, 3, 4] = 7' — the prefix was '4d6skh2'
+```
+
+Only those four codes are affected; `4dF` and `!p` end in letters but are their
+own tokens, so they stay flush. Snapshot assertions over `expression` or
+`rendered` for an affected expression need re-recording.
+
+**One `vs` case stops discarding its natural face.** Only `vs` expressions
+whose roll side both appends explosion dice and clamps them — `!` or `!!`
+combined with `minN`/`maxN` — are affected: a clamped continuation used to be
+counted as a second primary d20, and two primaries suppress the natural 20 /
+natural 1 step. Without the clamp (`1d20! vs 30`) the continuation never looked
+like a primary, and those degrees are unchanged.
+
+```typescript
+import { DegreeOfSuccess } from 'roll-parser';
 
 const result = roll('1d20!min5 vs 30', { rng: createMockRng([20, 2, 12]) });
 
@@ -73,9 +93,7 @@ result.natural; // 20 — was `undefined`
 result.degree === DegreeOfSuccess.Success; // true — was `Failure`
 ```
 
-This needs a `vs` whose roll side both appends explosion dice and clamps them.
-Without the clamp — `1d20! vs 30` — the continuation never looked like a
-primary, and those degrees are unchanged.
+If you pinned `natural` or `degree` on such a roll, re-record it.
 
 **Success counting a dice-less group is now a parse error.** `{3, 5, 7}>=4`
 used to return the group's sum with `successes: 0`, so the
@@ -84,16 +102,16 @@ used to return the group's sum with `successes: 0`, so the
 its subtotals is undecided, so the form is refused instead.
 
 ```typescript
-import { roll } from 'roll-parser';
-
 roll('{3, 5, 7}>=4'); // throws 'INVALID_SUCCESS_COUNT_TARGET' — was 15
 roll('{3, 5, 7}kh1>=4'); // throws 'INVALID_SUCCESS_COUNT_TARGET' — was 7
+roll('{3, 0d6}>=4').total; // 0 — was 3
 ```
 
 Groups holding at least one pool are untouched — `{3, 1d6}>=4` counts the `1d6`
 exactly as it did. `0d6>=4` also still parses and totals 0; only targets that
-can never roll a die are rejected. One related total moved: a group whose pool
-turns out empty at run time, `{3, 0d6}>=4`, now totals 0 rather than 3.
+can never roll a die are rejected. There is no in-notation rewrite for a
+literal-only group: replace the literals with the pool they stood in for
+(`3d6>=4`), or drop the count and keep the group's sum (`{3, 5, 7}`).
 
 **A second success count re-scores the pool instead of adding to it.** Group
 braces let one count wrap another (`{4d6>=5f1}<=2f6`), which the parse-time
@@ -103,9 +121,6 @@ top-level counts stopped describing the total. The outermost count now owns the
 tags outright.
 
 ```typescript
-import { roll } from 'roll-parser';
-import { createMockRng } from 'roll-parser/testing';
-
 const result = roll('{4d6>=5f1}<=2f6', { rng: createMockRng([6, 5, 2, 1]) });
 
 result.total; // 1
@@ -114,9 +129,10 @@ result.failures; // 1 — was 0
 result.rendered; // '{4d6>=5f1}<=2f6[__6__, 5, **2**, **1**] = 1'
 ```
 
-`total` never moved — it always came from the outermost count. What changed is
-`successes`, `failures`, `rolls[].modifiers`, and `rendered`, which now agree
-with it, so `successCount.total === successes - failures` holds again. A lone
+`total` never moved — it always came from the outermost count, so a test
+asserting only `total` needs no change. What changed is `successes`,
+`failures`, `rolls[].modifiers`, and `rendered`, which now agree with it, so
+`successCount.total === successes - failures` holds again. A lone
 count is untouched, and so is a nested pair whose thresholds agree
 (`{4d6>=5}>=5`). Dropped dice come out untagged; only the DC side of a `vs`
 keeps tags from an inner count, since no pool pass may tally it.
@@ -129,25 +145,22 @@ the `1d4` from `-3` to `+3`. The parser already refused `(2d6+3)kh2` for exactly
 this reason; the brace form now does too.
 
 ```typescript
-import { roll } from 'roll-parser';
-import { createMockRng } from 'roll-parser/testing';
-
 roll('{2d6+3}kh2', { rng: createMockRng([4, 5]) }); // throws 'INVALID_KEEP_DROP_TARGET' — was 9
 roll('{2d6-1d4}kh3', { rng: createMockRng([4, 5, 3]) }); // throws 'INVALID_KEEP_DROP_TARGET' — was 12
+roll('{2d6*2}kh2', { rng: createMockRng([4, 5]) }); // throws 'INVALID_KEEP_DROP_TARGET'
+roll('{2d6+0}kh2', { rng: createMockRng([4, 5]) }); // throws 'INVALID_KEEP_DROP_TARGET' — identity terms too
 roll('{4d6+2d8}kh3', { rng: createMockRng([6, 6, 6, 1, 8, 1]) }).total; // 20 — unchanged
 ```
 
-Also newly rejected, same cause: a scaled or function-wrapped pool (`{2d6*2}kh2`,
-`{abs(1d6-1d8)}kh1`), and a success count, which returned the face sum rather
-than the tally. `{4d6>=5}kh1` throws `INVALID_SUCCESS_COUNT_TARGET`, not the
-keep/drop code — a single-sub-roll group used to hide the count from the reject
-that `(4d6>=5)kh1` has always hit, and both spellings now report the same thing.
+Also newly rejected, same cause: a function-wrapped pool (`{abs(1d6-1d8)}kh1`),
+and a success count, which returned the face sum rather than the tally.
+`{4d6>=5}kh1` throws `INVALID_SUCCESS_COUNT_TARGET`, not the keep/drop code — a
+single-sub-roll group used to hide the count from the reject that `(4d6>=5)kh1`
+has always hit, and both spellings now report the same thing.
 
-The check is structural rather than arithmetic, so a term that happened to be an
-identity is refused along with the rest even though its total was already right:
-`{2d6+0}kh2`, `{2d6*1}kh2`, and `{2d6+1d8-0}kh3` all throw now. Widening the rule
-to evaluate the term first would accept `{2d6+0}kh2` and still reject
-`{2d6+3}kh2`, which is a worse contract to build notation against.
+The check is structural rather than arithmetic, so identity terms are refused
+with the rest even though their total was already right: `{2d6+0}kh2`,
+`{2d6*1}kh2`, and `{2d6+1d8-0}kh3` all throw.
 
 Additive pools are the form this syntax exists for and are untouched —
 `{4d6+2d8}kh3`, `{2d6kh1+1d8}kh2`, `{{1d6, 1d8}+2d6}kh2`. Multi-sub-roll groups
@@ -162,9 +175,6 @@ Roll20 counts one success per sub-roll total, and that is what the count does
 now.
 
 ```typescript
-import { roll } from 'roll-parser';
-import { createMockRng } from 'roll-parser/testing';
-
 const result = roll('{2d6, 2d6}>=10', { rng: createMockRng([6, 5, 2, 1]) });
 
 result.total; // 1 — was 0
@@ -172,37 +182,46 @@ result.successes; // 1 — was 0
 result.rendered; // '{2d6[6, 5], 2d6[2, 1]}>=10 = 1'
 ```
 
-Four things move with it. `rendered` shows each sub-roll's own bracket instead
-of one flat pool, since the dice no longer are the units. The dice come back
-untagged — no `'success'` or `'failure'` in `rolls[].modifiers` — for the same
-reason. A `fT` threshold now scores subtotals too, so `{4d6+2d8, 3d20+3,
-5d10+1}>=40f<=10` reports 2 successes and 1 failure rather than a per-face
-tally. And a literal sub-roll is a subtotal like any other, so it is now scored
-rather than skipped: `{3, 1d6}>=4f<=3` with face `[6]` reports one success and
-one failure where it used to report one success alone. Single-sub-roll groups
-(`{4d6}>=5`, `{2d6+1d8}>=5`) are the flat-pool form and are unchanged.
+Four things move with it:
+
+- **`rendered`** shows each sub-roll's own bracket instead of one flat pool —
+  the dice are no longer the units.
+- **`rolls[].modifiers`** comes back untagged: no `'success'` or `'failure'` on
+  any die, for the same reason. Read `successes` / `failures` instead.
+- **`fT` thresholds** score subtotals too, so `{4d6+2d8, 3d20+3,
+  5d10+1}>=40f<=10` weighs three subtotals rather than 21 faces.
+- **A literal sub-roll** is a subtotal like any other, so it is scored rather
+  than skipped.
+
+```typescript
+const literal = roll('{3, 1d6}>=4f<=3', { rng: createMockRng([6]) });
+
+literal.successes; // 1
+literal.failures; // 1 — was 0
+literal.total; // 0 — was 1
+```
+
+Single-sub-roll groups (`{4d6}>=5`, `{2d6+1d8}>=5`) are the flat-pool form and
+are unchanged.
 
 **Two group spellings of a success count are now parse errors.** Both used to
 reach the flat counter with the subtotals already gone.
 
 ```typescript
-import { roll } from 'roll-parser';
-
 roll('{3d20+5}>=21'); // throws 'INVALID_SUCCESS_COUNT_TARGET' — was a count of bare faces
 roll('{2d6, 2d8}kh1>=4'); // throws 'INVALID_SUCCESS_COUNT_TARGET' — was a count of loose dice
+roll('({2d6, 2d8})>=4'); // throws 'INVALID_SUCCESS_COUNT_TARGET'
 ```
 
-The first is the single-sub-roll rule keep/drop already has: that form compares
-one face at a time, so a scalar term never reaches the comparison. A scaled or
-function-wrapped pool goes with it — `{2d6*2}>=4` and `{floor(2d6/2)}>=2` throw
-too, exactly as `{2d6*2}kh2` does. Roll20 folds the remaining math into each
-roll instead, which is only well defined for `pool ± scalar`, so the form is
-refused rather than half-implemented. The second
-covers every way a multi-sub-roll group can arrive somewhere other than as the
-count's direct target — `{{2d6, 2d8}}>=4` and `({2d6, 2d8})>=4` throw the same
-code. To keep a rejected expression, fold the scalar into the threshold —
-`3d20>=16` counts the same dice `{3d20+5}>=21` was meant to — or, for the
-selection case, count the group directly (`{2d6, 2d8}>=4`).
+- **`{3d20+5}>=21`** hits the single-sub-roll rule keep/drop already has: that
+  form compares one face at a time, so a scalar term never reaches the
+  comparison. A scaled or function-wrapped pool goes with it — `{2d6*2}>=4` and
+  `{floor(2d6/2)}>=2` throw too, exactly as `{2d6*2}kh2` does. To keep it, fold
+  the scalar into the threshold: `3d20>=16` counts the same dice.
+- **`{2d6, 2d8}kh1>=4`** covers every way a multi-sub-roll group can arrive
+  somewhere other than as the count's direct target — `{{2d6, 2d8}}>=4` and
+  `({2d6, 2d8})>=4` throw the same code. To keep it, count the group directly:
+  `{2d6, 2d8}>=4`.
 
 ## Upgrading from 3.0.0 to 3.1.0
 
@@ -248,8 +267,8 @@ group sub-roll nested inside another one used to emit mismatched delimiters —
 `{{(1d6[1]), 1d8[4]}, ({(1d10[1]), 1d12[3]})}`. Anything parsing that output
 should be reading `--json` instead.
 
-**New, optional: `roll-parser/render`.** A subpath export whose
-`renderBreakdown(result, marks?)` rebuilds the breakdown from `result.parts`
+**New, optional: `renderBreakdown` from `roll-parser/render`.** A subpath
+export whose `renderBreakdown(result, marks?)` rebuilds the breakdown from `result.parts`
 with markers you choose, so you no longer have to regex the markdown out of
 `rendered`. With no marks its output is byte-identical to `rendered`, which
 makes it a drop-in starting point:
@@ -300,9 +319,7 @@ classes. v3 has `roll(notation, options)` for the common path, and
 | `convert(obj)`, `Roll`, `WodRoll`, `Result` | removed — there are no roll-description objects to build or convert |
 
 **Result fields moved.** v2 returned `Result { notation, value, rolls }` where
-`rolls` was a plain `number[]`. The v3 snippets below draw from
-`createMockRng` (exported by `roll-parser/testing`) so their numbers are exact
-rather than whatever the dice happened to do:
+`rolls` was a plain `number[]`.
 
 <!-- readme-test: skip -->
 ```typescript

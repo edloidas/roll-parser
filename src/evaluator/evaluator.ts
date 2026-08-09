@@ -483,15 +483,29 @@ function evalMetaOperand(node: ASTNode, rng: RNG, ctx: EvalContext, env: EvalEnv
   }
 
   const metaCtx = createContext();
-  // A meta operand resolves to a scalar, so its verdicts are released with its
-  // dice — the tally counterpart of the `TALLY_FLAGS` strip in `mergeMetaRolls`.
-  const successTally = env.subtotalSuccesses;
-  const failureTally = env.subtotalFailures;
-  const value = evalNode(node, rng, metaCtx, env).total;
-  env.subtotalSuccesses = successTally;
-  env.subtotalFailures = failureTally;
+  // The tally counterpart of the `TALLY_FLAGS` strip in `mergeMetaRolls`.
+  const value = evalDiscardingSubtotals(node, rng, metaCtx, env).total;
   mergeMetaRolls(ctx, metaCtx);
   return value;
+}
+
+/**
+ * Evaluates a node whose result is consumed as a scalar — a meta operand or a
+ * `vs` DC — rolling back any subtotal verdicts it scored so they never reach
+ * the top-level tally.
+ */
+function evalDiscardingSubtotals(
+  node: ASTNode,
+  rng: RNG,
+  ctx: EvalContext,
+  env: EvalEnv,
+): EvalResult {
+  const successTally = env.subtotalSuccesses;
+  const failureTally = env.subtotalFailures;
+  const result = evalNode(node, rng, ctx, env);
+  env.subtotalSuccesses = successTally;
+  env.subtotalFailures = failureTally;
+  return result;
 }
 
 /** Rejects dice counts that cannot address a pool. */
@@ -1719,12 +1733,8 @@ function evalVersus(node: VersusNode, rng: RNG, ctx: EvalContext, env: EvalEnv):
     const dcCtx = createContext();
     // A subtotal count on the DC side (`1d20 vs {{2d6, 2d6}>=10}`) is rolled
     // back for the same reason `countTaggedDice` skips DC dice: no pool pass
-    // may tally that side, so its verdicts stay out of the top-level counts.
-    const dcSuccessTally = env.subtotalSuccesses;
-    const dcFailureTally = env.subtotalFailures;
-    const dcResult = evalNode(node.dc, rng, dcCtx, env);
-    env.subtotalSuccesses = dcSuccessTally;
-    env.subtotalFailures = dcFailureTally;
+    // may tally that side.
+    const dcResult = evalDiscardingSubtotals(node.dc, rng, dcCtx, env);
 
     const degree = calculateDegree(rollResult.total, dcResult.total, natural);
 

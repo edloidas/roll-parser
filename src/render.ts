@@ -123,7 +123,6 @@ function failCode(point: ResolvedComparePoint): string {
 function expr(part: RollPart): string {
   switch (part.type) {
     case 'literal':
-      return String(part.value);
     case 'variable':
       return String(part.value);
     case 'dice':
@@ -145,10 +144,7 @@ function expr(part: RollPart): string {
     case 'explode':
       return `${expr(part.target)}${explodeCode(part)}`;
     case 'reroll':
-      return joinModifierCode(
-        expr(part.target),
-        `${part.once ? 'ro' : 'r'}${comparePointCode(part.condition)}`,
-      );
+      return joinModifierCode(expr(part.target), rerollCode(part));
     case 'dieBound':
       return joinModifierCode(expr(part.target), dieBoundCode(part));
     case 'sort':
@@ -165,6 +161,10 @@ function expr(part: RollPart): string {
 function explodeCode(part: Extract<RollPart, { type: 'explode' }>): string {
   const marker = EXPLODE_MARKERS[part.variant];
   return part.threshold == null ? marker : `${marker}${comparePointCode(part.threshold)}`;
+}
+
+function rerollCode(part: Extract<RollPart, { type: 'reroll' }>): string {
+  return `${part.once ? 'ro' : 'r'}${comparePointCode(part.condition)}`;
 }
 
 /** Negative bounds are parenthesized so the expression re-parses. */
@@ -239,9 +239,8 @@ function poolOf(part: RollPart): DieResult[] {
 }
 
 /**
- * Marks one die. `plain` suppresses the three state marks for dice inside a
- * dropped sub-roll, where the group wrapper already carries the verdict —
- * crit and fumble survive, since they describe the face, not the selection.
+ * Marks one die. `plain` suppresses the three state marks inside a dropped
+ * sub-roll — the rule {@link DieMarks.droppedGroup} documents.
  */
 function markDie(die: DieResult, marks: DieMarks, plain: boolean): string {
   let text = String(die.result);
@@ -320,25 +319,20 @@ function renderPart(part: RollPart, marks: DieMarks, plain: boolean): string {
     case 'explode':
       return renderModifier(part.target, explodeCode(part), part.rolls, marks, plain);
     case 'reroll':
-      return renderModifier(
-        part.target,
-        `${part.once ? 'ro' : 'r'}${comparePointCode(part.condition)}`,
-        part.rolls,
-        marks,
-        plain,
-      );
+      return renderModifier(part.target, rerollCode(part), part.rolls, marks, plain);
     case 'successCount':
       // Subtotal counting renders through the group, which shows each sub-roll's
       // own dice; only the flat form collapses into one bracket.
       return part.target.type === 'group' && part.target.parts.length >= 2
         ? `${renderPart(part.target, marks, plain)}${successCountCode(part)}`
         : renderModifier(part.target, successCountCode(part), part.rolls, marks, plain);
+    // These three render as their own normalized expression plus a pool.
     case 'dieBound':
-      return `${joinModifierCode(expr(part.target), dieBoundCode(part))}${renderPool(poolOf(part.target), marks, plain)}`;
+      return `${expr(part)}${renderPool(poolOf(part.target), marks, plain)}`;
     case 'sort':
-      return `${joinModifierCode(expr(part.target), part.order === 'ascending' ? 's' : 'sd')}${renderPool(part.rolls, marks, plain)}`;
+      return `${expr(part)}${renderPool(part.rolls, marks, plain)}`;
     case 'critThreshold':
-      return `${joinModifierCode(expr(part.target), critThresholdCode(part))}${renderPool(poolOf(part.target), marks, plain)}`;
+      return `${expr(part)}${renderPool(poolOf(part.target), marks, plain)}`;
   }
 }
 
