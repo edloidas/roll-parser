@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.2.0] - 2026-08-09
+
+Every entry below is a correctness fix, but several change what a working
+expression returns and five group forms that used to evaluate now throw.
+[MIGRATION.md](MIGRATION.md#upgrading-from-310-to-320) walks each one with a
+rewrite. Seeds are untouched: the same seed and notation roll the same faces
+they did in 3.1.0.
+
+### Fixed
+
+- Success counting a multi-sub-roll group now scores one success per sub-roll subtotal, the way keep/drop on the same node always did, so `{2d6, 2d6}>=10` finds the 11 it was missing. The dice stop being the units: `rendered` shows each sub-roll's own bracket, `rolls[].modifiers` comes back untagged, and `fT` thresholds weigh subtotals too. Targets whose arithmetic no per-die comparison ever reaches — `{3d20+5}>=21`, `{2d6*2}>=4`, `{2d6, 2d8}kh1>=4` — throw `INVALID_SUCCESS_COUNT_TARGET` instead of comparing faces against a number the sub-roll's math never produced ([#303](https://github.com/edloidas/roll-parser/issues/303))
+- A second success count reaching the same pool through group braces (`{4d6>=5f1}<=2f6`) now re-scores it outright rather than appending to the inner pass's tags, so no die comes back both `'success'` and `'failure'` and `successes`/`failures` describe `total` again. The outermost count owns the tags; dropped dice come out untagged, while the DC side of a `vs` keeps tags from an inner count, since no pool pass may tally it. `total` never moved ([#297](https://github.com/edloidas/roll-parser/issues/297))
+- Success counting a group that can never roll a die (`{3, 5, 7}>=4`, `{3, 5, 7}kh1>=4`) now throws `INVALID_SUCCESS_COUNT_TARGET` instead of returning the group's sum with `successes: 0`, which read the documented `successCount.total === successes - failures` invariant as `15 === 0`. A pool that is empty only at run time (`{3, 0d6}>=4`) totals 0 rather than the literal sum ([#304](https://github.com/edloidas/roll-parser/issues/304))
+- Keep/drop on a single-sub-roll group whose total is not the sum of its kept faces now throws `INVALID_KEEP_DROP_TARGET` instead of silently discarding the rest of the arithmetic. `{2d6+3}kh2` lost the `+3`, and `{2d6-1d4}kh3` — which drops nothing — flipped the `1d4` from `-3` to `+3`; `{2d6*2}kh2` and `{abs(1d6-1d8)}kh1` are refused for the same reason `(2d6+3)kh2` already was. The check is structural, so identity terms (`{2d6+0}kh2`) go with them. Additive pools (`{4d6+2d8}kh3`) and multi-sub-roll groups, which select on subtotals, are untouched. A brace-wrapped success count now reports `INVALID_SUCCESS_COUNT_TARGET` at any nesting depth, matching what `(4d6>=5)kh1` always did ([#302](https://github.com/edloidas/roll-parser/issues/302))
+- Penetrating explosion now records the face it rolled in `initialResult` on every die it appends, so the `initialResult ?? result` idiom `DieResult` documents recovers the natural face instead of the stored `raw - 1` — a natural 20 was indistinguishable from a 19. Bare `cs`/`cf` consequently judges a `!p` continuation by that face, so `1d6cf>5!p` and `1d6!pcf>5` agree where the README documented them as disagreeing. Separately, a `vs` roll whose explosion dice are clamped by `minN`/`maxN` (`1d20!min5 vs 30`) stops misreading the continuation as a second primary d20, which had been suppressing the natural-20/1 step ([#300](https://github.com/edloidas/roll-parser/issues/300))
+- `cs`, `cf`, `s`, and `sd` adjacent to another modifier now keep a space in `expression` and `rendered`, so the normalized string re-parses. Those four codes end in a letter the lexer scans as an identifier, so maximal munch swallowed whatever followed: `1d20cs cf` normalized to `1d20cscf` and `4d6 s kh2` to `4d6s kh2`, neither of which round-trips through `parse`. `4dF` and `!p` end in letters but are their own tokens and stay flush ([#299](https://github.com/edloidas/roll-parser/issues/299))
+- Demo site: the equation chip keeps explode and reroll dice. It read only `sort` out of the part tree, so any other pool-bearing modifier's dice went missing from the chip ([#313](https://github.com/edloidas/roll-parser/issues/313))
+
+### Documentation
+
+- `MIGRATION.md` gains a 3.1.0 → 3.2.0 section covering all five newly rejected forms with a rewrite for each, plus the values that moved: `initialResult` on `!p` dice, one `vs` degree, the `expression`/`rendered` spacing, and the totals and tags of nested and grouped success counts ([#300](https://github.com/edloidas/roll-parser/issues/300), [#293](https://github.com/edloidas/roll-parser/issues/293))
+- README gains a `Reading crit and fumble` subsection showing the per-die loop over `result.rolls`, with `site/src/dice.ts` named as the working in-repo example. It documents the four traps such a loop hits — `'meta'` dice must be filtered, `'dc'` dice need a deliberate choice, `rendered` must never be spliced by bracket position, and the default crit rule fires on every pool's max face — and names `rendered`'s markdown as Discord-flavored, pointing at `renderBreakdown` for other dialects ([#293](https://github.com/edloidas/roll-parser/issues/293))
+- README's `## Contents` is a grouped two-level index, and the seven overlapping notation-rejection bullets are folded into one table with a `Write instead` column. The nested-count tag-ownership rule moved to `RollResult`, where the fields it describes live ([#293](https://github.com/edloidas/roll-parser/issues/293))
+
 ## [3.1.0] - 2026-08-08
 
 ### Added
@@ -217,7 +241,8 @@ Dice mechanics (Stage 2):
 - Dice count safety limit via `maxDice` option (default 10,000), enforced across the whole expression to prevent DoS via additive groups like `5000d6+5000d6` ([#19](https://github.com/edloidas/roll-parser/issues/19))
 - Parser and evaluator correctness: duplicate `kept` modifier entries, implicit modifier count defaulting to 1 (`4d6kh` → `4d6kh1`), `critical` flag suppression when `sides === 1`, negative `--seed` CLI values ([#21](https://github.com/edloidas/roll-parser/issues/21))
 
-[Unreleased]: https://github.com/edloidas/roll-parser/compare/v3.1.0...HEAD
+[Unreleased]: https://github.com/edloidas/roll-parser/compare/v3.2.0...HEAD
+[3.2.0]: https://github.com/edloidas/roll-parser/releases/tag/v3.2.0
 [3.1.0]: https://github.com/edloidas/roll-parser/releases/tag/v3.1.0
 [3.0.0]: https://github.com/edloidas/roll-parser/releases/tag/v3.0.0
 [3.0.0-beta.0]: https://github.com/edloidas/roll-parser/releases/tag/v3.0.0-beta.0
