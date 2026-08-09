@@ -387,7 +387,9 @@ dice land in `result.rolls` tagged `'meta'` so an audit log can still show them.
 
 `result.rendered` uses markdown markers, so a Discord bot or chat log can print
 it as-is: `~~n~~` for a die dropped by keep/drop or group selection, `**n**` for
-a success, `__n__` for a failure.
+a success, `__n__` for a failure. The dialect is Discord's, not a universal one
+— Telegram MarkdownV2 rejects `**bold**` and spells strike `~n~` — so expect a
+transform, or emit your own dialect with [`renderBreakdown`](#custom-markers).
 
 ```typescript
 roll('4d6kh3', { seed: 'demo' }).rendered; // '4d6[1, 6, ~~1~~, 3] = 10'
@@ -431,6 +433,80 @@ Marks compose in a fixed order: `critical` then `fumble` innermost, then
 exactly one of `dropped`, `success`, or `failure` — a dropped die is never
 also shown as a success. With no marks the output is byte-identical to
 `result.rendered`; a property test pins that.
+
+#### Reading crit and fumble
+
+`rendered` carries no marker for a crit or a fumble — those live on the dice.
+`die.critical` and `die.fumble` already reflect any `cs` / `cf` override, so a
+UI that builds its own elements reads the booleans rather than the string.
+
+```typescript
+const result = roll('4d20cs>=19', { rng: createMockRng([20, 19, 7, 1]) });
+
+const marked = result.rolls
+  .filter((die) => !die.modifiers.includes('meta'))
+  .map((die) => {
+    let text = String(die.result);
+    if (die.critical) text = `<b>${text}</b>`;
+    if (die.fumble) text = `<i>${text}</i>`;
+    return text;
+  });
+
+marked.join(', '); // '<b>20</b>, <b>19</b>, 7, <i>1</i>'
+```
+
+The 19 is critical only because `cs>=19` said so — the booleans are where the
+override lands. Compose the two marks rather than branching on one: overlapping
+thresholds set both, and `1d6cs>=3cf<=4` rolling a 3 does exactly that.
+
+`site/src/dice.ts` in this repo is the working version: `dieStates` turns the
+same booleans into CSS classes, `dieTitle` into a tooltip, and the tray legend
+lights up only for the states a roll actually produced.
+
+That loop is right for a plain pool. Four decisions it cannot dodge:
+
+- **`'meta'` dice are not yours to show.** They resolve counts, sides, and
+  modifier arguments, and they carry ordinary crit flags — in `4d6kh(1d2)` the
+  `1d2` rolling a 2 hits its max face and arrives `critical: true`. The filter
+  above is not optional.
+- **`'dc'` dice are a judgment call.** They do render — `1d20 vs 2d10` shows
+  `1d20[5] vs 2d10[10, 10]` — but they sit outside the roll-side pool while
+  still taking the default crit rule, so that `[10, 10]` arrives as two crits
+  nobody rolled for. Drop them and a per-die zip has no dice left for a
+  two-number bracket; keep them and the DC side lights up on its own faces.
+  [`renderBreakdown`](#custom-markers) does not decide this for you — it marks
+  every flagged die — but its callbacks receive the die, so gate on the tag.
+  For a hand-rolled walk, `result.parts` keeps the two sides apart: the
+  `versus` part carries `roll` and `dc` as separate subtrees.
+- **Never splice `rendered` by bracket position.** `{2d6, 2d8}kh1` puts one
+  strike around the whole dropped sub-roll, `{2d6[6, 6], ~~2d8[1, 1]~~}`, yet
+  its inner dice each carry `'dropped'` — group selection re-flags them after
+  the sub-roll's own text was captured. Marking every `'dropped'` die into that
+  string yields `~~2d8[~~1~~, ~~1~~]~~`. Rebuild with
+  [`renderBreakdown`](#custom-markers) instead of patching the baked string.
+- **Density is your call.** The default rule flags the max face of any pool,
+  not just d20s — `3d6` rolling a 6 is `critical: true` — so marking it
+  unconditionally makes ordinary pools glitter. Gate on `die.sides === 20`, or
+  on whatever your table's rule is. `d1` and Fate dice are the exceptions:
+  having no exceptional face, they stay `false` unless `cs` / `cf` says so.
+
+The claims above, in code:
+
+```typescript
+import { renderBreakdown } from 'roll-parser/render';
+
+roll('1d6cs>=3cf<=4', { rng: createMockRng([3]) }).rolls[0]?.fumble; // true
+roll('4d6kh(1d2)', { rng: createMockRng([2, 3, 6, 2, 5]) }).rolls[0]?.critical; // true
+roll('1d20 vs 2d10', { rng: createMockRng([5, 10, 10]) }).rolls[2]?.critical; // true
+roll('3dF', { rng: createMockRng([1, 0, -1]) }).rolls[0]?.critical; // false
+roll('{2d6, 2d8}kh1', { rng: createMockRng([6, 6, 1, 1]) }).rendered;
+// '{2d6[6, 6], ~~2d8[1, 1]~~} = 12'
+
+// Gating a mark on the `'dc'` tag keeps the DC side unmarked
+renderBreakdown(roll('1d20 vs 2d10', { rng: createMockRng([5, 10, 10]) }), {
+  critical: (die, text) => (die.modifiers.includes('dc') ? text : `<b>${text}</b>`),
+}); // '1d20[5] vs 2d10[10, 10] = Critical Failure'
+```
 
 ## Randomness
 
