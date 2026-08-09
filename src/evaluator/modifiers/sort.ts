@@ -37,7 +37,7 @@ export function sortDice(
       : (a: DieResult, b: DieResult) => b.result - a.result;
 
   // Scan before allocating: the `filter` this replaced built a throwaway array
-  // on every sort to serve a case only a `vs` can produce (#281).
+  // on every sort to serve a case only a `vs` can produce.
   if (!hasVersusDc || !dice.some(isVersusDc)) return [...dice].sort(cmp);
 
   // Sort only the pool members, then lay them back into the slots they came

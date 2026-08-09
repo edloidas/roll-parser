@@ -69,7 +69,8 @@ roll('4d6kh3', { rng: createMockRng([3, 6, 2, 5]) }).total; // 14, every run
   parse depth are all bounded, and every failure is a typed error with a stable
   code and a source span.
 - **Small and fast.** ≈12.7 kB brotli for the whole library, ≈5.5 kB for just
-  `parse`, ≈213 B for the testing entry point. Zero runtime dependencies, zero
+  `parse`, ≈1.4 kB for `roll-parser/render`, ≈213 B for the testing entry
+  point. Zero runtime dependencies, zero
   `node:` imports. A `1d20` round trip takes about 0.5 µs.
 - **Tested.** 1,500+ tests behind CI-enforced coverage floors — 100% of
   functions, 98% of lines — including every code example in this README, which
@@ -84,22 +85,28 @@ roll('4d6kh3', { rng: createMockRng([3, 6, 2, 5]) }).total; // 14, every run
 
 ## Contents
 
-- [Install](#install)
-- [Notation reference](#notation-reference)
+**Start here**
+
+- [Install](#install) — [CDN](#cdn--browser-without-a-bundler) · [Upgrading](#upgrading)
+- [Notation reference](#notation-reference) — [Dice](#dice) · [Arithmetic](#arithmetic-and-functions) · [Modifiers](#modifiers) · [Pools and checks](#pools-and-checks)
 - [Recipes by game system](#recipes-by-game-system)
-- [Working with results](#working-with-results)
-- [Randomness](#randomness)
-- [Options](#options)
-- [Error handling](#error-handling)
-- [Using the parser directly](#using-the-parser-directly)
-- [TypeScript](#typescript)
-- [CLI](#cli)
-- [Performance](#performance)
-- [Known limitations](#known-limitations)
-- [Versioning](#versioning)
-- [Upgrading](#upgrading)
-- [Contributing](#contributing)
-- [License](#license)
+
+**Using results**
+
+- [Working with results](#working-with-results) — [RollResult](#rollresult) · [The parts tree](#the-parts-tree)
+- [Rendering](#rendering) — [Custom markers](#custom-markers) · [Reading crit and fumble](#reading-crit-and-fumble)
+
+**Configuring a roll**
+
+- [Options](#options) — [Safety limits](#safety-limits)
+- [Randomness](#randomness) — [Seeded rolls](#seeded-rolls) · [Replay](#replay-and-saveresume) · [Custom RNGs](#custom-rngs) · [Testing](#testing)
+
+**Reference**
+
+- [Error handling](#error-handling) — [Notation errors](#notation-errors) · [Error classes](#error-classes) · [Error codes](#error-codes)
+- [Using the parser directly](#using-the-parser-directly) · [TypeScript](#typescript)
+- [CLI](#cli) · [Performance](#performance) · [Known limitations](#known-limitations)
+- [Versioning](#versioning) · [Contributing](#contributing) · [License](#license)
 
 ## Install
 
@@ -145,9 +152,9 @@ as one request:
 
 ### Upgrading
 
-[MIGRATION.md](MIGRATION.md) covers every upgrade path, newest first — 3.0.0 to
-3.1.0, v2 to v3, and the v3 pre-releases. v3 is a complete rewrite and the 2.x
-API is not compatible; to stay on the old line, pin `roll-parser@2.3.2`.
+[MIGRATION.md](MIGRATION.md) covers every upgrade path, newest first. v3 is a
+complete rewrite and the 2.x API is not compatible; to stay on the old line,
+pin `roll-parser@2.3.2`.
 
 ## Notation reference
 
@@ -221,14 +228,17 @@ Chained keep/drop modifiers do **not** nest. `4d6kh3dl1` flattens into two
 specs applied independently to the same pool, with the dropped sets unioned —
 the Roll20 rule.
 
-`cs` / `cf` covers the whole pool, including dice that `!`, `!p`, `r`, and `ro`
-add after it — `1d6cs<2!` and `1d6!cs<2` flag the same dice. One case stays
-order-sensitive: an explicit threshold reads a die's current value, so
-modifiers that rewrite it rather than add a die (`!!`, `minN`, `maxN`) are
-judged on whatever that value is when the threshold runs. With `[6, 6, 3]`,
-`1d6cs>10!!` reports no critical while `1d6!!cs>10` reports one, judging the
-compounded 15. The side you *don't* override always reads the natural face, so
-`1d6cf>5!p` and `1d6!pcf>5` agree with plain `1d6!p` on the added 6.
+`cs` / `cf` covers the whole pool, dice that `!`, `!p`, `r`, and `ro` add
+included, and position does not matter — `1d6cs<2!` and `1d6!cs<2` flag the
+same dice. The side you leave alone keeps the default rule, reading each die's
+natural face, so writing `cf>5` does not disturb `critical`: `1d6cf>5!p` and
+`1d6!pcf>5` both agree with plain `1d6!p` on the appended die.
+
+One case stays order-sensitive: an explicit threshold reads a die's current
+value, so modifiers that rewrite it rather than add a die (`!!`, `minN`,
+`maxN`) are judged on whatever that value is when the threshold runs. With
+`[6, 6, 3]`, `1d6cs>10!!` reports no critical while `1d6!!cs>10` reports one,
+judging the compounded 15.
 
 ### Pools and checks
 
@@ -238,9 +248,9 @@ compounded 15. The side you *don't* override always reads the natural face, so
 | `fT` / `f<cmp>T` | Subtract dice meeting the failure threshold — `10d10>=6f1`, `10d10>=6f<=2` |
 | `<roll> vs <dc>` | PF2e degree of success, with nat-20/nat-1 upgrade and downgrade |
 | `{a, b}khN` | Grouped roll: each sub-roll's subtotal competes as one compound die |
-| `{a+b}khN` | Single-sub-roll group: keep/drop selects across the flattened pool — added dice terms only |
+| `{a+b}khN` | Single-sub-roll group: keep/drop selects across the flattened pool — `+`-joined pools only, a literal or any math throws |
 | `{a, b}<cmp>T` | Grouped roll: each sub-roll's subtotal is counted, not its dice — `{2d6, 2d6}>=10` |
-| `{a+b}<cmp>T` | Single-sub-roll group: counts across the flattened pool — added dice terms only |
+| `{a+b}<cmp>T` | Single-sub-roll group: counts across the flattened pool — `+`-joined pools only, a literal or any math throws |
 
 > [!IMPORTANT]
 > Success counting is **terminal** — no modifier or arithmetic applies to it
@@ -249,10 +259,8 @@ compounded 15. The side you *don't* override always reads the natural face, so
 > result: `{10d10>=6}+2`.
 >
 > Braces also let a second count re-score the same pool — `{4d6>=5}<=2f5`. The
-> outermost count wins outright: every die is judged against its thresholds
-> alone, so `successes`, `failures`, and the rendered markers agree with it, and
-> dice it does not count come out untagged. The one exception is the DC side of
-> a `vs`, which sits outside every pool pass and keeps whatever tagged it.
+> outermost count owns the result; see
+> [RollResult](#rollresult) for what that means for the fields you read.
 
 > [!WARNING]
 > A bare `d` after a dice expression is rejected: `4d6d1` throws
@@ -301,7 +309,7 @@ pool.total; // 5 — successes minus failures
 | `notation` | `string` | Exactly what you passed in |
 | `expression` | `string` | Normalized form; meta-expressions appear as their resolved values |
 | `rendered` | `string` | Markdown breakdown with per-die markers |
-| `rolls` | `DieResult[]` | Every die in order: `sides`, `result`, `modifiers`, `critical`, `fumble` |
+| `rolls` | `DieResult[]` | Every die in order, meta-expression dice included: `sides`, `result`, `modifiers`, `critical`, `fumble` |
 | `parts` | `RollPart` | Typed evaluation tree mirroring the AST 1:1 |
 | `successes` / `failures` | `number?` | Present only when success counting was used |
 | `degree` / `natural` | `DegreeOfSuccess?` / `number?` | Present only for a top-level `vs` |
@@ -331,6 +339,12 @@ JSON.stringify(roll('3d6', { rng: createMockRng([4, 2, 6]) }));
 > [!NOTE]
 > `rolls[]` and the `rolls[]` inside `parts` hold the *same* `DieResult`
 > objects — no deep clone, so annotating a die is visible through both views.
+
+When counts nest through braces (`{4d6>=5}<=2f5`), the outermost one owns the
+result: every die is judged against its thresholds alone, so `successes`,
+`failures`, `rolls[].modifiers`, and `rendered` all agree with it, and dice it
+does not count come out untagged. The DC side of a `vs` is the exception — it
+sits outside every pool pass and keeps whatever tagged it.
 
 ### The parts tree
 
@@ -459,9 +473,9 @@ The 19 is critical only because `cs>=19` said so — the booleans are where the
 override lands. Compose the two marks rather than branching on one: overlapping
 thresholds set both, and `1d6cs>=3cf<=4` rolling a 3 does exactly that.
 
-`site/src/dice.ts` in this repo is the working version: `dieStates` turns the
-same booleans into CSS classes, `dieTitle` into a tooltip, and the tray legend
-lights up only for the states a roll actually produced.
+The [playground](https://roll-parser.edloidas.io/) does exactly this — its
+[source](https://github.com/edloidas/roll-parser/blob/master/site/src/dice.ts)
+turns the same booleans into CSS classes, a tooltip, and a legend.
 
 That loop is right for a plain pool. Four decisions it cannot dodge:
 
@@ -478,11 +492,10 @@ That loop is right for a plain pool. Four decisions it cannot dodge:
   every flagged die — but its callbacks receive the die, so gate on the tag.
   For a hand-rolled walk, `result.parts` keeps the two sides apart: the
   `versus` part carries `roll` and `dc` as separate subtrees.
-- **Never splice `rendered` by bracket position.** `{2d6, 2d8}kh1` puts one
-  strike around the whole dropped sub-roll, `{2d6[6, 6], ~~2d8[1, 1]~~}`, yet
-  its inner dice each carry `'dropped'` — group selection re-flags them after
-  the sub-roll's own text was captured. Marking every `'dropped'` die into that
-  string yields `~~2d8[~~1~~, ~~1~~]~~`. Rebuild with
+- **Never splice `rendered` by bracket position.** `{2d6, 2d8}kh1` strikes the
+  dropped sub-roll as a whole, `{2d6[6, 6], ~~2d8[1, 1]~~}`, yet its inner dice
+  each carry `'dropped'` too — marking every `'dropped'` die into that string
+  yields `~~2d8[~~1~~, ~~1~~]~~`. Rebuild with
   [`renderBreakdown`](#custom-markers) instead of patching the baked string.
 - **Density is your call.** The default rule flags the max face of any pool,
   not just d20s — `3d6` rolling a 6 is `critical: true` — so marking it
@@ -1051,16 +1064,12 @@ Values are **p50**, from
 two significant digits: another machine shifts every row, and a busy one
 inflates the heavy cases most.
 
-The `10d10>=6f1` `roll` figure and the `4d6sd` row come from a later
-five-pass measurement on the same machine, after the per-die `'dc'` tag checks
-that had entered the keep/drop, success-count, and sort paths were hoisted out
-of those loops. That session was not idle: `evaluate / 10d10>=6f1` and
-`evaluate / 10d10sd` each read bimodally across passes with roughly 10% between
-the two modes, so those two are quoted as "recovered to the pre-exclusion
-range" rather than to a point value. The rows this hoist does not touch
-(`1d20`, `2d6+3`, `4d6kh3`, `100d6`) re-measured within noise of the figures
-above and are left as first measured, since the earlier idle session is the
-better data for them.
+The `4d6sd` row and the `10d10>=6f1` `roll` figure come from a later five-pass
+measurement on the same machine, after the per-die `'dc'` tag checks were
+hoisted out of the keep/drop, success-count, and sort loops. That session was
+not idle and those two read bimodally with roughly 10% between the modes, so
+take them as a recovered range rather than point values. Every other row is as
+first measured.
 
 p50 rather than mean, because the mean here is effectively a GC-pause
 histogram and swings ±40% between processes. Every bench body is JIT-primed
@@ -1080,17 +1089,42 @@ any commit that regresses a case past 1.75x. Bundle size is gated in CI by
 
 ## Known limitations
 
-- **Keep/drop does not echo into the render prefix.** `4d6kh3` renders as
-  `4d6[1, 6, ~~1~~, 3] = 10`, while every other modifier family does echo
-  (`8d6![…]`, `4d6sd[…]`, `10d10>=6f1[…]`). The dropped die is still marked;
-  only the `kh3` is missing, and `result.expression` has it.
-- **`4d6d1` is a parse error, not "drop 1".** The bare `d` is the dice
-  operator, and reading `4d6d1` as "roll 4d6, then roll that many d1" is a
-  silent trap, so it throws `AMBIGUOUS_DICE_CHAIN`.
-- **Threshold comparisons bind tight.** `1d6!>=5+2` parses as `(1d6!>=5)+2`;
-  parenthesize for a computed threshold, `1d6!>=(5+2)`. Success counts bind the
-  same way but are terminal, so `1d6>=5+2` errors outright — write
-  `1d6>=(5+2)`, or `{1d6>=5}+2` to add to the count itself.
+### Notation the parser rejects
+
+| Form | Throws | Write instead |
+|------|--------|---------------|
+| `{2d6+3}kh2`, `{2d6-1d4}kh3`, `{2d6*2}kh2`, `{2d6+0}kh2` | `INVALID_KEEP_DROP_TARGET` | `{2d6}kh2 + 3`, or one sub-roll per term: `{2d6+3, 1d8}kh1` |
+| `{3d20+5}>=21`, `{2d6-1d4}>=3`, `{2d6*2}>=4`, `{floor(2d6/2)}>=2` | `INVALID_SUCCESS_COUNT_TARGET` | fold the scalar into the threshold: `3d20>=16` |
+| `{3, 5, 7}>=4` | `INVALID_SUCCESS_COUNT_TARGET` | give the group a pool: `3d6>=4` |
+| `{{2d6, 2d8}}>=4`, `({2d6, 2d8})>=4`, `{2d6, 2d8}kh1>=4` | `INVALID_SUCCESS_COUNT_TARGET` | count the group directly: `{2d6, 2d8}>=4` |
+| `{4d6>=5}kh1` | `INVALID_SUCCESS_COUNT_TARGET` | the count is already terminal — select first, `{4d6kh1}>=5` |
+| `{2d6, 1d8}s` | `INVALID_SORT_TARGET` | flatten to one sub-roll: `{2d6+1d8}s` |
+| `4d6d1` | `AMBIGUOUS_DICE_CHAIN` | `4d6dl1` to drop a die, `(4d6)d1` for nested dice |
+
+The first two rows share one cause: a single-sub-roll group compares dice one
+face at a time, so a literal, a subtracted or scaled pool, or a function wrapper
+never reaches the comparison. The check is structural rather than arithmetic, so
+an identity term (`{2d6+0}kh2`) is refused with the rest. Adding pools
+(`{4d6+2d8}kh3`, `{2d6+1d8}>=5`) is the form these braces exist for and always
+works.
+
+A counted group needs at least one die somewhere in it — one real pool is
+enough, and the other sub-rolls may be literals: `{3, 1d6}>=4` scores both
+subtotals, the literal `3` included. A pool that is merely empty at run time
+(`0d6>=4`) still parses and totals 0. Subtotals exist only while the count holds
+the group directly, which is why the fourth row throws rather than falling back
+to loose faces; the DC side of a `vs` is exempt (`{1d20 vs {2d6, 2d8}}>=5`
+counts the d20), since no pool pass tallies a DC.
+
+Sorting a multi-sub-roll group is refused rather than shipped wrong: spec-correct
+sorting there is hierarchical — dice within each sub-roll, then sub-rolls by
+total — and the evaluator only flat-sorts.
+
+### Rendering and `expression`
+
+- **Keep/drop does not echo into the render prefix** — see
+  [Rendering](#rendering). The dropped die is still marked; only the `kh3` is
+  missing, and `result.expression` has it.
 - **`result.expression` substitutes meta-expressions with their resolved
   values,** so it does not round-trip through `parse` when they are present:
   `roll('(1d4)d6').expression` is `'4d6'` when the `1d4` rolled 4, and
@@ -1106,42 +1140,13 @@ any commit that regresses a case past 1.75x. Bundle size is gated in CI by
 - **Outer parentheses drop when crit thresholds collapse.** `(1d20cs>19)cs=1`
   reports `expression: '1d20cs>19cs=1'` because chained `cs`/`cf` fold into one
   node. It re-parses to the same AST; only the text differs.
-- **Sorting a multi-sub-roll group is rejected.** `{2d6, 1d8}s` throws
-  `INVALID_SORT_TARGET`. Spec-correct sorting there is hierarchical — dice
-  within each sub-roll, then sub-rolls by total — and the evaluator only
-  flat-sorts, so the syntax is refused rather than shipped wrong. Single
-  sub-roll groups (`{2d6+1d8}s`) still work as the flat-pool escape hatch.
-- **Keep/drop on a single-sub-roll group takes added dice terms only.**
-  `{4d6+2d8}kh3` selects across the six faces and totals them, which is the
-  whole point of the form. A term that contributes to the group's total without
-  contributing a face — a literal, a subtracted or scaled pool, a function call —
-  has nowhere to go in that sum, so `{2d6+3}kh2`, `{2d6-1d4}kh3`, and
-  `{2d6*2}kh2` throw `INVALID_KEEP_DROP_TARGET` instead of quietly returning the
-  face sum, and `{4d6>=5}kh1` throws `INVALID_SUCCESS_COUNT_TARGET` like the
-  `(4d6>=5)kh1` it brackets. The check is structural, not arithmetic, so an
-  identity term is refused with the rest — `{2d6+0}kh2` reads the same as
-  `{2d6+3}kh2` here. Put the arithmetic outside the selection (`{2d6}kh2+3`) or
-  give each term its own sub-roll (`{2d6+3, 1d8}kh1`), where keep/drop compares
-  subtotals.
-- **Success counting a group that rolls no dice is rejected.** `{3, 5, 7}>=4`
-  throws `INVALID_SUCCESS_COUNT_TARGET`. A count needs a pool to score, and a
-  literal-only group has none, so the syntax is refused rather than answered
-  wrongly. Groups holding at least one pool (`{3, 1d6}>=4`) count their
-  subtotals, and a pool that is merely empty at run time (`0d6>=4`) still
-  totals 0.
-- **Only a direct multi-sub-roll group counts subtotals.** Subtotals exist while
-  `evalSuccessCount` holds the group itself, so reaching one any other way —
-  `{{2d6, 2d8}}>=4`, `({2d6, 2d8})>=4`, `{2d6, 2d8}kh1>=4` — throws
-  `INVALID_SUCCESS_COUNT_TARGET` rather than falling back to loose faces. The DC
-  side of a `vs` is free of the rule (`{1d20 vs {2d6, 2d8}}>=5` counts the d20),
-  since no pool pass tallies a DC.
-- **A single-sub-roll group counts added dice terms only.** `{3d20+5}>=21`,
-  `{2d6-1d4}>=3`, `{2d6*2}>=4`, and `{floor(2d6/2)}>=2` throw
-  `INVALID_SUCCESS_COUNT_TARGET`. That form compares dice one face at a time, so
-  a scalar, a subtracted term, a scale factor, or a function wrapper never
-  reaches the comparison — the same restriction keep/drop has on `{2d6+3}kh2`.
-  Roll20 folds the remaining math into each roll instead, which is only well
-  defined for `pool ± scalar`. Adding pools (`{2d6+1d8}>=5`) still works.
+
+### Arithmetic and precedence
+
+- **Threshold comparisons bind tight.** `1d6!>=5+2` parses as `(1d6!>=5)+2`;
+  parenthesize for a computed threshold, `1d6!>=(5+2)`. Success counts bind the
+  same way but are terminal, so `1d6>=5+2` errors outright — write
+  `1d6>=(5+2)`, or `{1d6>=5}+2` to add to the count itself.
 - **Division does not floor.** `7/2` totals `3.5`, not `3` — arithmetic is plain
   IEEE-754 throughout. Wrap it when you need an integer: `floor(7/2)` totals `3`.
 - **The power operator has no overflow guard.** `2**999` totals `5.357…e+300`.

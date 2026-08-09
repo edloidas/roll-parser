@@ -134,12 +134,10 @@ function markSingleExtreme(
 }
 
 /**
- * Calculates total from dice, excluding dropped dice.
+ * Sums the dice a keep/drop pass left standing.
  *
- * @param dice - Array of die results
  * @param hasVersusDc - Shared env flag; skips the DC exclusion when no `vs` has
  *   tagged anything
- * @returns Sum of non-dropped dice
  */
 export function sumKeptDice(dice: DieResult[], hasVersusDc: boolean): number {
   let total = 0;

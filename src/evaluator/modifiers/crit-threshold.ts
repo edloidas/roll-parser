@@ -48,11 +48,8 @@ import { matchesCondition } from './compare.js';
 import { isVersusDc } from './flags.js';
 
 /**
- * Applies success/fail threshold arrays to a dice pool, overriding each
- * die's `critical` and `fumble` flags in place. Writing `natural` for
- * `initialResult ?? result`, a die matches `'default'` on the success side
- * when `natural === sides && sides > 1`, and on the fail side when
- * `natural === 1 && sides > 1`. Meta dice are skipped.
+ * Applies success/fail threshold arrays to a dice pool, overriding each die's
+ * `critical` and `fumble` flags in place. Meta and DC dice are skipped.
  *
  * Also records the rule against every die it touched, so later explode and
  * reroll dice can inherit it via {@link inheritCritRule}.
@@ -79,12 +76,11 @@ export function applyCritThresholds(
 /**
  * Judges one die by a recorded rule, overwriting both flags. A side always
  * carries at least `'default'` — `evalCritThreshold` fills the side the user
- * left out — so neither flag is silently left untouched. `natural` is the face
- * the `'default'` sentinel reads; an explicit threshold always reads `result`.
+ * left out — so neither flag is silently left untouched.
  */
 function applyCritRule(die: DieResult, rule: CritRule, natural: number): void {
-  die.critical = rule.success.some((t) => matchesCrit(t, die, natural));
-  die.fumble = rule.fail.some((t) => matchesFumble(t, die, natural));
+  die.critical = rule.success.some((t) => matchesThreshold(t, die, natural, die.sides));
+  die.fumble = rule.fail.some((t) => matchesThreshold(t, die, natural, 1));
 }
 
 /**
@@ -108,17 +104,19 @@ export function inheritCritRule(env: EvalEnv, parent: DieResult, child: DieResul
   rules.set(child, rule);
 }
 
-function matchesCrit(threshold: ResolvedCritThreshold, die: DieResult, natural: number): boolean {
+/**
+ * `defaultFace` is the face the `'default'` sentinel looks for — `die.sides`
+ * on the success side, `1` on the fail side. The `sides > 1` guard mirrors
+ * `createDieResult`: a d1 always rolls 1, so it is neither.
+ */
+function matchesThreshold(
+  threshold: ResolvedCritThreshold,
+  die: DieResult,
+  natural: number,
+  defaultFace: number,
+): boolean {
   if (threshold === 'default') {
-    return natural === die.sides && die.sides > 1;
-  }
-  return matchesCondition(die.result, threshold.operator, threshold.value);
-}
-
-function matchesFumble(threshold: ResolvedCritThreshold, die: DieResult, natural: number): boolean {
-  if (threshold === 'default') {
-    // Mirrors `createDieResult` — a d1 always rolls 1, never a fumble.
-    return natural === 1 && die.sides > 1;
+    return natural === defaultFace && die.sides > 1;
   }
   return matchesCondition(die.result, threshold.operator, threshold.value);
 }
