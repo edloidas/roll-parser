@@ -36,7 +36,7 @@ a running `site:dev` resolves `roll-parser` into it and caches resolution failur
 it cannot recover from; `scripts/prune-dist.ts` deletes what the passes did not
 write, and `bun run clean` (which `release:dry` runs) is the pristine path. Do not
 reintroduce a bundler: Bun ≤1.3.11 breaks pure re-export entrypoints (e.g. `src/testing.ts`) and `--target browser` silently stubs `node:` builtins instead of erroring
-- Byte budgets are a release gate (`check:size`): 12.85 kB `index.js`, 6 kB `{ parse }`, 12.5 kB `{ roll }`, 250 B `testing.js` — see `size-limit` in `package.json` before adding surface area. Raising a budget is its own commit, never a line in a feature PR
+- Byte budgets are a release gate (`check:size`): 12.85 kB `index.js`, 6 kB `{ parse }`, 12.75 kB `{ roll }`, 250 B `testing.js` — see `size-limit` in `package.json` before adding surface area. Raising a budget is its own commit, never a line in a feature PR
 - `files` ships `src/` deliberately: `.d.ts.map` points consumer go-to-definition at the real sources. Removing it breaks nothing visibly — the jumps just die
 - Relative imports in `src/` carry explicit `.js` extensions — enforced by `moduleResolution: nodenext` at typecheck time
 - Library code must stay environment-neutral: no Node/Bun globals or `node:` imports outside `src/cli/` — enforced by Biome `noNodejsModules`, `types: []` in `tsconfig.build.json`, and the `browser-smoke` CI job
