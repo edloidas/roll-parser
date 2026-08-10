@@ -207,6 +207,26 @@ function appendAll<T>(target: T[], source: readonly T[]): void {
   }
 }
 
+/**
+ * Message for an operand that has to be a whole number — dice count, dice
+ * sides, keep/drop count. A fractional value there is almost always an
+ * unrounded division (`5d(20/3)`, `4d6kh(3/2)`), and the fix is a function the
+ * notation already carries, so the message names it rather than leaving the
+ * author to find it. Only finite positive values get the hint: no rounding
+ * rescues a negative count or a `NaN`.
+ *
+ * The value prints in full, repeating decimals and all. Shortening it to a
+ * fixed width read better on `20/3` but rounded `1.00001` to `1` — naming a
+ * side count the evaluator accepts, which reads as a bug in the library rather
+ * than in the notation. Exactness is worth more than the digits it costs.
+ */
+function invalidIntegerOperand(label: string, value: number): string {
+  if (Number.isInteger(value) || !Number.isFinite(value) || value <= 0) {
+    return `${label}: ${value}`;
+  }
+  return `${label}: ${value} (use 'floor', 'ceil', or 'round')`;
+}
+
 /** Drops the internal notation `code`, leaving the public `KeepDropSpec` shape. */
 function toPublicSpecs(specs: KeepDropChainEntry[]): KeepDropSpec[] {
   return specs.map(({ code: _code, ...spec }) => spec);
@@ -511,7 +531,11 @@ function evalDiscardingSubtotals(
 /** Rejects dice counts that cannot address a pool. */
 function requireDiceCount(count: number, nodeType: 'Dice' | 'FateDice'): void {
   if (!Number.isInteger(count) || count < 0) {
-    throw new EvaluatorError(`Invalid dice count: ${count}`, 'INVALID_DICE_COUNT', nodeType);
+    throw new EvaluatorError(
+      invalidIntegerOperand('Invalid dice count', count),
+      'INVALID_DICE_COUNT',
+      nodeType,
+    );
   }
 }
 
@@ -564,7 +588,11 @@ function evalDice(node: DiceNode, rng: RNG, ctx: EvalContext, env: EvalEnv): Eva
 
   requireDiceCount(count, 'Dice');
   if (!Number.isInteger(sides) || sides < 1) {
-    throw new EvaluatorError(`Invalid dice sides: ${sides}`, 'INVALID_DICE_SIDES', 'Dice');
+    throw new EvaluatorError(
+      invalidIntegerOperand('Invalid dice sides', sides),
+      'INVALID_DICE_SIDES',
+      'Dice',
+    );
   }
   if (sides > MAX_DICE_SIDES) {
     throw new EvaluatorError(
@@ -952,7 +980,7 @@ function flattenKeepDropChain(
 
     if (!Number.isInteger(modCount) || modCount < 0) {
       throw new EvaluatorError(
-        `Invalid keep/drop count: ${modCount}`,
+        invalidIntegerOperand('Invalid keep/drop count', modCount),
         'INVALID_KEEP_DROP_COUNT',
         'KeepDrop',
       );
