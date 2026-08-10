@@ -3324,6 +3324,90 @@ describe('evaluate', () => {
       }
       expect(result.total).toBe(12);
     });
+
+    describe('fractional operands name the rounding fix', () => {
+      const HINT = "(use 'floor', 'ceil', or 'round')";
+
+      test('5d(20/3) reports the fractional sides and the hint', () => {
+        const error = expectRollError(
+          () => evaluate(parse('5d(20/3)'), createMockRng([])),
+          EvaluatorError,
+          'INVALID_DICE_SIDES',
+        );
+
+        expect(error.message).toBe(`Invalid dice sides: 6.666666666666667 ${HINT}`);
+      });
+
+      test('(1/2)d6 reports the fractional count and the hint', () => {
+        const error = expectRollError(
+          () => evaluate(parse('(1/2)d6'), createMockRng([])),
+          EvaluatorError,
+          'INVALID_DICE_COUNT',
+        );
+
+        expect(error.message).toBe(`Invalid dice count: 0.5 ${HINT}`);
+      });
+
+      test('4d6kh(3/2) reports the fractional keep count and the hint', () => {
+        const error = expectRollError(
+          () => evaluate(parse('4d6kh(3/2)'), createMockRng([])),
+          EvaluatorError,
+          'INVALID_KEEP_DROP_COUNT',
+        );
+
+        expect(error.message).toBe(`Invalid keep/drop count: 1.5 ${HINT}`);
+      });
+
+      test('a negative count stays hintless — no rounding rescues it', () => {
+        const error = expectRollError(
+          () => evaluate(parse('(-3/2)d6'), createMockRng([])),
+          EvaluatorError,
+          'INVALID_DICE_COUNT',
+        );
+
+        expect(error.message).toBe('Invalid dice count: -1.5');
+      });
+
+      test('1d0 stays hintless — an integer needs no rounding', () => {
+        const error = expectRollError(
+          () => evaluate(parse('1d0'), createMockRng([])),
+          EvaluatorError,
+          'INVALID_DICE_SIDES',
+        );
+
+        expect(error.message).toBe('Invalid dice sides: 0');
+      });
+
+      test('the message never names a side count that would be accepted', () => {
+        // Truncating the display to a fixed width turned `1.00001` into `1` — a
+        // valid side count, which reads as a library bug rather than a notation
+        // one. The value prints exact for that reason.
+        const error = expectRollError(
+          () => evaluate(parse('5d(100001/100000)'), createMockRng([])),
+          EvaluatorError,
+          'INVALID_DICE_SIDES',
+        );
+
+        expect(error.message).toBe(`Invalid dice sides: 1.00001 ${HINT}`);
+      });
+
+      test('a near-zero fraction is not displayed as zero', () => {
+        const error = expectRollError(
+          () => evaluate(parse('5d(1/100000)'), createMockRng([])),
+          EvaluatorError,
+          'INVALID_DICE_SIDES',
+        );
+
+        expect(error.message).toBe(`Invalid dice sides: 0.00001 ${HINT}`);
+      });
+
+      test('the hinted fix parses and rolls: 5d(round(20/3)) is 5d7', () => {
+        const result = evaluate(parse('5d(round(20/3))'), createMockRng([1, 2, 3, 4, 7]));
+
+        expect(result.rolls.every((die) => die.sides === 7)).toBe(true);
+        expect(result.total).toBe(17);
+      });
+    });
   });
 
   describe('variables', () => {

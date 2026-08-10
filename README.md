@@ -1149,6 +1149,9 @@ total — and the evaluator only flat-sorts.
   `1d6>=(5+2)`, or `{1d6>=5}+2` to add to the count itself.
 - **Division does not floor.** `7/2` totals `3.5`, not `3` — arithmetic is plain
   IEEE-754 throughout. Wrap it when you need an integer: `floor(7/2)` totals `3`.
+  Operands that must be whole numbers — dice count, dice sides, keep/drop count —
+  reject a fraction instead of rounding it for you: `5d(20/3)` throws
+  `INVALID_DICE_SIDES`, `5d(round(20/3))` rolls `5d7`.
 - **The power operator has no overflow guard.** `2**999` totals `5.357…e+300`.
   Only a non-finite result throws `NON_FINITE_RESULT`, so finite-but-enormous
   totals pass through unflagged.
