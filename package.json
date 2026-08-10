@@ -1,6 +1,6 @@
 {
   "name": "roll-parser",
-  "version": "3.2.0",
+  "version": "3.2.1",
   "description": "High-performance dice notation parser for tabletop RPGs. TypeScript-first, runs on Node, Bun, and browsers with zero dependencies.",
   "type": "module",
   "bin": {

@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.2.1] - 2026-08-10
+
+### Changed
+
+- The three errors for operands that must be whole numbers — dice count, dice sides, and keep/drop count — now name the fix instead of only the value: `5d(20/3)` reports `Invalid dice sides: 6.666666666666667 (use 'floor', 'ceil', or 'round')`. Division still does not floor, so a fraction there stays an error rather than being rounded for you; the hint points at the escape hatch the notation already has. `1d0`, negative counts, and non-finite values keep their bare messages, since no rounding rescues them, and the value is printed exact — a fixed-width display rounded `1.00001` to `1`, naming a side count the evaluator accepts ([#318](https://github.com/edloidas/roll-parser/issues/318))
+
+### Documentation
+
+- `README.md`'s "Division does not floor" gotcha now covers the dice-operand consequence, with `5d(20/3)` and its `5d(round(20/3))` rewrite ([#318](https://github.com/edloidas/roll-parser/issues/318))
+
 ## [3.2.0] - 2026-08-09
 
 Every entry below is a correctness fix, but several change what a working
@@ -241,7 +251,8 @@ Dice mechanics (Stage 2):
 - Dice count safety limit via `maxDice` option (default 10,000), enforced across the whole expression to prevent DoS via additive groups like `5000d6+5000d6` ([#19](https://github.com/edloidas/roll-parser/issues/19))
 - Parser and evaluator correctness: duplicate `kept` modifier entries, implicit modifier count defaulting to 1 (`4d6kh` → `4d6kh1`), `critical` flag suppression when `sides === 1`, negative `--seed` CLI values ([#21](https://github.com/edloidas/roll-parser/issues/21))
 
-[Unreleased]: https://github.com/edloidas/roll-parser/compare/v3.2.0...HEAD
+[Unreleased]: https://github.com/edloidas/roll-parser/compare/v3.2.1...HEAD
+[3.2.1]: https://github.com/edloidas/roll-parser/releases/tag/v3.2.1
 [3.2.0]: https://github.com/edloidas/roll-parser/releases/tag/v3.2.0
 [3.1.0]: https://github.com/edloidas/roll-parser/releases/tag/v3.1.0
 [3.0.0]: https://github.com/edloidas/roll-parser/releases/tag/v3.0.0
