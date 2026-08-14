@@ -1147,6 +1147,11 @@ total — and the evaluator only flat-sorts.
   parenthesize for a computed threshold, `1d6!>=(5+2)`. Success counts bind the
   same way but are terminal, so `1d6>=5+2` errors outright — write
   `1d6>=(5+2)`, or `{1d6>=5}+2` to add to the count itself.
+- **An explode claims the comparison that follows it.** `3d6!>4` explodes on
+  5 and 6; it is not a success count, so there is nothing for an `f` clause to
+  attach to and `3d6!>4f1` throws `UNEXPECTED_TOKEN`. Parenthesize the explode
+  to count its pool, `(3d6!)>4f1`, or give the count its own threshold,
+  `3d6!>4>=5f1`.
 - **Division does not floor.** `7/2` totals `3.5`, not `3` — arithmetic is plain
   IEEE-754 throughout. Wrap it when you need an integer: `floor(7/2)` totals `3`.
   Operands that must be whole numbers — dice count, dice sides, keep/drop count —

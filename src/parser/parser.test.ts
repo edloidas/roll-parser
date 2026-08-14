@@ -1312,6 +1312,38 @@ describe('Parser', () => {
     });
   });
 
+  describe('orphaned fail threshold', () => {
+    it('rejects an explode that took the comparison: 3d6!>4f1 (#320)', () => {
+      const error = expectRollError(() => parseAst('3d6!>4f1'), ParseError, 'UNEXPECTED_TOKEN');
+      expect(error.message).toContain('requires a success count');
+      expect(error.position).toBe(6);
+    });
+
+    it('rejects a fail threshold with no comparison at all: 3d6f1 (#320)', () => {
+      const error = expectRollError(() => parseAst('3d6f1'), ParseError, 'UNEXPECTED_TOKEN');
+      expect(error.message).toContain('requires a success count');
+      expect(error.position).toBe(3);
+    });
+
+    it.each(['10d10!>=6f1', '3d6!!>4f1', '(3d6!>4)f1', '3d6!f1', '3d6r<3f1'])(
+      'rejects orphaned fail threshold: %s (#320)',
+      (notation) => {
+        expectRollError(() => parseAst(notation), ParseError, 'UNEXPECTED_TOKEN');
+      },
+    );
+
+    it('parses the rewrites README offers for 3d6!>4f1 (#320)', () => {
+      // The documented escape hatches — a lie the moment either stops parsing.
+      expect(parseAst('(3d6!)>4f1').type).toBe('SuccessCount');
+      expect(parseAst('3d6!>4>=5f1').type).toBe('SuccessCount');
+    });
+
+    it('leaves a leading f on its own error: f1 (#320)', () => {
+      // NUD position, never LED — `parseLed` is not on this path.
+      expectRollError(() => parseAst('f1'), ParseError, 'UNEXPECTED_TOKEN');
+    });
+  });
+
   describe('success count rejected in meta-expression positions', () => {
     // SuccessCount is terminal at every meta-expression parse site: modifier
     // count, dice sides/count (infix + prefix), Fate/percent dice count,
