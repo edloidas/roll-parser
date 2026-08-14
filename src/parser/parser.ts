@@ -395,6 +395,9 @@ export class Parser {
       case TokenType.VS:
         return this.parseVersus(left, token);
 
+      case TokenType.FAIL:
+        return Parser.throwOrphanFailThreshold(token);
+
       default:
         throw new ParseError(
           `Unexpected infix token '${token.value}'`,
@@ -1186,6 +1189,26 @@ export class Parser {
     this.rejectVersusMetaOperand(failValue, token);
 
     return { operator: '=', value: failValue };
+  }
+
+  /**
+   * Rejects an `f` that reached LED position, which means no success count is
+   * there to own it — `parseSuccessCount` consumes its own `f`, so this is the
+   * only way the token surfaces.
+   *
+   * The trigger clause names the cause of nearly every orphan: an explode's
+   * comparison is optional, so `3d6!>4f1` reads as a success count with a botch
+   * threshold when `!` has already spent the `>4`. Naming it unconditionally
+   * keeps this off the `index.js` byte budget; **README.md → Arithmetic and
+   * precedence** carries the two rewrites.
+   */
+  private static throwOrphanFailThreshold(token: Token): never {
+    throw new ParseError(
+      `Fail threshold requires a success count; an explode's comparison is its trigger`,
+      'UNEXPECTED_TOKEN',
+      token.position,
+      token,
+    );
   }
 
   private parseVersus(left: ASTNode, token: Token): VersusNode {
