@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.2.2] - 2026-08-14
+
+### Changed
+
+- A failure threshold with no success count to attach to now says so instead of reporting a bare `Unexpected infix token 'f'`. The input that provokes it reads like World of Darkness notation — `3d6!>4f1`, `10d10!>=6f1` — but an explode takes the comparison that follows it as its own trigger, leaving the `f` clause with nothing to modify. The code stays `UNEXPECTED_TOKEN`, and the position still points at the `f` ([#320](https://github.com/edloidas/roll-parser/issues/320))
+
+### Documentation
+
+- `README.md` gains an "An explode claims the comparison that follows it" gotcha under Arithmetic and precedence, with both rewrites: `(3d6!)>4f1` to count the exploded pool, or `3d6!>4>=5f1` to keep an explode trigger and a success threshold ([#320](https://github.com/edloidas/roll-parser/issues/320))
+
 ## [3.2.1] - 2026-08-10
 
 ### Changed
@@ -251,7 +261,8 @@ Dice mechanics (Stage 2):
 - Dice count safety limit via `maxDice` option (default 10,000), enforced across the whole expression to prevent DoS via additive groups like `5000d6+5000d6` ([#19](https://github.com/edloidas/roll-parser/issues/19))
 - Parser and evaluator correctness: duplicate `kept` modifier entries, implicit modifier count defaulting to 1 (`4d6kh` → `4d6kh1`), `critical` flag suppression when `sides === 1`, negative `--seed` CLI values ([#21](https://github.com/edloidas/roll-parser/issues/21))
 
-[Unreleased]: https://github.com/edloidas/roll-parser/compare/v3.2.1...HEAD
+[Unreleased]: https://github.com/edloidas/roll-parser/compare/v3.2.2...HEAD
+[3.2.2]: https://github.com/edloidas/roll-parser/releases/tag/v3.2.2
 [3.2.1]: https://github.com/edloidas/roll-parser/releases/tag/v3.2.1
 [3.2.0]: https://github.com/edloidas/roll-parser/releases/tag/v3.2.0
 [3.1.0]: https://github.com/edloidas/roll-parser/releases/tag/v3.1.0
