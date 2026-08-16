@@ -2245,6 +2245,16 @@ describe('Parser', () => {
         expect(error.message).toContain('Empty group');
       });
 
+      // `{}` named the mistake; `()` fell through to the generic prefix arm and
+      // reported `Unexpected token ')'` at the closer instead (#326).
+      it('should reject empty parentheses the way it rejects an empty group', () => {
+        const error = expectRollError(() => parseAst('()'), ParseError, 'UNEXPECTED_TOKEN');
+
+        expect(error.message).toBe('Empty parentheses');
+        // The opener, so the caret lands on the construct rather than its closer.
+        expect(error.position).toBe(0);
+      });
+
       it('should reject unterminated group with EOF', () => {
         const error = expectRollError(() => parseAst('{1d6, 2d8'), ParseError, 'EXPECTED_TOKEN');
 

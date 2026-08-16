@@ -517,6 +517,13 @@ export class Parser {
   }
 
   private parseGrouped(token: Token): GroupedNode {
+    // Mirrors `parseGroup`'s empty check. Without it `)` reaches the prefix arm
+    // and reports itself as an unexpected token, naming the closer rather than
+    // the empty construct.
+    if (this.peek().type === TokenType.RPAREN) {
+      throw new ParseError('Empty parentheses', 'UNEXPECTED_TOKEN', token.position, token);
+    }
+
     const expression = this.parseExpression(0);
     const close = this.expect(TokenType.RPAREN);
     return { type: 'Grouped', expression, start: token.position, end: close.end };
