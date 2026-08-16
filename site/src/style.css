@@ -814,8 +814,8 @@ button.die-overflow:hover {
 /* Top navigation — Guide/Docs pills, present in both idle and active states. */
 .top-nav {
   position: fixed;
-  top: 0.9rem;
-  right: 1rem;
+  top: calc(0.75rem - 1px);
+  right: calc(0.75rem - 1px);
   z-index: 5;
   display: flex;
   gap: 0.4rem;
