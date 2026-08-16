@@ -588,6 +588,25 @@ describe('Parser', () => {
       expect(() => parseAst('kh3')).toThrow(ParseError);
     });
 
+    // `Unexpected infix token '1'` named the digit and used parser jargon; the
+    // digit is not the surprise, the modifier it follows is (#326).
+    it('should name the count-less modifier rather than the digit', () => {
+      for (const notation of ['2d6s1', '2d6sa1', '2d6sd1', '2d6cs1', '2d6cf1', '2d6!0', '2d6!p3']) {
+        const error = expectRollError(() => parseAst(notation), ParseError, 'UNEXPECTED_TOKEN');
+
+        expect(error.message).toBe('This modifier takes no count');
+      }
+    });
+
+    // Two juxtaposed values are a different mistake and keep the generic wording.
+    it('should keep the generic message when no modifier precedes the number', () => {
+      for (const notation of ['2d6 3', '1 2']) {
+        const error = expectRollError(() => parseAst(notation), ParseError, 'UNEXPECTED_TOKEN');
+
+        expect(error.message).toContain('Unexpected infix token');
+      }
+    });
+
     it('should name the expected symbol and end of input in expect() errors', () => {
       expect(() => parseAst('((1d6')).toThrow(`Expected ')' but got end of input`);
       expect(() => parseAst('floor 2')).toThrow(`Expected '(' but got '2'`);
