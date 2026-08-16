@@ -659,8 +659,12 @@ export class Parser {
     // never hide inside one and widening the set would never match.
     const node = unwrapGrouped(target);
     if (isSuccessCount(node)) {
+      // ! Three shapes reach here and only one is a modifier — arithmetic
+      // ! (`5d6>=5+3`) and meta-operand reuse (`4d(1d6>=3)`) do too. The message
+      // ! names the property all three violate; **README.md → Pools and checks**
+      // ! carries the worked rewrites.
       throw new ParseError(
-        `Cannot apply modifier after success counting`,
+        `Success counting is terminal: it cannot be part of a larger expression`,
         'INVALID_SUCCESS_COUNT_TARGET',
         token.position,
         token,
