@@ -607,6 +607,15 @@ describe('Parser', () => {
       }
     });
 
+    // `vs` reaching prefix position means nothing is there to be checked against
+    // the DC, which `Unexpected token 'vs'` never said (#326).
+    it('should say versus needs a left-hand roll', () => {
+      const error = expectRollError(() => parseAst('vs 15'), ParseError, 'UNEXPECTED_TOKEN');
+
+      expect(error.message).toBe('Versus needs a roll on its left');
+      expect(error.position).toBe(0);
+    });
+
     it('should name the expected symbol and end of input in expect() errors', () => {
       expect(() => parseAst('((1d6')).toThrow(`Expected ')' but got end of input`);
       expect(() => parseAst('floor 2')).toThrow(`Expected '(' but got '2'`);

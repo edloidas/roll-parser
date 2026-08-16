@@ -324,6 +324,16 @@ export class Parser {
       case TokenType.EOF:
         throw new ParseError('Unexpected end of input', 'UNEXPECTED_END', token.position);
 
+      // Reaching prefix position means no roll precedes the `vs`, so there is
+      // nothing to check against the DC.
+      case TokenType.VS:
+        throw new ParseError(
+          'Versus needs a roll on its left',
+          'UNEXPECTED_TOKEN',
+          token.position,
+          token,
+        );
+
       default:
         throw new ParseError(
           `Unexpected token '${token.value}'`,
