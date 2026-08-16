@@ -384,7 +384,14 @@ export class Lexer {
     } else {
       const nameStart = this.pos;
       if (this.isAtEnd() || !this.isIdentifierStart(this.peek())) {
-        throw new LexerError('Empty @ variable name', 'UNEXPECTED_CHARACTER', startPos, '@');
+        // ! Reached by a missing name and by a name starting with a digit or a
+        // ! non-ASCII letter alike, so the message names the rule, not emptiness.
+        throw new LexerError(
+          `@ variable name must start with a letter or '_'`,
+          'UNEXPECTED_CHARACTER',
+          startPos,
+          '@',
+        );
       }
       this.advance();
       while (!this.isAtEnd() && this.isIdentifierPart(this.peek())) {
