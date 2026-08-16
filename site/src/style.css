@@ -54,6 +54,12 @@
  * * Tokens
  */
 
+/* ! Foreground tokens are tuned to clear WCAG AA (4.5:1) against the tightest
+   surface they land on — `--surface-strong`, not `--bg`, since the 7%/9% ink
+   wash sits under the breakdown chips and mini-dice. `--die-stroke` is the one
+   exception: it only ever paints SVG strokes and 1.5px borders, so it answers
+   to the 3:1 graphic bar. Re-measure against `--surface-strong` before
+   lightening any of these. */
 :root {
   --bg: #16120b;
   --bg-glow: #2a2113;
@@ -62,11 +68,11 @@
   --border: rgba(255, 230, 190, 0.15);
   --text: #f0e6d2;
   --text-muted: #b3a583;
-  --text-dim: #7d7259;
+  --text-dim: #9a8d70;
   --accent: #d9a441;
   --accent-soft: rgba(217, 164, 65, 0.4);
   --success: #a3c585;
-  --failure: #cf6a5e;
+  --failure: #d4776b;
   --die-stroke: #8a7d63;
   --gold-gradient: linear-gradient(135deg, #f0c060, #d9a441 45%, #a3622f);
 
@@ -96,13 +102,13 @@
   --border: rgba(43, 35, 23, 0.15);
   --text: #2b2317;
   --text-muted: #6b5d45;
-  --text-dim: #9a8b6f;
-  --accent: #a06b1f;
-  --accent-soft: rgba(160, 107, 31, 0.35);
-  --success: #4f7a3a;
-  --failure: #b04a3e;
+  --text-dim: #6e6049;
+  --accent: #855512;
+  --accent-soft: rgba(133, 85, 18, 0.35);
+  --success: #456b33;
+  --failure: #9c4136;
   --die-stroke: #8a7a5c;
-  --gold-gradient: linear-gradient(135deg, #b8842a, #a06b1f 45%, #7a4a18);
+  --gold-gradient: linear-gradient(135deg, #976d23, #855512 45%, #593611);
 }
 
 @media (prefers-color-scheme: light) {
@@ -114,13 +120,13 @@
     --border: rgba(43, 35, 23, 0.15);
     --text: #2b2317;
     --text-muted: #6b5d45;
-    --text-dim: #9a8b6f;
-    --accent: #a06b1f;
-    --accent-soft: rgba(160, 107, 31, 0.35);
-    --success: #4f7a3a;
-    --failure: #b04a3e;
+    --text-dim: #6e6049;
+    --accent: #855512;
+    --accent-soft: rgba(133, 85, 18, 0.35);
+    --success: #456b33;
+    --failure: #9c4136;
     --die-stroke: #8a7a5c;
-    --gold-gradient: linear-gradient(135deg, #b8842a, #a06b1f 45%, #7a4a18);
+    --gold-gradient: linear-gradient(135deg, #976d23, #855512 45%, #593611);
   }
 }
 
@@ -1191,8 +1197,10 @@ button.die-overflow:hover {
   word-break: break-all;
 }
 
+/* Tint stays at 0.18: `--failure` text sits on this red wash rather than on a
+   surface token, and 0.22 drops it to 4.44 — under AA in both themes. */
 .error-span {
-  background: rgba(207, 106, 94, 0.22);
+  background: rgba(207, 106, 94, 0.18);
   color: var(--failure);
   border-bottom: 2px solid var(--failure);
   border-radius: 2px;
