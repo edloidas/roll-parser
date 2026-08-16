@@ -110,10 +110,9 @@ const IDENTIFIER_KEYWORDS: Record<string, TokenType> = Object.assign(Object.crea
  * not. Membership doubles as the filter — the keywords left out (`d`, `f`, `r`,
  * `ro`, `vs`, the function names) have no split that parses.
  */
-// ! Both halves of a merge are looked up here, so the pair is only ever
-// ! suggested when both are separable. `min`/`max` share `TokenType.FUNCTION`
-// ! with `floor`, so the separator cannot be derived from the token type.
-// ! Null-prototype for the same reason as `IDENTIFIER_KEYWORDS` above.
+// ! `min`/`max` share `TokenType.FUNCTION` with `floor`, so the separator
+// ! cannot be derived from the token type. Null-prototype for the same reason
+// ! as `IDENTIFIER_KEYWORDS` above.
 const MODIFIER_SEPARATORS: Record<string, string> = Object.assign(Object.create(null), {
   kh: '1',
   kl: '1',
@@ -130,10 +129,9 @@ const MODIFIER_SEPARATORS: Record<string, string> = Object.assign(Object.create(
 } satisfies Record<string, string>);
 
 /**
- * Names a code point the message cannot render. A pasted no-break space, zero-width
- * space or byte-order mark shows as nothing between the quotes, so the reader is
- * left an empty pair and no way to tell what was rejected. Printable ASCII is
- * legible there already and stays unadorned.
+ * Names a code point the message cannot render — a no-break space, zero-width
+ * space or byte-order mark shows as nothing between the quotes. Printable ASCII
+ * is legible there already and stays unadorned.
  */
 function nameCodePoint(codePoint: number | undefined): string {
   if (codePoint == null || (codePoint > 0x20 && codePoint < 0x7f)) return '';
@@ -145,9 +143,8 @@ function nameCodePoint(codePoint: number | undefined): string {
  * them when the first takes no count — `4d6khs` lexes as one identifier `khs`
  * instead of `kh` + `s` — so the fix is to re-separate them.
  *
- * Both halves must be separable modifiers. `flor` starts with `f` and `kx`
- * starts with `k`, but neither tail is a modifier, so no split of either parses
- * and the hint stays out of the way.
+ * Both halves must be separable: `flor` and `kx` start with a keyword but end
+ * in something no split can rescue, so they get no hint.
  */
 function buildIdentifierHint(identifier: string): string {
   for (let length = identifier.length - 1; length >= 1; length--) {
@@ -384,8 +381,9 @@ export class Lexer {
     } else {
       const nameStart = this.pos;
       if (this.isAtEnd() || !this.isIdentifierStart(this.peek())) {
-        // ! Reached by a missing name and by a name starting with a digit or a
-        // ! non-ASCII letter alike, so the message names the rule, not emptiness.
+        // Reached by a missing name and by one starting with a digit or a
+        // non-ASCII letter alike, so the message names the rule rather than
+        // any one of those causes.
         throw new LexerError(
           `@ variable name must start with a letter or '_'`,
           'UNEXPECTED_CHARACTER',

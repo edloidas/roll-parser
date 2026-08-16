@@ -419,13 +419,10 @@ export class Parser {
         return Parser.throwOrphanFailThreshold(token);
 
       default: {
-        // A bare number after a modifier that took none — `2d6s1`, `2d6!0`. The
-        // digit is not the surprise; the modifier it follows is.
-        // ! Sort consumes nothing, ever. An explode only qualifies while its
-        // ! threshold is unset — past `2d6!>1 2` the modifier did take a
-        // ! comparison, and the stray number is an unrelated juxtaposition.
-        // ! A crit threshold reads the same way, but through its `'default'`
-        // ! sentinel rather than an empty list — bare `cs` fills the list too.
+        // A bare number after a modifier that took none — `2d6s1`, `2d6!0`.
+        // ! Only while the modifier is still empty-handed: past `2d6!>1 2` the
+        // ! explode did take its comparison, and the stray number is an
+        // ! unrelated juxtaposition that keeps the generic message.
         if (
           token.type === TokenType.NUMBER &&
           (left.type === 'Sort' ||
@@ -558,9 +555,8 @@ export class Parser {
   }
 
   private parseGrouped(token: Token): GroupedNode {
-    // Mirrors `parseGroup`'s empty check. Without it `)` reaches the prefix arm
-    // and reports itself as an unexpected token, naming the closer rather than
-    // the empty construct.
+    // Mirrors `parseGroup`'s empty check; without it `)` reaches the prefix arm
+    // and reports itself, naming the closer rather than the empty construct.
     if (this.peek().type === TokenType.RPAREN) {
       throw new ParseError('Empty parentheses', 'UNEXPECTED_TOKEN', token.position, token);
     }
@@ -708,9 +704,9 @@ export class Parser {
     const node = unwrapGrouped(target);
     if (isSuccessCount(node)) {
       // ! Three shapes reach here and only one is a modifier — arithmetic
-      // ! (`5d6>=5+3`) and meta-operand reuse (`4d(1d6>=3)`) do too. The message
-      // ! names the property all three violate; **README.md → Pools and checks**
-      // ! carries the worked rewrites.
+      // ! (`5d6>=5+3`) and meta-operand reuse (`4d(1d6>=3)`) do too, so the
+      // ! message has to stay true of all three. **README.md → Pools and
+      // ! checks** carries the worked rewrites.
       throw new ParseError(
         `Success counting is terminal: it cannot be part of a larger expression`,
         'INVALID_SUCCESS_COUNT_TARGET',

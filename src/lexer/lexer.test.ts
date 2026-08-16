@@ -856,9 +856,8 @@ describe('Lexer', () => {
       expect(error.position).toBe(3);
     });
 
-    // `sd` takes no count, so the old `sd1kh` suggestion did not parse. A
-    // count-less first half splits on a space instead (#326).
-    it('should split a count-less modifier on a space, not a count', () => {
+    // `sd` takes no count, so a count-less first half splits on a space.
+    it('should split a count-less modifier on a space, not a count (#326)', () => {
       const error = expectRollError(() => lex('4d6sasd'), LexerError, 'UNEXPECTED_IDENTIFIER');
 
       expect(error.message).toContain(`did you mean 'sa' followed by 'sd'`);
@@ -867,8 +866,8 @@ describe('Lexer', () => {
     });
 
     // The tail has to be a modifier in its own right. `kx` and `flor` merely
-    // start with one, so any split of them is still unparsable (#326).
-    it('should not hint when the tail is not a modifier', () => {
+    // start with one, so any split of them is still unparsable.
+    it('should not hint when the tail is not a modifier (#326)', () => {
       for (const notation of ['2d6kx1', 'flor(1.5)', '4d6khsasd']) {
         const error = expectRollError(() => lex(notation), LexerError, 'UNEXPECTED_IDENTIFIER');
 
@@ -877,14 +876,14 @@ describe('Lexer', () => {
     });
 
     // Both keyword tables are keyed by arbitrary user input. Over a plain object
-    // literal, `constructor` resolves up the prototype chain (#326).
-    it('should treat Object.prototype keys as unknown identifiers', () => {
+    // literal, `constructor` resolves up the prototype chain.
+    it('should treat Object.prototype keys as unknown identifiers (#326)', () => {
       const error = expectRollError(() => lex('constructor'), LexerError, 'UNEXPECTED_IDENTIFIER');
 
       expect(error.character).toBe('constructor');
     });
 
-    it('should not splat a prototype member into a split hint', () => {
+    it('should not splat a prototype member into a split hint (#326)', () => {
       const error = expectRollError(
         () => lex('4d6constructorkh2'),
         LexerError,
@@ -901,10 +900,9 @@ describe('Lexer', () => {
     // anything else that looks blank or numeric to a human is an unexpected
     // character, reported at a code-point-accurate position.
 
-    // Escaped rather than pasted: a no-break, zero-width or BOM code point
-    // renders as nothing between the quotes, so the message alone left the
-    // reader no way to tell what was rejected. The code point names it (#326).
-    it('should name code points the message cannot render', () => {
+    // Escaped rather than pasted — these render as nothing between the quotes,
+    // which is the whole reason the code point has to be named.
+    it('should name code points the message cannot render (#326)', () => {
       const cases: [string, string][] = [
         ['2d6\u00A0+3', 'U+00A0'],
         ['2d6\u200B+3', 'U+200B'],
@@ -991,9 +989,9 @@ describe('Lexer', () => {
       expect(error.position).toBe(0);
     });
 
-    // One check rejects both a missing name and a name that starts wrong, so
-    // calling every one of them "empty" was false for three of the four (#326).
-    it('should say what a bare @ name must start with, not that it is empty', () => {
+    // One check rejects a missing name and a wrongly-started one alike, so the
+    // message has to hold for both.
+    it('should say what a bare @ name must start with, not that it is empty (#326)', () => {
       for (const notation of ['@', '1d20+@', '@1', '@力']) {
         const error = expectRollError(() => lex(notation), LexerError, 'UNEXPECTED_CHARACTER');
 
