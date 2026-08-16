@@ -999,6 +999,25 @@ describe('Lexer', () => {
         expect(error.message).toContain(`must start with a letter or '_'`);
       }
     });
+
+    // The `@` these carry is a span anchor, not the offending text, so quoting
+    // it back reads as noise.
+    it('should not echo the @ back on messages that name a rule (#327)', () => {
+      for (const notation of ['@', '@1', '@{abc']) {
+        const error = expectRollError(() => lex(notation), LexerError, 'UNEXPECTED_CHARACTER');
+
+        expect(error.message).not.toContain(`: '@'`);
+        expect(error.character).toBe('@');
+      }
+    });
+
+    it('should still quote the offending text where it is the whole point (#327)', () => {
+      const character = expectRollError(() => lex('2d6+&'), LexerError, 'UNEXPECTED_CHARACTER');
+      expect(character.message).toBe(`Unexpected character: '&'`);
+
+      const identifier = expectRollError(() => lex('1d6mi'), LexerError, 'UNEXPECTED_IDENTIFIER');
+      expect(identifier.message).toBe(`Unexpected identifier: 'mi'`);
+    });
   });
 
   describe('non-string input', () => {

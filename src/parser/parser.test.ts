@@ -607,6 +607,96 @@ describe('Parser', () => {
       }
     });
 
+    // The modifier the stray number follows is never the outermost node here,
+    // so the arithmetic between them has to be seen through.
+    it('names the count-less modifier through a wrapping expression (#327)', () => {
+      for (const notation of ['1+2d6s1', '-2d6s1', '1d20 vs 2d6s1', '1+2d6!0', '1+2d6cs1']) {
+        const error = expectRollError(() => parseAst(notation), ParseError, 'UNEXPECTED_TOKEN');
+
+        expect(error.message).toBe('This modifier takes no count');
+      }
+    });
+
+    it('keeps the generic message through a wrapper when a threshold was taken (#327)', () => {
+      for (const notation of ['1+2d6!>1 2', '1+2d6cs>5 3', '1+2d6kh1 2', '1+2d6 2']) {
+        const error = expectRollError(() => parseAst(notation), ParseError, 'UNEXPECTED_TOKEN');
+
+        expect(error.message).toContain('Unexpected infix token');
+      }
+    });
+
+    // A closer ends the construct, so the stray number follows the group, the
+    // call, or the die — not the modifier still inside it.
+    it('stops the search at a closing delimiter (#327)', () => {
+      const closed = [
+        '(2d6s)1',
+        '{2d6s}1',
+        '{1,2d6s}1',
+        'floor(2d6s)1',
+        'max(1,2d6s)1',
+        '2d(2d6s)1',
+        '4d6kh(2d6s)1',
+        '2d6>=(2d6s)1',
+      ];
+
+      for (const notation of closed) {
+        const error = expectRollError(() => parseAst(notation), ParseError, 'UNEXPECTED_TOKEN');
+
+        expect(error.message).toContain('Unexpected infix token');
+      }
+    });
+
+    it('should call an empty notation empty rather than truncated (#327)', () => {
+      for (const notation of ['', '   ']) {
+        const error = expectRollError(() => parseAst(notation), ParseError, 'UNEXPECTED_END');
+
+        expect(error.message).toBe('Empty notation');
+      }
+    });
+
+    it('should name the operand a truncated notation still owes (#327)', () => {
+      const cases: [string, string][] = [
+        ['d', `Expected a side count after 'd'`],
+        ['1d', `Expected a side count after 'd'`],
+        ['6d', `Expected a side count after 'd'`],
+        ['1d20 vs', `Expected a difficulty class after 'vs'`],
+        ['1d6+', `Expected a value after '+'`],
+        ['2**', `Expected a value after '**'`],
+        ['1d%%', `Expected a value after '%'`],
+        ['-', `Expected a value after '-'`],
+        ['2d6r<', `Expected a value after '<'`],
+        ['2d6r>', `Expected a value after '>'`],
+        ['2d6r=', `Expected a value after '='`],
+        ['2d6>', `Expected a value after '>'`],
+        ['2d6>=', `Expected a value after '>='`],
+        ['2d6cs>', `Expected a value after '>'`],
+        ['2d6!>', `Expected a value after '>'`],
+        // The `f` is what the notation stops on, not the `>=` behind it.
+        ['2d6>=4f', `Expected a value after 'f'`],
+        ['(', `Expected a value after '('`],
+        ['{', `Expected a value after '{'`],
+        ['{1,', `Expected a value after ','`],
+        ['floor(', `Expected a value after '('`],
+        ['floor(1,', `Expected a value after ','`],
+      ];
+
+      for (const [notation, message] of cases) {
+        const error = expectRollError(() => parseAst(notation), ParseError, 'UNEXPECTED_END');
+
+        expect(error.message).toBe(message);
+      }
+    });
+
+    // Typing further into a comparison used to downgrade the diagnosis from
+    // naming the `r` to the generic end-of-input message.
+    it('should not lose specificity as a comparison is typed out (#327)', () => {
+      const partial = expectRollError(() => parseAst('2d6r'), ParseError, 'EXPECTED_TOKEN');
+      expect(partial.message).toBe(`Expected comparison operator after 'r'`);
+
+      const further = expectRollError(() => parseAst('2d6r<'), ParseError, 'UNEXPECTED_END');
+      expect(further.message).toBe(`Expected a value after '<'`);
+    });
+
     it('should say versus needs a left-hand roll (#326)', () => {
       const error = expectRollError(() => parseAst('vs 15'), ParseError, 'UNEXPECTED_TOKEN');
 
