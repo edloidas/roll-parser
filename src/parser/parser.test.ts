@@ -1176,6 +1176,30 @@ describe('Parser', () => {
       expectRollError(() => parseAst('10d10>=6>=5'), ParseError, 'INVALID_SUCCESS_COUNT_TARGET');
     });
 
+    // The rejection covers three shapes, and only one of them is a modifier —
+    // the message has to be true of arithmetic and operand use as well (#326).
+    it('should name terminality rather than a modifier that is often absent', () => {
+      const shapes = [
+        '10d10>=6kh5', // a modifier
+        '5d6>=5+3', // arithmetic
+        '2 * (1d6>=5)', // arithmetic, the count on the right
+        '4d(1d6>=3)', // reused as a meta operand
+        '10d10>=6>=5', // chained
+      ];
+
+      for (const notation of shapes) {
+        const error = expectRollError(
+          () => parseAst(notation),
+          ParseError,
+          'INVALID_SUCCESS_COUNT_TARGET',
+        );
+
+        expect(error.message).toBe(
+          'Success counting is terminal: it cannot be part of a larger expression',
+        );
+      }
+    });
+
     it('should reject non-dice target: 1>=3', () => {
       expectRollError(() => parseAst('1>=3'), ParseError, 'INVALID_SUCCESS_COUNT_TARGET');
     });
