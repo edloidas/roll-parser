@@ -398,13 +398,30 @@ export class Parser {
       case TokenType.FAIL:
         return Parser.throwOrphanFailThreshold(token);
 
-      default:
+      default: {
+        // A bare number after a modifier that takes none — `2d6s1`, `2d6!0`.
+        // The digit is not the surprise; the modifier it follows is. Explode and
+        // crit thresholds want a comparison here, sort wants nothing; **README.md
+        // → Modifiers** carries the forms.
+        const { type } = left;
+        if (
+          token.type === TokenType.NUMBER &&
+          (type === 'Sort' || type === 'Explode' || type === 'CritThreshold')
+        ) {
+          throw new ParseError(
+            'This modifier takes no count',
+            'UNEXPECTED_TOKEN',
+            token.position,
+            token,
+          );
+        }
         throw new ParseError(
           `Unexpected infix token '${token.value}'`,
           'UNEXPECTED_TOKEN',
           token.position,
           token,
         );
+      }
     }
   }
 
