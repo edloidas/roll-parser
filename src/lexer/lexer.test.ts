@@ -901,6 +901,32 @@ describe('Lexer', () => {
     // anything else that looks blank or numeric to a human is an unexpected
     // character, reported at a code-point-accurate position.
 
+    // Escaped rather than pasted: a no-break, zero-width or BOM code point
+    // renders as nothing between the quotes, so the message alone left the
+    // reader no way to tell what was rejected. The code point names it (#326).
+    it('should name code points the message cannot render', () => {
+      const cases: [string, string][] = [
+        ['2d6\u00A0+3', 'U+00A0'],
+        ['2d6\u200B+3', 'U+200B'],
+        ['\uFEFF2d6', 'U+FEFF'],
+        ['\uFF11\uFF44\uFF16', 'U+FF11'],
+      ];
+
+      for (const [notation, codePoint] of cases) {
+        const error = expectRollError(() => lex(notation), LexerError, 'UNEXPECTED_CHARACTER');
+
+        expect(error.message).toContain(codePoint);
+      }
+    });
+
+    // Printable ASCII is legible between the quotes already; naming it there
+    // would be noise on the overwhelmingly common case.
+    it('should not name printable ASCII code points', () => {
+      const error = expectRollError(() => lex('2d6+&'), LexerError, 'UNEXPECTED_CHARACTER');
+
+      expect(error.message).toBe(`Unexpected character: '&'`);
+    });
+
     it('should reject a no-break space as an unexpected character', () => {
       const error = expectRollError(() => lex('2d6 +3'), LexerError, 'UNEXPECTED_CHARACTER');
 
