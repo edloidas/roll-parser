@@ -130,6 +130,17 @@ const MODIFIER_SEPARATORS: Record<string, string> = Object.assign(Object.create(
 } satisfies Record<string, string>);
 
 /**
+ * Names a code point the message cannot render. A pasted no-break space, zero-width
+ * space or byte-order mark shows as nothing between the quotes, so the reader is
+ * left an empty pair and no way to tell what was rejected. Printable ASCII is
+ * legible there already and stays unadorned.
+ */
+function nameCodePoint(codePoint: number | undefined): string {
+  if (codePoint == null || (codePoint > 0x20 && codePoint < 0x7f)) return '';
+  return ` (U+${codePoint.toString(16).toUpperCase().padStart(4, '0')})`;
+}
+
+/**
  * Builds a hint for identifiers that merged two modifiers. Maximal munch joins
  * them when the first takes no count — `4d6khs` lexes as one identifier `khs`
  * instead of `kh` + `s` — so the fix is to re-separate them.
@@ -257,7 +268,12 @@ export class Lexer {
         // report the full code point instead of a lone surrogate ('�').
         const codePoint = this.input.codePointAt(startPos);
         const display = codePoint == null ? char : String.fromCodePoint(codePoint);
-        throw new LexerError('Unexpected character', 'UNEXPECTED_CHARACTER', startPos, display);
+        throw new LexerError(
+          `Unexpected character${nameCodePoint(codePoint)}`,
+          'UNEXPECTED_CHARACTER',
+          startPos,
+          display,
+        );
       }
     }
   }
