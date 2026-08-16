@@ -987,8 +987,19 @@ describe('Lexer', () => {
       // rather than a unicode identifier.
       const error = expectRollError(() => lex('@力'), LexerError, 'UNEXPECTED_CHARACTER');
 
-      expect(error.message).toContain('Empty @ variable name');
+      expect(error.message).toContain('must start with');
       expect(error.position).toBe(0);
+    });
+
+    // One check rejects both a missing name and a name that starts wrong, so
+    // calling every one of them "empty" was false for three of the four (#326).
+    it('should say what a bare @ name must start with, not that it is empty', () => {
+      for (const notation of ['@', '1d20+@', '@1', '@力']) {
+        const error = expectRollError(() => lex(notation), LexerError, 'UNEXPECTED_CHARACTER');
+
+        expect(error.message).not.toContain('Empty');
+        expect(error.message).toContain(`must start with a letter or '_'`);
+      }
     });
   });
 
