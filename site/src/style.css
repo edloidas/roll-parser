@@ -350,7 +350,7 @@ body {
 }
 
 .die.is-fumble .die-shape {
-  fill: rgba(207, 106, 94, 0.18);
+  fill: color-mix(in srgb, var(--failure) 18%, transparent);
 }
 
 .die.is-critical {
@@ -594,7 +594,7 @@ button.die-overflow:hover {
 
 .mini-die.is-fumble {
   border-color: var(--failure);
-  background: rgba(207, 106, 94, 0.18);
+  background: color-mix(in srgb, var(--failure) 18%, transparent);
 }
 
 .mini-die.is-dropped {
@@ -722,7 +722,7 @@ button.die-overflow:hover {
 
 .lg-sample.is-fumble {
   border-color: var(--failure);
-  background: rgba(207, 106, 94, 0.18);
+  background: color-mix(in srgb, var(--failure) 18%, transparent);
 }
 
 .lg-sample.is-success {
@@ -1083,7 +1083,7 @@ button.die-overflow:hover {
 
 .notation-input.is-invalid {
   border-color: var(--failure);
-  box-shadow: 0 0 0 2px rgba(207, 106, 94, 0.4);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--failure) 40%, transparent);
 }
 
 .copied-flag {
@@ -1198,10 +1198,11 @@ button.die-overflow:hover {
   word-break: break-all;
 }
 
-/* Tint stays at 0.18: `--failure` text sits on this red wash rather than on a
-   surface token, and 0.22 drops it to 4.44 — under AA in both themes. */
+/* ! `--failure` text sits on this wash, so the tint eats its own contrast.
+   Measured over `--bg`, 14% holds 4.93 dark / 4.55 light; 18% drops the light
+   theme to 4.29, under AA. Re-measure before raising it. */
 .error-span {
-  background: rgba(207, 106, 94, 0.18);
+  background: color-mix(in srgb, var(--failure) 14%, transparent);
   color: var(--failure);
   border-bottom: 2px solid var(--failure);
   border-radius: 2px;
