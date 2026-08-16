@@ -334,16 +334,15 @@ describe('roll() integration', () => {
     });
   });
 
-  // The lexer suggests a rewrite when maximal munch merges two modifiers into
-  // one identifier. A suggestion the parser then rejects is worse than none, so
-  // the whole keyword cross-product has to round-trip (#326).
+  // A suggestion the parser rejects is worse than none, so every hint the lexer
+  // can emit has to round-trip.
   describe('merged-modifier hints round-trip', () => {
     const MODIFIERS = ['kh', 'kl', 'k', 'dh', 'dl', 'min', 'max', 's', 'sa', 'sd', 'cs', 'cf'];
     // Keep/drop and the die bounds carry an operand of their own; the sort and
     // crit modifiers do not, so a merge ending in one is already complete.
     const NEEDS_OPERAND = new Set(['kh', 'kl', 'k', 'dh', 'dl', 'min', 'max']);
 
-    test('every suggested rewrite parses', () => {
+    test('every suggested rewrite parses (#326)', () => {
       let hinted = 0;
 
       for (const first of MODIFIERS) {

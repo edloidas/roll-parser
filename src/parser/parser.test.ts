@@ -588,9 +588,8 @@ describe('Parser', () => {
       expect(() => parseAst('kh3')).toThrow(ParseError);
     });
 
-    // `Unexpected infix token '1'` named the digit and used parser jargon; the
-    // digit is not the surprise, the modifier it follows is (#326).
-    it('should name the count-less modifier rather than the digit', () => {
+    // The digit is not the surprise; the modifier it follows is.
+    it('should name the count-less modifier rather than the digit (#326)', () => {
       for (const notation of ['2d6s1', '2d6sa1', '2d6sd1', '2d6!0', '2d6!p3', '2d6cs1', '2d6cf1']) {
         const error = expectRollError(() => parseAst(notation), ParseError, 'UNEXPECTED_TOKEN');
 
@@ -600,7 +599,7 @@ describe('Parser', () => {
 
     // An explode that already took its comparison did not refuse a count, so the
     // stray number is an unrelated juxtaposition and keeps the generic wording.
-    it('should keep the generic message once the modifier consumed a threshold', () => {
+    it('should keep the generic message once the modifier consumed a threshold (#326)', () => {
       for (const notation of ['2d6 3', '1 2', '2d6!>1 2', '2d6!p>4 7', '2d6cs>5 3']) {
         const error = expectRollError(() => parseAst(notation), ParseError, 'UNEXPECTED_TOKEN');
 
@@ -608,9 +607,7 @@ describe('Parser', () => {
       }
     });
 
-    // `vs` reaching prefix position means nothing is there to be checked against
-    // the DC, which `Unexpected token 'vs'` never said (#326).
-    it('should say versus needs a left-hand roll', () => {
+    it('should say versus needs a left-hand roll (#326)', () => {
       const error = expectRollError(() => parseAst('vs 15'), ParseError, 'UNEXPECTED_TOKEN');
 
       expect(error.message).toBe('Versus needs a roll on its left');
@@ -1206,8 +1203,8 @@ describe('Parser', () => {
     });
 
     // The rejection covers three shapes, and only one of them is a modifier —
-    // the message has to be true of arithmetic and operand use as well (#326).
-    it('should name terminality rather than a modifier that is often absent', () => {
+    // the message has to be true of arithmetic and operand use as well.
+    it('should name terminality rather than a modifier that is often absent (#326)', () => {
       const shapes = [
         '10d10>=6kh5', // a modifier
         '5d6>=5+3', // arithmetic
@@ -2274,9 +2271,7 @@ describe('Parser', () => {
         expect(error.message).toContain('Empty group');
       });
 
-      // `{}` named the mistake; `()` fell through to the generic prefix arm and
-      // reported `Unexpected token ')'` at the closer instead (#326).
-      it('should reject empty parentheses the way it rejects an empty group', () => {
+      it('should reject empty parentheses the way it rejects an empty group (#326)', () => {
         const error = expectRollError(() => parseAst('()'), ParseError, 'UNEXPECTED_TOKEN');
 
         expect(error.message).toBe('Empty parentheses');
