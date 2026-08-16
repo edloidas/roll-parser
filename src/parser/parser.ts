@@ -409,14 +409,16 @@ export class Parser {
         return Parser.throwOrphanFailThreshold(token);
 
       default: {
-        // A bare number after a modifier that takes none — `2d6s1`, `2d6!0`.
-        // The digit is not the surprise; the modifier it follows is. Explode and
-        // crit thresholds want a comparison here, sort wants nothing; **README.md
-        // → Modifiers** carries the forms.
-        const { type } = left;
+        // A bare number after a modifier that took none — `2d6s1`, `2d6!0`. The
+        // digit is not the surprise; the modifier it follows is.
+        // ! Sort consumes nothing, ever. An explode only qualifies while its
+        // ! threshold is unset — past `2d6!>1 2` the modifier did take a
+        // ! comparison, and the stray number is an unrelated juxtaposition.
+        // ! `CritThreshold` is out: bare `cs` still fills its threshold list
+        // ! with a sentinel, so an empty list cannot tell the two apart.
         if (
           token.type === TokenType.NUMBER &&
-          (type === 'Sort' || type === 'Explode' || type === 'CritThreshold')
+          (left.type === 'Sort' || (left.type === 'Explode' && left.threshold == null))
         ) {
           throw new ParseError(
             'This modifier takes no count',
