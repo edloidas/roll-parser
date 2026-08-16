@@ -852,8 +852,47 @@ describe('Lexer', () => {
       const error = expectRollError(() => lex('4d6sdkh2'), LexerError, 'UNEXPECTED_IDENTIFIER');
 
       expect(error.message).toContain(`did you mean 'sd' followed by 'kh'`);
-      expect(error.message).toContain('sd1kh');
+      expect(error.message).toContain('sd kh');
       expect(error.position).toBe(3);
+    });
+
+    // `sd` takes no count, so the old `sd1kh` suggestion did not parse. A
+    // count-less first half splits on a space instead (#326).
+    it('should split a count-less modifier on a space, not a count', () => {
+      const error = expectRollError(() => lex('4d6sasd'), LexerError, 'UNEXPECTED_IDENTIFIER');
+
+      expect(error.message).toContain(`did you mean 'sa' followed by 'sd'`);
+      expect(error.message).toContain('sa sd');
+      expect(error.message).not.toContain('sa1sd');
+    });
+
+    // The tail has to be a modifier in its own right. `kx` and `flor` merely
+    // start with one, so any split of them is still unparsable (#326).
+    it('should not hint when the tail is not a modifier', () => {
+      for (const notation of ['2d6kx1', 'flor(1.5)', '4d6khsasd']) {
+        const error = expectRollError(() => lex(notation), LexerError, 'UNEXPECTED_IDENTIFIER');
+
+        expect(error.message).not.toContain('did you mean');
+      }
+    });
+
+    // Both keyword tables are keyed by arbitrary user input. Over a plain object
+    // literal, `constructor` resolves up the prototype chain (#326).
+    it('should treat Object.prototype keys as unknown identifiers', () => {
+      const error = expectRollError(() => lex('constructor'), LexerError, 'UNEXPECTED_IDENTIFIER');
+
+      expect(error.character).toBe('constructor');
+    });
+
+    it('should not splat a prototype member into a split hint', () => {
+      const error = expectRollError(
+        () => lex('4d6constructorkh2'),
+        LexerError,
+        'UNEXPECTED_IDENTIFIER',
+      );
+
+      expect(error.message).not.toContain('native code');
+      expect(error.message).not.toContain('did you mean');
     });
   });
 
