@@ -56,16 +56,17 @@
 
 /* ! Foreground tokens are tuned to clear WCAG AA (4.5:1) against the tightest
    surface they land on — `--surface-strong`, not `--bg`, since the 7%/9% ink
-   wash sits under the breakdown chips and mini-dice. `--die-stroke` is the one
-   exception: it only ever paints SVG strokes and 1.5px borders, so it answers
-   to the 3:1 graphic bar. Re-measure against `--surface-strong` before
-   lightening any of these. */
+   wash sits under the breakdown chips and mini-dice. `--die-stroke` and
+   `--border` answer to the 3:1 non-text bar instead: they only paint strokes
+   and component edges. The `--surface` washes carry none of that bar, so
+   `--border` is measured composited over every fill it lands on, not just
+   `--bg`. Re-measure before weakening any of these. */
 :root {
   --bg: #16120b;
   --bg-glow: #2a2113;
   --surface: rgba(255, 240, 210, 0.05);
   --surface-strong: rgba(255, 240, 210, 0.09);
-  --border: rgba(255, 230, 190, 0.15);
+  --border: rgba(255, 230, 190, 0.45);
   --text: #f0e6d2;
   --text-muted: #b3a583;
   --text-dim: #9a8d70;
@@ -99,7 +100,7 @@
   --bg-glow: #fffaf0;
   --surface: rgba(43, 35, 23, 0.04);
   --surface-strong: rgba(43, 35, 23, 0.07);
-  --border: rgba(43, 35, 23, 0.15);
+  --border: rgba(43, 35, 23, 0.55);
   --text: #2b2317;
   --text-muted: #6b5d45;
   --text-dim: #6e6049;
@@ -117,7 +118,7 @@
     --bg-glow: #fffaf0;
     --surface: rgba(43, 35, 23, 0.04);
     --surface-strong: rgba(43, 35, 23, 0.07);
-    --border: rgba(43, 35, 23, 0.15);
+    --border: rgba(43, 35, 23, 0.55);
     --text: #2b2317;
     --text-muted: #6b5d45;
     --text-dim: #6e6049;

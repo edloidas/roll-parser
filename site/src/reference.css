@@ -236,7 +236,7 @@
 
 .widget:hover {
   transform: translateY(-3px);
-  border-color: var(--accent-soft);
+  border-color: var(--accent);
   background: var(--surface-strong);
 }
 
