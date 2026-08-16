@@ -334,6 +334,42 @@ describe('roll() integration', () => {
     });
   });
 
+  // The lexer suggests a rewrite when maximal munch merges two modifiers into
+  // one identifier. A suggestion the parser then rejects is worse than none, so
+  // the whole keyword cross-product has to round-trip (#326).
+  describe('merged-modifier hints round-trip', () => {
+    const MODIFIERS = ['kh', 'kl', 'k', 'dh', 'dl', 'min', 'max', 's', 'sa', 'sd', 'cs', 'cf'];
+    // Keep/drop and the die bounds carry an operand of their own; the sort and
+    // crit modifiers do not, so a merge ending in one is already complete.
+    const NEEDS_OPERAND = new Set(['kh', 'kl', 'k', 'dh', 'dl', 'min', 'max']);
+
+    test('every suggested rewrite parses', () => {
+      let hinted = 0;
+
+      for (const first of MODIFIERS) {
+        for (const second of MODIFIERS) {
+          const tail = NEEDS_OPERAND.has(second) ? '2' : '';
+          let message: string;
+          try {
+            parse(`4d6${first}${second}${tail}`);
+            continue;
+          } catch (error) {
+            message = (error as Error).message;
+          }
+
+          const suggestion = message.match(/write it as '([^']*)'/)?.[1];
+          if (suggestion == null) continue;
+          hinted++;
+
+          expect(() => parse(`4d6${suggestion}${tail}`)).not.toThrow();
+        }
+      }
+
+      // Guards the loop itself: a hint that stopped firing would pass vacuously.
+      expect(hinted).toBeGreaterThan(100);
+    });
+  });
+
   describe('syntax variations', () => {
     test('caret is alias for power operator', () => {
       expect(roll('2^3').total).toBe(8);

@@ -71,8 +71,14 @@ const CHAR_UPPER_Z = 90;
 const CHAR_LOWER_A = 97;
 const CHAR_LOWER_Z = 122;
 
-/** Known identifier keywords mapped to their token types. */
-const IDENTIFIER_KEYWORDS: Record<string, TokenType> = {
+/**
+ * Known identifier keywords mapped to their token types.
+ *
+ * Null-prototype, because every lookup here is keyed by arbitrary user input.
+ * Over a plain object literal `'constructor'` resolves to `Object`'s own, and
+ * the identifier leaves the lexer as a token whose `type` is a function.
+ */
+const IDENTIFIER_KEYWORDS: Record<string, TokenType> = Object.assign(Object.create(null), {
   kh: TokenType.KEEP_HIGH,
   kl: TokenType.KEEP_LOW,
   k: TokenType.KEEP_HIGH,
@@ -96,20 +102,50 @@ const IDENTIFIER_KEYWORDS: Record<string, TokenType> = {
   sd: TokenType.SORT_DESC,
   cs: TokenType.CRIT_SUCCESS,
   cf: TokenType.CRIT_FAIL,
-};
+} satisfies Record<string, TokenType>);
 
 /**
- * Builds a hint for identifiers that start with a known keyword. Maximal
- * munch merges adjacent modifiers when the first has no count — `4d6khs`
- * lexes as one identifier `khs` instead of `kh` + `s`. Point the user at the
- * explicit-count (or whitespace) split.
+ * Dice-pool modifiers that maximal munch can merge, mapped to what re-separates
+ * them: a count for the ones that take an operand, a space for the ones that do
+ * not. Membership doubles as the filter — the keywords left out (`d`, `f`, `r`,
+ * `ro`, `vs`, the function names) have no split that parses.
+ */
+// ! Both halves of a merge are looked up here, so the pair is only ever
+// ! suggested when both are separable. `min`/`max` share `TokenType.FUNCTION`
+// ! with `floor`, so the separator cannot be derived from the token type.
+// ! Null-prototype for the same reason as `IDENTIFIER_KEYWORDS` above.
+const MODIFIER_SEPARATORS: Record<string, string> = Object.assign(Object.create(null), {
+  kh: '1',
+  kl: '1',
+  k: '1',
+  dh: '1',
+  dl: '1',
+  min: '1',
+  max: '1',
+  s: ' ',
+  sa: ' ',
+  sd: ' ',
+  cs: ' ',
+  cf: ' ',
+} satisfies Record<string, string>);
+
+/**
+ * Builds a hint for identifiers that merged two modifiers. Maximal munch joins
+ * them when the first takes no count — `4d6khs` lexes as one identifier `khs`
+ * instead of `kh` + `s` — so the fix is to re-separate them.
+ *
+ * Both halves must be separable modifiers. `flor` starts with `f` and `kx`
+ * starts with `k`, but neither tail is a modifier, so no split of either parses
+ * and the hint stays out of the way.
  */
 function buildIdentifierHint(identifier: string): string {
   for (let length = identifier.length - 1; length >= 1; length--) {
     const prefix = identifier.slice(0, length);
-    if (IDENTIFIER_KEYWORDS[prefix] == null) continue;
+    const separator = MODIFIER_SEPARATORS[prefix];
+    if (separator == null) continue;
     const rest = identifier.slice(length);
-    return ` (did you mean '${prefix}' followed by '${rest}'? separate modifiers with a count or space, e.g. '${prefix}1${rest}')`;
+    if (MODIFIER_SEPARATORS[rest] == null) continue;
+    return ` (did you mean '${prefix}' followed by '${rest}'? write it as '${prefix}${separator}${rest}')`;
   }
   return '';
 }
