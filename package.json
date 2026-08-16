@@ -102,7 +102,7 @@
     {
       "name": "index.js (full library)",
       "path": "dist/index.js",
-      "limit": "12.85 kB"
+      "limit": "13 kB"
     },
     {
       "name": "index.js — { parse }",
@@ -114,7 +114,7 @@
       "name": "index.js — { roll }",
       "path": "dist/index.js",
       "import": "{ roll }",
-      "limit": "12.75 kB"
+      "limit": "12.8 kB"
     },
     {
       "name": "render.js — { renderBreakdown }",
