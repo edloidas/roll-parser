@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.3.0] - 2026-08-17
+
+Error-message work throughout: nine parse and lex errors now name the rule they
+enforce, or the token actually at fault, instead of reporting parser jargon.
+Every error code is unchanged and no notation evaluates differently — nothing
+that parsed before now throws, and nothing that threw before now parses. Code
+that matches on `code` is unaffected; code that matches on `message` is not.
+
+### Added
+
+- An expression that ends where an operand was required now names what it still owed, instead of reporting a bare unexpected end. `1d` reports `Expected a side count after 'd'`, `1d20 vs` reports `Expected a difficulty class after 'vs'`, `2d6r<` reports `Expected a value after '<'`, and a truncated `2d6>=4f` names the `f` rather than the comparison behind it. The code stays `UNEXPECTED_END`, the position still points past the last token, and empty input still reports `Empty notation` at position 0 ([#327](https://github.com/edloidas/roll-parser/issues/327))
+
+### Changed
+
+- Demo site: the five failure tints derive from `--failure` through `color-mix` instead of hard-coded `rgba()` literals, so they follow the token in both themes rather than painting the pre-`#322` dark red under the light palette ([#324](https://github.com/edloidas/roll-parser/issues/324))
+
+### Fixed
+
+- The hint for an identifier that merged two modifiers no longer suggests notation that does not parse. It is gated on both halves being separable modifiers — `flor` and `kx` merely start with one, so every split of them still failed — and the separator is picked by whether the first half takes a count, so the count-less `s`, `sa`, `sd`, `cs` and `cf` split on a space instead of `1`. `4d6khs` now suggests `kh1s`; a round-trip test asserts every hint the lexer emits parses ([#326](https://github.com/edloidas/roll-parser/issues/326))
+- `2d6constructor` reports `Unexpected identifier: 'constructor'` instead of lexing into a token typed with a function. The keyword and separator tables were plain objects, so `constructor` resolved to `Object`'s own; both now have a null prototype ([#326](https://github.com/edloidas/roll-parser/issues/326))
+- `Cannot apply modifier after success counting` is replaced by `Success counting is terminal: it cannot be part of a larger expression`, which holds for all three shapes that reach the rejection — a trailing modifier, arithmetic (`5d6>=5+3`), and meta-operand reuse (`4d(1d6>=3)`). The wording matches the **Pools and checks** callout in `README.md`, which carries the worked rewrites ([#326](https://github.com/edloidas/roll-parser/issues/326))
+- `UNEXPECTED_CHARACTER` appends the code point when the rejected character is not printable ASCII, so a pasted no-break space, zero-width space or BOM reads as `Unexpected character (U+00A0): ' '` rather than an empty pair of quotes. Printable ASCII stays unadorned ([#326](https://github.com/edloidas/roll-parser/issues/326))
+- `Empty @ variable name` is replaced by `@ variable name must start with a letter or '_'`, which was the rule all along — one check rejects a missing name and a wrongly-started one alike, so `@1` and `@力` were being called empty ([#326](https://github.com/edloidas/roll-parser/issues/326))
+- `()` reports `Empty parentheses` at the opener instead of `Unexpected token ')'` at the closer, the way `{}` already did — `parseGrouped` was missing the check `parseGroup` had ([#326](https://github.com/edloidas/roll-parser/issues/326))
+- A count after a modifier that takes none — `2d6s1`, `2d6cs1`, `2d6cf1`, `2d6!0` — reports `This modifier takes no count` instead of `Unexpected infix token '1'`. The digit is not the surprise, the modifier it follows is, and "infix token" is parser jargon. The check resolves down the right spine of binary, unary and versus nodes, so `1+2d6s1` is caught too, and it stops at any closer, so `2d(2d6s)1` keeps the generic wording — the stray token there follows the group, not the modifier inside it. Two juxtaposed values (`2d6 3`) and a modifier that already took a comparison (`2d6cs>5 3`) also keep the generic wording, since those are different mistakes ([#326](https://github.com/edloidas/roll-parser/issues/326), [#327](https://github.com/edloidas/roll-parser/issues/327))
+- `vs` with nothing on its left reports `Versus needs a roll on its left` instead of `Unexpected token 'vs'` ([#326](https://github.com/edloidas/roll-parser/issues/326))
+- Demo site: the palette meets WCAG AA. `--text-dim` and `--failure` were retuned in the dark palette, and `--text-dim`, `--accent`, `--accent-soft`, `--success` and `--failure` in both light blocks, each held on its own hue and measured against `--surface-strong`; the light `--gold-gradient` stops shifted by the same lightness delta as `--accent`, lifting the hero total's leading stop from 2.81 to 3.47 ([#322](https://github.com/edloidas/roll-parser/issues/322))
+- Demo site: `site/404.html` no longer carries a stale `--accent`. Its inline light palette kept the pre-`#322` `#a06b1f` while `style.css` moved on, leaving the `code` span and the link hover/focus colour at 3.88 against the page gradient; `#855512` lifts them to 5.42 ([#322](https://github.com/edloidas/roll-parser/issues/322))
+- Demo site: `--border` meets SC 1.4.11's 3:1 non-text bar on every fill it lands on — 3.37 dark and 3.30 light at the tightest adjacency, up from 1.47 and 1.33 against `--bg`. `.widget:hover` moved from `--accent-soft` to `--accent`, since the soft tint now composites fainter than the resting border and hover read as a de-emphasis ([#323](https://github.com/edloidas/roll-parser/issues/323))
+
+### Documentation
+
+- The README bundle-size figures match the current emit: `≈13.2 kB` for the full library and `≈6.1 kB` for `{ parse }` ([#326](https://github.com/edloidas/roll-parser/issues/326), [#327](https://github.com/edloidas/roll-parser/issues/327))
+
 ## [3.2.2] - 2026-08-14
 
 ### Changed
@@ -261,7 +295,8 @@ Dice mechanics (Stage 2):
 - Dice count safety limit via `maxDice` option (default 10,000), enforced across the whole expression to prevent DoS via additive groups like `5000d6+5000d6` ([#19](https://github.com/edloidas/roll-parser/issues/19))
 - Parser and evaluator correctness: duplicate `kept` modifier entries, implicit modifier count defaulting to 1 (`4d6kh` → `4d6kh1`), `critical` flag suppression when `sides === 1`, negative `--seed` CLI values ([#21](https://github.com/edloidas/roll-parser/issues/21))
 
-[Unreleased]: https://github.com/edloidas/roll-parser/compare/v3.2.2...HEAD
+[Unreleased]: https://github.com/edloidas/roll-parser/compare/v3.3.0...HEAD
+[3.3.0]: https://github.com/edloidas/roll-parser/releases/tag/v3.3.0
 [3.2.2]: https://github.com/edloidas/roll-parser/releases/tag/v3.2.2
 [3.2.1]: https://github.com/edloidas/roll-parser/releases/tag/v3.2.1
 [3.2.0]: https://github.com/edloidas/roll-parser/releases/tag/v3.2.0
