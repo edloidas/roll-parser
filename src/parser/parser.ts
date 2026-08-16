@@ -183,6 +183,45 @@ function isBareCritThreshold(node: CritThresholdNode): boolean {
 }
 
 /**
+ * Follows a node down to the one whose source text the next token abuts.
+ *
+ * In `1+2d6s1` the sort is already buried under the `+` by the time the stray
+ * `1` reaches LED position.
+ *
+ * ! Only these three descend. Every other node that holds a sub-expression
+ * ! closes it first — `(…)`, `{…}`, `f(…)`, and the parenthesized operand of
+ * ! `2d(…)` or `4d6kh(…)` all put a delimiter between the child and the stray
+ * ! token, so the child is not what that token follows.
+ */
+function rightmostNode(node: ASTNode): ASTNode {
+  let current = node;
+  for (;;) {
+    switch (current.type) {
+      case 'BinaryOp':
+        current = current.right;
+        break;
+      case 'UnaryOp':
+        current = current.operand;
+        break;
+      case 'Versus':
+        current = current.dc;
+        break;
+      default:
+        return current;
+    }
+  }
+}
+
+/**
+ * Names the operand a token was still waiting for when the notation ran out.
+ */
+function expectedOperand(token: Token): string {
+  if (token.type === TokenType.DICE) return 'a side count';
+  if (token.type === TokenType.VS) return 'a difficulty class';
+  return 'a value';
+}
+
+/**
  * Arity table for math functions. `min` and `max` are inclusive.
  * `POSITIVE_INFINITY` means unbounded (variadic).
  */
@@ -230,11 +269,9 @@ export class Parser {
    * Parse the token stream into an AST.
    */
   parse(): ASTNode {
-    if (this.peek().type === TokenType.EOF) {
-      throw new ParseError('Unexpected end of input', 'UNEXPECTED_END', this.peek().position);
-    }
-
-    const ast = this.parseExpression(0);
+    // Nothing has demanded an operand yet, so an immediate EOF is an empty
+    // notation rather than a truncated one.
+    const ast = this.parseExpression(0, undefined);
 
     if (this.peek().type !== TokenType.EOF) {
       const token = this.peek();
@@ -251,14 +288,18 @@ export class Parser {
 
   /**
    * Parse an expression with minimum binding power.
+   *
+   * `pending` is the token that demanded this operand — the `d` of `1d`, the
+   * `<` of `2d6r<`. It exists so a truncated notation can name what it was
+   * waiting for; `undefined` only at the top of the input.
    */
-  private parseExpression(minBp: number): ASTNode {
+  private parseExpression(minBp: number, pending: Token | undefined): ASTNode {
     const entryDepth = this.depth;
     this.depth += 1;
     this.guardDepth();
 
     try {
-      let left = this.parseNud();
+      let left = this.parseNud(pending);
 
       while (this.hasTokens()) {
         const token = this.peek();
@@ -300,7 +341,7 @@ export class Parser {
    * NUD - Null Denotation.
    * Handles tokens that appear at the start of an expression (prefix position).
    */
-  private parseNud(): ASTNode {
+  private parseNud(pending: Token | undefined): ASTNode {
     const token = this.advance();
 
     switch (token.type) {
@@ -332,7 +373,13 @@ export class Parser {
         return this.parseVariable(token);
 
       case TokenType.EOF:
-        throw new ParseError('Unexpected end of input', 'UNEXPECTED_END', token.position);
+        throw new ParseError(
+          pending == null
+            ? 'Empty notation'
+            : `Expected ${expectedOperand(pending)} after '${pending.value}'`,
+          'UNEXPECTED_END',
+          token.position,
+        );
 
       // Reaching prefix position means no roll precedes the `vs`, so there is
       // nothing to check against the DC.
@@ -423,11 +470,12 @@ export class Parser {
         // ! Only while the modifier is still empty-handed: past `2d6!>1 2` the
         // ! explode did take its comparison, and the stray number is an
         // ! unrelated juxtaposition that keeps the generic message.
+        const trailing = rightmostNode(left);
         if (
           token.type === TokenType.NUMBER &&
-          (left.type === 'Sort' ||
-            (left.type === 'Explode' && left.threshold == null) ||
-            (left.type === 'CritThreshold' && isBareCritThreshold(left)))
+          (trailing.type === 'Sort' ||
+            (trailing.type === 'Explode' && trailing.threshold == null) ||
+            (trailing.type === 'CritThreshold' && isBareCritThreshold(trailing)))
         ) {
           throw new ParseError(
             'This modifier takes no count',
@@ -468,7 +516,7 @@ export class Parser {
   }
 
   private parseUnaryMinus(token: Token): UnaryOpNode {
-    const operand = this.parseExpression(BP.UNARY);
+    const operand = this.parseExpression(BP.UNARY, token);
     this.rejectSuccessCountTarget(operand, token);
     return {
       type: 'UnaryOp',
@@ -480,7 +528,7 @@ export class Parser {
   }
 
   private parsePrefixDice(token: Token): DiceNode {
-    const sides = this.parseExpression(BP.DICE_RIGHT);
+    const sides = this.parseExpression(BP.DICE_RIGHT, token);
     this.rejectSuccessCountTarget(sides, token);
     this.rejectVersusMetaOperand(sides, token);
     return {
@@ -496,7 +544,7 @@ export class Parser {
     this.rejectSuccessCountTarget(left, token);
     this.rejectVersusMetaOperand(left, token);
     this.rejectBareDiceChain(left, token);
-    const sides = this.parseExpression(BP.DICE_RIGHT);
+    const sides = this.parseExpression(BP.DICE_RIGHT, token);
     this.rejectSuccessCountTarget(sides, token);
     this.rejectVersusMetaOperand(sides, token);
     return {
@@ -561,7 +609,7 @@ export class Parser {
       throw new ParseError('Empty parentheses', 'UNEXPECTED_TOKEN', token.position, token);
     }
 
-    const expression = this.parseExpression(0);
+    const expression = this.parseExpression(0, token);
     const close = this.expect(TokenType.RPAREN);
     return { type: 'Grouped', expression, start: token.position, end: close.end };
   }
@@ -574,10 +622,10 @@ export class Parser {
       throw new ParseError('Empty group', 'UNEXPECTED_TOKEN', startToken.position, startToken);
     }
 
-    const expressions: ASTNode[] = [this.parseExpression(0)];
+    const expressions: ASTNode[] = [this.parseExpression(0, startToken)];
     while (this.peek().type === TokenType.COMMA) {
-      this.advance();
-      expressions.push(this.parseExpression(0));
+      const comma = this.advance();
+      expressions.push(this.parseExpression(0, comma));
     }
 
     if (this.peek().type !== TokenType.RBRACE) {
@@ -601,16 +649,16 @@ export class Parser {
   private parseFunctionCall(token: Token): FunctionCallNode {
     // `FUNCTION`, `COMMA`, and `RPAREN` all sit at BP -1, so argument boundaries
     // fall out of the inner `parseExpression(0)` calls terminating on their own.
-    this.expect(TokenType.LPAREN);
+    const open = this.expect(TokenType.LPAREN);
 
     const args: ASTNode[] = [];
     if (this.peek().type !== TokenType.RPAREN) {
-      const first = this.parseExpression(0);
+      const first = this.parseExpression(0, open);
       this.rejectSuccessCountTarget(first, token);
       args.push(first);
       while (this.peek().type === TokenType.COMMA) {
-        this.advance();
-        const next = this.parseExpression(0);
+        const comma = this.advance();
+        const next = this.parseExpression(0, comma);
         this.rejectSuccessCountTarget(next, token);
         args.push(next);
       }
@@ -654,7 +702,7 @@ export class Parser {
 
     const operator = this.getOperatorSymbol(token);
     const rightBp = this.getRightBp(token);
-    const right = this.parseExpression(rightBp);
+    const right = this.parseExpression(rightBp, token);
 
     this.rejectSuccessCountTarget(right, token);
 
@@ -868,7 +916,7 @@ export class Parser {
       nextToken === TokenType.LPAREN ||
       nextToken === TokenType.AT;
     const count: ASTNode = hasExplicitCount
-      ? this.parseExpression(BP.DICE_LEFT)
+      ? this.parseExpression(BP.DICE_LEFT, token)
       : Parser.syntheticLiteral(1, token);
     this.rejectSuccessCountTarget(count, token);
     this.rejectVersusMetaOperand(count, token);
@@ -1030,7 +1078,7 @@ export class Parser {
       );
     }
 
-    const value = this.parseExpression(BP.DICE_LEFT);
+    const value = this.parseExpression(BP.DICE_LEFT, token);
     this.rejectSuccessCountTarget(value, token);
     this.rejectVersusMetaOperand(value, token);
 
@@ -1204,7 +1252,7 @@ export class Parser {
 
     const operator = this.getCompareOp(token);
     // Threshold binds at `BP.DICE_LEFT` — see `parseComparePoint` TSDoc.
-    const value = this.parseExpression(BP.DICE_LEFT);
+    const value = this.parseExpression(BP.DICE_LEFT, token);
     this.rejectSuccessCountTarget(value, token);
     this.rejectVersusMetaOperand(value, token);
     const start = target.start ?? token.position;
@@ -1214,8 +1262,8 @@ export class Parser {
       return { type: 'SuccessCount', target, threshold: { operator, value }, start, end };
     }
 
-    this.advance();
-    const failThreshold = this.parseFailThreshold(token);
+    const failToken = this.advance();
+    const failThreshold = this.parseFailThreshold(token, failToken);
 
     return {
       type: 'SuccessCount',
@@ -1227,12 +1275,18 @@ export class Parser {
     };
   }
 
-  /** Parses the `f...` suffix of a success count. Bare `fN` means `f=N`. */
-  private parseFailThreshold(token: Token): ComparePoint {
+  /**
+   * Parses the `f...` suffix of a success count. Bare `fN` means `f=N`.
+   *
+   * `token` is the success-count comparison, which the reject calls report
+   * against; `failToken` is the `f`, so a truncated `2d6>=4f` names it rather
+   * than the comparison behind it.
+   */
+  private parseFailThreshold(token: Token, failToken: Token): ComparePoint {
     if (this.isComparePointAhead()) return this.parseComparePoint();
 
     // Same threshold binding as `parseComparePoint` (BP.DICE_LEFT).
-    const failValue = this.parseExpression(BP.DICE_LEFT);
+    const failValue = this.parseExpression(BP.DICE_LEFT, failToken);
     this.rejectSuccessCountTarget(failValue, token);
     this.rejectVersusMetaOperand(failValue, token);
 
@@ -1274,7 +1328,7 @@ export class Parser {
       throw new ParseError('Cannot chain versus operators', 'NESTED_VERSUS', token.position, token);
     }
 
-    const dc = this.parseExpression(BP.VS_RIGHT);
+    const dc = this.parseExpression(BP.VS_RIGHT, token);
     this.rejectSuccessCountTarget(dc, token);
 
     return {
@@ -1324,7 +1378,7 @@ export class Parser {
 
     this.advance();
 
-    const value = this.parseExpression(BP.DICE_LEFT);
+    const value = this.parseExpression(BP.DICE_LEFT, token);
     this.rejectSuccessCountTarget(value, token);
     this.rejectVersusMetaOperand(value, token);
 

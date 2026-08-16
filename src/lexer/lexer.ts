@@ -41,6 +41,9 @@ export class LexerError extends RollParserError {
    * The offending text — a single character for `UNEXPECTED_CHARACTER` (the
    * whole code point, so astral symbols are not split into surrogates), or
    * the unrecognized word for `UNEXPECTED_IDENTIFIER`.
+   *
+   * Not guaranteed to appear in `message` — errors that name a rule rather than
+   * a character leave it out.
    */
   readonly character: string;
 
@@ -51,7 +54,7 @@ export class LexerError extends RollParserError {
     character: string,
     options?: ErrorOptions,
   ) {
-    super(`${message}: '${character}'`, code, options);
+    super(message, code, options);
     this.name = 'LexerError';
     this.position = position;
     this.character = character;
@@ -266,7 +269,7 @@ export class Lexer {
         const codePoint = this.input.codePointAt(startPos);
         const display = codePoint == null ? char : String.fromCodePoint(codePoint);
         throw new LexerError(
-          `Unexpected character${nameCodePoint(codePoint)}`,
+          `Unexpected character${nameCodePoint(codePoint)}: '${display}'`,
           'UNEXPECTED_CHARACTER',
           startPos,
           display,
@@ -343,7 +346,7 @@ export class Lexer {
     }
 
     throw new LexerError(
-      `Unexpected identifier${buildIdentifierHint(lower)}`,
+      `Unexpected identifier${buildIdentifierHint(lower)}: '${lower}'`,
       'UNEXPECTED_IDENTIFIER',
       startPos,
       lower,
