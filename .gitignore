@@ -2,6 +2,7 @@
 .claude/plans/
 .claude/settings.local.json
 .codex/
+.env
 .mcp.json
 .tmp/
 .wrangler/
