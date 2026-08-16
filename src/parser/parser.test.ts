@@ -591,7 +591,7 @@ describe('Parser', () => {
     // `Unexpected infix token '1'` named the digit and used parser jargon; the
     // digit is not the surprise, the modifier it follows is (#326).
     it('should name the count-less modifier rather than the digit', () => {
-      for (const notation of ['2d6s1', '2d6sa1', '2d6sd1', '2d6!0', '2d6!p3', '2d6!!2']) {
+      for (const notation of ['2d6s1', '2d6sa1', '2d6sd1', '2d6!0', '2d6!p3', '2d6cs1', '2d6cf1']) {
         const error = expectRollError(() => parseAst(notation), ParseError, 'UNEXPECTED_TOKEN');
 
         expect(error.message).toBe('This modifier takes no count');

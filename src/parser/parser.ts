@@ -173,6 +173,16 @@ const TOKEN_DISPLAY = {
 type ExpectableToken = keyof typeof TOKEN_DISPLAY;
 
 /**
+ * True while a crit threshold carries only the bare `cs`/`cf` sentinel, so no
+ * comparison was consumed. Emptiness cannot answer this — bare `cs` fills the
+ * list with `'default'` rather than leaving it empty.
+ */
+function isBareCritThreshold(node: CritThresholdNode): boolean {
+  const isDefault = (threshold: CritThreshold): boolean => threshold === 'default';
+  return node.successThresholds.every(isDefault) && node.failThresholds.every(isDefault);
+}
+
+/**
  * Arity table for math functions. `min` and `max` are inclusive.
  * `POSITIVE_INFINITY` means unbounded (variadic).
  */
@@ -414,11 +424,13 @@ export class Parser {
         // ! Sort consumes nothing, ever. An explode only qualifies while its
         // ! threshold is unset — past `2d6!>1 2` the modifier did take a
         // ! comparison, and the stray number is an unrelated juxtaposition.
-        // ! `CritThreshold` is out: bare `cs` still fills its threshold list
-        // ! with a sentinel, so an empty list cannot tell the two apart.
+        // ! A crit threshold reads the same way, but through its `'default'`
+        // ! sentinel rather than an empty list — bare `cs` fills the list too.
         if (
           token.type === TokenType.NUMBER &&
-          (left.type === 'Sort' || (left.type === 'Explode' && left.threshold == null))
+          (left.type === 'Sort' ||
+            (left.type === 'Explode' && left.threshold == null) ||
+            (left.type === 'CritThreshold' && isBareCritThreshold(left)))
         ) {
           throw new ParseError(
             'This modifier takes no count',
