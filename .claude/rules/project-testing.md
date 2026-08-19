@@ -2,8 +2,8 @@
 
 Bun's test runner. Structure, `createMockRng` usage, fast-check conventions, and
 co-location are all evident from the existing suites — match them. The coverage
-floor lives in `bunfig.toml` — note it is **100% functions** / 98% lines: any
-new function, exported or not, needs a test or `test:ci` fails.
+floor lives in `bunfig.toml` and nowhere else — note the **functions** threshold
+in particular: any new function, exported or not, needs a test or `test:ci` fails.
 
 ## Error assertions
 

@@ -31,16 +31,15 @@ with `biome check --write` and blocks commits on unfixable lint errors.
 
 - Runtime: Bun — never use npm, yarn, or pnpm (npm appears only in the smoke CI jobs and the release publish step). `bunfig.toml` pins `minimumReleaseAge` to 3 days — `bun add` of a freshly published version silently resolves to an older one
 - Library + CLI, ESM-only compiled JS (Node ≥22.12 — first version with unflagged `require(esm)`)
-- `dist/` is a per-file `tsc` emit, never a bundle, in **two** passes: comment-free JS + `.js.map`, then `.d.ts` + `.d.ts.map` with TSDoc intact — one pass cannot do both under TS7 (rationale in the `tsconfig.build*.json` comments). Keep both map kinds. The emit overwrites in place and never wipes `dist/` first —
-a running `site:dev` resolves `roll-parser` into it and caches resolution failures
-it cannot recover from; `scripts/prune-dist.ts` deletes what the passes did not
-write, and `bun run clean` (which `release:dry` runs) is the pristine path. Do not
-reintroduce a bundler: Bun ≤1.3.11 breaks pure re-export entrypoints (e.g. `src/testing.ts`) and `--target browser` silently stubs `node:` builtins instead of erroring
-- Byte budgets are a release gate (`check:size`): 13.5 kB `index.js`, 6.25 kB `{ parse }`, 13 kB `{ roll }`, 250 B `testing.js` — see `size-limit` in `package.json` before adding surface area. Raising a budget is its own commit, never a line in a feature PR
+- `dist/` is a per-file `tsc` emit, never a bundle, in **two** passes: comment-free JS + `.js.map`, then `.d.ts` + `.d.ts.map` with TSDoc intact — one pass cannot do both under TS7 (rationale in the `tsconfig.build*.json` comments). Keep both map kinds
+- The emit overwrites `dist/` in place and never wipes it first — a running `site:dev` resolves `roll-parser` into it and caches resolution failures it cannot recover from. `scripts/prune-dist.ts` deletes what the passes did not write; `bun run clean` (which `release:dry` runs) is the pristine path
+- Do not reintroduce a bundler: Bun ≤1.3.11 breaks pure re-export entrypoints (e.g. `src/testing.ts`), and `--target browser` silently stubs `node:` builtins instead of erroring
+- Byte budgets are a release gate (`check:size`) — the `size-limit` block in `package.json` is the source of truth, so read it before adding surface area. Raising a budget is its own commit, never a line in a feature PR
 - `files` ships `src/` deliberately: `.d.ts.map` points consumer go-to-definition at the real sources. Removing it breaks nothing visibly — the jumps just die
 - Relative imports in `src/` carry explicit `.js` extensions — enforced by `moduleResolution: nodenext` at typecheck time
 - Library code must stay environment-neutral: no Node/Bun globals or `node:` imports outside `src/cli/` — enforced by Biome `noNodejsModules`, `types: []` in `tsconfig.build.json`, and the `browser-smoke` CI job
-- `README.md` promises Deno and Cloudflare Workers support, and `deno-smoke` / `workers-smoke` are what earn it: both install the packed tarball and assert a `createMockRng` total, so dropping either job downgrades that promise to a guess. `scripts/worker-smoke` is deliberately not a root workspace — `wrangler` pulls a platform `workerd` binary, and the fixture has to resolve `roll-parser` to the tarball, not the repo
+- `README.md` promises Deno and Cloudflare Workers support, and `deno-smoke` / `workers-smoke` are what earn it: both install the packed tarball and assert a `createMockRng` total, so dropping either job downgrades that promise to a guess
+- `scripts/worker-smoke` is deliberately not a root workspace — `wrangler` pulls a platform `workerd` binary, and the fixture has to resolve `roll-parser` to the tarball, not the repo
 - Published types carry a TypeScript ≥5.0 floor (the first release with `moduleResolution: bundler`, which `README.md` offers) — the `ts-compat` matrix typechecks `scripts/ts-compat/consumer.ts` against the packed tarball, `ts-compat-floor` asserts 4.9 still fails, and raising the floor is a major. That fixture is deliberately not a root workspace: each matrix leg installs its own `typescript`
 - `src/version.ts` is generated from `package.json` by `bun run generate:version` — never edit it by hand; `check:version` and the `index.test.ts` drift test gate the sync
 - TypeDoc runs from `scripts/docs/node_modules/.bin/typedoc`, not the root: 0.28.x peers at TypeScript `<=6` and throws on the root `typescript@7`, so that workspace nests its own `typescript@6`. Do not fold it back into the root until TypeDoc 1.0 ships TS7 support (full rationale in `scripts/docs/package.json`)
@@ -87,8 +86,8 @@ Types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `perf`, `bui
   Closes #<issue1> #<issue2>
   ```
 
-`master` merges through a PR, must be up to date with it, and must pass the eight
-contexts the `protect-master` ruleset requires — that ruleset is the source of
+`master` merges through a PR, must be up to date with it, and must pass every
+context the `protect-master` ruleset requires — that ruleset is the source of
 truth. Renaming a job leaves its old context pending forever.
 
 ## Releasing
