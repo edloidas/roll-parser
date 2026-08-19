@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.3.1] - 2026-08-20
+
+### Changed
+
+- performance: the evaluator does less work per node and per die. `EvalContext`'s `expression` and `rendered` fragment arrays are single strings carried on `EvalResult`, so no branch can omit one; `rewriteFlags` is one loop instead of a closure, a filter array and a spread; a modifier's target context no longer renders the pool it discards, with every pool render routed through `renderedPool`; and `renderGroup` looks kept indices up in a `Set` rather than an array. No notation evaluates differently and no public type changed ([#336](https://github.com/edloidas/roll-parser/issues/336))
+
+### Documentation
+
+- `package.json` metadata is tuned for npm search: the `description` leads with queryable nouns and names the systems, `roller`, `die`, `notation`, `pathfinder` and the space-separated `dice notation` join the keywords, and seven keywords that ranked outside the top 100 for their own chip are gone. `README.md` gains a `min+brotli ≤13.5 kB` badge linking to the size breakdown ([#333](https://github.com/edloidas/roll-parser/issues/333))
+
 ## [3.3.0] - 2026-08-17
 
 Error-message work throughout: nine parse and lex errors now name the rule they
@@ -295,7 +305,8 @@ Dice mechanics (Stage 2):
 - Dice count safety limit via `maxDice` option (default 10,000), enforced across the whole expression to prevent DoS via additive groups like `5000d6+5000d6` ([#19](https://github.com/edloidas/roll-parser/issues/19))
 - Parser and evaluator correctness: duplicate `kept` modifier entries, implicit modifier count defaulting to 1 (`4d6kh` → `4d6kh1`), `critical` flag suppression when `sides === 1`, negative `--seed` CLI values ([#21](https://github.com/edloidas/roll-parser/issues/21))
 
-[Unreleased]: https://github.com/edloidas/roll-parser/compare/v3.3.0...HEAD
+[Unreleased]: https://github.com/edloidas/roll-parser/compare/v3.3.1...HEAD
+[3.3.1]: https://github.com/edloidas/roll-parser/releases/tag/v3.3.1
 [3.3.0]: https://github.com/edloidas/roll-parser/releases/tag/v3.3.0
 [3.2.2]: https://github.com/edloidas/roll-parser/releases/tag/v3.2.2
 [3.2.1]: https://github.com/edloidas/roll-parser/releases/tag/v3.2.1

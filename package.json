@@ -1,6 +1,6 @@
 {
   "name": "roll-parser",
-  "version": "3.3.0",
+  "version": "3.3.1",
   "description": "Dice notation parser and roller for tabletop RPGs — D&D 5e, Pathfinder, Fate. Typed results, seeded rolls, zero dependencies. TypeScript, Node, Bun, browser.",
   "type": "module",
   "bin": {
