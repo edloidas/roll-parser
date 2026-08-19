@@ -3293,10 +3293,8 @@ describe('evaluate', () => {
           { result: 6, sides: 10, modifiers: ['kept', 'success'], critical: false, fumble: false },
           { result: 1, sides: 10, modifiers: ['kept', 'failure'], critical: false, fumble: false },
         ],
-        expressionParts: [],
-        renderedParts: [],
       };
-      const parent: EvalContext = { rolls: [], expressionParts: [], renderedParts: [] };
+      const parent: EvalContext = { rolls: [] };
 
       mergeMetaRolls(parent, source);
 
