@@ -81,6 +81,11 @@ export const BENCH_CASES: BenchCase[] = [
   { id: '100d6kh1', notation: '100d6kh1', tier: 'heavy' },
   { id: '100d6sa', notation: '100d6sa', tier: 'heavy' },
 
+  // Reroll and stacked modifiers at pool scale. Every other reroll case is 4
+  // dice, and nothing else here runs more than two pool passes over one pool.
+  { id: '100d10ro<3', notation: '100d10ro<3', tier: 'heavy', variableWork: true },
+  { id: '100d10kh50sd cs>8', notation: '100d10kh50sd cs>8', tier: 'heavy' },
+
   { id: '1000d6', notation: '1000d6', tier: 'pathological' },
 ];
 

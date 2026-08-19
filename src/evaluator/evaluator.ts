@@ -132,7 +132,8 @@ export { DEFAULT_MAX_EXPLODE_ITERATIONS, DEFAULT_MAX_REROLL_ITERATIONS };
 //
 
 /**
- * Per-branch mutable accumulator for tracking rolls and output during recursion.
+ * Per-branch mutable accumulator for what flows up a recursion unchanged or
+ * merged. Everything a parent reformats instead rides {@link EvalResult}.
  *
  * Module-level export, deliberately absent from `src/index.ts` — the package
  * surface never mentions it. See {@link mergeMetaRolls} for why the export
@@ -140,8 +141,14 @@ export { DEFAULT_MAX_EXPLODE_ITERATIONS, DEFAULT_MAX_REROLL_ITERATIONS };
  */
 export type EvalContext = {
   rolls: DieResult[];
-  expressionParts: string[];
-  renderedParts: string[];
+  /**
+   * Set by a parent that discards its child's `rendered`, so the child skips
+   * building it.
+   *
+   * ! Does not propagate into nested contexts — `(4d6)kh1` evaluates into a
+   * ! fresh one, so only a modifier's direct dice-pool target is spared.
+   */
+  suppressRender?: boolean;
   /**
    * Populated by `evalVersus` with the resolved degree and natural value.
    * `evaluate()` reads this from the top-level ctx to surface `degree` and
@@ -156,12 +163,41 @@ export type EvalContext = {
 };
 
 /**
- * Creates an empty per-branch accumulator. Every sub-evaluation runs in a
- * fresh context so its rolls and rendered fragments can be merged back on the
- * parent's terms.
+ * Creates an empty per-branch accumulator. Every sub-evaluation runs in a fresh
+ * context so its rolls merge back on the parent's terms.
  */
 function createContext(): EvalContext {
-  return { rolls: [], expressionParts: [], renderedParts: [] };
+  return { rolls: [] };
+}
+
+/**
+ * Creates the context a postfix pool modifier evaluates its target into. Such a
+ * modifier rebuilds the breakdown from the target's `expression` plus a
+ * `renderDice` pass of its own, so whatever the target rendered is dead work.
+ *
+ * ! Not for `evalSuccessCount`'s subtotal branch or `evalGroupKeepDrop`. Both
+ * ! read their child's `rendered`, and both must keep using `createContext`.
+ */
+function createDiscardedRenderContext(): EvalContext {
+  const ctx = createContext();
+  ctx.suppressRender = true;
+  return ctx;
+}
+
+/**
+ * The rendered form a pool modifier contributes, or nothing when `ctx` belongs
+ * to a parent that discards it.
+ *
+ * ! Every pool render goes through here, including ones that look unreachable.
+ * ! In a chain each modifier's own context is the next one out's discarded
+ * ! target, so guarding only the innermost pool leaves every level above it
+ * ! rendering into the void.
+ *
+ * Wrappers that concatenate strings their children already built — arithmetic,
+ * grouping, a group count's subtotal branch — walk no pool and stay unguarded.
+ */
+function renderedPool(ctx: EvalContext, prefix: string, dice: DieResult[]): string {
+  return ctx.suppressRender ? '' : `${prefix}${renderDice(dice)}`;
 }
 
 /**
@@ -171,13 +207,21 @@ function createContext(): EvalContext {
 type KeepDropChainEntry = KeepDropSpec & { code: string };
 
 /**
- * Every branch returns its numeric total AND the `RollPart` it contributes
- * to the structured breakdown — TypeScript exhaustiveness guarantees no
- * branch can forget to produce a part.
+ * Every branch returns its total, the `RollPart` it contributes to the structured
+ * breakdown, and its two spellings — TypeScript exhaustiveness guarantees no
+ * branch can forget one.
+ *
+ * All four are values a parent reformats with its own syntax, so none of them
+ * merges. A field that instead flows up unchanged or merged belongs on
+ * {@link EvalContext}.
  */
 type EvalResult = {
   total: number;
   part: RollPart;
+  /** Normalized notation for this branch, as `RollResult.expression` spells it. */
+  expression: string;
+  /** Marked-up breakdown for this branch, as `RollResult.rendered` spells it. */
+  rendered: string;
 };
 
 //
@@ -338,7 +382,7 @@ function evalNode(node: ASTNode, rng: RNG, ctx: EvalContext, env: EvalEnv): Eval
 function evalNodeInner(node: ASTNode, rng: RNG, ctx: EvalContext, env: EvalEnv): EvalResult {
   switch (node.type) {
     case 'Literal':
-      return evalLiteral(node, ctx);
+      return evalLiteral(node);
 
     case 'Dice':
       return evalDice(node, rng, ctx, env);
@@ -386,7 +430,7 @@ function evalNodeInner(node: ASTNode, rng: RNG, ctx: EvalContext, env: EvalEnv):
       return evalCritThreshold(node, rng, ctx, env);
 
     case 'Variable':
-      return evalVariable(node, ctx, env);
+      return evalVariable(node, env);
 
     default: {
       const exhaustive: never = node;
@@ -403,11 +447,15 @@ function evalNodeInner(node: ASTNode, rng: RNG, ctx: EvalContext, env: EvalEnv):
 // * Leaf nodes
 //
 
-function evalLiteral(node: LiteralNode, ctx: EvalContext): EvalResult {
+function evalLiteral(node: LiteralNode): EvalResult {
   const { value } = node;
-  ctx.expressionParts.push(String(value));
-  ctx.renderedParts.push(String(value));
-  return { total: value, part: { type: 'literal', value, total: value, ...partSpan(node) } };
+  const text = String(value);
+  return {
+    total: value,
+    part: { type: 'literal', value, total: value, ...partSpan(node) },
+    expression: text,
+    rendered: text,
+  };
 }
 
 /**
@@ -429,7 +477,7 @@ function variableNeedsBraces(name: string): boolean {
  * while `rendered` keeps the original `@name` (or `@{name}`) annotated with
  * the resolved value in brackets so readers can attribute the number.
  */
-function evalVariable(node: VariableNode, ctx: EvalContext, env: EvalEnv): EvalResult {
+function evalVariable(node: VariableNode, env: EvalEnv): EvalResult {
   const present = Object.hasOwn(env.context, node.name);
   if (!present) {
     if (env.onMissingVariable === 'throw') {
@@ -440,11 +488,11 @@ function evalVariable(node: VariableNode, ctx: EvalContext, env: EvalEnv): EvalR
       );
     }
     const display = variableNeedsBraces(node.name) ? `@{${node.name}}` : `@${node.name}`;
-    ctx.expressionParts.push('0');
-    ctx.renderedParts.push(`${display}[0]`);
     return {
       total: 0,
       part: { type: 'variable', name: node.name, value: 0, total: 0, ...partSpan(node) },
+      expression: '0',
+      rendered: `${display}[0]`,
     };
   }
 
@@ -457,11 +505,11 @@ function evalVariable(node: VariableNode, ctx: EvalContext, env: EvalEnv): EvalR
     );
   }
   const display = variableNeedsBraces(node.name) ? `@{${node.name}}` : `@${node.name}`;
-  ctx.expressionParts.push(String(value));
-  ctx.renderedParts.push(`${display}[${value}]`);
   return {
     total: value,
     part: { type: 'variable', name: node.name, value, total: value, ...partSpan(node) },
+    expression: String(value),
+    rendered: `${display}[${value}]`,
   };
 }
 
@@ -556,7 +604,7 @@ function rollPool(
   notation: string,
   rollDie: () => DieResult,
   ctx: EvalContext,
-): { total: number; rolls: DieResult[] } {
+): { total: number; rolls: DieResult[]; expression: string; rendered: string } {
   const dice: DieResult[] = [];
   let total = 0;
 
@@ -568,10 +616,13 @@ function rollPool(
 
   appendAll(ctx.rolls, dice);
 
-  ctx.expressionParts.push(notation);
-  ctx.renderedParts.push(`${notation}${renderDice(dice)}`);
-
-  return { total, rolls: dice };
+  return {
+    total,
+    rolls: dice,
+    expression: notation,
+    // Empty rather than notation-only, so a stray reader fails visibly.
+    rendered: ctx.suppressRender ? '' : `${notation}${renderDice(dice)}`,
+  };
 }
 
 /**
@@ -604,7 +655,7 @@ function evalDice(node: DiceNode, rng: RNG, ctx: EvalContext, env: EvalEnv): Eva
 
   chargeDice(env, count, 'Dice');
 
-  const { total, rolls } = rollPool(
+  const { total, rolls, expression, rendered } = rollPool(
     count,
     `${count}d${sides}`,
     // Fresh `['kept']` per die — `success-count` appends tally flags in
@@ -613,7 +664,12 @@ function evalDice(node: DiceNode, rng: RNG, ctx: EvalContext, env: EvalEnv): Eva
     ctx,
   );
 
-  return { total, part: { type: 'dice', count, sides, rolls, total, ...partSpan(node) } };
+  return {
+    total,
+    part: { type: 'dice', count, sides, rolls, total, ...partSpan(node) },
+    expression,
+    rendered,
+  };
 }
 
 function evalFateDice(node: FateDiceNode, rng: RNG, ctx: EvalContext, env: EvalEnv): EvalResult {
@@ -622,14 +678,19 @@ function evalFateDice(node: FateDiceNode, rng: RNG, ctx: EvalContext, env: EvalE
   requireDiceCount(count, 'FateDice');
   chargeDice(env, count, 'FateDice');
 
-  const { total, rolls } = rollPool(
+  const { total, rolls, expression, rendered } = rollPool(
     count,
     `${count}dF`,
     () => createFateDieResult(rng.nextInt(-1, 1), ['kept']),
     ctx,
   );
 
-  return { total, part: { type: 'fateDice', count, rolls, total, ...partSpan(node) } };
+  return {
+    total,
+    part: { type: 'fateDice', count, rolls, total, ...partSpan(node) },
+    expression,
+    rendered,
+  };
 }
 
 //
@@ -680,9 +741,6 @@ function propagateMetadata(parent: EvalContext, metadata: EvalContext['versusMet
 /**
  * Merges a child sub-context back into its parent. Copies `rolls` and
  * delegates `versusMetadata` propagation to `propagateMetadata`.
- *
- * Does not merge `expressionParts` / `renderedParts` — each wrapper formats
- * those with its own operator/function syntax.
  */
 function mergeContext(parent: EvalContext, child: EvalContext): void {
   appendAll(parent.rolls, child.rolls);
@@ -703,14 +761,6 @@ function evalBinaryOp(node: BinaryOpNode, rng: RNG, ctx: EvalContext, env: EvalE
   mergeContext(ctx, leftCtx);
   mergeContext(ctx, rightCtx);
 
-  const leftExpr = leftCtx.expressionParts.join('');
-  const rightExpr = rightCtx.expressionParts.join('');
-  const leftRendered = leftCtx.renderedParts.join('');
-  const rightRendered = rightCtx.renderedParts.join('');
-
-  ctx.expressionParts.push(`${leftExpr} ${node.operator} ${rightExpr}`);
-  ctx.renderedParts.push(`${leftRendered} ${node.operator} ${rightRendered}`);
-
   const total = applyBinaryOperator(node.operator, left.total, right.total);
 
   return {
@@ -723,6 +773,8 @@ function evalBinaryOp(node: BinaryOpNode, rng: RNG, ctx: EvalContext, env: EvalE
       total,
       ...partSpan(node),
     },
+    expression: `${left.expression} ${node.operator} ${right.expression}`,
+    rendered: `${left.rendered} ${node.operator} ${right.rendered}`,
   };
 }
 
@@ -763,17 +815,13 @@ function evalUnaryOp(node: UnaryOpNode, rng: RNG, ctx: EvalContext, env: EvalEnv
 
   mergeContext(ctx, innerCtx);
 
-  const innerExpr = innerCtx.expressionParts.join('');
-  const innerRendered = innerCtx.renderedParts.join('');
-
-  ctx.expressionParts.push(`-${innerExpr}`);
-  ctx.renderedParts.push(`-${innerRendered}`);
-
   const total = -inner.total;
 
   return {
     total,
     part: { type: 'unaryOp', operator: '-', operand: inner.part, total, ...partSpan(node) },
+    expression: `-${inner.expression}`,
+    rendered: `-${inner.rendered}`,
   };
 }
 
@@ -787,12 +835,11 @@ function evalGrouped(node: GroupedNode, rng: RNG, ctx: EvalContext, env: EvalEnv
 
   mergeContext(ctx, innerCtx);
 
-  ctx.expressionParts.push(`(${innerCtx.expressionParts.join('')})`);
-  ctx.renderedParts.push(`(${innerCtx.renderedParts.join('')})`);
-
   return {
     total: inner.total,
     part: { type: 'grouped', inner: inner.part, total: inner.total, ...partSpan(node) },
+    expression: `(${inner.expression})`,
+    rendered: `(${inner.rendered})`,
   };
 }
 
@@ -816,18 +863,20 @@ function evalGroup(node: GroupNode, rng: RNG, ctx: EvalContext, env: EvalEnv): E
     const subCtx = createContext();
     const sub = evalNode(expr, rng, subCtx, env);
     mergeContext(ctx, subCtx);
-    subExprs.push(subCtx.expressionParts.join(''));
-    subRendered.push(subCtx.renderedParts.join(''));
+    subExprs.push(sub.expression);
+    subRendered.push(sub.rendered);
     subParts.push(sub.part);
     total += sub.total;
   }
 
-  ctx.expressionParts.push(`{${subExprs.join(', ')}}`);
-  ctx.renderedParts.push(`{${subRendered.join(', ')}}`);
-
   // No `keptIndices` — bare groups (and single-sub passthroughs) perform
   // no sub-roll selection; only `evalGroupKeepDrop` sets it.
-  return { total, part: { type: 'group', parts: subParts, total, ...partSpan(node) } };
+  return {
+    total,
+    part: { type: 'group', parts: subParts, total, ...partSpan(node) },
+    expression: `{${subExprs.join(', ')}}`,
+    rendered: `{${subRendered.join(', ')}}`,
+  };
 }
 
 function evalFunctionCall(
@@ -849,12 +898,6 @@ function evalFunctionCall(
     mergeContext(ctx, argCtx);
   }
 
-  const argExprs = argCtxs.map((c) => c.expressionParts.join(''));
-  const argRendereds = argCtxs.map((c) => c.renderedParts.join(''));
-
-  ctx.expressionParts.push(`${node.name}(${argExprs.join(', ')})`);
-  ctx.renderedParts.push(`${node.name}(${argRendereds.join(', ')})`);
-
   const total = applyFunction(
     node.name,
     argResults.map((r) => r.total),
@@ -869,6 +912,8 @@ function evalFunctionCall(
       total,
       ...partSpan(node),
     },
+    expression: `${node.name}(${argResults.map((r) => r.expression).join(', ')})`,
+    rendered: `${node.name}(${argResults.map((r) => r.rendered).join(', ')})`,
   };
 }
 
@@ -1068,9 +1113,9 @@ function formatExplodeCode(
 }
 
 function evalExplode(node: ExplodeNode, rng: RNG, ctx: EvalContext, env: EvalEnv): EvalResult {
-  const targetCtx = createContext();
+  const targetCtx = createDiscardedRenderContext();
   const target = evalNode(node.target, rng, targetCtx, env);
-  const targetExpr = targetCtx.expressionParts.join('');
+  const targetExpr = target.expression;
 
   let thresholdValue: number | undefined;
   if (node.threshold != null) {
@@ -1096,9 +1141,12 @@ function evalExplode(node: ExplodeNode, rng: RNG, ctx: EvalContext, env: EvalEnv
 
   // No-op when the target produced no dice (e.g., `(1+2)!`).
   if (targetCtx.rolls.length === 0) {
-    ctx.expressionParts.push(`${targetExpr}${code}`);
-    ctx.renderedParts.push(`${targetExpr}${code}`);
-    return { total: target.total, part: buildPart(target.total, targetCtx.rolls) };
+    return {
+      total: target.total,
+      part: buildPart(target.total, targetCtx.rolls),
+      expression: `${targetExpr}${code}`,
+      rendered: ctx.suppressRender ? '' : `${targetExpr}${code}`,
+    };
   }
 
   const shouldExplode = buildShouldExplode(node.threshold?.operator, thresholdValue);
@@ -1106,23 +1154,25 @@ function evalExplode(node: ExplodeNode, rng: RNG, ctx: EvalContext, env: EvalEnv
   const expanded = EXPLODE_APPLIERS[node.variant](targetCtx.rolls, shouldExplode, rng, env);
 
   appendAll(ctx.rolls, expanded);
-  ctx.expressionParts.push(`${targetExpr}${code}`);
-  // Rendered form carries the explode code — unlike kh/dl, whose dropped dice
-  // are self-evident, explosion origin is otherwise invisible.
-  ctx.renderedParts.push(`${targetExpr}${code}${renderDice(expanded)}`);
-
   const total = sumKeptDice(expanded, env.hasVersusDc);
-  return { total, part: buildPart(total, expanded) };
+  return {
+    total,
+    part: buildPart(total, expanded),
+    expression: `${targetExpr}${code}`,
+    // Rendered form carries the explode code — unlike kh/dl, whose dropped dice
+    // are self-evident, explosion origin is otherwise invisible.
+    rendered: renderedPool(ctx, `${targetExpr}${code}`, expanded),
+  };
 }
 
 function evalReroll(node: RerollNode, rng: RNG, ctx: EvalContext, env: EvalEnv): EvalResult {
-  const targetCtx = createContext();
+  const targetCtx = createDiscardedRenderContext();
   const target = evalNode(node.target, rng, targetCtx, env);
 
   const thresholdValue = evalMetaOperand(node.condition.value, rng, ctx, env);
 
   const code = `${node.once ? 'ro' : 'r'}${node.condition.operator}${thresholdValue}`;
-  const modifierExpr = joinModifierCode(targetCtx.expressionParts.join(''), code);
+  const modifierExpr = joinModifierCode(target.expression, code);
   const condition: ResolvedComparePoint = {
     operator: node.condition.operator,
     value: thresholdValue,
@@ -1130,8 +1180,6 @@ function evalReroll(node: RerollNode, rng: RNG, ctx: EvalContext, env: EvalEnv):
 
   // No-op when the target produced no dice (e.g., `(1+2)r<5`).
   if (targetCtx.rolls.length === 0) {
-    ctx.expressionParts.push(modifierExpr);
-    ctx.renderedParts.push(modifierExpr);
     const total = sumKeptDice(targetCtx.rolls, env.hasVersusDc);
     return {
       total,
@@ -1144,6 +1192,8 @@ function evalReroll(node: RerollNode, rng: RNG, ctx: EvalContext, env: EvalEnv):
         total,
         ...partSpan(node),
       },
+      expression: modifierExpr,
+      rendered: ctx.suppressRender ? '' : modifierExpr,
     };
   }
 
@@ -1152,9 +1202,6 @@ function evalReroll(node: RerollNode, rng: RNG, ctx: EvalContext, env: EvalEnv):
     : applyRecursiveReroll(targetCtx.rolls, node.condition.operator, thresholdValue, rng, env);
 
   appendAll(ctx.rolls, pool);
-  ctx.expressionParts.push(modifierExpr);
-  ctx.renderedParts.push(`${modifierExpr}${renderDice(pool)}`);
-
   const total = sumKeptDice(pool, env.hasVersusDc);
   return {
     total,
@@ -1167,6 +1214,8 @@ function evalReroll(node: RerollNode, rng: RNG, ctx: EvalContext, env: EvalEnv):
       total,
       ...partSpan(node),
     },
+    expression: modifierExpr,
+    rendered: renderedPool(ctx, modifierExpr, pool),
   };
 }
 
@@ -1177,7 +1226,7 @@ function evalReroll(node: RerollNode, rng: RNG, ctx: EvalContext, env: EvalEnv):
  * and the total re-summed, since clamping changes kept-die values.
  */
 function evalDieBound(node: DieBoundNode, rng: RNG, ctx: EvalContext, env: EvalEnv): EvalResult {
-  const targetCtx = createContext();
+  const targetCtx = createDiscardedRenderContext();
   const target = evalNode(node.target, rng, targetCtx, env);
 
   const boundValue = evalMetaOperand(node.value, rng, ctx, env);
@@ -1199,13 +1248,12 @@ function evalDieBound(node: DieBoundNode, rng: RNG, ctx: EvalContext, env: EvalE
   // Negative bounds render parenthesized so `result.expression` re-parses
   // (`4d6min-2` is a syntax error; `4d6min(-2)` is not).
   const code = boundValue < 0 ? `${node.bound}(${boundValue})` : `${node.bound}${boundValue}`;
-  const modifierExpr = joinModifierCode(targetCtx.expressionParts.join(''), code);
-
-  ctx.expressionParts.push(modifierExpr);
-  ctx.renderedParts.push(`${modifierExpr}${renderDice(targetCtx.rolls)}`);
+  const modifierExpr = joinModifierCode(target.expression, code);
 
   const total = sumKeptDice(targetCtx.rolls, env.hasVersusDc);
   return {
+    expression: modifierExpr,
+    rendered: renderedPool(ctx, modifierExpr, targetCtx.rolls),
     total,
     part: {
       type: 'dieBound',
@@ -1235,7 +1283,7 @@ function evalDieBound(node: DieBoundNode, rng: RNG, ctx: EvalContext, env: EvalE
  * per-sub-roll sorting (Stage 3 spec §3 "Group interaction") is implemented.
  */
 function evalSort(node: SortNode, rng: RNG, ctx: EvalContext, env: EvalEnv): EvalResult {
-  const targetCtx = createContext();
+  const targetCtx = createDiscardedRenderContext();
   const target = evalNode(node.target, rng, targetCtx, env);
 
   const sortedRolls = sortDice(targetCtx.rolls, node.order, env.hasVersusDc);
@@ -1244,12 +1292,11 @@ function evalSort(node: SortNode, rng: RNG, ctx: EvalContext, env: EvalEnv): Eva
   propagateMetadata(ctx, targetCtx.versusMetadata);
 
   const code = node.order === 'ascending' ? 's' : 'sd';
-  const modifierExpr = joinModifierCode(targetCtx.expressionParts.join(''), code);
-
-  ctx.expressionParts.push(modifierExpr);
-  ctx.renderedParts.push(`${modifierExpr}${renderDice(sortedRolls)}`);
+  const modifierExpr = joinModifierCode(target.expression, code);
 
   return {
+    expression: modifierExpr,
+    rendered: renderedPool(ctx, modifierExpr, sortedRolls),
     total: target.total,
     part: {
       type: 'sort',
@@ -1288,7 +1335,7 @@ function evalCritThreshold(
   ctx: EvalContext,
   env: EvalEnv,
 ): EvalResult {
-  const targetCtx = createContext();
+  const targetCtx = createDiscardedRenderContext();
   const target = evalNode(node.target, rng, targetCtx, env);
 
   const successResolved = node.successThresholds.map((t) => resolveCritThreshold(t, rng, ctx, env));
@@ -1308,12 +1355,11 @@ function evalCritThreshold(
   const modifierExpr = [
     ...successResolved.map((t) => (t === 'default' ? 'cs' : `cs${t.operator}${t.value}`)),
     ...failResolved.map((t) => (t === 'default' ? 'cf' : `cf${t.operator}${t.value}`)),
-  ].reduce(joinModifierCode, targetCtx.expressionParts.join(''));
-
-  ctx.expressionParts.push(modifierExpr);
-  ctx.renderedParts.push(`${modifierExpr}${renderDice(targetCtx.rolls)}`);
+  ].reduce(joinModifierCode, target.expression);
 
   return {
+    expression: modifierExpr,
+    rendered: renderedPool(ctx, modifierExpr, targetCtx.rolls),
     total: target.total,
     part: {
       type: 'critThreshold',
@@ -1359,7 +1405,7 @@ function evalKeepDrop(node: KeepDropNode, rng: RNG, ctx: EvalContext, env: EvalE
     return evalGroupKeepDrop(node, baseTarget, specs, rng, ctx, env);
   }
 
-  const targetCtx = createContext();
+  const targetCtx = createDiscardedRenderContext();
   const target = evalNode(baseTarget, rng, targetCtx, env);
 
   const mergedDice = mergeDropSets(targetCtx.rolls, specs, env.hasVersusDc);
@@ -1368,11 +1414,8 @@ function evalKeepDrop(node: KeepDropNode, rng: RNG, ctx: EvalContext, env: EvalE
 
   const total = sumKeptDice(mergedDice, env.hasVersusDc);
 
-  const targetExpr = targetCtx.expressionParts.join('');
+  const targetExpr = target.expression;
   const keepDropCodes = specs.map((s) => `${s.code}${s.count}`).join('');
-
-  ctx.expressionParts.push(joinModifierCode(targetExpr, keepDropCodes));
-  ctx.renderedParts.push(`${targetExpr}${renderDice(mergedDice)}`);
 
   return {
     total,
@@ -1383,6 +1426,8 @@ function evalKeepDrop(node: KeepDropNode, rng: RNG, ctx: EvalContext, env: EvalE
       total,
       ...partSpan(node),
     },
+    expression: joinModifierCode(targetExpr, keepDropCodes),
+    rendered: renderedPool(ctx, targetExpr, mergedDice),
   };
 }
 
@@ -1446,8 +1491,8 @@ function evalGroupKeepDrop(
       subtotal: sub.total,
       part: sub.part,
       rolls: subCtx.rolls,
-      expr: subCtx.expressionParts.join(''),
-      rendered: subCtx.renderedParts.join(''),
+      expr: sub.expression,
+      rendered: sub.rendered,
       versusMetadata: subCtx.versusMetadata,
       scoredSuccesses: env.subtotalSuccesses - successTally,
       scoredFailures: env.subtotalFailures - failureTally,
@@ -1507,11 +1552,6 @@ function evalGroupKeepDrop(
   const subExprStrs = subRolls.map((s) => s.expr);
   const keepDropCodes = specs.map((s) => `${s.code}${s.count}`).join('');
 
-  ctx.expressionParts.push(`{${subExprStrs.join(', ')}}${keepDropCodes}`);
-  // Keep/drop codes live in `expressionParts` only — the per-sub strikethrough
-  // already shows which sub-rolls were kept.
-  ctx.renderedParts.push(`{${outerRendered.join(', ')}}`);
-
   // `keptIndices` sits on the inner `group` part even though the outer modifier
   // computed it — it describes sub-roll selection. Dropped sub-rolls keep their
   // complete parts; consumers filter by `keptIndices`.
@@ -1532,6 +1572,10 @@ function evalGroupKeepDrop(
       total,
       ...partSpan(node),
     },
+    expression: `{${subExprStrs.join(', ')}}${keepDropCodes}`,
+    // Keep/drop codes live in `expression` only — the per-sub strikethrough
+    // already shows which sub-rolls were kept.
+    rendered: `{${outerRendered.join(', ')}}`,
   };
 }
 
@@ -1582,7 +1626,7 @@ function evalSuccessCount(
 
   const targetCtx = createContext();
   const target = evalNode(node.target, rng, targetCtx, env);
-  const targetExpr = targetCtx.expressionParts.join('');
+  const targetExpr = target.expression;
 
   // True once any count has run: an inner one that tagged this very pool (only
   // a group can arrange that — `{4d6>=5}<=2f5`), or an unrelated earlier one,
@@ -1652,9 +1696,12 @@ function evalSuccessCount(
   // Reachable only through a zero-count pool — a target holding no dice node at
   // all is rejected at parse time.
   if (pool.length === 0) {
-    ctx.expressionParts.push(`${targetExpr}${code}`);
-    ctx.renderedParts.push(`${targetExpr}${code}`);
-    return { total: 0, part: buildPart(0, 0, 0) };
+    return {
+      total: 0,
+      part: buildPart(0, 0, 0),
+      expression: `${targetExpr}${code}`,
+      rendered: `${targetExpr}${code}`,
+    };
   }
 
   const result = countSuccesses(
@@ -1673,19 +1720,16 @@ function evalSuccessCount(
   }
 
   appendAll(ctx.rolls, targetCtx.rolls);
-  ctx.expressionParts.push(`${targetExpr}${code}`);
-  // A subtotal count renders through the group — its sub-rolls carry their own
-  // brackets, and one flat bracket would spell out the units it never used. The
-  // strip pairs with the tag release above: markers and tags go together.
-  ctx.renderedParts.push(
-    bySubtotal
-      ? `${stripTallyMarkers(targetCtx.renderedParts.join(''))}${code}`
-      : `${targetExpr}${code}${renderDice(targetCtx.rolls)}`,
-  );
-
   return {
     total: result.total,
     part: buildPart(result.total, result.successes, result.failures),
+    expression: `${targetExpr}${code}`,
+    // A subtotal count renders through the group — its sub-rolls carry their own
+    // brackets, and one flat bracket would spell out the units it never used. The
+    // strip pairs with the tag release above: markers and tags go together.
+    rendered: bySubtotal
+      ? `${stripTallyMarkers(target.rendered)}${code}`
+      : renderedPool(ctx, `${targetExpr}${code}`, targetCtx.rolls),
   };
 }
 
@@ -1778,13 +1822,6 @@ function evalVersus(node: VersusNode, rng: RNG, ctx: EvalContext, env: EvalEnv):
     if (dcCtx.rolls.length > 0) env.hasVersusDc = true;
     appendAll(ctx.rolls, dcCtx.rolls);
 
-    const rollExpr = rollCtx.expressionParts.join('');
-    const dcExpr = dcCtx.expressionParts.join('');
-    const rollRendered = rollCtx.renderedParts.join('');
-    const dcRendered = dcCtx.renderedParts.join('');
-
-    ctx.expressionParts.push(`${rollExpr} vs ${dcExpr}`);
-    ctx.renderedParts.push(`${rollRendered} vs ${dcRendered}`);
     ctx.versusMetadata = { degree, natural, dcTotal: dcResult.total };
 
     return {
@@ -1797,6 +1834,8 @@ function evalVersus(node: VersusNode, rng: RNG, ctx: EvalContext, env: EvalEnv):
         total: rollResult.total,
         ...partSpan(node),
       },
+      expression: `${rollResult.expression} vs ${dcResult.expression}`,
+      rendered: `${rollResult.rendered} vs ${dcResult.rendered}`,
     };
   } finally {
     env.insideVersus = false;
@@ -1879,7 +1918,7 @@ export function evaluate(ast: ASTNode, rng: RNG, options: EvaluateOptions = {}):
   };
   const ctx = createContext();
 
-  const { total, part } = evalNode(ast, rng, ctx, env);
+  const { total, part, expression, rendered: renderedBody } = evalNode(ast, rng, ctx, env);
 
   if (!Number.isFinite(total)) {
     throw new EvaluatorError(
@@ -1889,11 +1928,10 @@ export function evaluate(ast: ASTNode, rng: RNG, options: EvaluateOptions = {}):
     );
   }
 
-  const expression = ctx.expressionParts.join('');
   // Versus replaces the numeric total with the degree label in the rendered
   // form; `RollResult.total` remains the numeric roll total.
   const trailing = ctx.versusMetadata ? degreeLabel(ctx.versusMetadata.degree) : String(total);
-  const rendered = `${ctx.renderedParts.join('')} = ${trailing}`;
+  const rendered = `${renderedBody} = ${trailing}`;
 
   // `RollResult` is `Readonly` — optional fields fold in via conditional spreads.
   const versus = ctx.versusMetadata;

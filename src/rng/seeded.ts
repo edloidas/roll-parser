@@ -246,6 +246,12 @@ export class SeededRNG implements RNG {
    */
   private toSeedString(seed?: string | number): string {
     // ! The library's one permitted `Math.random()` site — both draws stay here.
+    // ! Decimal, though the ~53 characters cost `hashSeed` an iteration each.
+    // ! Decimal double-to-string is a JIT fast path and other radixes are not, so
+    // ! every shorter encoding that keeps both draws whole measured slower. The
+    // ! one that beats it truncates each draw to a uint32, dropping the auto-seed
+    // ! to 64 draw bits against the ~100 documented above — refused. A faster
+    // ! auto-seed has to skip the string, not shorten it.
     if (seed == null) return `${Date.now()}-${Math.random()}-${Math.random()}`;
     return String(seed);
   }

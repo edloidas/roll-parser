@@ -68,11 +68,27 @@ export function stripFlags(
   return modifiers.filter((modifier) => !excluded.includes(modifier));
 }
 
-/** Returns `modifiers` with `excluded` removed and `added` appended, in order. */
+/**
+ * Returns `modifiers` with `excluded` removed and `added` appended, in order.
+ *
+ * ! Always a fresh array, even when the result equals `modifiers`. `mergeMetaRolls`
+ * ! clones a die as `{ ...die, modifiers: rewriteFlags(...) }`, so returning the
+ * ! input would leave clone and original sharing flags that later passes mutate.
+ */
 export function rewriteFlags(
   modifiers: readonly DieModifier[],
   excluded: readonly DieModifier[],
   ...added: DieModifier[]
 ): DieModifier[] {
-  return [...stripFlags(modifiers, excluded), ...added];
+  // One array, not `stripFlags`'s filter plus a spread — this runs per die.
+  const rewritten: DieModifier[] = [];
+
+  for (const modifier of modifiers) {
+    if (!excluded.includes(modifier)) rewritten.push(modifier);
+  }
+  for (const flag of added) {
+    rewritten.push(flag);
+  }
+
+  return rewritten;
 }

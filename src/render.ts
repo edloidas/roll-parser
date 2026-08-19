@@ -342,8 +342,9 @@ function renderGroup(
   plain: boolean,
 ): string {
   const { keptIndices } = part;
+  const kept = keptIndices == null ? null : new Set(keptIndices);
   const subRolls = part.parts.map((sub, index) => {
-    if (keptIndices == null || keptIndices.includes(index)) {
+    if (kept == null || kept.has(index)) {
       return renderPart(sub, marks, plain);
     }
     const inner = renderPart(sub, marks, true);
