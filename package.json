@@ -1,7 +1,7 @@
 {
   "name": "roll-parser",
   "version": "3.3.0",
-  "description": "High-performance dice notation parser for tabletop RPGs. TypeScript-first, runs on Node, Bun, and browsers with zero dependencies.",
+  "description": "Dice notation parser and roller for tabletop RPGs — D&D 5e, Pathfinder, Fate. Typed results, seeded rolls, zero dependencies. TypeScript, Node, Bun, browser.",
   "type": "module",
   "bin": {
     "roll-parser": "./dist/cli/index.js"
@@ -44,12 +44,11 @@
     "tabletop",
     "dnd",
     "d20",
-    "typescript",
-    "esm",
-    "browser",
-    "zero-dependency",
-    "cli",
-    "bun"
+    "roller",
+    "die",
+    "notation",
+    "pathfinder",
+    "dice notation"
   ],
   "homepage": "https://roll-parser.edloidas.io/",
   "bugs": {

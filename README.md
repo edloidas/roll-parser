@@ -13,6 +13,7 @@ Dice notation for tabletop RPGs, rolled into structured results.
   <a href="https://github.com/edloidas/roll-parser/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/edloidas/roll-parser/ci.yml?branch=master&label=CI" alt="CI status"></a>
   <a href="https://github.com/edloidas/roll-parser/blob/master/LICENSE"><img src="https://img.shields.io/npm/l/roll-parser?color=blue" alt="MIT license"></a>
   <a href="https://nodejs.org/"><img src="https://img.shields.io/node/v/roll-parser?color=5fa04e" alt="Node.js >= 22.12"></a>
+  <a href="https://github.com/edloidas/roll-parser#why-roll-parser"><img src="https://img.shields.io/badge/min%2Bbrotli-%E2%89%A413.5%20kB-8b5cf6" alt="min+brotli ≤13.5 kB"></a>
 </p>
 
 <p align="center">
@@ -51,11 +52,11 @@ roll('4d6kh3', { rng: createMockRng([3, 6, 2, 5]) }).total; // 14, every run
 
 ## Why roll-parser
 
-- **Complete notation.** Keep/drop, three flavours of exploding dice, rerolls,
-  min/max clamps, success pools, crit thresholds, sorting, grouped rolls, PF2e
-  degrees of success, math functions, variables, computed dice — enough for D&D 5e,
-  Pathfinder, World of Darkness, Shadowrun, Fate, Savage Worlds, and Call of
-  Cthulhu without escape hatches. Spelled the way
+- **Complete notation.** A dice roller that takes keep/drop, three flavours of
+  exploding dice, rerolls, min/max clamps, success pools, crit thresholds,
+  sorting, grouped rolls, PF2e degrees of success, math functions, variables,
+  computed dice — enough for D&D 5e, Pathfinder, World of Darkness, Shadowrun,
+  Fate, Savage Worlds, and Call of Cthulhu without escape hatches. Spelled the way
   [Roll20](https://help.roll20.net/hc/en-us/articles/360037773133-Dice-Reference)
   spells it wherever the two overlap, so the notation your table already uses
   keeps working.
