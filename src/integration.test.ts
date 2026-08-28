@@ -238,10 +238,17 @@ describe('roll() integration', () => {
       expect(result.total).toBe(18);
     });
 
-    test('no options uses random RNG', () => {
-      const result = roll('1d6');
-      expect(result.total).toBeGreaterThanOrEqual(1);
-      expect(result.total).toBeLessThanOrEqual(6);
+    test('no options builds a fresh RNG on every call', () => {
+      // A range check alone is satisfied by a pinned default seed, which would
+      // hand every caller the same roll. Four d1000 leave 10^12 sequences, so
+      // twenty repeats collide only if the stream is not fresh.
+      const sequences = Array.from({ length: 20 }, () =>
+        roll('4d1000')
+          .rolls.map((die) => die.result)
+          .join(','),
+      );
+
+      expect(new Set(sequences).size).toBe(sequences.length);
     });
   });
 

@@ -138,6 +138,17 @@ describe('evaluator draw consumption', () => {
       expect(countDraws('1d(1d4)', [4, 3]).draws).toBe(2);
     });
 
+    test('(1d2)d(1d4) draws the count expression before the sides expression', () => {
+      // With one meta operand the two are indistinguishable; only a notation
+      // carrying both can tell `count → sides` from `sides → count`. Here the
+      // documented order resolves to 2d3, the reverse to 3d2.
+      const notation = '(1d2)d(1d4)';
+      const result = evaluate(parse(notation), createMockRng([2, 3, 1, 1]), { notation });
+
+      expect(result.expression).toBe('2d3');
+      expect(countDraws(notation, [2, 3, 1, 1]).draws).toBe(4);
+    });
+
     test('4d6kh(1d2) draws the keep count before the pool', () => {
       expect(countDraws('4d6kh(1d2)', [1, 5, 3, 4, 6]).draws).toBe(5);
     });
