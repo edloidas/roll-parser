@@ -1041,36 +1041,29 @@ precedes them. Errors go to stderr; only the result goes to stdout.
 
 | Notation | `lex` | `parse` | `roll` (end to end) |
 |----------|------:|--------:|--------------------:|
-| `1d20` | 85 ns | 164 ns | **0.49 µs** (~2.0M rolls/s) |
-| `2d6+3` | 98 ns | 215 ns | **0.77 µs** |
-| `4d6kh3` | 122 ns | 245 ns | **1.2 µs** |
-| `4d6sd` | 101 ns | 211 ns | **0.84 µs** |
-| `10d10>=6f1` | 161 ns | 336 ns | **1.6 µs** |
-| `100d6` | 82 ns | 168 ns | **2.6 µs** |
+| `1d20` | 86 ns | 166 ns | **0.43 µs** (~2.3M rolls/s) |
+| `2d6+3` | 104 ns | 230 ns | **0.64 µs** |
+| `4d6kh3` | 127 ns | 262 ns | **0.98 µs** |
+| `4d6sd` | 112 ns | 232 ns | **0.77 µs** |
+| `10d10>=6f1` | 165 ns | 361 ns | **1.6 µs** |
+| `100d6` | 81 ns | 162 ns | **2.6 µs** |
 
 The `roll` column pays for a fresh `SeededRNG` per call, which an injected RNG
 avoids. Every roll also builds the `parts` tree; there is no opt-out and these
-numbers include it. A 1000-die pool costs roughly 47x a `1d20` (~23 µs here),
-while lexing and parsing stay flat at ~84 / ~168 ns.
+numbers include it. A 1000-die pool costs roughly 56x a `1d20` (~24 µs here),
+while lexing and parsing stay flat at ~83 / ~164 ns.
 
 <details>
 <summary>Measurement protocol</summary>
 
 Values are **p50**, from
 [mitata](https://github.com/evanwashere/mitata) with forced per-iteration GC
-(`.gc('inner')`), taken as the per-record median of four full
-`bun run bench:json` passes, every row agreeing within 5% except
-`lex / 4d6kh3` at 7%. Measured 2026-08-05 on Bun
-1.3.14, Apple M2 Pro, macOS, idle and on AC power. Read them as
-two significant digits: another machine shifts every row, and a busy one
-inflates the heavy cases most.
-
-The `4d6sd` row and the `10d10>=6f1` `roll` figure come from a later five-pass
-measurement on the same machine, after the per-die `'dc'` tag checks were
-hoisted out of the keep/drop, success-count, and sort loops. That session was
-not idle and those two read bimodally with roughly 10% between the modes, so
-take them as a recovered range rather than point values. Every other row is as
-first measured.
+(`.gc('inner')`), taken as the per-record median of eight full
+`bun run bench:json` passes. Measured 2026-09-03 on Bun 1.4.0, Apple M2 Pro,
+macOS, on AC power but not on an idle machine — pass-to-pass spread runs 7-11%
+on the `lex` and `parse` rows and up to 10% on `roll`, against 5% for the idle
+session these numbers replace. Read them as two significant digits: another
+machine shifts every row, and a busy one inflates the heavy cases most.
 
 p50 rather than mean, because the mean here is effectively a GC-pause
 histogram and swings ±40% between processes. Every bench body is JIT-primed
