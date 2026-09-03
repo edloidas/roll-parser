@@ -4845,9 +4845,8 @@ describe('evaluate', () => {
   });
 
   describe('error contract escapes (#128)', () => {
-    // ? Above Bun 1.3's ~640k argument-list ceiling on Linux — where
-    // ? `push(...array)` and `Math.max(...array)` used to blow the stack with a
-    // ? bare `RangeError`.
+    // ? Above Bun's ~638k argument-list ceiling — where `push(...array)` and
+    // ? `Math.max(...array)` used to blow the stack with a bare `RangeError`.
     const OVER_SPREAD_LIMIT = 700_000;
     // Each case allocates 700k objects: under two seconds alone, but past Bun's
     // 5s default once the rest of the suite's GC pressure is in play.
