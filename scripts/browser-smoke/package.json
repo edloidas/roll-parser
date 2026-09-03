@@ -5,6 +5,6 @@
   "type": "module",
   "description": "Isolated dependency tree for the real-browser smoke harness. Playwright and its Chromium download are CI-only weight, so they live here rather than in the root dependency tree — same pattern as scripts/docs. The harness (run.ts) executes the browser-smoke bundle in headless Chromium; see .github/workflows/ci.yml and release.yml for the jobs that run it.",
   "dependencies": {
-    "playwright": "^1.62.0"
+    "playwright": "^1.62.1"
   }
 }
