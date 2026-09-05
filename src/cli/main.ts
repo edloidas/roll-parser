@@ -27,9 +27,12 @@ Options:
   --               Treat every following argument as notation
 
 JSON output:
-  Emits the complete result, including the structured "parts" tree. The
-  "degree" field (DegreeOfSuccess) serializes as a number: 0 critical failure,
-  1 failure, 2 success, 3 critical success. Errors stay plain text on stderr.
+  Emits the complete result, including the structured "parts" tree, plus the
+  "seed" that produced it and the "version" that fixes the seed-to-dice
+  mapping — rerun with --seed <seed> on the same major to replay the roll.
+  When --seed is omitted the CLI mints one. The "degree" field
+  (DegreeOfSuccess) serializes as a number: 0 critical failure, 1 failure,
+  2 success, 3 critical success. Errors stay plain text on stderr.
 
 Exit codes:
   0  Success
@@ -43,6 +46,9 @@ Examples:
   roll-parser "1d20+7 vs 25" --json
   roll-parser -- -1d6+3
 `;
+
+// The build sets `types: []`, so no ambient runtime globals are declared.
+declare const crypto: { randomUUID(): string };
 
 /** Sink for one stream's worth of CLI output. */
 export type WriteFn = (text: string) => void;
@@ -112,9 +118,10 @@ export function main(env: CliEnv): number {
   }
 
   try {
-    const options = args.seed != null ? { seed: args.seed } : {};
-    const result = roll(args.notation, options);
-    const output = formatResult(result, { json: args.json, verbose: args.verbose });
+    // `SeededRNG`'s auto-seed is unreachable, so mint one that can be echoed back.
+    const seed = args.seed ?? crypto.randomUUID();
+    const result = roll(args.notation, { seed });
+    const output = formatResult(result, { json: args.json, verbose: args.verbose, seed });
     stdout(`${output}\n`);
   } catch (error) {
     if (isRollParserError(error)) {
