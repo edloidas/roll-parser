@@ -315,8 +315,9 @@ pool.total; // 5 — successes minus failures
 | `successes` / `failures` | `number?` | Present only when success counting was used |
 | `degree` / `natural` | `DegreeOfSuccess?` / `number?` | Present only for a top-level `vs` |
 
-`Readonly` at the top level and fully JSON-serializable — this is exactly what
-the CLI's `--json` flag prints.
+`Readonly` at the top level and fully JSON-serializable. The CLI's `--json`
+flag prints these fields and appends two of its own, `seed` and `version` —
+see [CLI](#cli).
 
 ```typescript
 JSON.stringify(roll('3d6', { rng: createMockRng([4, 2, 6]) }));
@@ -1025,11 +1026,22 @@ $ roll-parser --seed demo -- -1d6+3
 2
 ```
 
+That payload is cut short; in full it ends:
+
+```json
+{"total":8,"notation":"1d20+7 vs 15", …, "seed":"demo","version":"3.3.1"}
+```
+
 Verbose mode rewrites the markdown markers for plain terminals: `~~n~~` becomes
 `(n)`, `**n**` becomes `[n]`, `__n__` becomes `{n}`. `--seed` takes both
 `--seed value` and `--seed=value`, and accepts any non-empty value including a
-dash-prefixed one. `--help` and `--version` win over any usage error that
-precedes them. Errors go to stderr; only the result goes to stdout.
+dash-prefixed one. The `--json` payload ends with two fields the library
+result does not carry: the `seed` that produced the roll and the `version`
+that fixes the seed-to-dice mapping — feed that seed back through `--seed` on
+the same major and the dice repeat. Omitting `--seed` mints one, so an
+unplanned roll stays reproducible too. `--help` and `--version` win over
+any usage error that precedes them. Errors go to stderr; only the result goes
+to stdout.
 
 | Exit code | Meaning |
 |----------:|---------|

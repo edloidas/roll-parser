@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import { VERSION } from '../index.js';
 import { createMockRng } from '../rng/mock.js';
 import { roll } from '../roll.js';
 import { formatResult } from './format.js';
@@ -113,7 +114,33 @@ describe('formatResult', () => {
         rendered: '2d6[3, 5] + 3 = 11',
         rolls: result.rolls,
         parts: result.parts,
+        version: VERSION,
       });
+    });
+
+    test('appends the seed that produced the result', () => {
+      const result = roll('2d6+3', { rng: createMockRng([3, 5]) });
+      const parsed = JSON.parse(formatResult(result, { json: true, seed: 'demo' }));
+
+      expect(parsed.seed).toBe('demo');
+      expect(parsed.version).toBe(VERSION);
+      expect(parsed.total).toBe(11);
+    });
+
+    test('omits the seed key entirely when no seed is given', () => {
+      const result = roll('2d6+3', { rng: createMockRng([3, 5]) });
+      const parsed = JSON.parse(formatResult(result, { json: true }));
+
+      expect('seed' in parsed).toBe(false);
+      expect(parsed.version).toBe(VERSION);
+    });
+
+    test('appends its two keys without disturbing the library shape', () => {
+      const result = roll('4d6kh3', { rng: createMockRng([3, 1, 5, 4]) });
+      const parsed = JSON.parse(formatResult(result, { json: true, seed: 'demo' }));
+      const libraryKeys = Object.keys(JSON.parse(JSON.stringify(result)));
+
+      expect(Object.keys(parsed)).toEqual([...libraryKeys, 'seed', 'version']);
     });
 
     test('keeps the structured parts tree', () => {

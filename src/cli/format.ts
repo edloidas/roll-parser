@@ -6,6 +6,7 @@
  * @module cli/format
  */
 
+import { VERSION } from '../index.js';
 import { type DieMarks, renderBreakdown } from '../render.js';
 import type { RollResult } from '../types.js';
 
@@ -30,6 +31,8 @@ export type FormatOptions = {
   json?: boolean;
   /** Show the detailed roll breakdown instead of the bare total. */
   verbose?: boolean;
+  /** Seed that produced the result. Emitted in JSON mode only. */
+  seed?: string;
 };
 
 /**
@@ -41,15 +44,20 @@ export type FormatOptions = {
  * tree — as a single-line `JSON.stringify` payload, where `degree` appears as
  * its numeric `DegreeOfSuccess` value.
  *
+ * The JSON payload appends two fields the library result does not carry:
+ * `seed` — the key is absent, not null, when none is given — and `version`,
+ * which fixes the seed-to-dice mapping. Together they let the payload replay
+ * through `--seed` on the same major.
+ *
  * @param result - The roll result to format
  * @param options - Output mode; JSON wins when combined with verbose
  * @returns Formatted string for terminal output
  */
 export function formatResult(result: RollResult, options: FormatOptions = {}): string {
-  const { json = false, verbose = false } = options;
+  const { json = false, verbose = false, seed } = options;
 
   if (json) {
-    return JSON.stringify(result);
+    return JSON.stringify({ ...result, seed, version: VERSION });
   }
 
   if (!verbose) {

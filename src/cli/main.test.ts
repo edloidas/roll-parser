@@ -12,6 +12,7 @@
 import { describe, expect, test } from 'bun:test';
 import { VERSION } from '../index.js';
 import { LexerError } from '../lexer/lexer.js';
+import { roll } from '../roll.js';
 import { main, writeErrorContext } from './main.js';
 
 type CliRun = { stdout: string; stderr: string; exitCode: number };
@@ -93,6 +94,8 @@ describe('cli main', () => {
       const { stdout } = run(['--help']);
 
       expect(stdout).toContain('--json');
+      expect(stdout).toContain('"seed"');
+      expect(stdout).toContain('"version"');
       expect(stdout).toContain('DegreeOfSuccess');
       expect(stdout).toContain('Exit codes:');
       expect(stdout).toContain('0  Success');
@@ -154,6 +157,30 @@ describe('cli main', () => {
       expect(parsed.parts.target.rolls.map((die: { result: number }) => die.result)).toEqual([
         3, 3, 6, 5,
       ]);
+      expect(parsed.seed).toBe('test');
+      expect(parsed.version).toBe(VERSION);
+    });
+
+    test('--json emits a minted seed when --seed is omitted', () => {
+      const first = JSON.parse(run(['4d6kh3', '--json']).stdout);
+
+      expect(typeof first.seed).toBe('string');
+      expect(first.seed).not.toBe('');
+      expect(first.version).toBe(VERSION);
+
+      const replay = JSON.parse(run(['4d6kh3', '--seed', first.seed, '--json']).stdout);
+
+      expect(replay.total).toBe(first.total);
+      expect(replay.rendered).toBe(first.rendered);
+      expect(replay.seed).toBe(first.seed);
+    });
+
+    test('a minted seed is fresh on every unseeded run', () => {
+      const seeds = new Set(
+        Array.from({ length: 5 }, () => JSON.parse(run(['1d20', '--json']).stdout).seed),
+      );
+
+      expect(seeds.size).toBe(5);
     });
 
     test('--json wins over --verbose', () => {
@@ -176,6 +203,13 @@ describe('cli main', () => {
       expect(exitCode).toBe(0);
       expect(Number(stdout.trim())).toBeGreaterThanOrEqual(3);
       expect(Number(stdout.trim())).toBeLessThanOrEqual(18);
+    });
+
+    test('non-JSON output stays the total alone, with no seed appended', () => {
+      const expected = roll('2d6+3', { seed: 'test' });
+
+      expect(run(['2d6+3', '--seed', 'test']).stdout).toBe(`${expected.total}\n`);
+      expect(run(['2d6+3', '--seed', 'test', '--verbose']).stdout).toBe(`${expected.rendered}\n`);
     });
   });
 
