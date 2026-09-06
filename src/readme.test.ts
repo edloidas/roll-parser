@@ -502,8 +502,10 @@ function runCliCase(entry: CliCase): void {
   };
   const exitCode = main({ argv: entry.argv, stdout: write, stderr: write });
 
-  // Without this the README's exit-code table stays entirely unchecked.
-  const diagnostic = entry.expected.startsWith('Error:');
+  // Without this the README's exit-code table stays entirely unchecked. Under
+  // --json a diagnostic is a JSON object keyed `error` rather than an `Error:`
+  // line, so both spellings have to count.
+  const diagnostic = entry.expected.startsWith('Error:') || entry.expected.startsWith('{"error":');
   if (diagnostic !== (exitCode !== 0)) {
     throw new Error(
       `${entry.file}:${entry.line} documents ${diagnostic ? 'an error' : 'a success'} but the CLI exited ${exitCode}\n  $ ${entry.command}`,
