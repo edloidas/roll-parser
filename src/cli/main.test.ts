@@ -102,6 +102,15 @@ describe('cli main', () => {
       expect(stdout).toContain('1  Roll or parse error');
       expect(stdout).toContain('2  Usage error');
     });
+
+    test('help documents the json error line and its one exclusion', () => {
+      const { stdout } = run(['--help']);
+
+      expect(stdout).toContain('JSON errors:');
+      expect(stdout).toContain('"error"');
+      expect(stdout).toContain('"span"');
+      expect(stdout).toContain('stay plain text');
+    });
   });
 
   describe('rolling', () => {
@@ -189,12 +198,21 @@ describe('cli main', () => {
       );
     });
 
-    test('--json leaves errors as plain text on stderr', () => {
-      const { stdout, stderr, exitCode } = run(['2d6+&', '--json']);
+    test('--json renders errors as JSON on stderr (#343)', () => {
+      const { stdout, stderr, exitCode } = run(['2d6+&', '--json', '--seed', 'test']);
 
       expect(exitCode).toBe(1);
       expect(stdout).toBe('');
-      expect(stderr).toBe(`Error: Unexpected character: '&'\n  2d6+&\n      ^\n`);
+      expect(JSON.parse(stderr)).toEqual({
+        error: {
+          message: "Unexpected character: '&'",
+          code: 'UNEXPECTED_CHARACTER',
+          span: { start: 4 },
+        },
+        notation: '2d6+&',
+        seed: 'test',
+        version: VERSION,
+      });
     });
 
     test('an unseeded roll still lands in range', () => {
@@ -295,6 +313,95 @@ describe('cli main', () => {
 
       expect(exitCode).toBe(1);
       expect(stderr).toBe('Error: Invalid dice sides: 0\n  2d6+1d0+3\n      ^\n');
+    });
+  });
+
+  describe('json errors', () => {
+    test('the record is a single line and stdout stays empty', () => {
+      const { stdout, stderr } = run(['2d6+&', '--json', '--seed', 'test']);
+
+      expect(stdout).toBe('');
+      expect(stderr.endsWith('\n')).toBe(true);
+      expect(stderr.trimEnd()).not.toContain('\n');
+    });
+
+    test('an evaluator error carries the span end the caret cannot show', () => {
+      const { stderr, exitCode } = run(['2d6+1d0+3', '--json', '--seed', 'test']);
+
+      expect(exitCode).toBe(1);
+      expect(JSON.parse(stderr).error).toEqual({
+        message: 'Invalid dice sides: 0',
+        code: 'INVALID_DICE_SIDES',
+        span: { start: 4, end: 7 },
+      });
+    });
+
+    test('a parser error carries a start-only span', () => {
+      const { stderr, exitCode } = run(['(1+2', '--json', '--seed', 'test']);
+
+      expect(exitCode).toBe(1);
+      expect(JSON.parse(stderr).error).toEqual({
+        message: "Expected ')' but got end of input",
+        code: 'EXPECTED_TOKEN',
+        span: { start: 4 },
+      });
+    });
+
+    test('a missing notation is JSON too, still exit 2', () => {
+      const { stdout, stderr, exitCode } = run(['--json']);
+
+      expect(exitCode).toBe(2);
+      expect(stdout).toBe('');
+      expect(JSON.parse(stderr)).toEqual({
+        error: { message: 'No dice notation provided.' },
+        version: VERSION,
+      });
+    });
+
+    test('an unknown option is reported before --json, so it stays plain text', () => {
+      // `parseArgs` returns at the bad option, so the flag was never established.
+      const { stderr, exitCode } = run(['--bogus', '--json']);
+
+      expect(exitCode).toBe(2);
+      expect(stderr).toBe('Error: Unknown option: --bogus\nRun "roll-parser --help" for usage.\n');
+    });
+
+    test('a missing --seed value stays plain text even with --json before it', () => {
+      const { stderr, exitCode } = run(['2d6', '--json', '--seed']);
+
+      expect(exitCode).toBe(2);
+      expect(stderr).toBe('Error: Missing value for --seed\nRun "roll-parser --help" for usage.\n');
+    });
+
+    test('a seeded failure replays from its own record', () => {
+      const record = JSON.parse(run(['1d6/(1d2-1)', '--json', '--seed', 'test']).stderr);
+
+      expect(record.error.code).toBe('DIVISION_BY_ZERO');
+
+      const replay = JSON.parse(run(['1d6/(1d2-1)', '--json', '--seed', record.seed]).stderr);
+
+      expect(replay).toEqual(record);
+    });
+
+    test('an unseeded failure records the minted seed and replays from it', () => {
+      // `1d6/0` draws before it divides, so the failure doesn't depend on which value came back.
+      const record = JSON.parse(run(['1d6/0', '--json']).stderr);
+
+      expect(record.error.code).toBe('DIVISION_BY_ZERO');
+      expect(typeof record.seed).toBe('string');
+      expect(record.seed).not.toBe('');
+
+      const replay = JSON.parse(run(['1d6/0', '--json', '--seed', record.seed]).stderr);
+
+      expect(replay).toEqual(record);
+    });
+
+    test('the minted seed on a failure is fresh on every run', () => {
+      const seeds = new Set(
+        Array.from({ length: 5 }, () => JSON.parse(run(['1d6/0', '--json']).stderr).seed),
+      );
+
+      expect(seeds.size).toBe(5);
     });
   });
 

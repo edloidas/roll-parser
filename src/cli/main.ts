@@ -8,7 +8,12 @@
  * @module cli/main
  */
 
-import { getErrorSpan, isRollParserError } from '../errors.js';
+import {
+  type ErrorSpan,
+  getErrorSpan,
+  isRollParserError,
+  type RollParserErrorCode,
+} from '../errors.js';
 import { VERSION } from '../index.js';
 import { roll } from '../roll.js';
 import { parseArgs } from './args.js';
@@ -32,7 +37,15 @@ JSON output:
   mapping — rerun with --seed <seed> on the same major to replay the roll.
   When --seed is omitted the CLI mints one. The "degree" field
   (DegreeOfSuccess) serializes as a number: 0 critical failure, 1 failure,
-  2 success, 3 critical success. Errors stay plain text on stderr.
+  2 success, 3 critical success.
+
+JSON errors:
+  Once --json is parsed, every diagnostic is one JSON line on stderr:
+  {"error":{"message":...,"code":...,"span":{"start":N}},...}. A roll error
+  adds the "notation" and "seed" that produced it, so a failure replays like
+  a result does; "code" and "span" are absent when the failure carries
+  neither. Unknown options and a missing --seed value are reported before
+  --json is known, so those stay plain text.
 
 Exit codes:
   0  Success
@@ -80,14 +93,41 @@ export function writeErrorContext(notation: string, error: unknown, write: Write
   write(`  ${' '.repeat(column)}^\n`);
 }
 
+/** The `error` member of the `--json` failure record. */
+type JsonErrorBody = {
+  message: string;
+  code?: RollParserErrorCode;
+  span?: ErrorSpan | undefined;
+};
+
+/**
+ * What the failure record needs to replay a roll that got as far as the
+ * dice. A usage error passes no context — it never reached the dice, so
+ * there is no roll to reproduce.
+ */
+type RollContext = {
+  notation: string;
+  seed: string;
+};
+
+/**
+ * Writes one failure record as compact JSON. `JSON.stringify` drops the
+ * absent members, so a lexer error carries no `end` and a usage error carries
+ * neither `code` nor `span` — the key is missing rather than null, matching
+ * how the success payload omits `seed`.
+ */
+function writeJsonError(write: WriteFn, error: JsonErrorBody, context?: RollContext): void {
+  write(`${JSON.stringify({ error, ...context, version: VERSION })}\n`);
+}
+
 /**
  * Runs one CLI invocation and returns the process exit code: `0` on success,
  * `1` for a roll-parser error, `2` for a usage error. Anything that is not a
  * `RollParserError` propagates so the runtime reports it with a stack.
  *
- * `--json` swaps the success payload only — diagnostics stay plain text on
- * stderr and the exit codes are identical, so scripts can branch on the code
- * before parsing stdout.
+ * `--json` swaps the success payload on stdout and every diagnostic raised
+ * after it is parsed on stderr. Exit codes are identical either way, so
+ * scripts can still branch on the code before reading a stream.
  */
 export function main(env: CliEnv): number {
   const { argv, stdout, stderr } = env;
@@ -112,21 +152,34 @@ export function main(env: CliEnv): number {
   }
 
   if (args.notation == null) {
-    stderr('Error: No dice notation provided.\n');
-    stderr('Run "roll-parser --help" for usage.\n');
+    if (args.json) {
+      writeJsonError(stderr, { message: 'No dice notation provided.' });
+    } else {
+      stderr('Error: No dice notation provided.\n');
+      stderr('Run "roll-parser --help" for usage.\n');
+    }
     return 2;
   }
 
+  // `SeededRNG`'s auto-seed is unreachable, so mint one that can be echoed back.
+  const seed = args.seed ?? crypto.randomUUID();
+
   try {
-    // `SeededRNG`'s auto-seed is unreachable, so mint one that can be echoed back.
-    const seed = args.seed ?? crypto.randomUUID();
     const result = roll(args.notation, { seed });
     const output = formatResult(result, { json: args.json, verbose: args.verbose, seed });
     stdout(`${output}\n`);
   } catch (error) {
     if (isRollParserError(error)) {
-      stderr(`Error: ${error.message}\n`);
-      writeErrorContext(args.notation, error, stderr);
+      if (args.json) {
+        writeJsonError(
+          stderr,
+          { message: error.message, code: error.code, span: getErrorSpan(error) },
+          { notation: args.notation, seed },
+        );
+      } else {
+        stderr(`Error: ${error.message}\n`);
+        writeErrorContext(args.notation, error, stderr);
+      }
       return 1;
     }
     throw error;

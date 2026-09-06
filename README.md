@@ -1022,6 +1022,9 @@ Error: Invalid dice sides: 0
   2d6+1d0+3
       ^
 
+$ roll-parser "2d6+1d0+3" --json --seed demo
+{"error":{"message":"Invalid dice sides: 0","code":"INVALID_DICE_SIDES","span":{"start":4,"end":7}},"notation":"2d6+1d0+3","seed":"demo",...}
+
 $ roll-parser --seed demo -- -1d6+3
 2
 ```
@@ -1042,6 +1045,16 @@ the same major and the dice repeat. Omitting `--seed` mints one, so an
 unplanned roll stays reproducible too. `--help` and `--version` win over
 any usage error that precedes them. Errors go to stderr; only the result goes
 to stdout.
+
+Once `--json` is parsed, every diagnostic is one JSON line on stderr instead
+of the caret diagram. `code` is the same stable `RollParserErrorCode` the
+library throws, and `span` is what `getErrorSpan` returns — `{ start }` for a
+lexer or parser error, `{ start, end }` for an evaluator one, absent when the
+failure carries no position. A roll error also repeats the `notation` and
+`seed` that produced it, so a failure replays through `--seed` exactly as a
+result does. Branch on `code`, not on `message`, which is free to change
+between releases. An unknown option and a missing `--seed` value are reported
+before `--json` can be established, so those two stay plain text.
 
 | Exit code | Meaning |
 |----------:|---------|
