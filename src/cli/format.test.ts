@@ -30,15 +30,12 @@ describe('formatResult', () => {
 
     test('parenthesizes dropped dice', () => {
       const result = roll('4d6kh3', { rng: createMockRng([3, 1, 5, 4]) });
-      expect(formatResult(result, { verbose: true })).toContain('(1)');
-      expect(formatResult(result, { verbose: true })).not.toContain('~~');
+      expect(formatResult(result, { verbose: true })).toBe('4d6[3, (1), 5, 4] = 12');
     });
 
     test('renders keep highest correctly', () => {
       const result = roll('4d6kh3', { rng: createMockRng([6, 2, 5, 4]) });
-      const output = formatResult(result, { verbose: true });
-      expect(output).toContain('(2)');
-      expect(output).toContain('= 15');
+      expect(formatResult(result, { verbose: true })).toBe('4d6[6, (2), 5, 4] = 15');
     });
 
     test('handles single die roll', () => {
@@ -48,41 +45,24 @@ describe('formatResult', () => {
 
     test('parenthesizes dropped fate dice, negative faces included', () => {
       const result = roll('4dFkh2', { rng: createMockRng([-1, 0, 1, 1]) });
-      const output = formatResult(result, { verbose: true });
-
-      expect(output).toContain('(-1)');
-      expect(output).toContain('(0)');
-      expect(output).not.toContain('~~');
-      expect(output).toBe('4dF[(-1), (0), 1, 1] = 2');
+      expect(formatResult(result, { verbose: true })).toBe('4dF[(-1), (0), 1, 1] = 2');
     });
 
     test('parenthesizes intermediate rerolled dice', () => {
       // 2d6r<2 with RNG [1, 5, 3] — die 0 rerolls 1 → 3.
       const result = roll('2d6r<2', { rng: createMockRng([1, 5, 3]) });
-      const output = formatResult(result, { verbose: true });
-
-      expect(output).toContain('(1)');
-      expect(output).not.toContain('~~');
-      expect(output).toContain('= 8');
+      expect(formatResult(result, { verbose: true })).toBe('2d6r<2[(1), 3, 5] = 8');
     });
 
     test('brackets successes and braces failures', () => {
       const result = roll('3d6>=5f1', { rng: createMockRng([1, 5, 3]) });
-      const output = formatResult(result, { verbose: true });
-
-      expect(output).toContain('[5]');
-      expect(output).toContain('{1}');
-      expect(output).not.toContain('**');
-      expect(output).not.toContain('__');
+      expect(formatResult(result, { verbose: true })).toBe('3d6>=5f1[{1}, [5], 3] = 0');
     });
 
     test('parenthesizes a whole sub-roll dropped by group keep', () => {
       // The wrapper spans notation, not just a number — `(1d8[2])`.
       const result = roll('{1d8, 1d10}kh1', { rng: createMockRng([2, 7]) });
-      const output = formatResult(result, { verbose: true });
-
-      expect(output).toBe('{(1d8[2]), 1d10[7]} = 7');
-      expect(output).not.toContain('~~');
+      expect(formatResult(result, { verbose: true })).toBe('{(1d8[2]), 1d10[7]} = 7');
     });
 
     test('nests a dropped sub-roll that itself contains a dropped sub-roll (#292)', () => {

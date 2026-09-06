@@ -119,9 +119,8 @@ describe('cli main', () => {
       const second = run(['2d6+3', '--seed', 'test']);
 
       expect(first.exitCode).toBe(0);
-      expect(first.stdout).toBe(second.stdout);
-      expect(Number(first.stdout.trim())).toBeGreaterThanOrEqual(5);
-      expect(Number(first.stdout.trim())).toBeLessThanOrEqual(15);
+      expect(first.stdout).toBe('9\n');
+      expect(second.stdout).toBe(first.stdout);
     });
 
     test('--verbose renders the breakdown with dropped dice', () => {
@@ -298,7 +297,7 @@ describe('cli main', () => {
 
       expect(exitCode).toBe(1);
       expect(stdout).toBe('');
-      expect(stderr).toContain('Error:');
+      expect(stderr).toBe("Error: Unexpected identifier: 'invalid'\n  invalid_notation\n  ^\n");
     });
 
     test('positioned error prints the notation with a caret', () => {
