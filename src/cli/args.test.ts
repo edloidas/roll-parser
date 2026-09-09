@@ -187,6 +187,21 @@ describe('parseArgs', () => {
       expect(result).toEqual({ ok: false, error: 'Unknown option: --first', json: true });
     });
 
+    test('reports the missing seed value when it precedes an unknown option', () => {
+      const result = parseArgs(['--seed', '', '--bogus', '--json']);
+      expect(result).toEqual({ ok: false, error: 'Missing value for --seed', json: true });
+    });
+
+    test('reports the unknown option when it precedes a missing seed value', () => {
+      const result = parseArgs(['--bogus', '--seed', '', '--json']);
+      expect(result).toEqual({ ok: false, error: 'Unknown option: --bogus', json: true });
+    });
+
+    test('reports the missing --seed= value when it precedes an unknown option', () => {
+      const result = parseArgs(['--seed=', '--bogus', '--json']);
+      expect(result).toEqual({ ok: false, error: 'Missing value for --seed', json: true });
+    });
+
     test('is not set when --seed consumed it as a value', () => {
       const result = parseArgs(['--seed', '--json', '--bogus']);
       expect(result).toEqual({ ok: false, error: 'Unknown option: --bogus', json: false });
