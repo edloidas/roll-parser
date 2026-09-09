@@ -19,9 +19,13 @@ export type CliArgs = {
 };
 
 /**
- * Result of parsing CLI arguments — either success or a usage error.
+ * Result of parsing CLI arguments — either success or a usage error. The
+ * failure arm carries `json` so a usage error renders in the format the
+ * caller asked for.
  */
-export type ParseArgsResult = { ok: true; args: CliArgs } | { ok: false; error: string };
+export type ParseArgsResult =
+  | { ok: true; args: CliArgs }
+  | { ok: false; error: string; json: boolean };
 
 /** Argument that stops option parsing — everything after it is notation. */
 const TERMINATOR = '--';
@@ -85,6 +89,7 @@ export function parseArgs(argv: string[]): ParseArgsResult {
   let verbose = false;
   let json = false;
   let seed: string | undefined;
+  let error: string | undefined;
   const positional: string[] = [];
 
   for (let i = 0; i < argv.length; i++) {
@@ -102,23 +107,29 @@ export function parseArgs(argv: string[]): ParseArgsResult {
       // `--seed -abc` is a valid seed, not a missing value.
       const next = argv[i + 1];
       if (next == null || next === '') {
-        return { ok: false, error: 'Missing value for --seed' };
+        error ??= 'Missing value for --seed';
+      } else {
+        seed = next;
+        i++;
       }
-      seed = next;
-      i++;
     } else if (arg.startsWith('--seed=')) {
       const value = arg.slice('--seed='.length);
       if (value === '') {
-        return { ok: false, error: 'Missing value for --seed' };
+        error ??= 'Missing value for --seed';
+      } else {
+        seed = value;
       }
-      seed = value;
-    } else if (arg.startsWith('--')) {
-      return { ok: false, error: `Unknown option: ${arg}` };
-    } else if (arg.startsWith('-') && !isNegativeNotation(arg)) {
-      return { ok: false, error: `Unknown option: ${arg}` };
+    } else if (arg.startsWith('--') || (arg.startsWith('-') && !isNegativeNotation(arg))) {
+      error ??= `Unknown option: ${arg}`;
     } else {
       positional.push(arg);
     }
+  }
+
+  // The loop runs to the end even after a usage error: only it knows that
+  // `--seed --json` binds the flag as a seed value and `-- --json` makes it notation.
+  if (error != null) {
+    return { ok: false, error, json };
   }
 
   // Joined, not separate rolls — a shell splits `roll-parser 2d6 + 3` into three

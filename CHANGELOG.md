@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- `--json` now covers the two usage errors that escaped it. `Unknown option: <x>` and `Missing value for --seed` were raised at the offending token, before the flag was known, so they printed as plain text; `parseArgs` now records the first usage error and runs the loop to the end, so the flag survives alongside it. Detection stays positional: `--seed --json` binds `--json` as the seed value and `roll-parser -- --json` makes it notation, and neither emits JSON. The record is `{"error":{"message":...},"version":...}` — a usage error never reached the dice, so it carries no `code`, `span`, `notation` or `seed`. Exit code 2 is unchanged ([#351](https://github.com/edloidas/roll-parser/issues/351))
+
 ## [3.3.1] - 2026-08-20
 
 ### Changed
