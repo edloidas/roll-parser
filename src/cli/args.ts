@@ -92,6 +92,11 @@ export function parseArgs(argv: string[]): ParseArgsResult {
   let error: string | undefined;
   const positional: string[] = [];
 
+  // First usage error wins — a later one is deliberately dropped.
+  const failWith = (message: string): void => {
+    error ??= message;
+  };
+
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i] as string;
 
@@ -107,7 +112,7 @@ export function parseArgs(argv: string[]): ParseArgsResult {
       // `--seed -abc` is a valid seed, not a missing value.
       const next = argv[i + 1];
       if (next == null || next === '') {
-        error ??= 'Missing value for --seed';
+        failWith('Missing value for --seed');
       } else {
         seed = next;
         i++;
@@ -115,12 +120,12 @@ export function parseArgs(argv: string[]): ParseArgsResult {
     } else if (arg.startsWith('--seed=')) {
       const value = arg.slice('--seed='.length);
       if (value === '') {
-        error ??= 'Missing value for --seed';
+        failWith('Missing value for --seed');
       } else {
         seed = value;
       }
     } else if (arg.startsWith('--') || (arg.startsWith('-') && !isNegativeNotation(arg))) {
-      error ??= `Unknown option: ${arg}`;
+      failWith(`Unknown option: ${arg}`);
     } else {
       positional.push(arg);
     }
