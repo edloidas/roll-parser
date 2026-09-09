@@ -32,7 +32,7 @@ export type FormatOptions = {
   /** Show the detailed roll breakdown instead of the bare total. */
   verbose?: boolean;
   /** Seed that produced the result. Emitted in JSON mode only. */
-  seed?: string;
+  seed: string;
 };
 
 /**
@@ -44,17 +44,17 @@ export type FormatOptions = {
  * tree — as a single-line `JSON.stringify` payload, where `degree` appears as
  * its numeric `DegreeOfSuccess` value.
  *
- * The JSON payload appends two fields the library result does not carry:
- * `seed` — the key is absent, not null, when none is given — and `version`,
- * which fixes the seed-to-dice mapping. Together they let the payload replay
- * through `--seed` on the same major.
+ * The JSON payload appends two fields the library result does not carry: the
+ * `seed` that produced the result and the `version` that fixes the
+ * seed-to-dice mapping. Together they let the payload replay through `--seed`
+ * on the same major.
  *
  * @param result - The roll result to format
  * @param options - Output mode; JSON wins when combined with verbose
  * @returns Formatted string for terminal output
  */
-export function formatResult(result: RollResult, options: FormatOptions = {}): string {
-  const { json = false, verbose = false, seed } = options;
+export function formatResult(result: RollResult, options: FormatOptions): string {
+  const { json, verbose, seed } = options;
 
   if (json) {
     return JSON.stringify({ ...result, seed, version: VERSION });

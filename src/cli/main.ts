@@ -113,8 +113,7 @@ type RollContext = {
 /**
  * Writes one failure record as compact JSON. `JSON.stringify` drops the
  * absent members, so a lexer error carries no `end` and a usage error carries
- * neither `code` nor `span` — the key is missing rather than null, matching
- * how the success payload omits `seed`.
+ * neither `code` nor `span` — the key is missing rather than null.
  */
 function writeJsonError(write: WriteFn, error: JsonErrorBody, context?: RollContext): void {
   write(`${JSON.stringify({ error, ...context, version: VERSION })}\n`);
