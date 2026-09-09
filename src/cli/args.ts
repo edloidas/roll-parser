@@ -64,7 +64,7 @@ function findInformationalFlag(argv: string[]): 'help' | 'version' | undefined {
  * do not reach for `--`; `--` remains the unambiguous form.
  */
 function isNegativeNotation(arg: string): boolean {
-  return arg.length > 1 && /^[\ddD({@]/.test(arg.slice(1));
+  return /^[\ddD({@]/.test(arg.slice(1));
 }
 
 /**
