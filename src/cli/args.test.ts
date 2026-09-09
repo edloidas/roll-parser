@@ -63,13 +63,14 @@ describe('parseArgs', () => {
       });
     });
 
-    test('treats negative prefix dice notation as positional args', () => {
-      for (const notation of ['-d6', '-D6', '-dF', '-(2d6)', '-{2d6}', '-@str']) {
+    test.each(['-d6', '-D6', '-dF', '-(2d6)', '-{2d6}', '-@str'])(
+      'treats %s as a positional arg',
+      (notation) => {
         const result = parseArgs([notation]);
         expect(result.ok).toBe(true);
         if (result.ok) expect(result.args.notation).toBe(notation);
-      }
-    });
+      },
+    );
 
     test('rejects unknown short options that do not look like notation', () => {
       const result = parseArgs(['-x']);
@@ -291,17 +292,15 @@ describe('parseArgs', () => {
       if (result.ok) expect(result.args.showHelp).toBe(true);
     });
 
-    test('--help wins over --version in either order', () => {
-      for (const argv of [
-        ['--version', '--help'],
-        ['--help', '--version'],
-      ]) {
-        const result = parseArgs(argv);
-        expect(result.ok).toBe(true);
-        if (result.ok) {
-          expect(result.args.showHelp).toBe(true);
-          expect(result.args.showVersion).toBe(false);
-        }
+    test.each([
+      ['--version', '--help'],
+      ['--help', '--version'],
+    ])('--help wins over --version given %s then %s', (first, second) => {
+      const result = parseArgs([first, second]);
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.args.showHelp).toBe(true);
+        expect(result.args.showVersion).toBe(false);
       }
     });
 
