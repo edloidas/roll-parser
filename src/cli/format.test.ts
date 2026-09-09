@@ -8,61 +8,65 @@ describe('formatResult', () => {
   describe('normal mode', () => {
     test('returns just the total as a string', () => {
       const result = roll('2d6+3', { rng: createMockRng([3, 5]) });
-      expect(formatResult(result, {})).toBe('11');
+      expect(formatResult(result, { seed: 'test' })).toBe('11');
     });
 
     test('handles negative totals', () => {
       const result = roll('1d4-5', { rng: createMockRng([1]) });
-      expect(formatResult(result, {})).toBe('-4');
+      expect(formatResult(result, { seed: 'test' })).toBe('-4');
     });
 
     test('handles zero total', () => {
       const result = roll('0d6');
-      expect(formatResult(result, {})).toBe('0');
+      expect(formatResult(result, { seed: 'test' })).toBe('0');
     });
   });
 
   describe('verbose mode', () => {
     test('returns rendered breakdown for simple rolls', () => {
       const result = roll('2d6+3', { rng: createMockRng([3, 5]) });
-      expect(formatResult(result, { verbose: true })).toBe('2d6[3, 5] + 3 = 11');
+      expect(formatResult(result, { verbose: true, seed: 'test' })).toBe('2d6[3, 5] + 3 = 11');
     });
 
     test('parenthesizes dropped dice', () => {
       const result = roll('4d6kh3', { rng: createMockRng([3, 1, 5, 4]) });
-      expect(formatResult(result, { verbose: true })).toBe('4d6[3, (1), 5, 4] = 12');
+      expect(formatResult(result, { verbose: true, seed: 'test' })).toBe('4d6[3, (1), 5, 4] = 12');
     });
 
     test('renders keep highest correctly', () => {
       const result = roll('4d6kh3', { rng: createMockRng([6, 2, 5, 4]) });
-      expect(formatResult(result, { verbose: true })).toBe('4d6[6, (2), 5, 4] = 15');
+      expect(formatResult(result, { verbose: true, seed: 'test' })).toBe('4d6[6, (2), 5, 4] = 15');
     });
 
     test('handles single die roll', () => {
       const result = roll('1d20', { rng: createMockRng([15]) });
-      expect(formatResult(result, { verbose: true })).toBe('1d20[15] = 15');
+      expect(formatResult(result, { verbose: true, seed: 'test' })).toBe('1d20[15] = 15');
     });
 
     test('parenthesizes dropped fate dice, negative faces included', () => {
       const result = roll('4dFkh2', { rng: createMockRng([-1, 0, 1, 1]) });
-      expect(formatResult(result, { verbose: true })).toBe('4dF[(-1), (0), 1, 1] = 2');
+      expect(formatResult(result, { verbose: true, seed: 'test' })).toBe(
+        '4dF[(-1), (0), 1, 1] = 2',
+      );
     });
 
     test('parenthesizes intermediate rerolled dice', () => {
       // 2d6r<2 with RNG [1, 5, 3] — die 0 rerolls 1 → 3.
       const result = roll('2d6r<2', { rng: createMockRng([1, 5, 3]) });
-      expect(formatResult(result, { verbose: true })).toBe('2d6r<2[(1), 3, 5] = 8');
+      expect(formatResult(result, { verbose: true, seed: 'test' })).toBe('2d6r<2[(1), 3, 5] = 8');
     });
 
     test('brackets successes and braces failures', () => {
       const result = roll('3d6>=5f1', { rng: createMockRng([1, 5, 3]) });
-      expect(formatResult(result, { verbose: true })).toBe('3d6>=5f1[{1}, [5], 3] = 0');
+      expect(formatResult(result, { verbose: true, seed: 'test' })).toBe(
+        '3d6>=5f1[{1}, [5], 3] = 0',
+      );
     });
 
     test('parenthesizes a whole sub-roll dropped by group keep', () => {
       // The wrapper spans notation, not just a number — `(1d8[2])`.
       const result = roll('{1d8, 1d10}kh1', { rng: createMockRng([2, 7]) });
-      expect(formatResult(result, { verbose: true })).toBe('{(1d8[2]), 1d10[7]} = 7');
+      expect(formatResult(result, { verbose: true, seed: 'test' })).toBe('{(1d8[2]), 1d10[7]} = 7');
     });
 
     test('nests a dropped sub-roll that itself contains a dropped sub-roll (#292)', () => {
@@ -75,7 +79,7 @@ describe('formatResult', () => {
         rng: createMockRng([1, 4, 1, 3]),
       });
 
-      expect(formatResult(result, { verbose: true })).toBe(
+      expect(formatResult(result, { verbose: true, seed: 'test' })).toBe(
         '{{(1d6[1]), 1d8[4]}, ({(1d10[1]), 1d12[3]})} = 4',
       );
     });
@@ -84,7 +88,7 @@ describe('formatResult', () => {
   describe('json mode', () => {
     test('emits the whole result on a single line', () => {
       const result = roll('2d6+3', { rng: createMockRng([3, 5]) });
-      const output = formatResult(result, { json: true });
+      const output = formatResult(result, { json: true, seed: 'demo' });
 
       expect(output).not.toContain('\n');
       expect(JSON.parse(output)).toEqual({
@@ -94,25 +98,9 @@ describe('formatResult', () => {
         rendered: '2d6[3, 5] + 3 = 11',
         rolls: result.rolls,
         parts: result.parts,
+        seed: 'demo',
         version: VERSION,
       });
-    });
-
-    test('appends the seed that produced the result', () => {
-      const result = roll('2d6+3', { rng: createMockRng([3, 5]) });
-      const parsed = JSON.parse(formatResult(result, { json: true, seed: 'demo' }));
-
-      expect(parsed.seed).toBe('demo');
-      expect(parsed.version).toBe(VERSION);
-      expect(parsed.total).toBe(11);
-    });
-
-    test('omits the seed key entirely when no seed is given', () => {
-      const result = roll('2d6+3', { rng: createMockRng([3, 5]) });
-      const parsed = JSON.parse(formatResult(result, { json: true }));
-
-      expect('seed' in parsed).toBe(false);
-      expect(parsed.version).toBe(VERSION);
     });
 
     test('appends its two keys without disturbing the library shape', () => {
@@ -125,17 +113,18 @@ describe('formatResult', () => {
 
     test('keeps the structured parts tree', () => {
       const result = roll('4d6kh3', { rng: createMockRng([3, 1, 5, 4]) });
-      const parsed = JSON.parse(formatResult(result, { json: true }));
+      const parsed = JSON.parse(formatResult(result, { json: true, seed: 'demo' }));
 
       expect(parsed.parts.type).toBe('keepDrop');
-      expect(parsed.parts.total).toBe(parsed.total);
+      expect(parsed.total).toBe(12);
+      expect(parsed.parts.total).toBe(12);
       expect(parsed.parts.specs).toEqual([{ kind: 'keep', selector: 'highest', count: 3 }]);
       expect(parsed.parts.target.rolls).toHaveLength(4);
     });
 
     test('serializes DegreeOfSuccess as a number', () => {
       const result = roll('1d20+10 vs 25', { rng: createMockRng([15]) });
-      const parsed = JSON.parse(formatResult(result, { json: true }));
+      const parsed = JSON.parse(formatResult(result, { json: true, seed: 'demo' }));
 
       expect(parsed.degree).toBe(2);
       expect(parsed.parts.degree).toBe(2);
@@ -143,10 +132,10 @@ describe('formatResult', () => {
 
     test('json wins over verbose', () => {
       const result = roll('4d6kh3', { rng: createMockRng([3, 1, 5, 4]) });
+      const output = formatResult(result, { json: true, verbose: true, seed: 'demo' });
 
-      expect(formatResult(result, { json: true, verbose: true })).toBe(
-        formatResult(result, { json: true }),
-      );
+      expect(output).toBe(formatResult(result, { json: true, seed: 'demo' }));
+      expect(JSON.parse(output).total).toBe(12);
     });
   });
 });
