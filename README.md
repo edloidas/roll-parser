@@ -1053,8 +1053,10 @@ lexer or parser error, `{ start, end }` for an evaluator one, absent when the
 failure carries no position. A roll error also repeats the `notation` and
 `seed` that produced it, so a failure replays through `--seed` exactly as a
 result does. Branch on `code`, not on `message`, which is free to change
-between releases. An unknown option and a missing `--seed` value are reported
-before `--json` can be established, so those two stay plain text.
+between releases. Usage errors are covered too — an unknown option and a
+missing `--seed` value carry a `message` and nothing else. Detection honours
+what `--json` actually binds to, so `--seed --json` reads the flag as the seed
+value and `roll-parser -- --json` reads it as notation; neither emits JSON.
 
 | Exit code | Meaning |
 |----------:|---------|

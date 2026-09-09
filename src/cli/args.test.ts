@@ -73,7 +73,7 @@ describe('parseArgs', () => {
 
     test('rejects unknown short options that do not look like notation', () => {
       const result = parseArgs(['-x']);
-      expect(result).toEqual({ ok: false, error: 'Unknown option: -x' });
+      expect(result).toEqual({ ok: false, error: 'Unknown option: -x', json: false });
     });
   });
 
@@ -131,17 +131,17 @@ describe('parseArgs', () => {
 
     test('returns error for --seed without value', () => {
       const result = parseArgs(['2d6', '--seed']);
-      expect(result).toEqual({ ok: false, error: 'Missing value for --seed' });
+      expect(result).toEqual({ ok: false, error: 'Missing value for --seed', json: false });
     });
 
     test('returns error for --seed= with empty value', () => {
       const result = parseArgs(['--seed=']);
-      expect(result).toEqual({ ok: false, error: 'Missing value for --seed' });
+      expect(result).toEqual({ ok: false, error: 'Missing value for --seed', json: false });
     });
 
     test('returns error for --seed with an empty value', () => {
       const result = parseArgs(['2d6', '--seed', '']);
-      expect(result).toEqual({ ok: false, error: 'Missing value for --seed' });
+      expect(result).toEqual({ ok: false, error: 'Missing value for --seed', json: false });
     });
 
     test('parses --seed with negative numeric value', () => {
@@ -172,6 +172,31 @@ describe('parseArgs', () => {
   });
 
   describe('json flag', () => {
+    test('survives a usage error raised at a later argument', () => {
+      const result = parseArgs(['2d6', '--json', '--bogus']);
+      expect(result).toEqual({ ok: false, error: 'Unknown option: --bogus', json: true });
+    });
+
+    test('survives a usage error raised at an earlier argument', () => {
+      const result = parseArgs(['--bogus', '2d6', '--json']);
+      expect(result).toEqual({ ok: false, error: 'Unknown option: --bogus', json: true });
+    });
+
+    test('reports the first of several usage errors', () => {
+      const result = parseArgs(['--first', '--second', '--json']);
+      expect(result).toEqual({ ok: false, error: 'Unknown option: --first', json: true });
+    });
+
+    test('is not set when --seed consumed it as a value', () => {
+      const result = parseArgs(['--seed', '--json', '--bogus']);
+      expect(result).toEqual({ ok: false, error: 'Unknown option: --bogus', json: false });
+    });
+
+    test('is not set when the terminator made it notation', () => {
+      const result = parseArgs(['--bogus', '--', '--json']);
+      expect(result).toEqual({ ok: false, error: 'Unknown option: --bogus', json: false });
+    });
+
     test('parses --json', () => {
       const result = parseArgs(['2d6', '--json']);
       expect(result.ok).toBe(true);
@@ -323,7 +348,7 @@ describe('parseArgs', () => {
   describe('error cases', () => {
     test('returns error for unknown long flag', () => {
       const result = parseArgs(['--unknown']);
-      expect(result).toEqual({ ok: false, error: 'Unknown option: --unknown' });
+      expect(result).toEqual({ ok: false, error: 'Unknown option: --unknown', json: false });
     });
 
     // The `-x` short-flag case sits in `notation parsing`, next to the

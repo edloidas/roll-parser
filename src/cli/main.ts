@@ -40,12 +40,12 @@ JSON output:
   2 success, 3 critical success.
 
 JSON errors:
-  Once --json is parsed, every diagnostic is one JSON line on stderr:
+  Every diagnostic is one JSON line on stderr:
   {"error":{"message":...,"code":...,"span":{"start":N}},...}. A roll error
   adds the "notation" and "seed" that produced it, so a failure replays like
   a result does; "code" and "span" are absent when the failure carries
-  neither. Unknown options and a missing --seed value are reported before
-  --json is known, so those stay plain text.
+  neither. Usage errors are covered too, but only where --json still reads as
+  the flag: it is a seed value in --seed --json, and notation after --.
 
 Exit codes:
   0  Success
@@ -124,8 +124,8 @@ function writeJsonError(write: WriteFn, error: JsonErrorBody, context?: RollCont
  * `1` for a roll-parser error, `2` for a usage error. Anything that is not a
  * `RollParserError` propagates so the runtime reports it with a stack.
  *
- * `--json` swaps the success payload on stdout and every diagnostic raised
- * after it is parsed on stderr. Exit codes are identical either way, so
+ * `--json` swaps the success payload on stdout and every diagnostic on
+ * stderr, usage errors included. Exit codes are identical either way, so
  * scripts can still branch on the code before reading a stream.
  */
 export function main(env: CliEnv): number {
@@ -133,8 +133,12 @@ export function main(env: CliEnv): number {
   const parsed = parseArgs(argv);
 
   if (!parsed.ok) {
-    stderr(`Error: ${parsed.error}\n`);
-    stderr('Run "roll-parser --help" for usage.\n');
+    if (parsed.json) {
+      writeJsonError(stderr, { message: parsed.error });
+    } else {
+      stderr(`Error: ${parsed.error}\n`);
+      stderr('Run "roll-parser --help" for usage.\n');
+    }
     return 2;
   }
 

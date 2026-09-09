@@ -103,13 +103,15 @@ describe('cli main', () => {
       expect(stdout).toContain('2  Usage error');
     });
 
-    test('help documents the json error line and its one exclusion', () => {
+    test('help documents the json error line and the two positional exclusions', () => {
       const { stdout } = run(['--help']);
 
       expect(stdout).toContain('JSON errors:');
       expect(stdout).toContain('"error"');
       expect(stdout).toContain('"span"');
-      expect(stdout).toContain('stay plain text');
+      expect(stdout).toContain('Usage errors are covered too');
+      expect(stdout).toContain('a seed value in --seed --json');
+      expect(stdout).toContain('notation after --');
     });
   });
 
@@ -357,19 +359,40 @@ describe('cli main', () => {
       });
     });
 
-    test('an unknown option is reported before --json, so it stays plain text', () => {
-      // `parseArgs` returns at the bad option, so the flag was never established.
-      const { stderr, exitCode } = run(['--bogus', '--json']);
+    test('an unknown option is JSON even though it precedes --json', () => {
+      const { stdout, stderr, exitCode } = run(['--bogus', '--json']);
+
+      expect(exitCode).toBe(2);
+      expect(stdout).toBe('');
+      expect(JSON.parse(stderr)).toEqual({
+        error: { message: 'Unknown option: --bogus' },
+        version: VERSION,
+      });
+    });
+
+    test('a missing --seed value is JSON too', () => {
+      const { stdout, stderr, exitCode } = run(['2d6', '--json', '--seed']);
+
+      expect(exitCode).toBe(2);
+      expect(stdout).toBe('');
+      expect(JSON.parse(stderr)).toEqual({
+        error: { message: 'Missing value for --seed' },
+        version: VERSION,
+      });
+    });
+
+    test('a usage error stays plain text when --seed consumed --json', () => {
+      const { stderr, exitCode } = run(['--seed', '--json', '--bogus']);
 
       expect(exitCode).toBe(2);
       expect(stderr).toBe('Error: Unknown option: --bogus\nRun "roll-parser --help" for usage.\n');
     });
 
-    test('a missing --seed value stays plain text even with --json before it', () => {
-      const { stderr, exitCode } = run(['2d6', '--json', '--seed']);
+    test('a usage error stays plain text when -- made --json notation', () => {
+      const { stderr, exitCode } = run(['--bogus', '--', '--json']);
 
       expect(exitCode).toBe(2);
-      expect(stderr).toBe('Error: Missing value for --seed\nRun "roll-parser --help" for usage.\n');
+      expect(stderr).toBe('Error: Unknown option: --bogus\nRun "roll-parser --help" for usage.\n');
     });
 
     test('a seeded failure replays from its own record', () => {
