@@ -5,6 +5,11 @@ co-location are all evident from the existing suites — match them. The coverag
 floor lives in `bunfig.toml` and nowhere else — note the **functions** threshold
 in particular: any new function, exported or not, needs a test or `test:ci` fails.
 
+That threshold pushes toward calling a new function and asserting nothing, and a
+test that only proves the function ran is worth less than the uncovered line.
+Expected values are hand-computed constants — never re-derived with the code's own
+formula, and never obtained by calling the function under test.
+
 ## Error assertions
 
 Use `expectRollError` from `src/test-helpers.ts`. Never a bare `try`/`catch`, and

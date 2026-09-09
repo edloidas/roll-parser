@@ -53,38 +53,27 @@ Prefer promoting recurring checks to a real `*.test.ts`.
 
 ## Git & GitHub
 
-Conventional Commits: `<type>: <description> #<issue>`
+Conventional Commits; types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`,
+`chore`, `perf`, `build`, `ci`. The global conventions hold — below is what this
+repo adds.
 
-Types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `perf`, `build`, `ci`
-
-- Imperative mood, under 72 chars, no period
-- Include issue number when related: `feat: add parser #5`
-- No promotional or generated-by lines
-- Add `Co-Authored-By: Mikita Taukachou <edloidas@gmail.com>` — commits here are
-  pushed from the secondary `adiutriel` account, and the trailer attributes them
-- Optional body: past tense, one line per change, backticks for code refs
-- Use `Changelog: skip` body trailer to exclude a commit from release notes (honored by the `release-changelog` skill)
-- PRs should contain a single commit on merge; squash locally and force-push before merging unless the PR combines work from several tasks
-
-### Issues
-
-- **Title**: `<type>: <description>`; `epic: <description>` for issues that aggregate sub-issues (never used in commits)
-- **Body**: concisely explain what and why, end with a `Rationale` section; headers `####` for short issues (1–2 headers), `###` at 3+
-
-### Pull Requests
-
-- **Title**: `<type>: <description> #<number>`
-- **Body**: concise, no emojis, separate all sections with one blank line
-- Multiple issues go on one `Closes` line: `Closes #1 #23 #456`
-- Never append a generated footer, `---` rule, session link, `<sub>` attribution,
-  or promotional line. Applies to PRs created from the web too, where these
-  instructions are the only source of truth.
-
-  ```
-  <summary of changes>
-
-  Closes #<issue1> #<issue2>
-  ```
+- **Commit**: `<type>: <description> #<issue>`, imperative, under 72 chars, no
+  period. Body optional: past tense, one line per change, backticks for code refs.
+  Always add `Co-Authored-By: Mikita Taukachou <edloidas@gmail.com>` — commits here
+  are pushed from the secondary `adiutriel` account. A `Changelog: skip` body
+  trailer keeps a commit out of the release notes (honored by `release-changelog`).
+- **Issue title**: `<type>: <description>`; `epic: <description>` for issues that
+  aggregate sub-issues — never used in commits.
+- **Issue body**: what and why, ending in a `Rationale` section. Headers `####` for
+  short issues (1–2 headers), `###` at 3+.
+- **PR title**: matches the commit title, `<type>: <description> #<number>`.
+- **PR body**: one blank line between sections. One `Closes #<number>` per line —
+  GitHub links only the first issue on a line, so a shared line silently drops the
+  rest. Beyond the generated-by ban: no `---` rule, session link, or `<sub>`
+  attribution. Applies to PRs opened from the web, where these instructions are the
+  only source of truth.
+- PRs squash to a single commit on merge — squash locally and force-push first,
+  unless the PR combines work from several tasks.
 
 `master` merges through a PR, must be up to date with it, and must pass every
 context the `protect-master` ruleset requires — that ruleset is the source of
