@@ -11,6 +11,29 @@ import { isVersusDc } from './flags.js';
 type EligibleDie = { result: number; index: number };
 
 /**
+ * The die at pool slot `index` when it is eligible for keep/drop selection,
+ * `null` otherwise. Marks an ineligible-but-droppable die in `droppedMask` on
+ * the way past.
+ */
+function selectOrMarkDropped(
+  dice: DieResult[],
+  index: number,
+  droppedMask: Uint8Array,
+  hasVersusDc: boolean,
+): DieResult | null {
+  const die = dice[index];
+  if (die == null) return null;
+  if (hasVersusDc && isVersusDc(die)) return null;
+
+  if (die.modifiers.includes('dropped')) {
+    droppedMask[index] = 1;
+    return null;
+  }
+
+  return die;
+}
+
+/**
  * Records into `droppedMask` every pool slot that `kind` / `selector` /
  * `count` drops.
  *
@@ -39,14 +62,8 @@ export function markDroppedIndices(
   const eligible: EligibleDie[] = [];
 
   for (let index = 0; index < dice.length; index++) {
-    const die = dice[index];
+    const die = selectOrMarkDropped(dice, index, droppedMask, hasVersusDc);
     if (die == null) continue;
-    if (hasVersusDc && isVersusDc(die)) continue;
-
-    if (die.modifiers.includes('dropped')) {
-      droppedMask[index] = 1;
-      continue;
-    }
 
     eligible.push({ result: die.result, index });
   }
@@ -64,6 +81,20 @@ export function markDroppedIndices(
     return;
   }
 
+  dropBySelection(eligible, count, isKeep, selector, droppedMask);
+}
+
+/**
+ * Reached only once both whole-pool cases are ruled out, so the selected range
+ * is always a strict subset of `eligible`.
+ */
+function dropBySelection(
+  eligible: EligibleDie[],
+  count: number,
+  isKeep: boolean,
+  selector: KeepDropSpec['selector'],
+  droppedMask: Uint8Array,
+): void {
   // Stable sort — ties resolve by original pool order.
   eligible.sort(
     selector === 'highest' ? (a, b) => b.result - a.result : (a, b) => a.result - b.result,
@@ -95,20 +126,15 @@ function markSingleExtreme(
   hasVersusDc: boolean,
 ): void {
   const isKeep = kind === 'keep';
-  const wantHighest = selector === 'highest';
+  const isMoreExtreme =
+    selector === 'highest' ? (a: number, b: number) => a > b : (a: number, b: number) => a < b;
 
   let extremeIndex = -1;
   let extremeResult = 0;
 
   for (let index = 0; index < dice.length; index++) {
-    const die = dice[index];
+    const die = selectOrMarkDropped(dice, index, droppedMask, hasVersusDc);
     if (die == null) continue;
-    if (hasVersusDc && isVersusDc(die)) continue;
-
-    if (die.modifiers.includes('dropped')) {
-      droppedMask[index] = 1;
-      continue;
-    }
 
     const { result } = die;
 
@@ -118,7 +144,7 @@ function markSingleExtreme(
       continue;
     }
 
-    if (wantHighest ? result > extremeResult : result < extremeResult) {
+    if (isMoreExtreme(result, extremeResult)) {
       // A keep drops the dethroned extreme; a drop keeps everything else.
       if (isKeep) droppedMask[extremeIndex] = 1;
       extremeIndex = index;

@@ -216,8 +216,45 @@ type Cell = {
   status: CellStatus;
   notationUsed: string;
   detail?: string;
-  observed?: { mean: number; min: number; max: number };
+  observed?: Observed;
 };
+
+type Observed = { mean: number; min: number; max: number };
+
+function sampleStats(sampler: (notation: string) => number, notation: string): Observed {
+  let sum = 0;
+  let lowest = Number.POSITIVE_INFINITY;
+  let highest = Number.NEGATIVE_INFINITY;
+
+  for (let index = 0; index < SAMPLES; index++) {
+    const value = sampler(notation);
+    if (typeof value !== 'number' || Number.isNaN(value)) {
+      throw new Error(`non-numeric result: ${value}`);
+    }
+    sum += value;
+    if (value < lowest) lowest = value;
+    if (value > highest) highest = value;
+  }
+
+  return { mean: sum / SAMPLES, min: lowest, max: highest };
+}
+
+function findExpectationProblems(expect: Expectation, observed: Observed): string[] {
+  const { mean, min, max } = observed;
+  const problems: string[] = [];
+
+  if (expect.min !== undefined && min < expect.min) {
+    problems.push(`min ${min} < ${expect.min}`);
+  }
+  if (expect.max !== undefined && max > expect.max) {
+    problems.push(`max ${max} > ${expect.max}`);
+  }
+  if (expect.mean !== undefined && Math.abs(mean - expect.mean) > (expect.tolerance ?? 0.4)) {
+    problems.push(`mean ${mean.toFixed(2)} vs expected ${expect.mean}`);
+  }
+
+  return problems;
+}
 
 function evaluateCell(matrixCase: MatrixCase, adapterName: AdapterName): Cell {
   const adapter = ADAPTERS.find((candidate) => candidate.name === adapterName);
@@ -239,35 +276,14 @@ function evaluateCell(matrixCase: MatrixCase, adapterName: AdapterName): Cell {
       : adapter.rollTotal;
 
   try {
-    let sum = 0;
-    let lowest = Number.POSITIVE_INFINITY;
-    let highest = Number.NEGATIVE_INFINITY;
-    for (let index = 0; index < SAMPLES; index++) {
-      const value = sampler(notation);
-      if (typeof value !== 'number' || Number.isNaN(value)) {
-        throw new Error(`non-numeric result: ${value}`);
-      }
-      sum += value;
-      if (value < lowest) lowest = value;
-      if (value > highest) highest = value;
-    }
-    const mean = sum / SAMPLES;
-    const { expect } = matrixCase;
-    const problems: string[] = [];
-    if (expect.min !== undefined && lowest < expect.min) {
-      problems.push(`min ${lowest} < ${expect.min}`);
-    }
-    if (expect.max !== undefined && highest > expect.max) {
-      problems.push(`max ${highest} > ${expect.max}`);
-    }
-    if (expect.mean !== undefined && Math.abs(mean - expect.mean) > (expect.tolerance ?? 0.4)) {
-      problems.push(`mean ${mean.toFixed(2)} vs expected ${expect.mean}`);
-    }
+    const observed = sampleStats(sampler, notation);
+    const problems = findExpectationProblems(matrixCase.expect, observed);
+
     return {
       status: problems.length === 0 ? 'pass' : 'semantic',
       notationUsed: notation,
       detail: problems.join('; ') || undefined,
-      observed: { mean: Number(mean.toFixed(3)), min: lowest, max: highest },
+      observed: { ...observed, mean: Number(observed.mean.toFixed(3)) },
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

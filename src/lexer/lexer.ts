@@ -215,6 +215,14 @@ export class Lexer {
       return this.scanAt();
     }
 
+    return this.scanOperator(char, startPos);
+  }
+
+  /**
+   * Single- and two-character operators. The last resort in `nextToken`'s
+   * dispatch, so an unrecognised character can only be a lexer error.
+   */
+  private scanOperator(char: string, startPos: number): Token {
     this.advance();
 
     switch (char) {

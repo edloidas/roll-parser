@@ -119,6 +119,18 @@ function writeJsonError(write: WriteFn, error: JsonErrorBody, context?: RollCont
   write(`${JSON.stringify({ error, ...context, version: VERSION })}\n`);
 }
 
+/** Reports a usage error and returns the exit code for one. */
+function failUsage(stderr: WriteFn, message: string, json: boolean): number {
+  if (json) {
+    writeJsonError(stderr, { message });
+  } else {
+    stderr(`Error: ${message}\n`);
+    stderr('Run "roll-parser --help" for usage.\n');
+  }
+
+  return 2;
+}
+
 /**
  * Runs one CLI invocation and returns the process exit code: `0` on success,
  * `1` for a roll-parser error, `2` for a usage error. Anything that is not a
@@ -133,13 +145,7 @@ export function main(env: CliEnv): number {
   const parsed = parseArgs(argv);
 
   if (!parsed.ok) {
-    if (parsed.json) {
-      writeJsonError(stderr, { message: parsed.error });
-    } else {
-      stderr(`Error: ${parsed.error}\n`);
-      stderr('Run "roll-parser --help" for usage.\n');
-    }
-    return 2;
+    return failUsage(stderr, parsed.error, parsed.json);
   }
 
   const { args } = parsed;
@@ -155,13 +161,7 @@ export function main(env: CliEnv): number {
   }
 
   if (args.notation == null) {
-    if (args.json) {
-      writeJsonError(stderr, { message: 'No dice notation provided.' });
-    } else {
-      stderr('Error: No dice notation provided.\n');
-      stderr('Run "roll-parser --help" for usage.\n');
-    }
-    return 2;
+    return failUsage(stderr, 'No dice notation provided.', args.json);
   }
 
   // `SeededRNG`'s auto-seed is unreachable, so mint one that can be echoed back.

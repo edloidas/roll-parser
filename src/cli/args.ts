@@ -68,6 +68,61 @@ function isNegativeNotation(arg: string): boolean {
 }
 
 /**
+ * A seed is an opaque string, so any non-empty next argument counts:
+ * `--seed -abc` is a valid seed, not a missing value. `null` when it is missing.
+ */
+function readSeedValue(
+  arg: string,
+  next: string | undefined,
+): { seed: string; consumed: number } | null {
+  if (arg === '--seed') {
+    return next == null || next === '' ? null : { seed: next, consumed: 1 };
+  }
+
+  const value = arg.slice('--seed='.length);
+  return value === '' ? null : { seed: value, consumed: 0 };
+}
+
+type ArgAccumulator = {
+  verbose: boolean;
+  json: boolean;
+  seed?: string;
+  error?: string;
+  positional: string[];
+};
+
+/**
+ * First usage error wins — a later one is deliberately dropped. The sole owner
+ * of the `??=`, so a new error site cannot express the precedence wrongly.
+ */
+function failWith(acc: ArgAccumulator, message: string): void {
+  acc.error ??= message;
+}
+
+/** Returns how many further arguments this one consumed as a value. */
+function applyArg(arg: string, next: string | undefined, acc: ArgAccumulator): number {
+  if (arg === '--verbose' || arg === '-v') {
+    acc.verbose = true;
+  } else if (arg === '--json') {
+    acc.json = true;
+  } else if (arg === '--seed' || arg.startsWith('--seed=')) {
+    const read = readSeedValue(arg, next);
+    if (read == null) {
+      failWith(acc, 'Missing value for --seed');
+    } else {
+      acc.seed = read.seed;
+      return read.consumed;
+    }
+  } else if (arg.startsWith('--') || (arg.startsWith('-') && !isNegativeNotation(arg))) {
+    failWith(acc, `Unknown option: ${arg}`);
+  } else {
+    acc.positional.push(arg);
+  }
+
+  return 0;
+}
+
+/**
  * Parses a raw argument array into typed CLI options.
  *
  * @param argv - Arguments to parse (typically `process.argv.slice(2)`)
@@ -86,50 +141,20 @@ export function parseArgs(argv: string[]): ParseArgsResult {
     };
   }
 
-  let verbose = false;
-  let json = false;
-  let seed: string | undefined;
-  let error: string | undefined;
-  const positional: string[] = [];
-
-  // First usage error wins — a later one is deliberately dropped.
-  const failWith = (message: string): void => {
-    error ??= message;
-  };
+  const acc: ArgAccumulator = { verbose: false, json: false, positional: [] };
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i] as string;
 
     if (arg === TERMINATOR) {
-      positional.push(...argv.slice(i + 1));
+      acc.positional.push(...argv.slice(i + 1));
       break;
-    } else if (arg === '--verbose' || arg === '-v') {
-      verbose = true;
-    } else if (arg === '--json') {
-      json = true;
-    } else if (arg === '--seed') {
-      // A seed is an opaque string, so any non-empty next argument counts:
-      // `--seed -abc` is a valid seed, not a missing value.
-      const next = argv[i + 1];
-      if (next == null || next === '') {
-        failWith('Missing value for --seed');
-      } else {
-        seed = next;
-        i++;
-      }
-    } else if (arg.startsWith('--seed=')) {
-      const value = arg.slice('--seed='.length);
-      if (value === '') {
-        failWith('Missing value for --seed');
-      } else {
-        seed = value;
-      }
-    } else if (arg.startsWith('--') || (arg.startsWith('-') && !isNegativeNotation(arg))) {
-      failWith(`Unknown option: ${arg}`);
-    } else {
-      positional.push(arg);
     }
+
+    i += applyArg(arg, argv[i + 1], acc);
   }
+
+  const { verbose, json, seed, error, positional } = acc;
 
   // The loop runs to the end even after a usage error: only it knows that
   // `--seed --json` binds the flag as a seed value and `-- --json` makes it notation.

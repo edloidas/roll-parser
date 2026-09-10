@@ -70,6 +70,52 @@ function findStatsProblem({ p50, p75, ticks }: MitataStats): string | null {
   return null;
 }
 
+/**
+ * `label` is resolved by the caller because a problem still has to name the run
+ * when the name is itself what is wrong.
+ */
+function toRecord(
+  group: string | null | undefined,
+  trialGroup: number,
+  trialRun: MitataRun,
+  label: string,
+): { record: BenchmarkRecord } | { problem: string } {
+  // Every bench registers inside a `group()`, so an index the layout cannot
+  // resolve means a corrupt dump, never a legitimately ungrouped bench.
+  if (!isNonEmptyName(group)) {
+    return { problem: `group ${trialGroup} has no name in the layout` };
+  }
+
+  if (!isNonEmptyName(trialRun.name)) {
+    return { problem: 'case name is empty' };
+  }
+
+  const stats = trialRun.stats;
+
+  if (stats == null) {
+    return { problem: 'missing stats' };
+  }
+
+  const problem = findStatsProblem(stats);
+
+  if (problem != null) {
+    return { problem };
+  }
+
+  const { p50, p75, ticks } = stats;
+  const mode = getSamplingMode(ticks);
+
+  return {
+    record: {
+      name: label,
+      unit: 'ns',
+      value: round(p50),
+      range: `± ${round(p75 - p50)} ns`,
+      extra: `group=${group} case=${trialRun.name} p50=${round(p50)}ns p75=${round(p75)}ns mode=${mode}`,
+    },
+  };
+}
+
 export function toRecords(dump: MitataDump): RecordsResult {
   const records: BenchmarkRecord[] = [];
   const problems: string[] = [];
@@ -84,29 +130,10 @@ export function toRecords(dump: MitataDump): RecordsResult {
     for (const [index, trialRun] of trial.runs.entries()) {
       const label = `${groupLabel} / ${isNonEmptyName(trialRun.name) ? trialRun.name : `#${index}`}`;
 
-      // Every bench registers inside a `group()`, so an index the layout cannot
-      // resolve means a corrupt dump, never a legitimately ungrouped bench.
-      if (!isNonEmptyName(group)) {
-        problems.push(`${label}: group ${trial.group} has no name in the layout`);
-        continue;
-      }
+      const outcome = toRecord(group, trial.group, trialRun, label);
 
-      if (!isNonEmptyName(trialRun.name)) {
-        problems.push(`${label}: case name is empty`);
-        continue;
-      }
-
-      const stats = trialRun.stats;
-
-      if (stats == null) {
-        problems.push(`${label}: missing stats`);
-        continue;
-      }
-
-      const problem = findStatsProblem(stats);
-
-      if (problem != null) {
-        problems.push(`${label}: ${problem}`);
+      if ('problem' in outcome) {
+        problems.push(`${label}: ${outcome.problem}`);
         continue;
       }
 
@@ -118,17 +145,7 @@ export function toRecords(dump: MitataDump): RecordsResult {
       }
 
       seen.add(label);
-
-      const { p50, p75, ticks } = stats;
-      const mode = getSamplingMode(ticks);
-
-      records.push({
-        name: label,
-        unit: 'ns',
-        value: round(p50),
-        range: `± ${round(p75 - p50)} ns`,
-        extra: `group=${group} case=${trialRun.name} p50=${round(p50)}ns p75=${round(p75)}ns mode=${mode}`,
-      });
+      records.push(outcome.record);
     }
   }
 
