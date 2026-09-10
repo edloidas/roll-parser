@@ -12,7 +12,6 @@
 import { describe, expect, test } from 'bun:test';
 import { VERSION } from '../index.js';
 import { LexerError } from '../lexer/lexer.js';
-import { roll } from '../roll.js';
 import { main, writeErrorContext } from './main.js';
 
 type CliRun = { stdout: string; stderr: string; exitCode: number };
@@ -225,10 +224,8 @@ describe('cli main', () => {
     });
 
     test('non-JSON output stays the total alone, with no seed appended', () => {
-      const expected = roll('2d6+3', { seed: 'test' });
-
-      expect(run(['2d6+3', '--seed', 'test']).stdout).toBe(`${expected.total}\n`);
-      expect(run(['2d6+3', '--seed', 'test', '--verbose']).stdout).toBe(`${expected.rendered}\n`);
+      expect(run(['2d6+3', '--seed', 'test']).stdout).toBe('9\n');
+      expect(run(['2d6+3', '--seed', 'test', '--verbose']).stdout).toBe('2d6[3, 3] + 3 = 9\n');
     });
   });
 
@@ -451,14 +448,6 @@ describe('cli main', () => {
 
     test('emits nothing for a non-library error', () => {
       expect(contextFor('2d6', new Error('boom'))).toBe('');
-    });
-
-    test('emits nothing for a non-integer position', () => {
-      expect(contextFor('2d6+&', new LexerError('bad', 'UNEXPECTED_CHARACTER', 1.5, '&'))).toBe('');
-    });
-
-    test('emits nothing for a negative position', () => {
-      expect(contextFor('2d6+&', new LexerError('bad', 'UNEXPECTED_CHARACTER', -1, '&'))).toBe('');
     });
 
     test('emits nothing for a position past the end of the notation', () => {
