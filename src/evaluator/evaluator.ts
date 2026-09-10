@@ -1598,6 +1598,37 @@ function formatFailCode(operator: CompareOp, value: number): string {
   return operator === '=' ? `f${value}` : `f${operator}${value}`;
 }
 
+/**
+ * The units a success count scores: sub-roll subtotals for a multi-sub group,
+ * the target's own dice otherwise.
+ */
+// ! Releases every die an inner count tagged, `vs` DC dice included, though
+// ! `countSuccesses` spares those. The `stripTallyMarkers` pass below reads
+// ! rendered text and cannot tell a DC die apart, so sparing one here leaves a
+// ! tag whose `**` is already gone and `renderBreakdown` stops reproducing
+// ! `rendered`.
+function clearTallyFlags(rolls: DieResult[]): void {
+  for (const die of rolls) {
+    die.modifiers = stripFlags(die.modifiers, TALLY_FLAGS);
+  }
+}
+
+function countablePool(
+  target: EvalResult,
+  targetCtx: EvalContext,
+  bySubtotal: boolean,
+): DieResult[] {
+  if (!bySubtotal) return targetCtx.rolls;
+
+  return (target.part as Extract<RollPart, { type: 'group' }>).parts.map((sub) => ({
+    sides: 0,
+    result: sub.total,
+    modifiers: [],
+    critical: false,
+    fumble: false,
+  }));
+}
+
 function evalSuccessCount(
   node: SuccessCountNode,
   rng: RNG,
@@ -1657,25 +1688,9 @@ function evalSuccessCount(
   // `ctx.rolls`. Only a direct group target arrives here — the parser refuses
   // every form that would reach the count with the subtotals already gone.
   const bySubtotal = node.target.type === 'Group' && node.target.expressions.length >= 2;
-  const pool: DieResult[] = bySubtotal
-    ? (target.part as Extract<RollPart, { type: 'group' }>).parts.map((sub) => ({
-        sides: 0,
-        result: sub.total,
-        modifiers: [],
-        critical: false,
-        fumble: false,
-      }))
-    : targetCtx.rolls;
+  const pool = countablePool(target, targetCtx, bySubtotal);
 
-  // ! Releases every die an inner count tagged, `vs` DC dice included, though
-  // ! `countSuccesses` spares those. The marker strip below reads rendered text
-  // ! and cannot tell a DC die apart, so sparing one here leaves a tag whose
-  // ! `**` is already gone and `renderBreakdown` stops reproducing `rendered`.
-  if (bySubtotal && poolAlreadyCounted) {
-    for (const die of targetCtx.rolls) {
-      die.modifiers = stripFlags(die.modifiers, TALLY_FLAGS);
-    }
-  }
+  if (bySubtotal && poolAlreadyCounted) clearTallyFlags(targetCtx.rolls);
 
   // An empty pool (`0d6>=4`) scores zero of both, so its total is 0 — never
   // `target.total`, which would break `total === successes - failures`.
