@@ -130,9 +130,9 @@
   ],
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.5",
-    "@biomejs/biome": "^2.5.11",
+    "@biomejs/biome": "^2.5.12",
     "@size-limit/preset-small-lib": "^13.0.3",
-    "@types/bun": "^1.4.0",
+    "@types/bun": "^1.4.2",
     "esbuild": "^0.28.2",
     "fast-check": "^4.9.0",
     "mitata": "^1.0.34",
