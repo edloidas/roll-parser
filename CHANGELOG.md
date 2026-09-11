@@ -7,9 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.4.0] - 2026-09-11
+
+CLI release: `--json` becomes a complete record. A payload now names the seed
+and version that produced it, so any roll — seeded or not — can be replayed from
+its own output, and every diagnostic the CLI raises now arrives as one JSON line
+instead of an `Error:` prefix and a caret diagram. The library, its public types
+and its serialized shape are untouched; the `--json` success payload only gains
+keys at the end, so existing field access is unaffected.
+
+### Added
+
+- `--json` output ends in `seed` and `version`, making a payload re-derivable from itself. The CLI mints its own seed with `crypto.randomUUID()` rather than letting `SeededRNG` auto-seed and discard the value, so the emitted seed is one that can be handed straight back to `--seed`; `version` rides along because the seed-to-dice mapping is only fixed within a major. Minting is unconditional, so the plain and verbose paths draw from the same source. Both keys are appended, so every existing key keeps its position ([#342](https://github.com/edloidas/roll-parser/issues/342))
+- Every diagnostic raised after `--json` is parsed is now one JSON line on stderr, carrying the error's stable `code` and the `span` that `getErrorSpan` normalizes, plus the `notation` and `seed` that produced the failure. Machine consumers no longer have to regex the message and count caret spaces for a position the process already held. The record reports `span` rather than a flat position because the evaluator carries a start and an end. A failing unseeded roll is now reproducible too — the minted seed was declared inside the `try` and the `catch` never echoed it. Exit codes and empty-stdout-on-failure are unchanged ([#343](https://github.com/edloidas/roll-parser/issues/343))
+
 ### Changed
 
 - `--json` now covers the two usage errors that escaped it. `Unknown option: <x>` and `Missing value for --seed` were raised at the offending token, before the flag was known, so they printed as plain text; `parseArgs` now records the first usage error and runs the loop to the end, so the flag survives alongside it. Detection stays positional: `--seed --json` binds `--json` as the seed value and `roll-parser -- --json` makes it notation, and neither emits JSON. The record is `{"error":{"message":...},"version":...}` — a usage error never reached the dice, so it carries no `code`, `span`, `notation` or `seed`. Exit code 2 is unchanged ([#351](https://github.com/edloidas/roll-parser/issues/351))
+- A failed run whose notation was passed after `--` now ends with a hint saying the terminator makes everything after it part of the notation. It is gated on what the parser did rather than on `argv` containing a `--`: `--seed` takes any non-empty next argument, so `--seed --` binds that `--` as a seed value and no terminator ever runs. `parseArgs` carries `terminated` on its success arm to express that. The `--json` path is untouched — every diagnostic there stays one JSON line ([#344](https://github.com/edloidas/roll-parser/issues/344))
+
+### Fixed
+
+- `roll-parser --seed -- --help` prints the manual instead of exiting 2 with `Unknown option`. The scan that finds `--help`, `-h` and `--version` broke at the first literal `--`, but `readSeedValue` takes any non-empty next argument, so in `--seed --` that `--` is the seed value and never reaches the terminator branch of the main loop. The scan now consumes a `--seed` value the way the loop does, exempting an informational flag from the skip so `--seed --help` still resolves to help ([#364](https://github.com/edloidas/roll-parser/issues/364))
+
+### Documentation
+
+- `HELP_TEXT` and the README CLI section no longer teach `--` as the way to write negative notation. `roll-parser -1d6+3` works on its own — `-1d6`, `-d6`, `-dF`, `-(2d6)`, `-{2d6}` and `-@str` are all accepted as positionals — and teaching the terminator there walked users into its real semantics, where a trailing `--verbose` becomes part of the notation and the lexer rejects it as an identifier. The `--` option line now names what the terminator is actually for ([#344](https://github.com/edloidas/roll-parser/issues/344))
+- The README `--json` sample no longer pins a `"version":"3.3.1"` literal that nothing checks, and the prose states that `version` is a bare semver with no `v` prefix ([#348](https://github.com/edloidas/roll-parser/issues/348))
+- The README performance table is re-measured under Bun 1.4 as the per-record median of eight `bench:json` passes: `roll` runs 8-18% faster on the light expressions and flat on the heavy pools, while `lex` and `parse` land within 10% of the old figures in both directions. The measurement protocol records the non-idle session and its wider pass-to-pass spread ([#340](https://github.com/edloidas/roll-parser/issues/340))
 
 ## [3.3.1] - 2026-08-20
 
@@ -309,7 +334,8 @@ Dice mechanics (Stage 2):
 - Dice count safety limit via `maxDice` option (default 10,000), enforced across the whole expression to prevent DoS via additive groups like `5000d6+5000d6` ([#19](https://github.com/edloidas/roll-parser/issues/19))
 - Parser and evaluator correctness: duplicate `kept` modifier entries, implicit modifier count defaulting to 1 (`4d6kh` → `4d6kh1`), `critical` flag suppression when `sides === 1`, negative `--seed` CLI values ([#21](https://github.com/edloidas/roll-parser/issues/21))
 
-[Unreleased]: https://github.com/edloidas/roll-parser/compare/v3.3.1...HEAD
+[Unreleased]: https://github.com/edloidas/roll-parser/compare/v3.4.0...HEAD
+[3.4.0]: https://github.com/edloidas/roll-parser/releases/tag/v3.4.0
 [3.3.1]: https://github.com/edloidas/roll-parser/releases/tag/v3.3.1
 [3.3.0]: https://github.com/edloidas/roll-parser/releases/tag/v3.3.0
 [3.2.2]: https://github.com/edloidas/roll-parser/releases/tag/v3.2.2
