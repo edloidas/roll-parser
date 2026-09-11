@@ -21,10 +21,11 @@ export type CliArgs = {
 /**
  * Result of parsing CLI arguments — either success or a usage error. The
  * failure arm carries `json` so a usage error renders in the format the
- * caller asked for.
+ * caller asked for; the success arm carries `terminated`, true only when a
+ * `--` was consumed as the terminator rather than as a `--seed` value.
  */
 export type ParseArgsResult =
-  | { ok: true; args: CliArgs }
+  | { ok: true; args: CliArgs; terminated: boolean }
   | { ok: false; error: string; json: boolean };
 
 /** Argument that stops option parsing — everything after it is notation. */
@@ -60,11 +61,22 @@ function findInformationalFlag(argv: string[]): 'help' | 'version' | undefined {
 /**
  * True for an argument that starts with `-` yet reads as notation rather than
  * an option: negative numbers (`-3`) and negative-prefixed expressions
- * (`-d6`, `-D6`, `-dF`, `-(2d6)`, `-{2d6}`, `-@str`). A fallback for users who
- * do not reach for `--`; `--` remains the unambiguous form.
+ * (`-d6`, `-D6`, `-dF`, `-(2d6)`, `-{2d6}`, `-@str`). These need no `--`, which
+ * exists for notation that would otherwise parse as an option.
  */
 function isNegativeNotation(arg: string): boolean {
   return /^[\ddD({@]/.test(arg.slice(1));
+}
+
+/** Every option this parser accepts as a whole argument. */
+const KNOWN_OPTIONS = new Set(['--verbose', '-v', '--json', '--help', '-h', '--version', '--seed']);
+
+/**
+ * True for an argument this parser accepts as a *valid* option outside a `--`
+ * terminator — `--typo` is read as an option and rejected, and is not one here.
+ */
+export function isKnownOption(arg: string): boolean {
+  return KNOWN_OPTIONS.has(arg) || arg.startsWith('--seed=');
 }
 
 /**
@@ -133,6 +145,7 @@ export function parseArgs(argv: string[]): ParseArgsResult {
   if (informational != null) {
     return {
       ok: true,
+      terminated: false,
       args: {
         ...BASE_ARGS,
         showHelp: informational === 'help',
@@ -142,12 +155,14 @@ export function parseArgs(argv: string[]): ParseArgsResult {
   }
 
   const acc: ArgAccumulator = { verbose: false, json: false, positional: [] };
+  let terminated = false;
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i] as string;
 
     if (arg === TERMINATOR) {
       acc.positional.push(...argv.slice(i + 1));
+      terminated = true;
       break;
     }
 
@@ -166,5 +181,5 @@ export function parseArgs(argv: string[]): ParseArgsResult {
   // words and the user means one expression.
   const notation = positional.length > 0 ? positional.join(' ') : undefined;
 
-  return { ok: true, args: { ...BASE_ARGS, notation, verbose, json, seed } };
+  return { ok: true, terminated, args: { ...BASE_ARGS, notation, verbose, json, seed } };
 }

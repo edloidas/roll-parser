@@ -16,7 +16,7 @@ import {
 } from '../errors.js';
 import { VERSION } from '../index.js';
 import { roll } from '../roll.js';
-import { parseArgs } from './args.js';
+import { isKnownOption, parseArgs } from './args.js';
 import { formatResult } from './format.js';
 
 const HELP_TEXT = `roll-parser v${VERSION}
@@ -29,7 +29,7 @@ Options:
   -v, --verbose    Show detailed roll breakdown
   --json           Print the whole result as compact JSON (wins over --verbose)
   --seed <value>   Use seed for reproducible rolls
-  --               Treat every following argument as notation
+  --               Notation that looks like an option — put options before it
 
 JSON output:
   Emits the complete result, including the structured "parts" tree, plus the
@@ -57,7 +57,7 @@ Examples:
   roll-parser 4d6kh3 --verbose
   roll-parser 4d6dl1 --seed "character-str"
   roll-parser "1d20+7 vs 25" --json
-  roll-parser -- -1d6+3
+  roll-parser -1d6+3
 `;
 
 // The build sets `types: []`, so no ambient runtime globals are declared.
@@ -91,6 +91,17 @@ export function writeErrorContext(notation: string, error: unknown, write: Write
 
   write(`  ${notation}\n`);
   write(`  ${' '.repeat(column)}^\n`);
+}
+
+/**
+ * Names the ordering rule when `--` swallowed an option. Gated on `terminated`,
+ * never on `argv` holding a `--`: `--seed --` makes that `--` a seed value, so a
+ * textual scan would name a terminator that never ran.
+ */
+function writeOptionHint(terminated: boolean, notation: string, write: WriteFn): void {
+  if (terminated && notation.split(' ').some(isKnownOption)) {
+    write('Hint: options must come before "--"\n');
+  }
 }
 
 /** The `error` member of the `--json` failure record. */
@@ -148,7 +159,7 @@ export function main(env: CliEnv): number {
     return failUsage(stderr, parsed.error, parsed.json);
   }
 
-  const { args } = parsed;
+  const { args, terminated } = parsed;
 
   if (args.showHelp) {
     stdout(HELP_TEXT);
@@ -182,6 +193,7 @@ export function main(env: CliEnv): number {
       } else {
         stderr(`Error: ${error.message}\n`);
         writeErrorContext(args.notation, error, stderr);
+        writeOptionHint(terminated, args.notation, stderr);
       }
       return 1;
     }

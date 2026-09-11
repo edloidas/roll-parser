@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { parseArgs } from './args.js';
+import { isKnownOption, parseArgs } from './args.js';
 
 describe('parseArgs', () => {
   describe('notation parsing', () => {
@@ -7,6 +7,7 @@ describe('parseArgs', () => {
       const result = parseArgs(['2d6+3']);
       expect(result).toEqual({
         ok: true,
+        terminated: false,
         args: {
           notation: '2d6+3',
           verbose: false,
@@ -22,6 +23,7 @@ describe('parseArgs', () => {
       const result = parseArgs(['2d6', '+', '3']);
       expect(result).toEqual({
         ok: true,
+        terminated: false,
         args: {
           notation: '2d6 + 3',
           verbose: false,
@@ -37,6 +39,7 @@ describe('parseArgs', () => {
       const result = parseArgs([]);
       expect(result).toEqual({
         ok: true,
+        terminated: false,
         args: {
           notation: undefined,
           verbose: false,
@@ -52,6 +55,7 @@ describe('parseArgs', () => {
       const result = parseArgs(['-3']);
       expect(result).toEqual({
         ok: true,
+        terminated: false,
         args: {
           notation: '-3',
           verbose: false,
@@ -273,6 +277,23 @@ describe('parseArgs', () => {
     });
   });
 
+  describe('terminator reporting', () => {
+    test('terminated is true only when -- stopped option parsing', () => {
+      const result = parseArgs(['--', '-1d6']);
+      expect(result).toMatchObject({ ok: true, terminated: true });
+    });
+
+    test('a -- consumed as the --seed value is not a terminator (#344)', () => {
+      const result = parseArgs(['--seed', '--', '2d6']);
+      expect(result).toMatchObject({ ok: true, terminated: false });
+      if (result.ok) expect(result.args.seed).toBe('--');
+    });
+
+    test('terminated is false when no -- appears at all', () => {
+      expect(parseArgs(['2d6+3'])).toMatchObject({ ok: true, terminated: false });
+    });
+  });
+
   describe('informational precedence', () => {
     test('--help wins over an earlier unknown option', () => {
       const result = parseArgs(['--oops', '--help']);
@@ -308,6 +329,7 @@ describe('parseArgs', () => {
       const result = parseArgs(['2d6', '--json', '--help']);
       expect(result).toEqual({
         ok: true,
+        terminated: false,
         args: {
           notation: undefined,
           verbose: false,
@@ -367,5 +389,35 @@ describe('parseArgs', () => {
 
     // The `-x` short-flag case sits in `notation parsing`, next to the
     // negative-notation cases it draws the boundary against.
+  });
+});
+
+describe('isKnownOption', () => {
+  // Each row asserts the predicate against what `parseArgs` actually does with
+  // the same argument, so an option added to `applyArg` alone fails here.
+  // Blind to one added to neither — that pairs two silences, not two lists.
+  test.each([
+    ['--verbose', true],
+    ['-v', true],
+    ['--json', true],
+    ['--help', true],
+    ['-h', true],
+    ['--version', true],
+    ['--seed', true],
+    ['--seed=demo', true],
+    ['--unknown', false],
+    ['--seeds', false],
+    ['-x', false],
+  ])('agrees with parseArgs on %s', (arg, known) => {
+    const parsed = parseArgs([arg as string]);
+    const rejectedAsUnknown = !parsed.ok && parsed.error === `Unknown option: ${arg}`;
+
+    expect(isKnownOption(arg as string)).toBe(known);
+    expect(rejectedAsUnknown).toBe(!known);
+  });
+
+  // `parseArgs` accepts these as notation, which says nothing about the predicate.
+  test.each(['-1d6', '-d6', '2d6+3', '--', ''])('rejects %s, which is not an option', (arg) => {
+    expect(isKnownOption(arg)).toBe(false);
   });
 });

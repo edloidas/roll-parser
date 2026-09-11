@@ -266,6 +266,49 @@ describe('cli main', () => {
       expect(exitCode).toBe(2);
       expect(stderr).toContain('No dice notation provided');
     });
+
+    test('an option swallowed by -- earns a hint (#344)', () => {
+      const { stderr, exitCode } = run(['--', '-1d6', '--verbose']);
+
+      expect(exitCode).toBe(1);
+      expect(stderr).toBe(
+        "Error: Unexpected identifier: 'verbose'\n" +
+          '  -1d6 --verbose\n' +
+          '         ^\n' +
+          'Hint: options must come before "--"\n',
+      );
+    });
+
+    test('a dash-prefixed non-option after -- earns no hint (#344)', () => {
+      const { stderr, exitCode } = run(['--', '-1d6', '-x']);
+
+      expect(exitCode).toBe(1);
+      expect(stderr).toBe("Error: Unexpected identifier: 'x'\n  -1d6 -x\n        ^\n");
+    });
+
+    test('a -- taken as the --seed value earns no hint (#344)', () => {
+      const { stderr, exitCode } = run(['--seed', '--', '2d6 --verbose']);
+
+      // `--seed` ate the `--` as its value, so no terminator ever ran.
+      expect(exitCode).toBe(1);
+      expect(stderr).toBe("Error: Unexpected identifier: 'verbose'\n  2d6 --verbose\n        ^\n");
+    });
+
+    test('a quoted notation carrying an option word earns no hint (#344)', () => {
+      const { stderr, exitCode } = run(['2d6 --verbose', '--seed', 'test']);
+
+      // No terminator was typed, so the ordering advice would name a `--` the
+      // user never wrote.
+      expect(exitCode).toBe(1);
+      expect(stderr).toBe("Error: Unexpected identifier: 'verbose'\n  2d6 --verbose\n        ^\n");
+    });
+
+    test('--json keeps its single line, hint or not (#344)', () => {
+      const { stderr } = run(['--json', '--seed', 'test', '--', '-1d6', '--verbose']);
+
+      expect(stderr.trimEnd()).not.toContain('\n');
+      expect(JSON.parse(stderr).error.message).toBe("Unexpected identifier: 'verbose'");
+    });
   });
 
   describe('exit codes', () => {
