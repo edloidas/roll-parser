@@ -41,18 +41,34 @@ const BASE_ARGS: CliArgs = {
   showVersion: false,
 };
 
+/** Which informational flag an argument is, if any. */
+function informationalKind(arg: string | undefined): 'help' | 'version' | undefined {
+  if (arg === '--help' || arg === '-h') return 'help';
+  if (arg === '--version') return 'version';
+  return undefined;
+}
+
 /**
  * Finds `--help` / `--version` anywhere before the `--` terminator. Help wins
  * over version regardless of order, and both win over usage errors — a user
  * who mistyped an option is asking for the manual, not for a diagnostic.
+ *
+ * Consumes a `--seed` value the way the main loop does, so a `--` in that
+ * position is the value and not the terminator. The one exception is an
+ * informational flag sitting there, which outranks the seed: `--seed --help`
+ * is help, not a seed of `--help`.
  */
 function findInformationalFlag(argv: string[]): 'help' | 'version' | undefined {
   let flag: 'help' | 'version' | undefined;
 
-  for (const arg of argv) {
-    if (arg === TERMINATOR) break;
-    if (arg === '--help' || arg === '-h') return 'help';
-    if (arg === '--version') flag = 'version';
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i] as string;
+    const kind = informationalKind(arg);
+
+    if (kind === 'help') return 'help';
+    if (kind === 'version') flag = 'version';
+    else if (arg === TERMINATOR) break;
+    else if (arg === '--seed' && informationalKind(argv[i + 1]) == null) i += 1;
   }
 
   return flag;
