@@ -89,6 +89,14 @@ describe('cli main', () => {
       expect(stderr).toBe('');
     });
 
+    test('--help survives a -- taken as the --seed value (#364)', () => {
+      const { stdout, stderr, exitCode } = run(['--seed', '--', '--help']);
+
+      expect(exitCode).toBe(0);
+      expect(stdout).toContain('Usage: roll-parser');
+      expect(stderr).toBe('');
+    });
+
     test('help documents json output and exit codes', () => {
       const { stdout } = run(['--help']);
 

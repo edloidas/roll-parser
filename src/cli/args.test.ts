@@ -292,6 +292,53 @@ describe('parseArgs', () => {
     test('terminated is false when no -- appears at all', () => {
       expect(parseArgs(['2d6+3'])).toMatchObject({ ok: true, terminated: false });
     });
+
+    test('a -- bound as a seed value leaves the rest to the loop (#364)', () => {
+      expect(parseArgs(['--seed', '--', '--verbose', '2d6'])).toEqual({
+        ok: true,
+        terminated: false,
+        args: {
+          notation: '2d6',
+          verbose: true,
+          json: false,
+          seed: '--',
+          showHelp: false,
+          showVersion: false,
+        },
+      });
+    });
+
+    // The first `--seed` binds the second as its value, so the `--` after it is
+    // a real terminator and everything past it is notation.
+    test('a seed value of --seed leaves the next -- terminating (#364)', () => {
+      expect(parseArgs(['--seed', '--seed', '--', '--help'])).toEqual({
+        ok: true,
+        terminated: true,
+        args: {
+          notation: '--help',
+          verbose: false,
+          json: false,
+          seed: '--seed',
+          showHelp: false,
+          showVersion: false,
+        },
+      });
+    });
+
+    test('a real terminator still stops the scan (#364)', () => {
+      expect(parseArgs(['--seed=x', '--', '--help'])).toEqual({
+        ok: true,
+        terminated: true,
+        args: {
+          notation: '--help',
+          verbose: false,
+          json: false,
+          seed: 'x',
+          showHelp: false,
+          showVersion: false,
+        },
+      });
+    });
   });
 
   describe('informational precedence', () => {
@@ -323,6 +370,50 @@ describe('parseArgs', () => {
         expect(result.args.showHelp).toBe(true);
         expect(result.args.showVersion).toBe(false);
       }
+    });
+
+    test('--help still wins when --seed took the -- as its value (#364)', () => {
+      expect(parseArgs(['--seed', '--', '--help'])).toEqual({
+        ok: true,
+        terminated: false,
+        args: {
+          notation: undefined,
+          verbose: false,
+          json: false,
+          seed: undefined,
+          showHelp: true,
+          showVersion: false,
+        },
+      });
+    });
+
+    test('--version still wins when --seed took the -- as its value (#364)', () => {
+      expect(parseArgs(['--seed', '--', '--version'])).toEqual({
+        ok: true,
+        terminated: false,
+        args: {
+          notation: undefined,
+          verbose: false,
+          json: false,
+          seed: undefined,
+          showHelp: false,
+          showVersion: true,
+        },
+      });
+    });
+
+    test('-h still wins when --seed took the -- as its value (#364)', () => {
+      const result = parseArgs(['--seed', '--', '-h']);
+      expect(result.ok).toBe(true);
+      if (result.ok) expect(result.args.showHelp).toBe(true);
+    });
+
+    // The scan skips a seed value, so `-h` sitting in one has to be exempted by
+    // name or it is consumed and never seen.
+    test('-h in the seed-value position outranks the seed (#364)', () => {
+      const result = parseArgs(['--seed', '-h']);
+      expect(result.ok).toBe(true);
+      if (result.ok) expect(result.args.showHelp).toBe(true);
     });
 
     test('informational flags drop other options', () => {
