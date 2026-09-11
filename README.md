@@ -1032,19 +1032,19 @@ $ roll-parser -1d6+3 --seed demo
 That payload is cut short; in full it ends:
 
 ```json
-{"total":8,"notation":"1d20+7 vs 15", …, "seed":"demo","version":"3.3.1"}
+{"total":8,"notation":"1d20+7 vs 15", …, "seed":"demo","version":"…"}
 ```
 
 Verbose mode rewrites the markdown markers for plain terminals: `~~n~~` becomes
 `(n)`, `**n**` becomes `[n]`, `__n__` becomes `{n}`. `--seed` takes both
 `--seed value` and `--seed=value`, and accepts any non-empty value including a
 dash-prefixed one. The `--json` payload ends with two fields the library
-result does not carry: the `seed` that produced the roll and the `version`
-that fixes the seed-to-dice mapping — feed that seed back through `--seed` on
-the same major and the dice repeat. Omitting `--seed` mints one, so an
-unplanned roll stays reproducible too. `--help` and `--version` win over
-any usage error that precedes them. Errors go to stderr; only the result goes
-to stdout.
+result does not carry: the `seed` that produced the roll and the `version` (a
+bare semver, no `v` prefix) that fixes the seed-to-dice mapping — feed that
+seed back through `--seed` on the same major and the dice repeat. Omitting
+`--seed` mints one, so an unplanned roll stays reproducible too. `--help` and
+`--version` win over any usage error that precedes them. Errors go to stderr;
+only the result goes to stdout.
 
 Leading-minus notation needs no `--`: `-1d6+3`, `-d6`, `-dF`, `-(2d6)`,
 `-{2d6}` and `-@str` are all read as notation. `--` is the escape hatch for
