@@ -1004,7 +1004,7 @@ Options:
   -v, --verbose    Show detailed roll breakdown
   --json           Print the whole result as compact JSON (wins over --verbose)
   --seed <value>   Use seed for reproducible rolls
-  --               Treat every following argument as notation
+  --               Notation that looks like an option — put options before it
 ```
 
 ```bash
@@ -1025,7 +1025,7 @@ Error: Invalid dice sides: 0
 $ roll-parser "2d6+1d0+3" --json --seed demo
 {"error":{"message":"Invalid dice sides: 0","code":"INVALID_DICE_SIDES","span":{"start":4,"end":7}},"notation":"2d6+1d0+3","seed":"demo",...}
 
-$ roll-parser --seed demo -- -1d6+3
+$ roll-parser -1d6+3 --seed demo
 2
 ```
 
@@ -1045,6 +1045,13 @@ the same major and the dice repeat. Omitting `--seed` mints one, so an
 unplanned roll stays reproducible too. `--help` and `--version` win over
 any usage error that precedes them. Errors go to stderr; only the result goes
 to stdout.
+
+Leading-minus notation needs no `--`: `-1d6+3`, `-d6`, `-dF`, `-(2d6)`,
+`-{2d6}` and `-@str` are all read as notation. `--` is the escape hatch for
+notation that would otherwise parse as an option, and everything after it is
+notation — flags included — so options go before it, never after. A failed roll
+whose notation swallowed one prints `Hint: options must come before "--"` after
+the caret diagram.
 
 Once `--json` is parsed, every diagnostic is one JSON line on stderr instead
 of the caret diagram. `code` is the same stable `RollParserErrorCode` the
