@@ -131,14 +131,14 @@
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.5",
     "@biomejs/biome": "^2.5.12",
-    "@size-limit/preset-small-lib": "^13.0.3",
+    "@size-limit/preset-small-lib": "^14.1.0",
     "@types/bun": "^1.4.2",
     "esbuild": "^0.28.2",
     "fast-check": "^4.9.0",
     "mitata": "^1.0.34",
     "nano-staged": "^1.0.2",
     "publint": "^0.3.24",
-    "size-limit": "^13.0.3",
+    "size-limit": "^14.1.0",
     "typescript": "^7.0.2"
   },
   "overrides": {
