@@ -37,10 +37,10 @@ fix blocks the commit.
 
 Match the surrounding code. Style, naming, and type conventions are enforced by
 `biome check` rather than written down; what cannot be linted lives in
-`.claude/rules/`: `comments.md` (the `// !`, `// ?`, `// *`, `// TODO:` prefixes
-and their colors), `project-testing.md` (error assertions, the error-code gate,
-CLI test placement), and `rng.md` (the `RNG` contract). A few constraints worth
-calling out:
+`AGENTS.md`: **Comments** (the `// !`, `// ?`, `// *`, `// TODO:` prefixes and
+their colors), **Testing** (error assertions, the error-code gate, CLI test
+placement), and **RNG** (the `RNG` contract). A few constraints worth calling
+out:
 
 - Relative imports inside `src/` carry explicit `.js` extensions — the repo
   typechecks under `moduleResolution: nodenext`, which rejects extensionless
